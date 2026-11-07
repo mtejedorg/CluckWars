@@ -349,13 +349,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenVFX
   _hitCount: 8
   _hitColor: {r: 1, g: 0.78, b: 0.2, a: 1}
-  _deathCount: 22
-  _deathColor: {r: 0.95, g: 0.3, b: 0.2, a: 1}
-  _stunColor: {r: 1, g: 0.96, b: 0.35, a: 1}
-  _stunOrbitRadius: 0.4
-  _stunHeadOffset: 1.75
+  _deathFeatherCount: 10
+  _deathDustCount: 6
+  _deathDustColor: {r: 0.98, g: 0.94, b: 0.84, a: 1}
   _depositCount: 12
   _depositColor: {r: 0.96, g: 0.78, b: 0.26, a: 1}
+  _particleMaterial: {fileID: 2100000, guid: 4f4f0f677149a144aaa502265c3fc50a, type: 2}
+  _dustSprite: {fileID: 21300000, guid: bff934c358c51874a98640e6c5a45acb, type: 3}
+  _sparkleSprite: {fileID: 21300000, guid: e27a09cd64decb744a00ef41e9518249, type: 3}
+  _featherSprites:
+  - {fileID: 21300000, guid: 3803ec29e2fa21e4fb66ea7d4a89349b, type: 3}
+  - {fileID: 21300000, guid: 6c388f524d83d9c47b0aa51ef1ffa7a0, type: 3}
+  - {fileID: 21300000, guid: f5e62cebb1aa08c41ab363049c7c3eb2, type: 3}
 --- !u!114 &3315600165271083367
 MonoBehaviour:
   m_ObjectHideFlags: 0

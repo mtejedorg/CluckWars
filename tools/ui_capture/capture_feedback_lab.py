@@ -1,7 +1,12 @@
 """Ability-feedback evidence: opens AbilityLab.unity, enters Play, equips loadouts and
 screenshots hold / cast / impact / aftermath for every active ability and state.
 
-Usage (Editor open, bridge up, not in Play mode): python tools/ui_capture/capture_feedback_lab.py [out_dir]
+Usage (Editor open, bridge up, not in Play mode): python tools/ui_capture/capture_feedback_lab.py [out_dir] [--only a,b]
+  --only <ability>[,<ability>]  runs only those abilities' shots plus the 00_rest frame. Names: steal, stun, shove, slow
+                                (loadout A), speed, jump, shield, hide (loadout B), peck (C), hunt (D, Assassin).
+                                Without the flag the whole run is unchanged.
+Every ability's sequence is also probed for particle counts (CluckWars.EditorTools.ParticleProbe): the peaks per ability,
+per chicken (live particles, ParticleSystem count) and for the whole scene, are written to <out_dir>/particles.txt.
 Note: Fusion tick timers ignore Time.timeScale, so the TimeScale calls only slow the visuals; the
 ability timings in capture.log are real-time. Shoot at timeScale 1 when frame timing matters."""
 import sys, os, time, json
@@ -9,7 +14,25 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
 
-OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
+ONLY = None
+_args = sys.argv[1:]
+if "--only" in _args:
+    _i = _args.index("--only")
+    if _i + 1 >= len(_args):
+        sys.exit("--only needs a value, e.g. --only steal")
+    ONLY = {n.strip().lower() for n in _args[_i + 1].split(",") if n.strip()}
+    _bad = ONLY - {"steal", "stun", "shove", "slow", "speed", "jump", "shield", "hide", "peck", "hunt"}
+    if _bad:
+        sys.exit("unknown --only ability: " + ",".join(sorted(_bad)))
+    del _args[_i:_i + 2]
+
+
+def want(*names):
+    """True when the full run is on, or any of the named abilities was asked for with --only."""
+    return ONLY is None or any(n in ONLY for n in names)
+
+
+OUT = os.path.abspath(_args[0]) if len(_args) > 0 else os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "Captures", "feedback-lab")
 os.makedirs(OUT, exist_ok=True)
 
@@ -40,15 +63,18 @@ public class FB {
   public static string RespawnAs(string cls) { Lab().RespawnPlayerAs((ChickenClass)System.Enum.Parse(typeof(ChickenClass), cls)); return "respawn " + cls; }
   public static string ResetDummies() { foreach (var d in Lab().Dummies) d.ResetNow("capture"); return "reset"; }
   public static string ClearCooldowns() { var l = Local(); for (int i = 0; i < 4; i++) l.Abilities.TriggerCooldown(i, 0.01f); return "cd cleared"; }
+  public static string ProbeBegin(string tag) { return CluckWars.EditorTools.ParticleProbe.Begin(tag); }
+  public static string ProbeEnd(string tag) { return CluckWars.EditorTools.ParticleProbe.End(); }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
     string self = "SELF ctrl=" + l.CurrentControlState + " stunned=" + l.IsStunned + " opacity=" + l.VisualOpacity.ToString("0.00") + " stealProof=" + l.IsStealProof + " cargo=" + l.Cargo.Cargo.ToString("0.0")
       + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0"))) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount;
     string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
     return self + " || " + oth + " ts=" + Time.timeScale; }
 }"""
-SIG = {"Res": ["w", "h"], "RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"]}
+SIG = {"Res": ["w", "h"], "RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"], "ProbeBegin": ["tag"], "ProbeEnd": ["tag"]}
 
 LOG = open(os.path.join(OUT, "capture.log"), "a", encoding="utf-8")
+PEAKS = {}   # ability tag -> the ParticleProbe line for its sequence (written to particles.txt)
 
 
 def log(*a):
@@ -77,8 +103,26 @@ def shot(name):
         log("  SHOT FAILED", name)
 
 
+def probe_begin(tag):
+    cs("ProbeBegin", tag)
+
+
+def probe_end(tag):
+    PEAKS[tag] = str(cs("ProbeEnd", tag))
+    log("  particles", tag, "|", PEAKS[tag])
+
+
+def write_particles():
+    with open(os.path.join(OUT, "particles.txt"), "w", encoding="utf-8") as f:
+        f.write("# live particle peaks per ability sequence (ParticleSystem.particleCount, sampled every Editor update)\n")
+        f.write("# caps: <= 64 live and <= 7 ParticleSystems per chicken, <= 400 for the arena (FeedbackTuning)\n")
+        for tag, line in PEAKS.items():
+            f.write(tag + ": " + line + "\n")
+
+
 def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
     log("==", tag, "slot", slot)
+    probe_begin(tag)
     cs("TimeScale", ts)
     log(" ", cs("Hold", str(slot)))
     time.sleep(0.7)
@@ -90,6 +134,7 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
         while time.time() - t0 < delay:
             time.sleep(0.05)
         shot(tag + "_" + suffix)
+    probe_end(tag)
     cs("TimeScale", "1")
     time.sleep(0.5)
     log(" ", cs("ResetDummies"))
@@ -143,49 +188,65 @@ def main():
     time.sleep(3)
     shot("00_rest")
     # Loadout A: the four targeted moves (every rival in range)
-    log(cs("Loadout", "Snatch", "WingSlam", "CluckShock", "FeatherAura"))
-    time.sleep(2)
-    shot("01_rest_loadoutA")
-    ability(0, "steal", after=((0.4, "3_impact"), (1.2, "4_after")))
-    ability(1, "stun", after=((0.4, "3_impact"), (1.5, "4_after"), (3.5, "5_late")))
-    ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
-    ability(3, "slow", after=((0.6, "3_impact"), (3.0, "4_after"), (7.0, "5_late")))
-    stun_then_slow("badges_stun_slow")
+    if want("steal", "stun", "shove", "slow"):
+        log(cs("Loadout", "Snatch", "WingSlam", "CluckShock", "FeatherAura"))
+        time.sleep(2)
+        shot("01_rest_loadoutA")
+        if want("steal"):
+            ability(0, "steal", after=((0.4, "3_impact"), (1.2, "4_after")))
+        if want("stun"):
+            ability(1, "stun", after=((0.4, "3_impact"), (1.5, "4_after"), (3.5, "5_late")))
+        if want("shove"):
+            ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
+        if want("slow"):
+            ability(3, "slow", after=((0.6, "3_impact"), (3.0, "4_after"), (7.0, "5_late")))
+        if ONLY is None:
+            stun_then_slow("badges_stun_slow")
     # Loadout B: the self moves
-    log(cs("Loadout", "SpeedBurst", "Shadowstep", "TurtleMode", "Invisibility"))
-    time.sleep(2)
-    shot("02_rest_loadoutB")
-    cs("Stick", "1", "0")
-    time.sleep(0.3)
-    ability(0, "speed", after=((0.6, "3_impact"), (2.5, "4_after")))
-    cs("Stick", "0", "0")
-    ability(1, "jump", after=((0.25, "3_impact"), (1.0, "4_after")))
-    cs("Stick", "0", "1")
-    time.sleep(0.2)
-    ability(2, "shield", after=((1.0, "3_walk"), (2.0, "4_walkend"), (4.5, "5_egg"), (7.5, "6_eggend"), (10.5, "7_over")))
-    cs("Stick", "0", "0")
-    ability(3, "hide", after=((0.8, "3_hidden"), (3.5, "4_mid"), (7.5, "5_end")))
+    if want("speed", "jump", "shield", "hide"):
+        log(cs("Loadout", "SpeedBurst", "Shadowstep", "TurtleMode", "Invisibility"))
+        time.sleep(2)
+        shot("02_rest_loadoutB")
+        if want("speed"):
+            cs("Stick", "1", "0")
+            time.sleep(0.3)
+            ability(0, "speed", after=((0.6, "3_impact"), (2.5, "4_after")))
+            cs("Stick", "0", "0")
+        if want("jump"):
+            ability(1, "jump", after=((0.25, "3_impact"), (1.0, "4_after")))
+        if want("shield"):
+            cs("Stick", "0", "1")
+            time.sleep(0.2)
+            ability(2, "shield", after=((1.0, "3_walk"), (2.0, "4_walkend"), (4.5, "5_egg"), (7.5, "6_eggend"), (10.5, "7_over")))
+            cs("Stick", "0", "0")
+        if want("hide"):
+            ability(3, "hide", after=((0.8, "3_hidden"), (3.5, "4_mid"), (7.5, "5_end")))
     # Loadout C: Peck on the Warrior (Death Mark needs the Assassin; separate pass)
-    log(cs("Loadout", "Peck", "WingSlam", "Snatch", "SpeedBurst"))
-    time.sleep(2)
-    ability(0, "peck", after=((0.5, "3_impact"), (1.5, "4_after")))
+    if want("peck"):
+        log(cs("Loadout", "Peck", "WingSlam", "Snatch", "SpeedBurst"))
+        time.sleep(2)
+        ability(0, "peck", after=((0.5, "3_impact"), (1.5, "4_after")))
     # Loadout D: the Assassin hunt (Death Mark). Paw marker + HUNT! pop on the hunter side.
-    log(cs("RespawnAs", "Assassin"))
-    wait_player("Assassin")
-    log(cs("Loadout", "MarkKill", "WingSlam", "Shadowstep", "Invisibility"))
-    time.sleep(2)
-    cs("TimeScale", "1")
-    log(" ", cs("Hold", "0"))
-    time.sleep(0.7)
-    shot("hunt_1_hold")
-    log(" ", cs("Release", "0"))
-    shot("hunt_2_cast")
-    time.sleep(3)
-    shot("hunt_3_live")
-    log(cs("ResetDummies"))
-    log(cs("RespawnAs", "Warrior"))
-    wait_player("Warrior")
-    cs("TimeScale", "1")
+    if want("hunt"):
+        log(cs("RespawnAs", "Assassin"))
+        wait_player("Assassin")
+        log(cs("Loadout", "MarkKill", "WingSlam", "Shadowstep", "Invisibility"))
+        time.sleep(2)
+        cs("TimeScale", "1")
+        probe_begin("hunt")
+        log(" ", cs("Hold", "0"))
+        time.sleep(0.7)
+        shot("hunt_1_hold")
+        log(" ", cs("Release", "0"))
+        shot("hunt_2_cast")
+        time.sleep(3)
+        shot("hunt_3_live")
+        probe_end("hunt")
+        log(cs("ResetDummies"))
+        log(cs("RespawnAs", "Warrior"))
+        wait_player("Warrior")
+        cs("TimeScale", "1")
+    write_particles()
     log("done:", cs("Info"))
 
 

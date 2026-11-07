@@ -93,8 +93,8 @@ namespace CluckWars.Visuals
         /// <summary>Particles in the caster's white hit-confirm spark (§3.2).</summary>
         private const int HitSparkCount = 10;
 
-        /// <summary>Particles in the execute feather burst (§3.4).</summary>
-        private const int FeatherBurstCount = 20;
+        /// <summary>Particles in the execute feather burst (§3.4). Shares the Feather family cap with the death feathers.</summary>
+        private const int FeatherBurstCount = 14;
 
         /// <summary>Cream-white feather colour — deliberately distinct from
         /// <see cref="ChickenVFX"/>'s red death burst, which it layers on top of: the red
@@ -180,8 +180,9 @@ namespace CluckWars.Visuals
 
         // ---- Particles --------------------------------------------------------
 
-        private ParticleSystem _sparkPS;
-        private ParticleSystem _featherPS;
+        // The sparks and feathers are emitted through the sibling ChickenVFX families (no systems of their own).
+        private ChickenVFX _vfx;
+        private ChickenVFX.FxEmit _sparkEmit, _featherEmit;
 
         // ---- Replicated one-shot baselines ------------------------------------
 
@@ -234,7 +235,7 @@ namespace CluckWars.Visuals
             _attribution   = new HitAttribution(FeedbackTuning.HitAttributionWindowSeconds);
 
             BuildMotionLines();
-            BuildParticles();
+            BuildParticleEmits();
         }
 
         public override void Spawned()
@@ -1118,7 +1119,7 @@ namespace CluckWars.Visuals
         /// </summary>
         private void HandleRemoval()
         {
-            _featherPS?.Play();
+            if (_vfx != null) _vfx.EmitFeathers(in _featherEmit, 0.7f);
 
             // Knocked out: the long buzz, on the victim's own peer (a decoy shares its caster's input authority).
             if (HasInputAuthority && _controller != null && !_controller.IsDecoy) _haptics?.Buzz(HapticKind.Stun);
@@ -1142,123 +1143,27 @@ namespace CluckWars.Visuals
         {
             CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.HitSpark);   // breadcrumb only
             if (HiddenVisibilityRules.IsHiddenFor(_controller)) return;   // A1: no spark on a hidden victim for a remote peer
-            _sparkPS?.Play();
+            if (_vfx != null) _vfx.EmitSparkles(in _sparkEmit, 0.9f);
         }
 
-        private void BuildParticles()
+        private void BuildParticleEmits()
         {
-            var mat = BuildParticleMaterial();
-            _sparkPS   = BuildSparkPS(mat);
-            _featherPS = BuildFeatherPS(mat);
-        }
-
-        /// <summary>URP unlit particles first, with the same fallback chain
-        /// <see cref="ChickenVFX"/> uses so this works without manual asset setup.</summary>
-        private static Material BuildParticleMaterial()
-        {
-            Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            if (sh == null) sh = Shader.Find("Particles/Standard Unlit");
-            if (sh == null) sh = Shader.Find("Legacy Shaders/Particles/Alpha Blended Premultiply");
-            return sh != null ? new Material(sh) : null;
-        }
-
-        private ParticleSystem MakePS(string goName, Vector3 localOffset, Material mat)
-        {
-            var go = new GameObject(goName);
-            go.transform.SetParent(transform, worldPositionStays: false);
-            go.transform.localPosition = localOffset;
-
-            var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.loop            = false;
-            main.playOnAwake     = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-
-            var rend = go.GetComponent<ParticleSystemRenderer>();
-            rend.renderMode   = ParticleSystemRenderMode.Billboard;
-            rend.sortingOrder = 3; // above ChickenVFX's bursts
-            if (mat != null) rend.material = mat;
-
-            return ps;
-        }
-
-        /// <summary>
-        /// §3.2's "brief white hit-spark at each victim". Short, fast, pure white — the
-        /// caster's confirmation, deliberately a different read from
-        /// <see cref="ChickenVFX"/>'s warm gold ability burst so "it connected" and "I cast
-        /// something" never look like the same event.
-        /// </summary>
-        private ParticleSystem BuildSparkPS(Material mat)
-        {
-            var ps = MakePS("VFX_HitConfirmSpark", new Vector3(0f, 0.9f, 0f), mat);
-            var main = ps.main;
-            main.startLifetime   = new ParticleSystem.MinMaxCurve(0.10f, 0.20f);
-            main.startSpeed      = new ParticleSystem.MinMaxCurve(3.0f, 6.0f);
-            main.startSize       = new ParticleSystem.MinMaxCurve(0.05f, 0.11f);
-            main.startColor      = Color.white;
-            main.gravityModifier = 0.6f;
-            main.maxParticles    = HitSparkCount * 2;
-
-            var em = ps.emission;
-            em.rateOverTime = 0;
-            em.SetBursts(new[] { new ParticleSystem.Burst(0f, HitSparkCount) });
-
-            var sh = ps.shape;
-            sh.enabled   = true;
-            sh.shapeType = ParticleSystemShapeType.Sphere;
-            sh.radius    = 0.16f;
-
-            AddFadeOut(ps);
-            return ps;
-        }
-
-        /// <summary>
-        /// §3.4's feather burst. Slow, floaty, cream — reads as feathers, and layers on top
-        /// of <see cref="ChickenVFX"/>'s existing sharp red death burst rather than
-        /// replacing it (that one is the impact, this one is the aftermath drifting down).
-        /// </summary>
-        private ParticleSystem BuildFeatherPS(Material mat)
-        {
-            var ps = MakePS("VFX_FeatherBurst", new Vector3(0f, 0.7f, 0f), mat);
-            var main = ps.main;
-            main.startLifetime   = new ParticleSystem.MinMaxCurve(0.70f, 1.30f);
-            main.startSpeed      = new ParticleSystem.MinMaxCurve(1.2f, 3.0f);
-            main.startSize       = new ParticleSystem.MinMaxCurve(0.10f, 0.20f);
-            main.startColor      = FeatherColor;
-            main.gravityModifier = 0.18f;   // barely falls — feathers hang
-            main.startRotation   = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-            main.maxParticles    = FeatherBurstCount * 2;
-
-            var em = ps.emission;
-            em.rateOverTime = 0;
-            em.SetBursts(new[] { new ParticleSystem.Burst(0f, FeatherBurstCount) });
-
-            var sh = ps.shape;
-            sh.enabled   = true;
-            sh.shapeType = ParticleSystemShapeType.Sphere;
-            sh.radius    = 0.35f;
-
-            // Air drag so they slow to a drift instead of flying away like sparks.
-            var vel = ps.limitVelocityOverLifetime;
-            vel.enabled = true;
-            vel.dampen  = 0.35f;
-            vel.limit   = new ParticleSystem.MinMaxCurve(0.6f);
-
-            AddFadeOut(ps);
-            return ps;
-        }
-
-        /// <summary>Alpha fade over the last 28% of each particle's life; RGB held so
-        /// <c>main.startColor</c> stays the tint. Mirrors <c>ChickenVFX.AddFadeOut</c>.</summary>
-        private static void AddFadeOut(ParticleSystem ps)
-        {
-            var col = ps.colorOverLifetime;
-            col.enabled = true;
-            var g = new Gradient();
-            g.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.72f), new GradientAlphaKey(0f, 1f) });
-            col.color = new ParticleSystem.MinMaxGradient(g);
+            _vfx = GetComponent<ChickenVFX>();
+            // §3.2: brief white hit-confirm spark at each victim. Short, fast, pure white: a different read from the warm
+            // gold ability burst, so "it connected" and "I cast something" never look like the same event.
+            _sparkEmit = new ChickenVFX.FxEmit
+            {
+                Count = HitSparkCount, Color = Color.white, SizeMin = 0.24f, SizeMax = 0.42f,
+                SpeedMin = 3.0f, SpeedMax = 6.0f, LifeMin = 0.10f, LifeMax = 0.20f,
+                Shape = ChickenVFX.FxShape.Sphere, Radius = 0.16f, Gravity = 0.6f,
+            };
+            // §3.4: slow, floaty, cream feathers: the aftermath drifting down, layered on the class-tint death feathers.
+            _featherEmit = new ChickenVFX.FxEmit
+            {
+                Count = FeatherBurstCount, Color = FeatherColor, SizeMin = 0.30f, SizeMax = 0.50f,
+                SpeedMin = 1.2f, SpeedMax = 3.0f, LifeMin = 0.70f, LifeMax = 1.30f,
+                Shape = ChickenVFX.FxShape.Sphere, Radius = 0.35f, Gravity = 0.18f, RandomRotation = true,
+            };
         }
 
         // ---- Small math helpers -----------------------------------------------

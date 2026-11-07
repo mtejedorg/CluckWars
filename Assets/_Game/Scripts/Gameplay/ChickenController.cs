@@ -134,6 +134,10 @@ namespace CluckWars.Gameplay
         /// </remarks>
         public const float SlowVfxFlagThreshold = 0.92f;
 
+        /// <summary>The colour the class tint gives the body (white until the class model is applied). Local presentation
+        /// value, never networked: VFX tint feathers with it.</summary>
+        public Color ClassBodyTint { get; private set; } = Color.white;
+
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
@@ -570,6 +574,7 @@ namespace CluckWars.Gameplay
                     // did not exist when ChickenVisuals.Awake built its renderer list.
                     visuals.SetModelRoot(modelRoot);
                     visuals.ApplyTint(entry.TintColor, entry.TintStrength);
+                    ClassBodyTint = Color.Lerp(Color.white, entry.TintColor, entry.TintStrength);   // presentation only: the colour the body wears (death feathers read it)
                     _log?.Debug(Source, $"Applied tint {entry.TintColor} at strength {entry.TintStrength:0.##} for class {Class}.");
                 }
 

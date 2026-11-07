@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Fx_Atlas
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 0
+      compressionQuality: 0
+      maxTextureSize: 0
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 1024
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 0
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 1
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 21300000, guid: ca01be55327e68c4891055c4ee0c5fc2, type: 3}
+    - {fileID: 21300000, guid: 4718adffb0e5289419459ab6ac57eb2b, type: 3}
+    - {fileID: 21300000, guid: bff934c358c51874a98640e6c5a45acb, type: 3}
+    - {fileID: 21300000, guid: bad365bc46535f247b29098a98eda257, type: 3}
+    - {fileID: 21300000, guid: 75d0508aa73a82140babdd42e3356a6c, type: 3}
+    - {fileID: 21300000, guid: 18c3464cda05c8547a7fe52d45208952, type: 3}
+    - {fileID: 21300000, guid: 3803ec29e2fa21e4fb66ea7d4a89349b, type: 3}
+    - {fileID: 21300000, guid: 6c388f524d83d9c47b0aa51ef1ffa7a0, type: 3}
+    - {fileID: 21300000, guid: f5e62cebb1aa08c41ab363049c7c3eb2, type: 3}
+    - {fileID: 21300000, guid: e27a09cd64decb744a00ef41e9518249, type: 3}
+    - {fileID: 21300000, guid: 9c61a67b793780c46a9128471aa1750b, type: 3}
+    - {fileID: 21300000, guid: 8a71458831d57e4428a1022add51d25a, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 6c388f524d83d9c47b0aa51ef1ffa7a0: 21300000
+    - bff934c358c51874a98640e6c5a45acb: 21300000
+    - ca01be55327e68c4891055c4ee0c5fc2: 21300000
+    - 8a71458831d57e4428a1022add51d25a: 21300000
+    - 3803ec29e2fa21e4fb66ea7d4a89349b: 21300000
+    - 75d0508aa73a82140babdd42e3356a6c: 21300000
+    - 9c61a67b793780c46a9128471aa1750b: 21300000
+    - f5e62cebb1aa08c41ab363049c7c3eb2: 21300000
+    - 18c3464cda05c8547a7fe52d45208952: 21300000
+    - bad365bc46535f247b29098a98eda257: 21300000
+    - e27a09cd64decb744a00ef41e9518249: 21300000
+    - 4718adffb0e5289419459ab6ac57eb2b: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 6c388f524d83d9c47b0aa51ef1ffa7a0, type: 3}
+  - {fileID: 21300000, guid: bff934c358c51874a98640e6c5a45acb, type: 3}
+  - {fileID: 21300000, guid: ca01be55327e68c4891055c4ee0c5fc2, type: 3}
+  - {fileID: 21300000, guid: 8a71458831d57e4428a1022add51d25a, type: 3}
+  - {fileID: 21300000, guid: 3803ec29e2fa21e4fb66ea7d4a89349b, type: 3}
+  - {fileID: 21300000, guid: 75d0508aa73a82140babdd42e3356a6c, type: 3}
+  - {fileID: 21300000, guid: 9c61a67b793780c46a9128471aa1750b, type: 3}
+  - {fileID: 21300000, guid: f5e62cebb1aa08c41ab363049c7c3eb2, type: 3}
+  - {fileID: 21300000, guid: 18c3464cda05c8547a7fe52d45208952, type: 3}
+  - {fileID: 21300000, guid: bad365bc46535f247b29098a98eda257, type: 3}
+  - {fileID: 21300000, guid: e27a09cd64decb744a00ef41e9518249, type: 3}
+  - {fileID: 21300000, guid: 4718adffb0e5289419459ab6ac57eb2b, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - Fx_Feather_2
+  - Fx_Dust
+  - Fx_AuraEdge
+  - Fx_Whiff
+  - Fx_Feather_1
+  - Fx_EggShard_2
+  - Fx_SpeedLine
+  - Fx_Feather_3
+  - Fx_EggShard_3
+  - Fx_EggShard_1
+  - Fx_Sparkle
+  - Fx_Corn
+  m_RenderDataMap: {}
+  m_Tag: Fx_Atlas
+  m_IsVariant: 0

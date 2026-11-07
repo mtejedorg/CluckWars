@@ -1443,5 +1443,16 @@ namespace CluckWars.Visuals
         /// collider and ease back over the next 0.18 s, which reads as the model detaching.
         /// </remarks>
         public const float JumpTravelMaxResidual = 14f;
+
+        // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
+
+        /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>
+        public const int ParticleSystemsPerChickenCap = 7;
+
+        /// <summary>Hard cap on live particles per chicken at the worst coincidence.</summary>
+        public const int ParticlesPerChickenCap = 64;
+
+        /// <summary>Hard cap on live particles across the arena (4 birds, piles, the Slow aura, egg opens).</summary>
+        public const int ParticlesPerArenaCap = 400;
     }
 }
