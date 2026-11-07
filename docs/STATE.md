@@ -11,6 +11,8 @@ what's shipped, what's in flight, and what's blocked on testing.
 | Item | Status | Commit | Notes |
 |---|---|---|---|
 | A1 hidden bird | done | `37729428` | `HiddenVisibilityRules.AlphaFor` over `IsFadedOpacity` gates buff ring, identity ring, cargo bar, nameplate, badges, ChickenVFX, HitFeedback flash/sparks/motion lines on remote peers; local bird floor 0.45 (`FeedbackTuning.LocalHiddenOpacityFloor`). Not gated yet: floating text at a hidden victim, removal feathers. Suite 2882/2882 |
+| A2 slow-immune preview | done | `145c8a36` | `AbilityBaseSO.IsEffectNullified` asks `IsSlowImmune` for slow-only effects (`TargetEffectIsOnlySlow`, derived from area effect / emitted control); preview + IMMUNE pop only, `WouldAffect` unchanged. Placed slow zones also grey a walker while the window is open. Suite 2885/2885 |
+| A3 thief shake | done | A3 commit | `CasterStealShakeMagnitude` 0.18 -> 0.08, duration 0.22 -> 0.15 s (below the victim 0.12 / 0.25 s, above the plain cast 0.06); `StealShakeTierTests` pins the tiers. Suite 2887/2887 |
 
 ## 🎨 2026-11-06 - Ability feedback, state cues and icons: design review + generated assets (`simplify-abilities`, design only, nothing implemented)
 

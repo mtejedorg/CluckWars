@@ -167,15 +167,22 @@ namespace CluckWars.Visuals
         public const float CasterMicroShakeDurationSeconds = 0.12f;
 
         /// <summary>
-        /// Caster's own micro-shake on a landed Steal cast — bigger than a plain
-        /// hit because cargo visibly changes hands. Matches the existing
-        /// <c>ChickenVFX</c> call site (0.18 mag / 0.22 s); reproduced for the same
-        /// reason as <see cref="CasterMicroShakeMagnitude"/>.
+        /// Caster's own shake on a landed Steal cast — a touch above a plain hit
+        /// (<see cref="CasterMicroShakeMagnitude"/>, 0.06) because cargo changes
+        /// hands, but kept BELOW the victim's shake (<see cref="VictimHitShakeMagnitude"/>,
+        /// 0.12, which the victim gets on cargo loss). Cut from 0.18 / 0.22 s to
+        /// 0.08 / 0.15 s by spec 2026-11-06 §4.1: at 0.18 the thief shook harder than
+        /// the bird being robbed, so the camera told the wrong player something
+        /// happened to them. Read by both <c>ChickenVFX</c> and <c>HitFeedback</c>.
         /// </summary>
-        public const float CasterStealShakeMagnitude = 0.18f;
+        public const float CasterStealShakeMagnitude = 0.08f;
 
-        /// <summary>Duration pair for <see cref="CasterStealShakeMagnitude"/>.</summary>
-        public const float CasterStealShakeDurationSeconds = 0.22f;
+        /// <summary>
+        /// Duration pair for <see cref="CasterStealShakeMagnitude"/>. 0.15 s (was 0.22 s),
+        /// shorter than the victim's <see cref="VictimHitShakeDurationSeconds"/> (0.25 s)
+        /// for the same §4.1 reason.
+        /// </summary>
+        public const float CasterStealShakeDurationSeconds = 0.15f;
 
         /// <summary>
         /// NEW tier: the victim's own shake on being hit by any landing ability that
