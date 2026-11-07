@@ -217,7 +217,9 @@ def main():
         if want("shield"):
             cs("Stick", "0", "1")
             time.sleep(0.2)
-            ability(2, "shield", after=((1.0, "3_walk"), (2.0, "4_walkend"), (4.5, "5_egg"), (7.5, "6_eggend"), (10.5, "7_over")))
+            # The Shield is a 1 s walk then a 2 s egg then the hatch (3 s run): frames land on walk, close, idle egg, jitter, hatch, over.
+            ability(2, "shield", after=((0.45, "3_walk"), (1.05, "4_walkend"), (2.0, "5_egg"), (2.75, "5b_egg_jitter"),
+                                        (3.1, "6_eggend"), (3.3, "6b_hatch"), (4.5, "7_over")))
             cs("Stick", "0", "0")
         if want("hide"):
             ability(3, "hide", after=((0.8, "3_hidden"), (3.5, "4_mid"), (7.5, "5_end")))

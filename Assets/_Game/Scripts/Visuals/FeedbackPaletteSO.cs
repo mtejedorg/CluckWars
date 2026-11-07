@@ -40,6 +40,8 @@ namespace CluckWars.Visuals
         public Color InkColor = new Color(0.165f, 0.102f, 0.047f, 1f);
         [Tooltip("#FEF5E0 cream: held-move fill, no-target stalk, Death Mark shelled marker.")]
         public Color CreamColor = new Color(0.996f, 0.961f, 0.878f, 1f);
+        [Tooltip("#F5C842 yolk gold: the Egg Shell hatch puff.")]
+        public Color YolkColor = new Color(0.961f, 0.784f, 0.259f, 1f);
 
         [Header("Ability accents (AccentKey)")]
         public Color StealAccent = new Color(1f, 0.3f, 0.1f, 1f);

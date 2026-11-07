@@ -1445,6 +1445,74 @@ namespace CluckWars.Visuals
         /// </remarks>
         public const float JumpTravelMaxResidual = 14f;
 
+        // ---- Egg Shell body (batch D2, vfx.md 1.2-1.5) -----------------------------------------------
+
+        /// <summary>World height of the egg at class scale 1 (the authored mesh is 1 m, so it is scaled by this x the egg scale).</summary>
+        public const float ShellEggBaseHeight = 1.22f;
+        /// <summary>The egg scale is <c>min(ClassScale, this)</c>: the Fatty egg tops out at 1.22 x 1.27 = 1.55 m (just under ShellEggTopMaxHeight).</summary>
+        public const float ShellEggScaleCap = 1.27f;
+        /// <summary>No class's egg may reach this height (m): the nameplate pill starts at about 1.48-1.55.</summary>
+        public const float ShellEggTopMaxHeight = 1.55f;
+        /// <summary>Walk: how much of the seated cup is risen around the legs, and how long it takes (ease-out-back).</summary>
+        public const float ShellWalkCupRise = 0.35f;
+        public const float ShellWalkRiseSeconds = 0.25f;
+        public const float ShellWalkRiseOvershoot = 1.06f;
+        public const float ShellWalkRiseReducedSeconds = 0.15f;
+        /// <summary>Walk waddle: roll amplitude (deg) and frequency, composed into the animator's bank. Reduced Motion: the smaller one.</summary>
+        public const float ShellWaddleDegrees = 6f;
+        public const float ShellWaddleReducedDegrees = 2f;
+        public const float ShellWaddleHz = 2.2f;
+        public const float ShellWaddleBlendSeconds = 0.10f;
+        /// <summary>Heel dust while walking: puffs per metre walked (Reduced Motion halves it), puff colour alpha, and where it spawns behind the feet.</summary>
+        public const float ShellWalkDustPerMeter = 2f;
+        public const float ShellWalkDustAlpha = 0.6f;
+        public const float ShellWalkDustBehind = 0.30f;
+        /// <summary>Close: the cap drops from this multiple of its seated height over the drop time, then the egg squashes.</summary>
+        public const float ShellCloseSeconds = 0.30f;
+        public const float ShellCloseDropSeconds = 0.18f;
+        public const float ShellCloseReducedSeconds = 0.15f;
+        public const float ShellCapDropFromScale = 1.6f;
+        public const float ShellSquashXZ = 1.08f;
+        public const float ShellSquashY = 0.90f;
+        public const float ShellSquashSeconds = 0.12f;
+        public const int ShellClosePuffs = 6;
+        public const float ShellClosePuffRadius = 0.30f;
+        public const float ShellReducedGrowFrom = 0.85f;
+        /// <summary>The bird shrinks uniformly to this inside the egg (eased over the close, back over the open) so tail and wings fit.</summary>
+        public const float ShellBodyScale = 0.82f;
+        /// <summary>Authored height of every class model (m at root scale 1: the 1.6 m capsule) and how far the comb may peek above the egg.</summary>
+        public const float ShellModelHeight = 1.6f;
+        public const float ShellBodyTopAllowance = 0.10f;
+        /// <summary>Identity ring at alpha 1.0 for this long on the close edge.</summary>
+        public const float ShellRingFlashSeconds = 0.20f;
+        /// <summary>Idle: wobble about the base, breathing, last-moments jitter.</summary>
+        public const float ShellWobbleDegrees = 3f;
+        public const float ShellWobbleHz = 1.8f;
+        public const float ShellBreathAmount = 0.015f;
+        public const float ShellBreathHz = 1f;
+        public const float ShellJitterDegrees = 1.5f;
+        public const float ShellJitterHz = 8f;
+        public const float ShellJitterSeconds = 0.30f;
+        /// <summary>Cracks: <c>_Crack = smoothstep(start, end, elapsed01)</c>, pushed at <see cref="StatusArcDrainUpdateHz"/>; an early end snaps it to the third value first.</summary>
+        public const float ShellCrackStart = 0.40f;
+        public const float ShellCrackEnd = 0.90f;
+        public const float ShellCrackOnEarlyEnd = 0.60f;
+        /// <summary>Open: the cap pops and tumbles, the cup sinks, then the burst.</summary>
+        public const float ShellOpenSeconds = 0.40f;
+        public const float ShellOpenReducedSeconds = 0.20f;
+        public const float ShellCapPopHeight = 0.6f;
+        public const float ShellCapPopSeconds = 0.35f;
+        public const float ShellCapTumbleDegrees = 20f;
+        public const float ShellCapDrift = 0.25f;
+        public const float ShellCapScaleOutSeconds = 0.10f;
+        public const float ShellCupSinkSeconds = 0.25f;
+        public const float ShellFoldSeconds = 0.15f;
+        public const int ShellShardCount = 3;
+        public const int ShellFeatherCount = 10;
+        public const int ShellYolkPuffs = 6;
+        public const float ShellYolkAlpha = 0.7f;
+        public const float ShellFeatherAlpha = 0.9f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

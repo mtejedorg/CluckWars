@@ -48,5 +48,12 @@ namespace CluckWars.Visuals
         /// as for post-processing.
         /// </summary>
         public static bool MobileBakedHazeFor(RenderPipelineAsset rpAsset) => !PcHazePassFor(rpAsset);
+
+        /// <summary>
+        /// The Egg Shell meshes cast and receive shadows on the PC tier only (vfx.md 0.2: "no shadow casting on the Mobile
+        /// tier"). Same keying as the other tier switches: an unknown or missing asset takes the cheap path.
+        /// </summary>
+        public static bool ShellShadowsFor(RenderPipelineAsset rpAsset) =>
+            rpAsset != null && rpAsset.name == PcRpAssetName;
     }
 }

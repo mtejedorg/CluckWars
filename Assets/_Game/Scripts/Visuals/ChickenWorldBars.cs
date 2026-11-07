@@ -56,6 +56,7 @@ namespace CluckWars.Visuals
         private int _appliedRingCorner = -2;
         private float _appliedHiddenAlpha = 1f; // HiddenVisibilityRules alpha baked into _ringBaseColor (A1)
         private Color _ringBaseColor = Color.white;
+        private float _flashUntil = -1f;    // Time.time the identity-ring flash ends (FlashIdentityRing)
         private float _youEmphasis;          // 0..1, GET READY "this is you" marker (YouMarkerRules)
         private bool _ringEmphasised;        // last frame wrote an emphasised scale/alpha
 
@@ -198,6 +199,7 @@ namespace CluckWars.Visuals
 
             RefreshRing(live, hiddenAlpha);
             RefreshYouMarker(live);
+            ApplyRingFlash(hiddenAlpha);
             GroundRingStyle.SyncGhost(_ring, _ringGhost, RingAlpha);
 
             bool stunned = _combat != null && _combat.IsRemoved;
@@ -259,6 +261,31 @@ namespace CluckWars.Visuals
                 float offsetX = -_barWidth * 0.5f + fillWidth * pivot.x;
                 fill.transform.localPosition = new Vector3(offsetX, fill.transform.localPosition.y, fill.transform.localPosition.z);
             }
+        }
+
+        /// <summary>The player identity colour of the ring (opaque), for presentation that must wear it (the Egg Shell stripe). Read-only.</summary>
+        public Color IdentityColor { get { var c = _ringBaseColor; c.a = 1f; return c; } }
+
+        /// <summary>
+        /// Holds the identity ring at alpha 1.0 for <paramref name="seconds"/>, then lets it fall back to its normal opacity-gated
+        /// value (the Egg Shell close beat). Local presentation only; a hidden remote bird (ring off) shows nothing.
+        /// </summary>
+        public void FlashIdentityRing(float seconds) => _flashUntil = Time.time + Mathf.Max(0f, seconds);
+
+        private void ApplyRingFlash(float hiddenAlpha)
+        {
+            if (_ring == null || _flashUntil < 0f) return;
+            if (Time.time < _flashUntil)
+            {
+                if (hiddenAlpha <= 0f) return;
+                var c = _ringBaseColor;
+                c.a = hiddenAlpha;
+                _ring.color = c;
+                _ringEmphasised = true;     // lets RefreshYouMarker restore the base colour if it was the last writer
+                return;
+            }
+            _flashUntil = -1f;
+            _ring.color = _ringBaseColor;    // back to the current opacity-gated value
         }
 
         private void RefreshRing(bool live, float hiddenAlpha)

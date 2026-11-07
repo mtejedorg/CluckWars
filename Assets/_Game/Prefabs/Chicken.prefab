@@ -35,6 +35,7 @@ GameObject:
   - component: {fileID: 778592323106949538}
   - component: {fileID: 1825375558777686298}
   - component: {fileID: 5276517656185694567}
+  - component: {fileID: 1629746130025582680}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -158,9 +159,6 @@ MonoBehaviour:
     _value: 0
   _LeaderBountyActive:
     _value: 0
-  _AuraSlowActive: 0
-  _AuraSlowRadius: 0
-  _AuraSlowFactor: 0
   _IsStunned: 0
   _VerticalVelocity: 0
 --- !u!95 &5731265523250509895
@@ -286,10 +284,12 @@ MonoBehaviour:
   _slot1: {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
   _slot2: {fileID: 11400000, guid: f2c3f98e23f645109023f309da56e7e3, type: 2}
   _slot3: {fileID: 0}
-  _ActiveSlot: 0
+  _LastCastSlot: 0
   _ChargingSlot: 0
   _LastCastHitCount: 0
   _LastCastEventId: 0
+  _PeckChainActive:
+    _value: 0
 --- !u!114 &9204612626180569764
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -319,6 +319,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenMatchStats
   _Kills: 0
   _FoodDeposited: 0
+  _StunsTaken: 0
 --- !u!114 &7853284419870734786
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -361,6 +362,10 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 3803ec29e2fa21e4fb66ea7d4a89349b, type: 3}
   - {fileID: 21300000, guid: 6c388f524d83d9c47b0aa51ef1ffa7a0, type: 3}
   - {fileID: 21300000, guid: f5e62cebb1aa08c41ab363049c7c3eb2, type: 3}
+  _shardSprites:
+  - {fileID: 21300000, guid: bad365bc46535f247b29098a98eda257, type: 3}
+  - {fileID: 21300000, guid: 75d0508aa73a82140babdd42e3356a6c, type: 3}
+  - {fileID: 21300000, guid: 18c3464cda05c8547a7fe52d45208952, type: 3}
 --- !u!114 &3315600165271083367
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -536,3 +541,17 @@ MonoBehaviour:
       Raw: 0
     Behaviour: 0
   _KillReady: 0
+--- !u!114 &1629746130025582680
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1781e8670c4563c48af93ddfcf3f5e5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenShellVisuals
+  _shellModel: {fileID: 919132149155446097, guid: df14afcaeda73ba48acef7e309c8101d, type: 3}
+  _shellMaterial: {fileID: 2100000, guid: 8ce3e65a68a92ab4e94add68008ec6bc, type: 2}

@@ -282,6 +282,18 @@ namespace CluckWars.Visuals
         /// </param>
         public void SetSkeletalActive(bool active) => _skeletalActive = active;
 
+        /// <summary>
+        /// Extra roll (degrees) composed into this animator's bank accumulator by another component (the Egg Shell waddle).
+        /// A plain value the owner rewrites each frame: the animator stays the only writer of the model transform.
+        /// </summary>
+        public float ExtraRollDegrees { get; set; }
+
+        /// <summary>
+        /// Uniform scale multiplier composed into the model's scale by another component (the Egg Shell shrinks the bird to fit
+        /// inside the egg). 1 = rest. The animator stays the only writer of the model transform.
+        /// </summary>
+        public float ExtraUniformScale { get; set; } = 1f;
+
         private void LateUpdate()
         {
             // A null model root means the class had no ModelPrefab. ChickenController.AttachClassModel
@@ -477,12 +489,12 @@ namespace CluckWars.Visuals
             // "forward" — no parent-space direction conversion needed. Banking rolls into the
             // turn the root is making.
             float pitch = _leanMaxDegrees * _smoothedSpeed01;
-            float roll  = -_bankMaxDegrees * _smoothedYawRate01;
+            float roll  = -_bankMaxDegrees * _smoothedYawRate01 + ExtraRollDegrees;
 
             // ---- The single write ----
             _modelRoot.localPosition = _restPosition + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
-            _modelRoot.localScale    = _restScale;
+            _modelRoot.localScale    = _restScale * ExtraUniformScale;
         }
 
         /// <summary>
@@ -518,6 +530,7 @@ namespace CluckWars.Visuals
             // Lean into movement, and bank into the turn.
             pitch += _leanMaxDegrees * moving * notStunned;
             roll  += -_bankMaxDegrees * _smoothedYawRate01 * notStunned;
+            roll  += ExtraRollDegrees * notStunned;
 
             // Hit: instant-on squash impulse with a quick recoil, decaying to nothing.
             if (_hitTimer > 0f)
@@ -566,9 +579,9 @@ namespace CluckWars.Visuals
             _modelRoot.localPosition = _restPosition + Vector3.up * riseY + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
             _modelRoot.localScale    = new Vector3(
-                _restScale.x * scaleXZ,
-                _restScale.y * scaleY,
-                _restScale.z * scaleXZ);
+                _restScale.x * scaleXZ * ExtraUniformScale,
+                _restScale.y * scaleY * ExtraUniformScale,
+                _restScale.z * scaleXZ * ExtraUniformScale);
         }
 
         private void UpdateSpeed(float dt)

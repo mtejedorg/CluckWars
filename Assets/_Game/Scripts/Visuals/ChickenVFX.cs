@@ -52,6 +52,8 @@ namespace CluckWars.Visuals
             public FxShape Shape;
             public float Radius;
             public float ConeAngle;
+            /// <summary>Cone only: the minimum tilt from <see cref="Axis"/> (0 = anywhere inside the cone), for a ring-shaped fan.</summary>
+            public float ConeMinAngle;
             public Vector3 Axis;
             public float Gravity;
             public bool RandomRotation;
@@ -87,6 +89,8 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite _sparkleSprite;
         [Tooltip("Fx_Feather_1..3: picked at random per particle.")]
         [SerializeField] private Sprite[] _featherSprites = new Sprite[0];
+        [Tooltip("Fx_EggShard_1..3: picked at random per particle (the Egg Shell hatch).")]
+        [SerializeField] private Sprite[] _shardSprites = new Sprite[0];
 
         // ---- Budget (maxParticles per family; sum = ParticlesPerChickenCap minus headroom) ----
 
@@ -94,12 +98,19 @@ namespace CluckWars.Visuals
         public const int DustMaxParticles = 12;
         /// <summary>Feather family cap: 10 death feathers + HitFeedback's 14-feather execute burst.</summary>
         public const int FeatherMaxParticles = 24;
-        /// <summary>Sparkle family cap: ability burst 16 + hit 8 + cargo ring (~7 live) + hit-confirm 10 rarely coincide.</summary>
-        public const int SparkleMaxParticles = 28;
+        /// <summary>
+        /// Sparkle family cap: ability burst 16 + hit 8 + cargo ring (~7 live) + hit-confirm 10 rarely coincide. Was 28; D2
+        /// took 3 for the Shard family so the four families still sum to the 64 per-chicken cap (the old cap was already
+        /// below that four-way coincidence, so the clip is the same rare, invisible case).
+        /// </summary>
+        public const int SparkleMaxParticles = 25;
+        /// <summary>Shard family cap: the three egg shards of a hatch (real gravity, spin).</summary>
+        public const int ShardMaxParticles = 3;
 
         public const string DustSystemName = "VFX_Dust";
         public const string FeatherSystemName = "VFX_Feather";
         public const string SparkleSystemName = "VFX_Sparkle";
+        public const string ShardSystemName = "VFX_Shard";
 
         /// <summary>Cargo-full ring: emitted from a ticking loop in LateUpdate while the bird is full.</summary>
         private const float CargoRingRate = 12f;
@@ -111,6 +122,7 @@ namespace CluckWars.Visuals
         public Sprite DustSprite => _dustSprite;
         public Sprite SparkleSprite => _sparkleSprite;
         public Sprite[] FeatherSprites => _featherSprites;
+        public Sprite[] ShardSprites => _shardSprites;
 
         private static Material s_sharedMaterial;
 
@@ -122,6 +134,7 @@ namespace CluckWars.Visuals
         private ParticleSystem _dustPS;
         private ParticleSystem _featherPS;
         private ParticleSystem _sparklePS;
+        private ParticleSystem _shardPS;
         private ParticleSystem.EmitParams _ep;   // cached: every emit rewrites it, nothing allocates
 
         // Effect presets built once from the serialized counts and colours.
@@ -160,6 +173,16 @@ namespace CluckWars.Visuals
             _dustPS    = BuildFamily(DustSystemName, mat, 2, DustMaxParticles, _dustSprite);
             _featherPS = BuildFamily(FeatherSystemName, mat, BodyFxSortingOrder, FeatherMaxParticles, _featherSprites);
             _sparklePS = BuildFamily(SparkleSystemName, mat, BodyFxSortingOrder, SparkleMaxParticles, _sparkleSprite);
+            _shardPS   = BuildFamily(ShardSystemName, mat, BodyFxSortingOrder, ShardMaxParticles, _shardSprites);
+
+            // Shards keep real gravity (the other families bake theirs into the launch velocity) and tumble: callers
+            // emit them with Gravity 0 and the system pulls them down.
+            var shardMain = _shardPS.main;
+            shardMain.gravityModifier = 1f;
+            var spin = _shardPS.rotationOverLifetime;
+            spin.enabled = true;
+            spin.separateAxes = false;
+            spin.z = new ParticleSystem.MinMaxCurve(-2f * Mathf.PI, 2f * Mathf.PI);   // radians/s: +-360 deg/s
 
             // Air drag so feathers slow to a drift instead of flying off like sparks.
             var vel = _featherPS.limitVelocityOverLifetime;
@@ -287,6 +310,9 @@ namespace CluckWars.Visuals
         /// <summary>Emits <paramref name="e"/> from the Sparkle family at <paramref name="height"/> on this chicken.</summary>
         public void EmitSparkles(in FxEmit e, float height) => Emit(_sparklePS, in e, FxPoint(height));
 
+        /// <summary>Emits <paramref name="e"/> from the Shard family (real gravity, spin) at the world point <paramref name="world"/>.</summary>
+        public void EmitShards(in FxEmit e, Vector3 world) => Emit(_shardPS, in e, world);
+
         /// <summary>World-position variants, for effects that are not centred on the chicken root.</summary>
         public void EmitDustAt(in FxEmit e, Vector3 world) => Emit(_dustPS, in e, world);
         public void EmitFeathersAt(in FxEmit e, Vector3 world) => Emit(_featherPS, in e, world);
@@ -308,7 +334,7 @@ namespace CluckWars.Visuals
                         Vector3 axis = e.Axis.sqrMagnitude > 0f ? e.Axis.normalized : Vector3.up;
                         var rot = Quaternion.FromToRotation(Vector3.up, axis);
                         offset = rot * new Vector3(d.x, 0f, d.y);
-                        float tilt = Random.Range(0f, e.ConeAngle) * Mathf.Deg2Rad;
+                        float tilt = Random.Range(Mathf.Min(e.ConeMinAngle, e.ConeAngle), e.ConeAngle) * Mathf.Deg2Rad;
                         float az = Random.Range(0f, Mathf.PI * 2f);
                         dir = rot * new Vector3(Mathf.Sin(tilt) * Mathf.Cos(az), Mathf.Cos(tilt), Mathf.Sin(tilt) * Mathf.Sin(az));
                         break;

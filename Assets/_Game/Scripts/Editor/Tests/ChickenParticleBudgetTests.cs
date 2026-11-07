@@ -110,12 +110,17 @@ namespace CluckWars.Tests
         {
             var names = _systems.Select(p => p.name).ToArray();
             CollectionAssert.AreEquivalent(
-                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName }, names,
-                "D1 families: Dust, Feather, Sparkle only (Streak/Kernel/Shard arrive with their items)");
+                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName }, names,
+                "D2 families: Dust, Feather, Sparkle, Shard (Streak/Kernel arrive with their items)");
             int total = _systems.Sum(p => p.main.maxParticles);
             Assert.LessOrEqual(total, FeedbackTuning.ParticlesPerChickenCap,
                 "sum of maxParticles over the families must stay within the per-chicken cap");
             Assert.AreEqual(2, _systems.Single(p => p.name == ChickenVFX.DustSystemName).GetComponent<ParticleSystemRenderer>().sortingOrder, "dust is the ground band");
+            var shard = _systems.Single(p => p.name == ChickenVFX.ShardSystemName);
+            Assert.AreEqual(ChickenVFX.BodyFxSortingOrder, shard.GetComponent<ParticleSystemRenderer>().sortingOrder, "shards are body-height FX");
+            Assert.AreEqual(3, shard.main.maxParticles, "the three egg shards");
+            Assert.AreEqual(1f, shard.main.gravityModifier.constant, "shards keep real gravity 1");
+            Assert.IsTrue(shard.rotationOverLifetime.enabled, "shards spin");
         }
 
         [Test]
