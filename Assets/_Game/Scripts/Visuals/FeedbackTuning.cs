@@ -548,6 +548,14 @@ namespace CluckWars.Visuals
         /// </summary>
         public const int StatusBadgeMaxRows = 3;
 
+        /// <summary>Height (world metres) of the state glyph sprite on a status badge row (feedback batch C3).
+        /// The row spacing is 0.11, so the glyph is a touch taller than the row pitch and rows overlap by their
+        /// transparent margins only.</summary>
+        public const float StatusBadgeGlyphSize = 0.13f;
+
+        /// <summary>Gap between a badge row's glyph sprite and its text.</summary>
+        public const float StatusBadgeGlyphGap = 0.02f;
+
         /// <summary>
         /// Peak alpha for the screen-edge vignette pulse on entering a control
         /// state (§5.3). 0.35 — strong enough to be felt as a distinct "something

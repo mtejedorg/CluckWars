@@ -1601,8 +1601,21 @@ namespace CluckWars.Input
                     Color c = StatusColor(data.Kind);
                     if (row.Glyph != null)
                     {
-                        row.Glyph.text = HudFeedbackStyle.GlyphFor(data.Kind);
-                        row.Glyph.style.color = c;
+                        // Sprite glyph when the kind has one (class paints the background image, no text, no
+                        // tint: the sprites are two-tone); text fallback otherwise.
+                        foreach (var state in StateGlyphStyle.All)
+                            row.Glyph.RemoveFromClassList(StateGlyphStyle.UssClassFor(state));
+                        string glyphClass = HudFeedbackStyle.GlyphClassFor(data.Kind);
+                        if (glyphClass != null)
+                        {
+                            row.Glyph.AddToClassList(glyphClass);
+                            row.Glyph.text = string.Empty;
+                        }
+                        else
+                        {
+                            row.Glyph.text = HudFeedbackStyle.GlyphFor(data.Kind);
+                            row.Glyph.style.color = c;
+                        }
                     }
                     if (row.Name != null)
                     {

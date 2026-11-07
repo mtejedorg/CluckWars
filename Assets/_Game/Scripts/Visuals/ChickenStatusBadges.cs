@@ -1,26 +1,35 @@
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
+using CluckWars.Logging;
+using CluckWars.UI;
 using UnityEngine;
+using Zenject;
 
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// The §5.1 status badge stack: one small icon per active control status, floating
-    /// above the nameplate with a numeric countdown, stacked vertically with the most
-    /// severe on top (stun &gt; root &gt; slow). Answers FEEDBACK.md §7 cases 17 ("which
-    /// control state"), 18 ("how long the state lasts") and 21 ("a rival's control state,
-    /// from range") with an exact number, where the depleting ring
-    /// (<see cref="ControlStateVFX"/>) answers the same questions approximately but from
-    /// much further away.
+    /// The §5.1 status badge stack: one small icon per active status, floating above the
+    /// nameplate with a numeric countdown where the state has one, stacked vertically with
+    /// the most severe on top (stun &gt; egg &gt; waddle &gt; hidden &gt; root &gt; slow &gt; speeding,
+    /// spec 2026-11-06 §5). Answers FEEDBACK.md §7 cases 17 ("which control state"), 18
+    /// ("how long the state lasts") and 21 ("a rival's control state, from range") with an exact
+    /// number, where the depleting ring (<see cref="ControlStateVFX"/>) answers the same
+    /// questions approximately but from much further away.
     /// </summary>
     /// <remarks>
     /// <b>Extends ART.md §6.10, does not replace it.</b> §6.10 already defines two
-    /// nameplate badges — 🌱 for root and 🐌 for slow — rendered inline in
-    /// <see cref="ChickenNameplate"/>'s label. Those stay exactly as they are: they are
-    /// the always-on, zero-cost "this chicken is not free" marker attached to the name.
-    /// This component adds the layer §6.10 never had, the one §5.1 asks for — a *stack*,
-    /// one row per simultaneously-active status, each carrying its own quantity (a
-    /// countdown for the timed states, a magnitude for slow). A rooted-and-slowed chicken
-    /// shows one §6.10 nameplate glyph and two badge rows.
+    /// nameplate badges (a root glyph and a slow glyph) rendered in <see cref="ChickenNameplate"/>.
+    /// Those stay: they are the always-on, zero-cost "this chicken is not free" marker attached
+    /// to the name. This component adds the layer §6.10 never had, the one §5.1 asks for — a
+    /// *stack*, one row per simultaneously-active status, each carrying its own quantity.
+    ///
+    /// <b>Sprites, not text glyphs (feedback batch C3).</b> Each row draws its state glyph with a
+    /// <see cref="SpriteRenderer"/> (billboarded with the stack, same sorting as the row text); the
+    /// word and the countdown stay <c>TextMesh</c>. The sprites are <c>[SerializeField]</c> fields
+    /// wired on <c>Chicken.prefab</c> (no Resources load); the text glyph is only the documented
+    /// fallback when a field is null, and that is logged once so a missing wiring is not silent.
+    /// Root has no sprite (no caster applies it any more), so it stays text.
     ///
     /// <b>Vertical band, and why this one.</b> The on-character stack is crowded:
     /// <list type="bullet">
@@ -35,10 +44,9 @@ namespace CluckWars.Visuals
     /// the stack is sized to fit inside it: bottom row at
     /// <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/>, growing upward by
     /// <see cref="FeedbackTuning.StatusBadgeRowSpacing"/>, capped at
-    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows. Badge glyphs are authored
-    /// deliberately smaller than the nameplate's so three rows still clear 2.05. In
-    /// practice the top row sits lower than that worst case, because the stack billboards
-    /// toward the camera and the iso view tilts its up-axis.
+    /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> rows. The worst case on one bird is
+    /// stun + slow + zoom (the egg refuses both controls, the waddle refuses slows), so three
+    /// rows stay enough.
     ///
     /// <b>Bottom-anchored, growing upward.</b> A single badge therefore always appears in
     /// the same place, right above the name, rather than hovering at the top of a band
@@ -46,34 +54,40 @@ namespace CluckWars.Visuals
     /// whatever height the stack currently has.
     ///
     /// <b>Local only.</b> Every value is observed from already-replicated state
-    /// (<c>ControlFlags</c>, <c>StunRemaining</c>, <c>RootRemaining</c>) in
-    /// <c>LateUpdate</c>. No RPCs, no new networked properties, nothing written.
+    /// (<c>ControlFlags</c>, <c>StunRemaining</c>, <c>RootRemaining</c>, the slot active mask and
+    /// timers, <c>IsControlImmune</c>, <c>VisualOpacity</c>) in <c>LateUpdate</c>. No RPCs, no new
+    /// networked properties, nothing written.
     ///
-    /// <b>Maestro:</b> add to the Chicken prefab alongside <see cref="ChickenNameplate"/>.
-    /// No Inspector wiring required.
+    /// <b>Maestro:</b> sprite fields are wired on the Chicken prefab (see the STATE entry).
     /// </remarks>
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenStatusBadges : MonoBehaviour
     {
+        private const string Source = "ChickenStatusBadges";
+
         /// <summary>
-        /// Glyphs, one per state. Kept as named constants because they are the single
-        /// thing here most likely to need swapping: <c>TextMesh</c> renders through the
-        /// built-in dynamic font, and a platform whose font lacks one of these will draw a
-        /// tofu box. ⚡ and 🐌 are already proven on this project (⚡ is new, 🐌 and ☠ ship
-        /// today in <see cref="ChickenNameplate"/>). ⛓ is the §1.3 shackle called for by
-        /// the spec; if a device fonts it as tofu, change this one const — 🌱 (the §6.10
-        /// root glyph) is the drop-in fallback.
-        ///
-        /// Stage 5 (§5.2's HUD status strip) shows the same three states on the local
-        /// player's touch HUD, and §5.1/§5.2 are explicitly one vocabulary — so these now
-        /// alias <see cref="CluckWars.UI.HudFeedbackStyle"/>'s consts (compile-time, no
-        /// runtime change) rather than holding their own copies. Swapping a tofu glyph
-        /// there fixes both the world-space badge and the HUD row in one edit, which is
-        /// the only way the two can be guaranteed never to drift apart.
+        /// Text fallbacks, used only when a state sprite field is null (see the class remarks).
+        /// They alias <see cref="CluckWars.UI.HudFeedbackStyle"/>'s consts so the HUD strip and the
+        /// world badge fall back to the same glyph.
         /// </summary>
         private const string StunGlyph = CluckWars.UI.HudFeedbackStyle.StunGlyph;
         private const string RootGlyph = CluckWars.UI.HudFeedbackStyle.RootGlyph;
         private const string SlowGlyph = CluckWars.UI.HudFeedbackStyle.SlowGlyph;
+
+        // State glyph sprites, one per StateGlyphStyle state a badge can draw. Field names are
+        // "_glyph" + the StateGlyph enum name: the wiring test derives the expected asset from that.
+        [SerializeField] private Sprite _glyphStunned;
+        [SerializeField] private Sprite _glyphSlowed;
+        [SerializeField] private Sprite _glyphShieldWalk;
+        [SerializeField] private Sprite _glyphShieldEgg;
+        [SerializeField] private Sprite _glyphHidden;
+        [SerializeField] private Sprite _glyphSpeeding;
+
+        /// <summary>Sorting order of the glyph sprite and the row text: 0, as shipped. At the shipped
+        /// heights (1.78-2.00) the stack overlaps the nameplate pill, which draws above it; raising the
+        /// order paints the rows over the name instead. Where the stack sits is an open layout decision
+        /// (feedback batch C3, STATE), so the order stays as shipped until it is made.</summary>
+        public const int SortingOrder = 0;
 
         /// <summary>Badge text size. About half the nameplate's characterSize (0.05) so
         /// three rows fit the 0.35-unit gap the layout budget allows — see the class
@@ -101,36 +115,52 @@ namespace CluckWars.Visuals
         /// </summary>
         private const float SlowMagnitudeEpsilon = 0.999f;
 
-        private enum Badge : byte { None = 0, Stun = 1, Root = 2, Slow = 3 }
+        /// <summary>The badge kinds, in no particular order (priority lives in <see cref="Collect"/>).
+        /// Values stay below 8 so the entry-punch mask fits a byte.</summary>
+        public enum Badge : byte { None = 0, Stun = 1, Root = 2, Slow = 3, Waddle = 4, Egg = 5, Hidden = 6, Speed = 7 }
 
         private ChickenController _controller;
+        private AbilityController _abilities;
+        private ILogService _log;
 
-        private Transform   _stackRoot;
-        private TextMesh[]  _rows;
-        private Transform[] _rowTransforms;
+        private Transform       _stackRoot;
+        private TextMesh[]      _rows;
+        private MeshRenderer[]  _rowRenderers;
+        private Transform[]     _rowTransforms;
+        private SpriteRenderer[] _glyphs;
 
         // Per-row cache so a text write only happens when the rendered string would
         // actually change — TextMesh writes rebuild the glyph mesh.
         private Badge[] _rowBadge;
         private int[]   _rowQuantity;
+        private bool[]  _rowHasGlyph;
 
         // Scratch for this frame's active set. Fixed size, never reallocated.
         private Badge[] _active;
         private float[] _value;
 
+        private readonly bool[] _warnedMissingSprite = new bool[8];
+
         private float _nextTextUpdate;
         private byte  _lastActiveMask;
         private float _punchTimer = -1f;
 
+        [Inject]
+        public void Construct(ILogService log) => _log = log;
+
         private void Awake()
         {
             _controller = GetComponent<ChickenController>();
+            _abilities  = GetComponent<AbilityController>();
 
             int rows = Mathf.Max(1, FeedbackTuning.StatusBadgeMaxRows);
             _rows          = new TextMesh[rows];
+            _rowRenderers  = new MeshRenderer[rows];
             _rowTransforms = new Transform[rows];
+            _glyphs        = new SpriteRenderer[rows];
             _rowBadge      = new Badge[rows];
             _rowQuantity   = new int[rows];
+            _rowHasGlyph   = new bool[rows];
             _active        = new Badge[rows];
             _value         = new float[rows];
 
@@ -157,11 +187,14 @@ namespace CluckWars.Visuals
                 go.transform.SetParent(_stackRoot, worldPositionStays: false);
                 _rowTransforms[i] = go.transform;
 
-                // Mirrors ChickenNameplate.BuildLabel exactly — same TextMesh path, same
-                // billboard, so the two never drift apart in look or in cost.
-                var text = go.AddComponent<TextMesh>();
-                text.anchor        = TextAnchor.MiddleCenter;
-                text.alignment     = TextAlignment.Center;
+                // Mirrors ChickenNameplate.BuildLabel — same TextMesh path, same billboard, so the two
+                // never drift apart in look or in cost. Left-anchored: the row lays the glyph and the
+                // text out side by side and centres the pair (LayoutRow).
+                var textGo = new GameObject("Text");
+                textGo.transform.SetParent(go.transform, worldPositionStays: false);
+                var text = textGo.AddComponent<TextMesh>();
+                text.anchor        = TextAnchor.MiddleLeft;
+                text.alignment     = TextAlignment.Left;
                 text.fontSize      = FontSize;
                 text.characterSize = CharacterSize;
                 text.fontStyle     = FontStyle.Bold;
@@ -169,12 +202,26 @@ namespace CluckWars.Visuals
                 text.color         = Color.white;
                 _rows[i] = text;
 
-                var mr = go.GetComponent<MeshRenderer>();
+                var mr = textGo.GetComponent<MeshRenderer>();
                 if (mr != null)
                 {
                     mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                     mr.receiveShadows    = false;
+                    mr.sortingOrder      = SortingOrder;
                 }
+                _rowRenderers[i] = mr;
+
+                // The state glyph. Shared sprite material (no per-instance material); the sprites are
+                // two-tone art, so the colour stays white and only a future alpha gate would touch it.
+                var glyphGo = new GameObject("Glyph");
+                glyphGo.transform.SetParent(go.transform, worldPositionStays: false);
+                var sr = glyphGo.AddComponent<SpriteRenderer>();
+                sr.sortingOrder      = SortingOrder;
+                sr.color             = Color.white;
+                sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                sr.receiveShadows    = false;
+                sr.enabled           = false;
+                _glyphs[i] = sr;
 
                 go.SetActive(false);
                 _rowBadge[i]    = Badge.None;
@@ -198,7 +245,8 @@ namespace CluckWars.Visuals
             // decoy badge honestly needs a decoy-side ControlFlags derivation, which is a
             // real feature, not a guard removal.
             var obj = _controller.Object;
-            // A1: a hidden bird (Hide / Smoke Roost) shows no badges to a remote peer; its owner keeps them.
+            // A1: a hidden bird (Hide / Smoke Roost) shows no badges to a remote peer; its owner keeps them
+            // (the HIDDEN row itself is the owner's own cue, see ShowHiddenRow).
             if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller))
             {
                 HideStack();
@@ -219,50 +267,138 @@ namespace CluckWars.Visuals
             BillboardToCamera();
         }
 
+        // ---- Pure rules (public static so the EditMode tests drive them without a runner) ----------
+
+        /// <summary>The state sprite a badge draws, or <c>false</c> when the badge has none and stays text (Root).</summary>
+        public static bool TryGlyphFor(Badge badge, out StateGlyphStyle.StateGlyph glyph)
+        {
+            switch (badge)
+            {
+                case Badge.Stun:   glyph = StateGlyphStyle.StateGlyph.Stunned;    return true;
+                case Badge.Slow:   glyph = StateGlyphStyle.StateGlyph.Slowed;     return true;
+                case Badge.Waddle: glyph = StateGlyphStyle.StateGlyph.ShieldWalk; return true;
+                case Badge.Egg:    glyph = StateGlyphStyle.StateGlyph.ShieldEgg;  return true;
+                case Badge.Hidden: glyph = StateGlyphStyle.StateGlyph.Hidden;     return true;
+                case Badge.Speed:  glyph = StateGlyphStyle.StateGlyph.Speeding;   return true;
+                default:           glyph = default;                               return false;
+            }
+        }
+
         /// <summary>
-        /// Fills <see cref="_active"/>/<see cref="_value"/> in severity order and returns
-        /// how many statuses are live. Presence always comes from the replicated
-        /// <c>ControlFlags</c> bits so a rival's badge is correct on every peer (case 21);
-        /// the *quantity* is looked up separately and may legitimately be unavailable, in
-        /// which case the row renders as a bare glyph rather than a wrong number.
+        /// The HIDDEN row is the owner's own cue (spec §5, "self only"): drawn when this is the input-authority
+        /// bird and its replicated <c>VisualOpacity</c> reads as faded. A remote peer never builds it (and
+        /// never sees the bird's badges at all, A1).
+        /// </summary>
+        public static bool ShowHiddenRow(bool isLocal, float visualOpacity) =>
+            isLocal && ControlStateVFX.IsFadedOpacity(visualOpacity);
+
+        /// <summary>
+        /// Fills <paramref name="into"/> with the live badges in stacking priority (spec §5: stunned, then egg,
+        /// waddle, hidden, then the legacy root, slow, and zoom last) and returns how many fit; extra states
+        /// beyond <c>into.Length</c> (the row cap) are dropped from the bottom of the priority.
+        /// </summary>
+        public static int Collect(bool stunned, bool rooted, bool slowed, bool shellActive, bool controlImmune,
+                                  bool hiddenRow, bool speeding, Badge[] into)
+        {
+            int n = 0;
+            void Add(bool on, Badge b) { if (on && n < into.Length) into[n++] = b; }
+
+            Add(stunned, Badge.Stun);
+            Add(shellActive && controlImmune, Badge.Egg);
+            Add(shellActive && !controlImmune, Badge.Waddle);
+            Add(hiddenRow, Badge.Hidden);
+            Add(rooted, Badge.Root);
+            Add(slowed, Badge.Slow);
+            Add(speeding, Badge.Speed);
+            return n;
+        }
+
+        /// <summary>
+        /// Seconds the Shield's current phase has left, from the slot run's remaining time: the egg runs to the
+        /// end of the slot, the walk ends when <paramref name="eggSeconds"/> remain (<see cref="ShieldRules"/>).
+        /// </summary>
+        public static float ShellPhaseSeconds(bool egg, float runRemaining, float eggSeconds) =>
+            egg ? Mathf.Max(0f, runRemaining) : Mathf.Max(0f, runRemaining - eggSeconds);
+
+        /// <summary>Centres a glyph + text pair on the row origin: x of the glyph centre and of the text's left edge.</summary>
+        public static void RowLayout(float glyphWidth, float gap, float textWidth, out float glyphX, out float textX)
+        {
+            float g = Mathf.Max(0f, glyphWidth);
+            float t = Mathf.Max(0f, textWidth);
+            float sep = g > 0f && t > 0f ? gap : 0f;
+            float left = -(g + sep + t) * 0.5f;
+            glyphX = left + g * 0.5f;
+            textX  = left + g + sep;
+        }
+
+        /// <summary>
+        /// Fills <see cref="_active"/>/<see cref="_value"/> in priority order and returns how many statuses are
+        /// live. Presence always comes from replicated state so a rival's badge is correct on every peer
+        /// (case 21); the *quantity* may legitimately be unavailable, in which case the row renders as a bare
+        /// glyph or word rather than a wrong number.
         ///
         /// A *removed* chicken (<c>ChickenCombat.IsRemoved</c>) deliberately gets no stun
         /// badge: removal runs on its own respawn clock, not the control-stun timer, and
-        /// it is already told unambiguously by the nameplate's ☠ and the §3.4 execute
-        /// treatment. Badging it would put a number-less ⚡ on a corpse.
+        /// it is already told unambiguously by the nameplate's skull and the §3.4 execute
+        /// treatment.
         /// </summary>
         private int CollectActive()
         {
             var flags = _controller.ControlFlags;
-            int n = 0;
 
-            if ((flags & ControlVfx.Stunned) != 0 && n < _active.Length)
-            {
-                _active[n] = Badge.Stun;
-                _value[n]  = _controller.StunRemaining;
-                n++;
-            }
-            if ((flags & ControlVfx.Rooted) != 0 && n < _active.Length)
-            {
-                _active[n] = Badge.Root;
-                _value[n]  = _controller.RootRemaining;
-                n++;
-            }
-            if ((flags & ControlVfx.Slowed) != 0 && n < _active.Length)
-            {
-                _active[n] = Badge.Slow;
-                // SlowMultiplier is recomputed StateAuthority-side every tick and reads as
-                // a flat 1 on every other peer. Rather than render "×1.00" on a chicken
-                // that is visibly slowed, a peer that cannot know the magnitude passes 0
-                // here and gets the bare glyph. Slow also has no deadline to count down
-                // to at all (see ChickenController.SlowMultiplier's remarks) — the
-                // magnitude *is* the number for this state, by design, not a fallback.
-                float m = _controller.SlowMultiplier;
-                _value[n] = m < SlowMagnitudeEpsilon ? m : 0f;
-                n++;
-            }
+            bool shell = false, speeding = false;
+            float shellRemaining = 0f, eggSeconds = 0f;
+            ReadAbilityState(ref shell, ref speeding, ref shellRemaining, ref eggSeconds);
+            bool immune = _controller.IsControlImmune;
 
+            int n = Collect((flags & ControlVfx.Stunned) != 0, (flags & ControlVfx.Rooted) != 0,
+                            (flags & ControlVfx.Slowed) != 0, shell, immune,
+                            ShowHiddenRow(_controller.HasInputAuthority, _controller.VisualOpacity), speeding, _active);
+
+            for (int i = 0; i < n; i++)
+            {
+                switch (_active[i])
+                {
+                    case Badge.Stun: _value[i] = _controller.StunRemaining; break;
+                    case Badge.Root: _value[i] = _controller.RootRemaining; break;
+                    case Badge.Slow:
+                        // SlowMultiplier is recomputed StateAuthority-side every tick and reads as a flat 1 on
+                        // every other peer. Rather than render a wrong number on a chicken that is visibly
+                        // slowed, a peer that cannot know the magnitude passes 0 and gets the bare glyph. Slow
+                        // also has no deadline (see ChickenController.SlowMultiplier's remarks).
+                        float m = _controller.SlowMultiplier;
+                        _value[i] = m < SlowMagnitudeEpsilon ? m : 0f;
+                        break;
+                    case Badge.Waddle:
+                    case Badge.Egg:
+                        _value[i] = ShellPhaseSeconds(_active[i] == Badge.Egg, shellRemaining, eggSeconds);
+                        break;
+                    default: _value[i] = 0f; break;
+                }
+            }
             return n;
+        }
+
+        /// <summary>Reads the Shield and Speed slots off the replicated active mask / timers. The Shield's
+        /// remaining run and egg length come from the slot timer and the ability asset, nothing hard-coded.</summary>
+        private void ReadAbilityState(ref bool shell, ref bool speeding, ref float shellRemaining, ref float eggSeconds)
+        {
+            if (_abilities == null) return;
+            var abilitiesObj = _abilities.Object;
+            if (abilitiesObj == null || !abilitiesObj.IsValid) return;
+
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+            {
+                if (!_abilities.IsSlotActive(i)) continue;
+                var ability = _abilities.GetSlot(i);
+                if (ability is SpeedBurstAbilitySO) speeding = true;
+                else if (ability is TurtleModeAbilitySO turtle)
+                {
+                    shell = true;
+                    eggSeconds = turtle.EggSeconds;
+                    shellRemaining = _abilities.ActiveRemaining01For(i) * turtle.ResolveActiveDuration(_controller);
+                }
+            }
         }
 
         /// <summary>
@@ -325,12 +461,97 @@ namespace CluckWars.Visuals
                 {
                     _rowBadge[i]    = badge;
                     _rowQuantity[i] = quantity;
-                    _rows[i].text   = Compose(badge, quantity);
-                    _rows[i].color  = ColorFor(badge);
+                    ApplyRow(i, badge, quantity);
                 }
 
                 if (!rowGo.activeSelf) rowGo.SetActive(true);
+                LayoutRow(i);
             }
+        }
+
+        /// <summary>Writes one row: the sprite (or, with none wired, the text fallback glyph) and the text.</summary>
+        private void ApplyRow(int i, Badge badge, int quantity)
+        {
+            Sprite sprite = SpriteFor(badge);
+            string text = Compose(badge, quantity);
+
+            if (sprite == null)
+            {
+                string fallback = FallbackGlyph(badge);
+                if (fallback.Length > 0)
+                {
+                    text = text.Length > 0 ? fallback + " " + text : fallback;
+                    WarnMissingSprite(badge);
+                }
+            }
+
+            _rowHasGlyph[i] = sprite != null;
+            var sr = _glyphs[i];
+            sr.sprite  = sprite;
+            sr.enabled = sprite != null;
+            if (sprite != null)
+            {
+                float h = sprite.bounds.size.y;
+                float s = h > 1e-4f ? FeedbackTuning.StatusBadgeGlyphSize / h : 1f;
+                sr.transform.localScale = new Vector3(s, s, 1f);
+            }
+
+            _rows[i].text  = text;
+            _rows[i].color = ColorFor(badge);
+        }
+
+        /// <summary>Centres the glyph + text pair on the row. The text width is the renderer's mesh bounds, which
+        /// settles one frame after a text write; a row's first frame is a one-frame approximation.</summary>
+        private void LayoutRow(int i)
+        {
+            float glyphW = _rowHasGlyph[i] ? FeedbackTuning.StatusBadgeGlyphSize : 0f;
+            var mr = _rowRenderers[i];
+            float textW = mr != null && _rows[i].text.Length > 0 ? mr.localBounds.size.x : 0f;
+            RowLayout(glyphW, FeedbackTuning.StatusBadgeGlyphGap, textW, out float gx, out float tx);
+            _glyphs[i].transform.localPosition = new Vector3(gx, 0f, 0f);
+            _rows[i].transform.localPosition = new Vector3(tx, 0f, 0f);
+        }
+
+        /// <summary>The wired sprite for a state glyph, or null when that field is unwired or the state has no field.
+        /// The nameplate reads the slow glyph through this, so there is one wiring point.</summary>
+        public Sprite SpriteFor(StateGlyphStyle.StateGlyph glyph)
+        {
+            switch (glyph)
+            {
+                case StateGlyphStyle.StateGlyph.Stunned:    return _glyphStunned;
+                case StateGlyphStyle.StateGlyph.Slowed:     return _glyphSlowed;
+                case StateGlyphStyle.StateGlyph.ShieldWalk: return _glyphShieldWalk;
+                case StateGlyphStyle.StateGlyph.ShieldEgg:  return _glyphShieldEgg;
+                case StateGlyphStyle.StateGlyph.Hidden:     return _glyphHidden;
+                case StateGlyphStyle.StateGlyph.Speeding:   return _glyphSpeeding;
+                default:                                    return null;
+            }
+        }
+
+        private Sprite SpriteFor(Badge badge) =>
+            TryGlyphFor(badge, out var glyph) ? SpriteFor(glyph) : null;
+
+        /// <summary>Text glyph drawn only when the badge's sprite field is null. Empty when the badge has none
+        /// (Root prints its own text glyph in <see cref="Compose"/>; the new states are covered by their word).</summary>
+        private static string FallbackGlyph(Badge badge)
+        {
+            switch (badge)
+            {
+                case Badge.Stun: return StunGlyph;
+                case Badge.Slow: return SlowGlyph;
+                default:         return string.Empty;
+            }
+        }
+
+        private void WarnMissingSprite(Badge badge)
+        {
+            int k = (int)badge;
+            if (_warnedMissingSprite[k]) return;
+            _warnedMissingSprite[k] = true;
+
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            _log?.Warn(Source, $"No state glyph sprite wired for the {badge} badge on {name}; drawing the text fallback. " +
+                               "Re-wire the _glyph* fields on Chicken.prefab.");
         }
 
         /// <summary>Reduces a raw value to the integer the label actually shows, so the
@@ -342,30 +563,44 @@ namespace CluckWars.Visuals
             return badge == Badge.Slow ? 1 : Mathf.CeilToInt(value * 10f);
         }
 
+        /// <summary>The row text without a glyph: a countdown, a word, both, or nothing. Root keeps its text
+        /// glyph (it has no sprite).</summary>
         private static string Compose(Badge badge, int quantity)
         {
+            string secs = quantity > 0 ? CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : string.Empty;
             switch (badge)
             {
                 case Badge.Stun:
-                    return quantity > 0 ? StunGlyph + CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : StunGlyph;
+                    return secs;
                 case Badge.Root:
-                    return quantity > 0 ? RootGlyph + " " + CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : RootGlyph;
+                    return quantity > 0 ? RootGlyph + " " + secs : RootGlyph;
                 case Badge.Slow:
                     // Icon only: slow has no deadline and a x0.45 means nothing to a kid (Phase 7 A12).
-                    return SlowGlyph;
+                    return string.Empty;
+                case Badge.Waddle: return WordWithCountdown(UiText.Get(UiKeys.HudBadgeWaddle), secs);
+                case Badge.Egg:    return WordWithCountdown(UiText.Get(UiKeys.HudBadgeEgg), secs);
+                case Badge.Hidden: return UiText.Get(UiKeys.HudBadgeHidden);
+                case Badge.Speed:  return UiText.Get(UiKeys.HudBadgeFast);
                 default:
                     return string.Empty;
             }
         }
 
+        private static string WordWithCountdown(string word, string secs) =>
+            secs.Length > 0 ? word + " " + secs : word;
+
         private static Color ColorFor(Badge badge)
         {
             switch (badge)
             {
-                case Badge.Stun: return FeedbackTuning.CanonicalStunColor;
-                case Badge.Root: return FeedbackTuning.CanonicalRootColor;
-                case Badge.Slow: return FeedbackTuning.CanonicalSlowColor;
-                default:         return Color.white;
+                case Badge.Stun:   return FeedbackTuning.CanonicalStunColor;
+                case Badge.Root:   return FeedbackTuning.CanonicalRootColor;
+                case Badge.Slow:   return FeedbackTuning.CanonicalSlowColor;
+                case Badge.Waddle:
+                case Badge.Egg:    return FeedbackPalette.Current.Accent(AccentKey.EggShell);
+                case Badge.Hidden: return FeedbackPalette.Current.Accent(AccentKey.Hide);
+                case Badge.Speed:  return FeedbackPalette.Current.Accent(AccentKey.Speed);
+                default:           return Color.white;
             }
         }
 

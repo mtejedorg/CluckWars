@@ -97,6 +97,7 @@ namespace CluckWars.UI
         /// All three are confirmed present in that font's cmap. Noto Emoji is monochrome,
         /// so each row still tints to its canonical <c>FeedbackTuning</c> colour.
         /// </summary>
+        // Text fallback only: the HUD strip draws sprites via StateGlyphStyle (see GlyphClassFor); the text is used when a kind has none (Root).
         public const string StunGlyph = "⚡";        // HIGH VOLTAGE SIGN
         public const string RootGlyph = "⛓";        // CHAINS
         public const string SlowGlyph = "\U0001F40C";    // SNAIL
@@ -186,8 +187,30 @@ namespace CluckWars.UI
             }
         }
 
-        /// <summary>Glyph for a strip row, or the empty string for
-        /// <see cref="HudStatusKind.None"/>.</summary>
+        /// <summary>
+        /// The <see cref="StateGlyphStyle.StateGlyph"/> sprite a strip row draws for
+        /// <paramref name="kind"/>, or <c>false</c> when the kind has no sprite and the row falls
+        /// back to the text glyph (<see cref="GlyphFor"/>). Root has no sprite: no caster applies
+        /// it after the ability merge, so none was drawn (feedback spec section 7).
+        /// </summary>
+        public static bool TryGlyphStateFor(HudStatusKind kind, out StateGlyphStyle.StateGlyph state)
+        {
+            switch (kind)
+            {
+                case HudStatusKind.Stun: state = StateGlyphStyle.StateGlyph.Stunned; return true;
+                case HudStatusKind.Slow: state = StateGlyphStyle.StateGlyph.Slowed;  return true;
+                default:                 state = default;                            return false;
+            }
+        }
+
+        /// <summary>USS class painting the sprite for a strip row (<c>cw-status-glyph--&lt;state&gt;</c>),
+        /// or <c>null</c> when the kind has no sprite and uses the text fallback.</summary>
+        public static string GlyphClassFor(HudStatusKind kind) =>
+            TryGlyphStateFor(kind, out var state) ? StateGlyphStyle.UssClassFor(state) : null;
+
+        /// <summary>Text glyph for a strip row, or the empty string for
+        /// <see cref="HudStatusKind.None"/>. Only the text FALLBACK: a kind with a sprite
+        /// (<see cref="GlyphClassFor"/> non-null) shows the sprite and no text.</summary>
         public static string GlyphFor(HudStatusKind kind)
         {
             switch (kind)

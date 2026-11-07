@@ -445,6 +445,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e03842b881806c4bb6ff873b48458d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenStatusBadges
+  _glyphStunned: {fileID: 21300000, guid: 08effe4a68be27a4d82819c791472517, type: 3}
+  _glyphSlowed: {fileID: 21300000, guid: 1ed07032982081e4e9180bc2ad0d7ea3, type: 3}
+  _glyphShieldWalk: {fileID: 21300000, guid: cd8e36bbc2e526d47bfdb7bd5323cc42, type: 3}
+  _glyphShieldEgg: {fileID: 21300000, guid: 66532c0c4de444e43a21bc172770ce4b, type: 3}
+  _glyphHidden: {fileID: 21300000, guid: c7c3936b0b4b5c948a0e4e8309e5a7e1, type: 3}
+  _glyphSpeeding: {fileID: 21300000, guid: 29353a08ea02f6c45b13f3a9c8581fb6, type: 3}
 --- !u!114 &3035928202790050528
 MonoBehaviour:
   m_ObjectHideFlags: 0

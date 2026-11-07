@@ -379,6 +379,29 @@
     -unity-text-align: middle-center;
     color: rgb(254, 245, 224);
 }
+/* Sprite glyph rows (feedback batch C3): the row's glyph element carries one of these classes (set by the
+   controller from HudFeedbackStyle.GlyphClassFor) and draws the state sprite from StateGlyphStyle; the text glyph
+   above stays as the fallback for a kind with no sprite (Root). 28 px sprite centred in the same 46 px slot. */
+.cw-status-glyph--stunned, .cw-status-glyph--slowed, .cw-status-glyph--knocked-back, .cw-status-glyph--shield-walk,
+.cw-status-glyph--shield-egg, .cw-status-glyph--hidden, .cw-status-glyph--speeding, .cw-status-glyph--hunting,
+.cw-status-glyph--safe, .cw-status-glyph--peck-chain, .cw-status-glyph--marked {
+    width: 28px; height: 28px;
+    margin-left: 9px; margin-right: 9px;
+    align-self: center;
+    -unity-background-scale-mode: scale-to-fit;
+}
+.cw-status-glyph--stunned { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Stunned.png"); }
+.cw-status-glyph--slowed { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Slowed.png"); }
+.cw-status-glyph--knocked-back { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_KnockedBack.png"); }
+.cw-status-glyph--shield-walk { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_ShieldWalk.png"); }
+.cw-status-glyph--shield-egg { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_ShieldEgg.png"); }
+.cw-status-glyph--hidden { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Hidden.png"); }
+.cw-status-glyph--speeding { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Speeding.png"); }
+.cw-status-glyph--hunting { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Hunting.png"); }
+.cw-status-glyph--safe { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Safe.png"); }
+.cw-status-glyph--peck-chain { background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_PeckChain.png"); }
+.cw-status-glyph--marked { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Skull.png"); }
+
 /* 28px = 12 sp, the same floor the hex short-label was raised to in the
    2026-07-23 Android pass. Nothing in this sheet goes below it. */
 .cw-status-name {

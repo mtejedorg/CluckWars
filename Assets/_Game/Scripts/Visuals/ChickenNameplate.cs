@@ -41,6 +41,8 @@ namespace CluckWars.Visuals
         // Rival pill: dot diameter as a share of the text height, and the gap between dot and text, world units.
         private const float RivalDotScale = 0.78f;
         private const float RivalDotGap = 0.09f;
+        // The slow glyph sprite height as a share of the text height.
+        private const float SlowGlyphHeightScale = 1.1f;
         private static Sprite _pillSprite;
         private static Sprite _rivalPillSprite;
         private static Sprite _dotSprite;
@@ -55,6 +57,8 @@ namespace CluckWars.Visuals
         private SpriteRenderer _rivalPill;
         private SpriteRenderer _rivalDotRing;
         private SpriteRenderer _rivalDot;
+        private SpriteRenderer _slowGlyph;      // the slow state sprite, right of the name (feedback batch C3)
+        private ChickenStatusBadges _badges;    // owner of the wired state sprites
 
         private int  _appliedPlayerId  = -2;
         private ChickenClass _appliedClass;
@@ -64,6 +68,8 @@ namespace CluckWars.Visuals
         private bool _appliedBountyActive;
         private bool _wasStunned;
         private string _appliedStateIcon = string.Empty;
+        private bool _appliedSlowGlyph;
+        private bool _slowGlyphWanted;   // set by StateIcon: the slow sprite replaces the emoji
         private float _youEmphasis;   // 0..1, GET READY "this is you" marker (YouMarkerRules)
         private float _headLift;      // root-local metres added above _offset for a taller class model (Phase 8 D6)
 
@@ -107,6 +113,7 @@ namespace CluckWars.Visuals
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
+            _badges     = GetComponent<ChickenStatusBadges>();
             _rivalIndicator = GetComponent<RivalIndicator>();   // absent: the label never hides for the HUD
             BuildLabel();
         }
@@ -161,6 +168,10 @@ namespace CluckWars.Visuals
             _rivalDotRing = AddSprite(_textTransform, "RivalDotRing", DotSprite(), 2, SpriteDrawMode.Simple);
             _rivalDotRing.color = PlayerPalette.RivalPillRim;
             _rivalDot = AddSprite(_textTransform, "RivalDot", DotSprite(), 3, SpriteDrawMode.Simple);
+
+            // The slow state glyph, drawn right of the name inside the pill (a sprite, not an emoji; the sprite is
+            // wired on ChickenStatusBadges). One order above the text (set in FitMarks) so it never hides under the pill.
+            _slowGlyph = AddSprite(_textTransform, "SlowGlyph", null, RivalTextOrder + 1, SpriteDrawMode.Simple);
         }
 
         private static SpriteRenderer AddSprite(Transform parent, string name, Sprite sprite, int order, SpriteDrawMode mode)
@@ -211,6 +222,7 @@ namespace CluckWars.Visuals
             if (isNowStunned)
             {
                 ShowMarks(false, false, Color.clear);
+                if (_slowGlyph != null) _slowGlyph.enabled = false;
                 _text.text  = "☠";
                 _text.color = new Color(0.75f, 0.20f, 0.20f, 0.85f);
                 BillboardToCamera();
@@ -227,9 +239,11 @@ namespace CluckWars.Visuals
                 bool isBot = _controller.IsBot;
                 bool bountyActive = _controller.LeaderBountyActive;
                 string stateIcon = StateIcon();
+                bool slowGlyph = _slowGlyphWanted;
                 if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass
                     || isLocal != _appliedLocal || isBot != _appliedBot
-                    || bountyActive != _appliedBountyActive || stateIcon != _appliedStateIcon)
+                    || bountyActive != _appliedBountyActive || stateIcon != _appliedStateIcon
+                    || slowGlyph != _appliedSlowGlyph)
                 {
                     _appliedPlayerId = corner;
                     _appliedClass = klass;
@@ -238,6 +252,7 @@ namespace CluckWars.Visuals
                     _appliedBot = isBot;
                     _appliedBountyActive = bountyActive;
                     _appliedStateIcon = stateIcon;
+                    _appliedSlowGlyph = slowGlyph;
 
                     // No corner yet (spawn not stamped): the class is all there is to say.
                     string label = corner < 0
@@ -305,12 +320,30 @@ namespace CluckWars.Visuals
             if (size.x <= 0f || size.y <= 0f) size = new Vector2(0.6f, 0.3f);   // mesh not built yet: a "You"-sized pill
             var centre = new Vector3(_textRenderer.localBounds.center.x, _textRenderer.localBounds.center.y, 0.01f);
 
+            // Room on the right for the slow glyph sprite: as tall as the text, one small gap away from it.
+            float glyphW = 0f, glyphGap = 0f;
+            if (_slowGlyph != null)
+            {
+                _slowGlyph.enabled = _slowGlyphWanted && _slowGlyph.sprite != null;
+                _slowGlyph.sortingOrder = _textRenderer.sortingOrder + 1;   // one above the text, rival or local
+                if (_slowGlyph.enabled)
+                {
+                    glyphW = size.y * SlowGlyphHeightScale;
+                    glyphGap = RivalDotGap * 0.5f;
+                    float sh = _slowGlyph.sprite.bounds.size.y;
+                    float sc = sh > 1e-4f ? glyphW / sh : 1f;
+                    _slowGlyph.transform.localScale = new Vector3(sc, sc, 1f);
+                    _slowGlyph.transform.localPosition = new Vector3(centre.x + size.x * 0.5f + glyphGap + glyphW * 0.5f, centre.y, 0.005f);
+                }
+            }
+            float glyphExtra = glyphW > 0f ? glyphW + glyphGap : 0f;
+
             if (isLocal)
             {
                 if (_youPill == null) return;
-                _youPill.size = size + YouPillPadding * 2f;
-                _youPill.transform.localPosition = centre;
-                _plateCentreLocal = centre;
+                _youPill.size = size + new Vector2(glyphExtra, 0f) + YouPillPadding * 2f;
+                _youPill.transform.localPosition = centre + Vector3.right * (glyphExtra * 0.5f);
+                _plateCentreLocal = _youPill.transform.localPosition;
                 _plateHalfSize = _youPill.size * 0.5f;
                 return;
             }
@@ -318,8 +351,8 @@ namespace CluckWars.Visuals
             if (_rivalPill == null) return;
             float dot = size.y * RivalDotScale;
             float extra = dot + RivalDotGap;               // room on the left for the dot
-            _rivalPill.size = new Vector2(size.x + extra, size.y) + YouPillPadding * 2f;
-            _rivalPill.transform.localPosition = centre + Vector3.left * (extra * 0.5f);
+            _rivalPill.size = new Vector2(size.x + extra + glyphExtra, size.y) + YouPillPadding * 2f;
+            _rivalPill.transform.localPosition = centre + Vector3.left * ((extra - glyphExtra) * 0.5f);
             _plateCentreLocal = _rivalPill.transform.localPosition;
             _plateHalfSize = _rivalPill.size * 0.5f;
             var dotPos = new Vector3(centre.x - size.x * 0.5f - RivalDotGap - dot * 0.5f, centre.y, 0.005f);
@@ -403,12 +436,20 @@ namespace CluckWars.Visuals
         /// </summary>
         private string StateIcon()
         {
+            _slowGlyphWanted = false;
             if (_controller == null) return string.Empty;
             if (_controller.Rooted) return "🌱";
 
             bool slowed = _controller.SlowMultiplier < 0.999f
                           || (_cargo != null && _cargo.IsPileSlow);
-            return slowed ? "🐌" : string.Empty;
+            if (!slowed) return string.Empty;
+
+            // Sprite when the badges component carries one; the emoji is the fallback (the badge row logs the
+            // missing wiring once, ChickenStatusBadges.WarnMissingSprite).
+            var slowSprite = _badges != null ? _badges.SpriteFor(StateGlyphStyle.StateGlyph.Slowed) : null;
+            _slowGlyphWanted = slowSprite != null;
+            if (_slowGlyphWanted && _slowGlyph != null) _slowGlyph.sprite = slowSprite;
+            return _slowGlyphWanted ? string.Empty : "🐌";
         }
 
         private void BillboardToCamera()

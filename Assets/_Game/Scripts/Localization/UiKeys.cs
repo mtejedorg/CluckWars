@@ -275,6 +275,11 @@ namespace CluckWars.Localization
         public const string HudStatusStun = "hud.status.stun";
         public const string HudStatusStuck = "hud.status.stuck";
         public const string HudStatusSlow = "hud.status.slow";
+        /// <summary>World-space status badge words (feedback batch C3). Separate from the self-pop keys: those are only for the self-pop path.</summary>
+        public const string HudBadgeWaddle = "hud.badge.waddle";
+        public const string HudBadgeEgg = "hud.badge.egg";
+        public const string HudBadgeHidden = "hud.badge.hidden";
+        public const string HudBadgeFast = "hud.badge.fast";
         public const string HudHintHoldTouch = "hud.hint.hold.touch";
         public const string HudHintHoldPad = "hud.hint.hold.pad";
         public const string HudHintHoldKeys = "hud.hint.hold.keys";

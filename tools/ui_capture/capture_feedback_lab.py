@@ -21,6 +21,11 @@ public class FB {
   static IEnumerable<ChickenController> Others() { var l = Local(); return ChickenController.ActiveControllers.Where(k => k != null && k != l && k.Object != null && k.Object.IsValid); }
   public static string Open() { UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/_Game/Scenes/AbilityLab.unity", UnityEditor.SceneManagement.OpenSceneMode.Single); return "opened"; }
   public static string Play() { UnityEditor.EditorApplication.isPlaying = true; return "play"; }
+  static object GV(out System.Reflection.PropertyInfo p) { var t = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.GameView"); p = t.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic); return UnityEditor.EditorWindow.GetWindow(t); }
+  public static string Res(string w, string h) { PropertyInfo p; var gv = GV(out p);
+    if (w == "0") { int idx = UnityEditor.SessionState.GetInt("fb_gv_idx", -1); if (idx >= 0) p.SetValue(gv, idx); return "res restored idx=" + idx; }
+    UnityEditor.SessionState.SetInt("fb_gv_idx", (int)p.GetValue(gv));
+    UnityEditor.PlayModeWindow.SetCustomRenderingResolution(uint.Parse(w), uint.Parse(h), "capture"); return "res " + w + "x" + h; }
   public static string Stop() { UnityEditor.EditorApplication.isPlaying = false; return "stop"; }
   public static string State() { var lab = Lab(); var l = Local(); return "playing=" + Application.isPlaying + " lab=" + (lab != null) + " player=" + (l != null) + (l != null ? " class=" + l.Class + " ctrl=" + l.CurrentControlState : "") + " others=" + Others().Count(); }
   public static string Loadout(string a, string b, string c, string d) { var lab = Lab(); lab.IgnoreLegality = true; lab.DummyResetSeconds = 120f;
@@ -41,7 +46,7 @@ public class FB {
     string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
     return self + " || " + oth + " ts=" + Time.timeScale; }
 }"""
-SIG = {"RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"]}
+SIG = {"Res": ["w", "h"], "RespawnAs": ["cls"], "Loadout": ["a", "b", "c", "d"], "Hold": ["slot"], "Release": ["slot"], "Cast": ["slot"], "TimeScale": ["v"], "Stick": ["x", "y"]}
 
 LOG = open(os.path.join(OUT, "capture.log"), "a", encoding="utf-8")
 
@@ -92,6 +97,25 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3"):
     time.sleep(1.5)
 
 
+def stun_then_slow(tag):
+    """Both control states on the same dummies at once (the world badge stack should show STUN + SLOW rows)."""
+    log("==", tag, "slow then stun")
+    log(" ", cs("Hold", "3"))
+    time.sleep(0.4)
+    log(" ", cs("Release", "3"))
+    time.sleep(0.4)
+    log(" ", cs("Hold", "1"))
+    time.sleep(0.4)
+    log(" ", cs("Release", "1"))
+    time.sleep(0.25)
+    shot(tag)
+    time.sleep(0.4)
+    shot(tag + "_b")
+    log(" ", cs("ResetDummies"))
+    log(" ", cs("ClearCooldowns"))
+    time.sleep(1.5)
+
+
 def wait_player(cls):
     for _ in range(60):
         s = str(cs("State"))
@@ -103,6 +127,8 @@ def wait_player(cls):
 
 def main():
     bridge.init()
+    if os.environ.get("CAPTURE_PHONE") == "1":
+        log(cs("Res", "2400", "1080"))   # phone-size Game View for badge / glyph size checks
     log("state:", cs("State"))
     if "playing=True" not in str(cs("State")):
         log(cs("Open"))
@@ -124,6 +150,7 @@ def main():
     ability(1, "stun", after=((0.4, "3_impact"), (1.5, "4_after"), (3.5, "5_late")))
     ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
     ability(3, "slow", after=((0.6, "3_impact"), (3.0, "4_after"), (7.0, "5_late")))
+    stun_then_slow("badges_stun_slow")
     # Loadout B: the self moves
     log(cs("Loadout", "SpeedBurst", "Shadowstep", "TurtleMode", "Invisibility"))
     time.sleep(2)
@@ -166,4 +193,6 @@ try:
     main()
 finally:
     cs("TimeScale", "1")
+    if os.environ.get("CAPTURE_PHONE") == "1":
+        cs("Res", "0", "0")
     LOG.close()

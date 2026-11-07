@@ -275,5 +275,80 @@ namespace CluckWars.Tests
             // is genuinely a one-line change if a font that carries it is ever added.
             Assert.AreEqual("✕", HudFeedbackStyle.StunnedCrossGlyph);
         }
-    }
+    
+        // ---- Sprite glyphs (feedback batch C3) -----------------------------------
+
+        private const string TouchControlsUssPath = "Assets/UI/Styles/TouchControls.uss";
+        private const string MarkHudUssPath       = "Assets/UI/Styles/MarkHud.uss";
+
+        [Test]
+        public void StatusGlyphClass_StunAndSlow_MapToTheStateGlyphClasses()
+        {
+            Assert.AreEqual(StateGlyphStyle.UssClassFor(StateGlyphStyle.StateGlyph.Stunned),
+                HudFeedbackStyle.GlyphClassFor(HudStatusKind.Stun));
+            Assert.AreEqual(StateGlyphStyle.UssClassFor(StateGlyphStyle.StateGlyph.Slowed),
+                HudFeedbackStyle.GlyphClassFor(HudStatusKind.Slow));
+        }
+
+        [Test]
+        public void StatusGlyphClass_RootAndNone_FallBackToText()
+        {
+            Assert.IsNull(HudFeedbackStyle.GlyphClassFor(HudStatusKind.Root), "Root has no sprite (no caster after the merge).");
+            Assert.IsNull(HudFeedbackStyle.GlyphClassFor(HudStatusKind.None));
+            Assert.IsNotEmpty(HudFeedbackStyle.GlyphFor(HudStatusKind.Root), "the text fallback must still exist for Root.");
+        }
+
+        [Test]
+        public void EveryGlyphClassHudFeedbackStyleUses_HasARuleInTouchControlsUss()
+        {
+            string uss = System.IO.File.ReadAllText(TouchControlsUssPath);
+            foreach (HudStatusKind kind in System.Enum.GetValues(typeof(HudStatusKind)))
+            {
+                string cls = HudFeedbackStyle.GlyphClassFor(kind);
+                if (cls == null) continue;
+                Assert.IsTrue(UssHasBackgroundImageRule(uss, cls), $"{kind}: no `.{cls} {{ background-image }}` rule in TouchControls.uss.");
+            }
+        }
+
+        [Test]
+        public void EveryStatusGlyphRuleInUss_PointsAtItsStateGlyphStylePath()
+        {
+            string uss = System.IO.File.ReadAllText(TouchControlsUssPath);
+            foreach (var state in StateGlyphStyle.All)
+            {
+                string cls = StateGlyphStyle.UssClassFor(state);
+                var m = System.Text.RegularExpressions.Regex.Match(uss,
+                    @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"\s*\{[^}]*background-image:\s*url\(""project://database/([^""]+)""\)");
+                Assert.IsTrue(m.Success, $"{state}: no background-image rule for .{cls} in TouchControls.uss.");
+                Assert.AreEqual(StateGlyphStyle.SpritePathFor(state), m.Groups[1].Value, $"{state}: .{cls} points at the wrong file.");
+            }
+            // No stray glyph rule the map does not know.
+            var known = new System.Collections.Generic.HashSet<string>();
+            foreach (var state in StateGlyphStyle.All) known.Add(StateGlyphStyle.UssClassFor(state));
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(uss,
+                         @"\.(cw-status-glyph--[a-z-]+)\s*\{[^}]*background-image"))
+                Assert.IsTrue(known.Contains(m.Groups[1].Value), $".{m.Groups[1].Value} has an image rule but is not in StateGlyphStyle.");
+        }
+
+        [Test]
+        public void MarkHudUss_ShellGlyphIsShieldEgg_HunterMarkerIsThePaw_VictimKeepsTheSkull()
+        {
+            string uss = System.IO.File.ReadAllText(MarkHudUssPath);
+            StringAssert.Contains(System.IO.Path.GetFileName(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.ShieldEgg)),
+                UssRuleBody(uss, "cw-mark-shell-glyph"));
+            StringAssert.Contains(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.Hunting), UssRuleBody(uss, "cw-mark-skull"));
+            StringAssert.Contains(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.Marked), UssRuleBody(uss, "cw-hunter-skull-glyph"));
+        }
+
+        private static string UssRuleBody(string uss, string cls)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(uss, @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"\s*\{([^}]*)\}");
+            Assert.IsTrue(m.Success, $"no .{cls} rule.");
+            return m.Groups[1].Value;
+        }
+
+        private static bool UssHasBackgroundImageRule(string uss, string cls) =>
+            System.Text.RegularExpressions.Regex.IsMatch(uss,
+                @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"\s*\{[^}]*background-image:");
+}
 }
