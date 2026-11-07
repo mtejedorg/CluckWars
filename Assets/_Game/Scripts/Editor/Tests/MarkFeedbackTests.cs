@@ -92,9 +92,45 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void HuntWords_ShownNameIsHunt_InternalTypeUnchanged()
+        {
+            // Spec D5b: UI-only rename; the asset, the type and the code keep the Death Mark names.
+            var mark = TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");
+            Assert.AreEqual("Hunt", mark.DisplayName);
+            Assert.AreEqual("HUNT", mark.ShortLabel);
+            Assert.AreEqual("hud.pop.hunt", UiKeys.HudPopHunt);
+            Assert.IsTrue(UiText.HasKey(UiKeys.HudPopHunt));
+            Assert.AreEqual("HUNT!", UiText.Get(UiKeys.HudPopHunt));
+        }
+
+        [Test]
+        public void HuntPop_OnlyTheLocalHunter_OnlyTheFrameTheKillGoesLive()
+        {
+            Assert.IsTrue(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Assassin, Events = MarkEvents.KillLive }));
+            Assert.IsTrue(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Assassin, Events = MarkEvents.KillLive | MarkEvents.Lock }));
+            Assert.IsFalse(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Victim, Events = MarkEvents.KillLive }), "the victim keeps MARKED!");
+            Assert.IsFalse(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.None, Events = MarkEvents.KillLive }), "an observer sees no HUNT!");
+            Assert.IsFalse(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Assassin, Events = MarkEvents.None }), "not every frame");
+            Assert.IsFalse(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Assassin, Events = MarkEvents.Lock }), "not at the lock");
+        }
+
+        [Test]
+        public void HuntPop_SpawnsOverTheLocalChickenThroughTheSharedPopPath_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/Visuals/MarkFeedback.cs");
+            StringAssert.Contains("if (ShowsHuntPop(o) && _localHunter != null)", src);
+            StringAssert.Contains("_localHunter = r.Role == MarkRole.Assassin ? local : null;", src);
+            StringAssert.Contains("IsLocal = c.HasInputAuthority,", src);
+            StringAssert.Contains("UiText.Get(UiKeys.HudPopHunt)", src);
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(src, "FloatingCombatText.Spawn").Count, "HUNT! is the only pop spawned here");
+            StringAssert.DoesNotContain("[Rpc", src);
+            StringAssert.DoesNotContain("[Networked", src);
+        }
+
+        [Test]
         public void MarkCopy_NewKeysExist_OldKeysAreGone()
         {
-            Assert.AreEqual("KILL", UiText.Get(UiKeys.MarkHexKill));
+            Assert.AreEqual("POUNCE", UiText.Get(UiKeys.MarkHexKill), "spec D5b: HUNT then POUNCE");
             Assert.AreEqual("MARKED!", UiText.Get(UiKeys.MarkToast));
             Assert.AreEqual("LIVE 1s", UiText.Format(UiKeys.MarkClock, ("secs", 1)));
             Assert.AreEqual("LIVE IN 3", UiText.Format(UiKeys.MarkClockArming, ("secs", 3)));

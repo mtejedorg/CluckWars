@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Settings;
 using CluckWars.UI;
@@ -92,7 +93,7 @@ namespace CluckWars.Visuals
         private readonly MarkPresentationModel _model = new MarkPresentationModel();
         private readonly List<MarkChicken> _snapshot = new List<MarkChicken>(8);
         private readonly List<ChickenController> _snapshotRefs = new List<ChickenController>(8);
-        private ChickenController _target, _hunter;
+        private ChickenController _target, _hunter, _localHunter;
         private long _shownHunterId;
         private float _introLastSeenAt = float.NegativeInfinity;
 
@@ -124,7 +125,7 @@ namespace CluckWars.Visuals
         private void HardClear()
         {
             _model.Reset();
-            _target = _hunter = null;
+            _target = _hunter = _localHunter = null;
             _shownHunterId = 0;
             MarkScreenEffect.Clear();
         }
@@ -132,10 +133,18 @@ namespace CluckWars.Visuals
         private void Update()
         {
             var o = _model.Step(Gather(), Time.unscaledDeltaTime);
-            if (o.Role == MarkRole.None) _target = _hunter = null;
+            if (o.Role == MarkRole.None) _target = _hunter = _localHunter = null;
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
             if (o.Events != MarkEvents.None) PlayStings(o);
+            if (ShowsHuntPop(o) && _localHunter != null)
+                FloatingCombatText.Spawn(_localHunter.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight,
+                    UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
         }
+
+        /// <summary>HUNT! over the hunter the frame its kill goes live, on the hunter's own screen only: the Assassin role is
+        /// resolved from the local chicken (<c>HasInputAuthority</c>), so a victim or an observer never draws it.</summary>
+        public static bool ShowsHuntPop(in MarkOutputs o) =>
+            (o.Events & MarkEvents.KillLive) != 0 && o.Role == MarkRole.Assassin;
 
         // ---- Gathering (replicated state -> MarkInputs) ------------------------------------------------------------------
 
@@ -183,6 +192,7 @@ namespace CluckWars.Visuals
             _shownHunterId = _snapshot[r.Hunter].Id;
             _target = r.Role == MarkRole.Assassin ? target : null;
             _hunter = r.Role == MarkRole.Victim ? hunter : null;
+            _localHunter = r.Role == MarkRole.Assassin ? local : null;
 
             if (r.Role == MarkRole.Assassin) GatherAssassin(ref input, local, target, exec);
             else if (r.Role == MarkRole.Victim) GatherVictim(ref input, local, hunter);

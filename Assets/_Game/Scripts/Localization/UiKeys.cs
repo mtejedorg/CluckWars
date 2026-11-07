@@ -259,6 +259,8 @@ namespace CluckWars.Localization
         public const string HudPopSlow = "hud.pop.slow";
         public const string HudPopImmune = "hud.pop.immune";
         public const string HudPopFull = "hud.pop.full";
+        /// <summary>The hunter's own pop as its Hunt (Death Mark) kill goes live; local player only (spec D5b / D7b).</summary>
+        public const string HudPopHunt = "hud.pop.hunt";
         public const string HudStatusStun = "hud.status.stun";
         public const string HudStatusStuck = "hud.status.stuck";
         public const string HudStatusSlow = "hud.status.slow";

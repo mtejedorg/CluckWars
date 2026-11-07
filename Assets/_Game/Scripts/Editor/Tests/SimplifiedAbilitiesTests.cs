@@ -244,7 +244,7 @@ namespace CluckWars.Tests
             { "Jump", typeof(ShadowstepAbilitySO) },
             { "Egg Shell", typeof(TurtleModeAbilitySO) },
             { "Hide", typeof(InvisibilityAbilitySO) },
-            { "Death Mark", typeof(MarkKillAbilitySO) },
+            { "Hunt", typeof(MarkKillAbilitySO) },   // UI name since spec D5b; internally Death Mark
         };
 
         [Test]
@@ -281,7 +281,7 @@ namespace CluckWars.Tests
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Egg Shell")]
         [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Egg Shell", "Slow", "Steal")]
-        [TestCase(ChickenSubclass.Assassin_Spoiler, "Death Mark", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
+        [TestCase(ChickenSubclass.Assassin_Spoiler, "Hunt", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
         [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow")]        // Slow replaced Shove, 2026-11-05
         public void TheKit_ResolvesExactlyAsRuled(ChickenSubclass subclass, string s0, string s1, string s2, string s3)
         {

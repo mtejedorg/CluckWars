@@ -95,7 +95,7 @@ loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.
 loadout.kit.title,{perk} KIT
-mark.hex.kill,KILL
+mark.hex.kill,POUNCE
 hud.backin,BACK IN!
 mark.toast,MARKED!
 mark.clock,LIVE {secs}s
@@ -212,6 +212,7 @@ hud.pop.stuck,STUCK!
 hud.pop.slow,SLOW
 hud.pop.immune,IMMUNE
 hud.pop.full,FULL!
+hud.pop.hunt,HUNT!
 hud.status.stun,STUN
 hud.status.stuck,STUCK
 hud.status.slow,SLOW

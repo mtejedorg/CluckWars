@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6bcd670b3126faf47b3c7094b1d054f9, type: 3}
   m_Name: MarkKill
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
-  DisplayName: Death Mark
-  ShortLabel: EXEC
+  DisplayName: Hunt
+  ShortLabel: HUNT
   Description: Marks a rival, likelier far from home. Stun them within 6.2m, then
     press again to take everything they carry.
   AccentKey: 10

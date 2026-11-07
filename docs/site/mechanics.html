@@ -32,7 +32,7 @@
     <li><a href="#sct">Solo Clear Time</a></li>
     <li><a href="#roster">Roster</a></li>
     <li><a href="#steal">Steal and control</a></li>
-    <li><a href="#deathmark">Death Mark</a></li>
+    <li><a href="#deathmark">Hunt</a></li>
     <li><a href="#abilities">Abilities</a></li>
     <li><a href="#casting">Casting</a></li>
     <li><a href="#map">Piles, walls, jumps</a></li>
@@ -123,7 +123,7 @@
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (the Slow aura holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Shove, Egg Shell</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Egg Shell, Slow, Steal</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Death Mark, Stun, Jump, Hide</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Hunt, Stun, Jump, Hide</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>Every steal takes 1.6&times; more</td><td>Steal, Hide, Jump, Slow</td></tr>
         </tbody>
       </table>
@@ -174,9 +174,9 @@
   </section>
 
   <section id="deathmark">
-    <h2>Death Mark: one button, two presses</h2>
+    <h2>Hunt: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Death Mark on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
+    <p>The Assassin's execute (shown as Hunt; its internal name is Death Mark) is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Hunt on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
@@ -189,8 +189,8 @@
       </table>
     </div>
     <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. An Egg Shell's egg (the last 2 of its 3 seconds) makes you unkillable and unstunnable; its first-second walk does not. Stun reach (5.4 m) plus kill range (6.2 m) is 11.6 m.</p>
-    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown (4 s) so the Assassin can re-mark quickly; after a kill it is 8 s, so a round holds at most four kills.</p>
-    <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible (until the arm the marker shows a countdown digit and KILL stays dark). The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
+    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Hunt takes a reduced cooldown (4 s) so the Assassin can re-mark quickly; after a kill it is 8 s, so a round holds at most four kills.</p>
+    <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, a big yellow POUNCE button exactly while a kill is possible (until the arm the marker shows a countdown digit and POUNCE stays dark), and a HUNT! pop over itself the moment the kill goes live. The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
 
   <section id="abilities">
@@ -218,7 +218,7 @@
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">2 s</td><td>Dashes forward at 3&times; speed for 0.18 s (about 6 m for Sneaky, 5.5 m for Warrior), straight over walls.</td></tr>
           <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>Take a beakful from the pile you stand on. Forced for every forager.</td></tr>
-          <tr data-c="limited"><td>Death Mark <span class="tag t-assassin">Spoiler</span></td><td class="num">4 / 8 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 4 s after a miss, 8 s after a kill. Within 6.2 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
+          <tr data-c="limited"><td>Hunt <span class="tag t-assassin">Spoiler</span></td><td class="num">4 / 8 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 4 s after a miss, 8 s after a kill. Within 6.2 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
         </tbody>
       </table>
     </div>
@@ -230,12 +230,12 @@
         <thead><tr><th>Tier</th><th>Range</th><th>Abilities</th></tr></thead>
         <tbody>
           <tr><td>Low</td><td class="num">1 to 3 s</td><td>Jump</td></tr>
-          <tr><td>Medium</td><td class="num">4 to 6 s</td><td>Steal, Speed, Hide, Shove, Slow, Death Mark after a miss</td></tr>
-          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Egg Shell, Death Mark after a kill</td></tr>
+          <tr><td>Medium</td><td class="num">4 to 6 s</td><td>Steal, Speed, Hide, Shove, Slow, Hunt after a miss</td></tr>
+          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Egg Shell, Hunt after a kill</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Shortened on 2026-11-05 so a 45 s match stays busy. The High band holds the immunity move (Egg Shell) and the one hard stun (Stun, which also sets up a Death Mark kill). Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+    <p>Shortened on 2026-11-05 so a 45 s match stays busy. The High band holds the immunity move (Egg Shell) and the one hard stun (Stun, which also sets up a Hunt kill). Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
   </section>
 
   <section id="casting">

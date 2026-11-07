@@ -591,6 +591,8 @@ and bump slows land on it in full. Getting stuck has no source in the shipped re
 
 ### 6.4 The Assassin execute (the only hard removal)
 
+UI name Hunt (short label HUNT, second press POUNCE, HUNT! pop for the hunter when the kill goes live); internal name Death Mark (spec 2026-11-06 D5b).
+
 **One button, two presses.** Death Mark (named Mark/Kill until 2026-10-07; the code type is still
 `MarkKillAbilitySO`) is the **Assassin** specialization's forced (class shown as Sneaky, code `ChickenClass.Assassin`)
 pre-equip (§7.1: its `AllowedClasses` is `None`, so it can only arrive this way) — choosing Assassin equips it automatically,
