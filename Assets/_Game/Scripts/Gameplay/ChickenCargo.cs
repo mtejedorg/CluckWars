@@ -346,6 +346,7 @@ namespace CluckWars.Gameplay
             if (thief == null || thief.Object == null || !thief.Object.IsValid) return;
 
             _hitFeedback.NotifyAttacker(thief.transform.position);
+            _hitFeedback.PlayStealChunks(thief);   // D7: the kernels fly victim -> thief (local, every peer)
         }
 
         /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>

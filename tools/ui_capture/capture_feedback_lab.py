@@ -193,7 +193,7 @@ def main():
         time.sleep(2)
         shot("01_rest_loadoutA")
         if want("steal"):
-            ability(0, "steal", after=((0.4, "3_impact"), (1.2, "4_after")))
+            ability(0, "steal", after=((0.15, "3a_grab"), (0.4, "3_impact"), (0.65, "3b_flight"), (0.9, "3c_arrive"), (1.2, "4_after"), (1.55, "4a_arrive"), (1.9, "4b_arrive")))
         if want("stun"):
             ability(1, "stun", after=((0.4, "3_impact"), (1.5, "4_after"), (3.5, "5_late")))
         if want("shove"):

@@ -96,6 +96,10 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite[] _shardSprites = new Sprite[0];
         [Tooltip("Fx_SpeedLine: the Speed wind streak (Stretched Billboard).")]
         [SerializeField] private Sprite _speedLineSprite;
+        [Tooltip("Fx_Corn: the Steal food kernel (flown by FoodChunkFlight, a pooled sprite mover - not a particle).")]
+        [SerializeField] private Sprite _cornSprite;
+        [Tooltip("Fx_Whiff: the zero-hit Steal arc (a FoodChunkFlight mover).")]
+        [SerializeField] private Sprite _whiffSprite;
 
         // ---- Budget (maxParticles per family; sum = ParticlesPerChickenCap minus headroom) ----
 
@@ -196,6 +200,7 @@ namespace CluckWars.Visuals
         private float   _skidAccum;
         private int     _skidBudget;
         private FxEmit  _skidDust, _shoveRing;
+        private FxEmit  _stealArrival;
 
         // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
         // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
@@ -245,6 +250,7 @@ namespace CluckWars.Visuals
             vel.dampen  = 0.35f;
             vel.limit   = new ParticleSystem.MinMaxCurve(0.6f);
 
+            FoodChunkFlight.RegisterSprites(_cornSprite, _whiffSprite);
             BuildPresets();
         }
 
@@ -285,6 +291,15 @@ namespace CluckWars.Visuals
                 SpeedMin = FeedbackTuning.ShoveRingSpeed, SpeedMax = FeedbackTuning.ShoveRingSpeed,
                 LifeMin = FeedbackTuning.ShoveRingLifeSeconds, LifeMax = FeedbackTuning.ShoveRingLifeSeconds,
                 Shape = FxShape.Ring, Radius = FeedbackTuning.ShoveRingRadius, Gravity = 0f,
+            };
+            // Steal arrival (D7): gold sparkles at the thief when the kernels land.
+            _stealArrival = new FxEmit
+            {
+                Count = FeedbackTuning.StealArrivalSparkleCount, Color = FeedbackPalette.Current.YolkColor,
+                SizeMin = FeedbackTuning.StealArrivalSparkleSizeMin, SizeMax = FeedbackTuning.StealArrivalSparkleSizeMax,
+                SpeedMin = FeedbackTuning.StealArrivalSparkleSpeed, SpeedMax = FeedbackTuning.StealArrivalSparkleSpeed,
+                LifeMin = FeedbackTuning.StealArrivalSparkleLifeSeconds, LifeMax = FeedbackTuning.StealArrivalSparkleLifeSeconds,
+                Shape = FxShape.Ring, Radius = 0.3f, Gravity = 0f,
             };
             _speedDust = new FxEmit
             {
@@ -472,6 +487,20 @@ namespace CluckWars.Visuals
                 _animator.ExtraScale = squashing ? ShoveBeatRules.SquashScale(now - _squashStart, reduced) : Vector3.one;
                 if (squashing && now - _squashStart >= FeedbackTuning.ShoveSquashSeconds) _squashStart = -1f;
             }
+        }
+
+        /// <summary>
+        /// The Steal arrival (D7): gold sparkles at this thief when the kernels land. 4, or 2 fading in place under Reduced Motion.
+        /// Nothing on a hidden or faded thief (never reveal it).
+        /// </summary>
+        public void EmitStealArrival()
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            var e = _stealArrival;
+            e.Count = StealBeatRules.ArrivalSparkles(StealBeatRules.ChunkRoute.ToThief, reduced);
+            if (reduced) e.SpeedMin = e.SpeedMax = 0f;
+            EmitSparkles(in e, FeedbackTuning.StealArrivalSparkleHeight);
         }
 
         /// <summary>The caster half: accent sparkles in a ring at body height (8, or 4 fading in place under Reduced Motion).</summary>

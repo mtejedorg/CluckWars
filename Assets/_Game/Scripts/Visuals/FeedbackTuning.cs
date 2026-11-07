@@ -1615,6 +1615,65 @@ namespace CluckWars.Visuals
         public static readonly Vector3 ShoveSquashScale = new Vector3(1.12f, 0.88f, 1.12f);
         public const float ShoveSquashSeconds = 0.12f;
 
+        // ---- Steal beats (batch D7, vfx.md 2.1) -----------------------------------------------------
+
+        /// <summary>Caster beak: the grab lines start this far in front of the caster.</summary>
+        public const float StealGrabBeakDistance = 0.9f;
+        /// <summary>Height of the grab lines above the caster's feet (the impact motion lines' height).</summary>
+        public const float StealGrabLineHeight = 0.85f;
+        /// <summary>The lines reach this share of the way to the victim before they snap back.</summary>
+        public const float StealGrabReach = 0.8f;
+        public const float StealGrabExtendSeconds = 0.08f;
+        public const float StealGrabRetractSeconds = 0.10f;
+        /// <summary>Each further victim starts its line this much later (up to the 3 impact LineRenderers).</summary>
+        public const float StealGrabStaggerSeconds = 0.06f;
+        public const float StealGrabAlpha = 0.9f;
+        public const float StealGrabWidth = 0.06f;
+        /// <summary>Reduced Motion: the extended lines flash once and fade over this long (no travel).</summary>
+        public const float StealGrabFlashSeconds = 0.15f;
+
+        /// <summary>Whiff (zero-hit Steal): two Fx_Whiff arcs at the beak, grey (nothing orange), fading over this long.</summary>
+        public const int StealWhiffCount = 2;
+        public const float StealWhiffSeconds = 0.25f;
+        public const float StealWhiffScaleStart = 0.5f;
+        public const float StealWhiffScaleEnd = 1.1f;
+        /// <summary>World size (m) of a whiff arc at scale 1.</summary>
+        public const float StealWhiffSize = 0.55f;
+        public const float StealWhiffSpreadDegrees = 25f;
+        public const float StealWhiffAlpha = 0.7f;
+        public static readonly Color StealWhiffColor = new Color(0.78f, 0.78f, 0.76f, 1f);
+
+        /// <summary>Food chunks per robbed victim (kernel sprites), flying victim -> thief.</summary>
+        public const int StealChunksPerVictim = 3;
+        /// <summary>Pooled chunk movers per arena (3 victims x 3 kernels = 9 live at most, plus whiff arcs).</summary>
+        public const int StealChunkPoolSize = 12;
+        public const float StealChunkHeight = 1.0f;
+        public const float StealChunkArcHeight = 0.6f;
+        public const float StealChunkFlightSeconds = 0.35f;
+        public const float StealChunkSpinDegreesPerSecond = 540f;
+        /// <summary>Kernel world size. 0.24 m (spec 0.16): at 0.16 the kernel was about 10 px in the iso view and lost behind the bird.</summary>
+        public const float StealChunkSize = 0.24f;
+        public const int StealChunkSortingOrder = 5;
+        /// <summary>Each kernel of one robbery leaves this much later than the previous one (a stream, not a clump).</summary>
+        public const float StealChunkStaggerSeconds = 0.04f;
+        /// <summary>Sideways spread (m) of the three kernels' arcs, so they do not overlap.</summary>
+        public const float StealChunkSpread = 0.18f;
+        /// <summary>Thief hidden or faded: the kernels climb to the victim's own position plus this and vanish there.</summary>
+        public const float StealChunkHiddenRiseMetres = 1.2f;
+        /// <summary>Reduced Motion: the kernels fade in at the thief over this long (no travel).</summary>
+        public const float StealChunkReducedFadeSeconds = 0.2f;
+        /// <summary>A kernel fades out over the last share of its flight when it vanishes (hidden thief).</summary>
+        public const float StealChunkVanishFraction = 0.4f;
+
+        /// <summary>Arrival sparkles at the thief: 4 gold (2 under Reduced Motion, fading in place), 0.25 s.</summary>
+        public const int StealArrivalSparkleCount = 4;
+        public const int StealArrivalSparkleCountReduced = 2;
+        public const float StealArrivalSparkleLifeSeconds = 0.25f;
+        public const float StealArrivalSparkleSizeMin = 0.2f;
+        public const float StealArrivalSparkleSizeMax = 0.3f;
+        public const float StealArrivalSparkleSpeed = 1.2f;
+        public const float StealArrivalSparkleHeight = 1.0f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

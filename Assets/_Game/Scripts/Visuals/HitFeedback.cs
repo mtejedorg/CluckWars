@@ -3,6 +3,7 @@ using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Services;
+using CluckWars.Settings;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -177,6 +178,15 @@ namespace CluckWars.Visuals
         private readonly Vector3[] _linePoints = new Vector3[2];
         private float   _lineTimer = -1f; // <0 = idle
         private Vector3 _lineDirection = Vector3.forward;
+
+        // ---- Steal grab lines (D7): the same impact LineRenderers, driven by the cast edge on the CASTER ----
+
+        private ChickenController[] _grabVictims;      // up to one per impact line; the victims are followed live
+        private int   _grabCount;
+        private float _grabTimer = -1f;                // <0 = idle
+        private bool  _grabReduced;
+        private Color _grabColor;
+        private readonly Vector3[] _grabPoints = new Vector3[2];
 
         // ---- Particles --------------------------------------------------------
 
@@ -483,7 +493,11 @@ namespace CluckWars.Visuals
 
             int hitCount = _abilities.LastCastHitCount;
             if (hitCount > 0) ConfirmHits(ability, hitCount);
-            else              MarkImmuneTargets(ability);
+            else
+            {
+                if (ability is SnatchAbilitySO) PlayStealWhiff();
+                MarkImmuneTargets(ability);
+            }
         }
 
         /// <summary>
@@ -523,10 +537,13 @@ namespace CluckWars.Visuals
                 Vector3 casterPos = _controller.transform.position;
                 int found = ability.GatherTargets(_controller, _castTargets);
                 int sparks = Mathf.Min(found, hitCount);
+                bool stealBeat = ability is SnatchAbilitySO;
+                _grabCount = 0;
                 for (int i = 0; i < sparks; i++)
                 {
                     var victim = _castTargets[i];
                     if (victim == null || victim == _controller) continue;
+                    if (stealBeat) AddGrabVictim(victim);
 
                     // §3.2 case 15, and the only place it can be caught for a cast that
                     // landed on somebody. A control-immune rival (Immovable) is deliberately
@@ -571,6 +588,8 @@ namespace CluckWars.Visuals
                     victimFeedback.NotifyAttacker(casterPos);
                 }
             }
+
+            if (ability is SnatchAbilitySO && canReDeriveTargets) BeginGrabLines(ability.AccentColor);
 
             // Caster's own punch. Gated on HasInputAuthority exactly like ChickenVFX's
             // existing §3.1 every-cast shake — peers must never feel each other's camera.
@@ -889,6 +908,7 @@ namespace CluckWars.Visuals
         {
             AnimateFlash();
             AnimateMotionLines();
+            AnimateGrabLines();
         }
 
         private void AnimateFlash()
@@ -994,11 +1014,13 @@ namespace CluckWars.Visuals
             int count = Mathf.Max(1, FeedbackTuning.ImpactMotionLineCount);
             var mat = TelegraphShapes.BuildLineMaterial();
             _motionLines = new LineRenderer[count];
+            _grabVictims = new ChickenController[count];
             for (int i = 0; i < count; i++)
             {
                 _motionLines[i] = TelegraphShapes.BuildLine(
                     transform, "ImpactMotionLine" + i, mat, MotionLineWidth, loop: false);
                 _motionLines[i].enabled = false;
+                _motionLines[i].sortingOrder = FeedbackTuning.StealChunkSortingOrder;   // body-height FX order (vfx.md 0.1)
             }
         }
 
@@ -1017,7 +1039,7 @@ namespace CluckWars.Visuals
         /// </summary>
         private void AnimateMotionLines()
         {
-            if (_lineTimer < 0f || _motionLines == null) return;
+            if (_lineTimer < 0f || _motionLines == null || _grabTimer >= 0f) return;   // a live grab owns the renderers
 
             float life = Mathf.Max(0.0001f, FeedbackTuning.ImpactMotionLineLifetimeSeconds);
             _lineTimer += Time.deltaTime;
@@ -1066,6 +1088,101 @@ namespace CluckWars.Visuals
                 if (lr.positionCount != 2) lr.positionCount = 2;
                 lr.SetPositions(_linePoints);
                 if (!lr.enabled) lr.enabled = true;
+            }
+        }
+
+        // ---- Steal beats (D7, vfx.md 2.1) --------------------------------------
+
+        /// <summary>The caster half of a zero-hit Steal, on top of the grey cast ring: two grey whiff arcs at the beak. Nothing orange.</summary>
+        private void PlayStealWhiff()
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            Vector3 fwd = _controller.transform.forward;
+            Vector3 beak = _controller.transform.position + fwd * FeedbackTuning.StealGrabBeakDistance;
+            beak.y += FeedbackTuning.StealGrabLineHeight;
+            FoodChunkFlight.PlayWhiff(_controller, beak, fwd);
+        }
+
+        /// <summary>The victim half of a robbery, off the replicated <c>StealEventId</c> edge (called from <see cref="ChickenCargo"/>
+        /// with the resolved thief): the flying kernels. Local, on every peer; one robbery is one flight.</summary>
+        public void PlayStealChunks(ChickenController thief)
+        {
+            if (_controller == null || _controller.IsDecoy) return;
+            FoodChunkFlight.PlaySteal(_controller, thief);
+        }
+
+        private void AddGrabVictim(ChickenController victim)
+        {
+            if (_grabVictims == null || _grabCount >= _grabVictims.Length) return;
+            _grabVictims[_grabCount++] = victim;
+        }
+
+        private void BeginGrabLines(Color accent)
+        {
+            if (_grabCount == 0 || _controller == null || FoodChunkFlight.IsQuiet(_controller)) { _grabCount = 0; return; }
+            _grabColor = accent;
+            _grabReduced = PlayerPreferences.ReducedMotionEnabled;
+            _grabTimer = 0f;
+            for (int i = 0; i < _motionLines.Length; i++)
+                if (_motionLines[i] != null) _motionLines[i].widthMultiplier = FeedbackTuning.StealGrabWidth;
+        }
+
+        /// <summary>
+        /// Grab lines: per victim a line from the caster beak toward the victim that extends to 80 % over 0.08 s and retracts over
+        /// 0.10 s (a snatch, not a hit), staggered 0.06 s per victim on the three impact renderers. Reduced Motion: one 0.15 s alpha
+        /// flash of the extended lines. No line toward a bird this peer cannot see, none from a hidden caster.
+        /// </summary>
+        private void AnimateGrabLines()
+        {
+            if (_grabTimer < 0f || _motionLines == null) return;
+            _grabTimer += Time.deltaTime;
+            if (_grabTimer >= StealBeatRules.GrabTotalSeconds(_grabCount, _grabReduced) || FoodChunkFlight.IsQuiet(_controller))
+            {
+                EndGrabLines();
+                return;
+            }
+
+            Vector3 beak = transform.position + transform.forward * FeedbackTuning.StealGrabBeakDistance;
+            beak.y = transform.position.y + FeedbackTuning.StealGrabLineHeight;
+
+            for (int i = 0; i < _motionLines.Length; i++)
+            {
+                var lr = _motionLines[i];
+                if (lr == null) continue;
+                var victim = i < _grabCount ? _grabVictims[i] : null;
+                float el = _grabReduced ? _grabTimer : _grabTimer - StealBeatRules.GrabStart(i);
+                float alpha = StealBeatRules.GrabAlpha(el, _grabReduced);
+                if (victim == null || alpha <= 0f || !StealBeatRules.GrabLineApplies(FoodChunkFlight.IsQuiet(victim)))
+                {
+                    if (lr.enabled) lr.enabled = false;
+                    continue;
+                }
+
+                Vector3 target = victim.transform.position;
+                target.y = beak.y;
+                _grabPoints[0] = beak;
+                _grabPoints[1] = Vector3.Lerp(beak, target, StealBeatRules.GrabExtent(el, _grabReduced));
+
+                var c = _grabColor;
+                c.a = alpha;
+                lr.startColor = lr.endColor = c;
+                if (lr.positionCount != 2) lr.positionCount = 2;
+                lr.SetPositions(_grabPoints);
+                if (!lr.enabled) lr.enabled = true;
+            }
+        }
+
+        private void EndGrabLines()
+        {
+            _grabTimer = -1f;
+            _grabCount = 0;
+            if (_motionLines == null) return;
+            for (int i = 0; i < _motionLines.Length; i++)
+            {
+                if (_motionLines[i] == null) continue;
+                _motionLines[i].widthMultiplier = MotionLineWidth;
+                if (_motionLines[i].enabled) _motionLines[i].enabled = false;
+                _grabVictims[i] = null;
             }
         }
 
