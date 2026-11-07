@@ -57,6 +57,10 @@ namespace CluckWars.EditorTools
         public const string AbilityIconPrefix = "Icons/Abilities/";
         public const int AbilityIconMaxSize = 256;
 
+        /// <summary>State glyphs (one per StateGlyphStyle entry): 256 px sources, capped on every platform.</summary>
+        public const string StateGlyphPrefix = "Icons/States/";
+        public const int StateGlyphMaxSize = 256;
+
         /// <summary>Per-screen backdrops (2880x1440). Compressed (ASTC 6x6 on Android), not RGBA32: 16 MB each otherwise.</summary>
         public const string BackdropPrefix = "Backgrounds/Bg_";
         public const int BackdropMaxSize = 4096;
@@ -76,8 +80,8 @@ namespace CluckWars.EditorTools
 
         // Bump whenever the rules above change: Unity then re-imports every texture this
         // postprocessor touched, so the .meta files follow the code (2 = Phase 2 art rules,
-        // 3 = Phase 3B Fx rule, 4 = Fx_DashedRing world-ribbon exception).
-        public override uint GetVersion() => 4;
+        // 3 = Phase 3B Fx rule, 4 = Fx_DashedRing world-ribbon exception, 5 = Icons/States glyph cap).
+        public override uint GetVersion() => 5;
 
         void OnPreprocessTexture()
         {
@@ -129,6 +133,17 @@ namespace CluckWars.EditorTools
                 {
                     var ps = ti.GetPlatformTextureSettings(platform);
                     ps.maxTextureSize = AbilityIconMaxSize;   // also caps an existing override
+                    ti.SetPlatformTextureSettings(ps);
+                }
+            }
+            else if (key.StartsWith(StateGlyphPrefix))
+            {
+                ti.maxTextureSize = StateGlyphMaxSize;
+                foreach (var platform in PlatformOverrides)
+                {
+                    var ps = ti.GetPlatformTextureSettings(platform);
+                    ps.overridden = true;
+                    ps.maxTextureSize = StateGlyphMaxSize;
                     ti.SetPlatformTextureSettings(ps);
                 }
             }
