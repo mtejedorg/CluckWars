@@ -1,0 +1,138 @@
+using System.IO;
+using System.Linq;
+using CluckWars.Localization;
+using CluckWars.Visuals;
+using NUnit.Framework;
+
+namespace CluckWars.Tests
+{
+    /// <summary>
+    /// B4 pop catalog (spec 2026-11-06 section 12 D7b / D8b): the new pop words exist in UiText.csv,
+    /// the self-pops are drawn only on the owner's peer, and every self-pop call site goes through
+    /// <see cref="FloatingCombatText.SpawnSelfPop"/> while PUSH (a victim pop) stays on the all-peers path.
+    /// </summary>
+    public class SelfPopCatalogTests
+    {
+        private const string Scripts = "Assets/_Game/Scripts/";
+
+        private static string Read(string relative) => File.ReadAllText(Scripts + relative);
+
+        [Test]
+        public void CatalogKeys_ResolveToTheirWords()
+        {
+            Assert.AreEqual("WADDLE", UiText.Get(UiKeys.HudPopWaddle));
+            Assert.AreEqual("EGG!",   UiText.Get(UiKeys.HudPopEgg));
+            Assert.AreEqual("HATCH!", UiText.Get(UiKeys.HudPopHatch));
+            Assert.AreEqual("POOF!",  UiText.Get(UiKeys.HudPopPoof));
+            Assert.AreEqual("FAST!",  UiText.Get(UiKeys.HudPopFast));
+            Assert.AreEqual("HOP!",   UiText.Get(UiKeys.HudPopHop));
+            Assert.AreEqual("PUSH",   UiText.Get(UiKeys.HudPopPush));
+            Assert.AreEqual("HUNT!",  UiText.Get(UiKeys.HudPopHunt));
+            Assert.AreEqual("ROB -5", UiText.Format(UiKeys.HudPopRobbed, ("n", 5)));
+            Assert.AreEqual("+5",     UiText.Format(UiKeys.HudPopGrabbed, ("n", 5)));
+        }
+
+        [Test]
+        public void CatalogKeys_AreRowsInTheCsv()
+        {
+            var keys = new[]
+            {
+                UiKeys.HudPopWaddle, UiKeys.HudPopEgg, UiKeys.HudPopHatch, UiKeys.HudPopPoof, UiKeys.HudPopFast,
+                UiKeys.HudPopHop, UiKeys.HudPopRobbed, UiKeys.HudPopGrabbed, UiKeys.HudPopPush,
+            };
+            var csv = File.ReadAllLines("Assets/_Game/Resources/Text/UiText.csv");
+            foreach (var key in keys)
+                Assert.AreEqual(1, csv.Count(l => l.StartsWith(key + ",")), key + " must be exactly one CSV row");
+        }
+
+        [Test]
+        public void RefusalAndControlRows_AreUnchanged()
+        {
+            // D8b: IMMUNE / SAFE / STUCK! stay as shipped.
+            Assert.AreEqual("IMMUNE", UiText.Get(UiKeys.HudPopImmune));
+            Assert.AreEqual("SAFE",   UiText.Get(UiKeys.HudPopSafe));
+            Assert.AreEqual("STUCK!", UiText.Get(UiKeys.HudPopStuck));
+            Assert.AreEqual("STUN",   UiText.Get(UiKeys.HudPopStun));
+        }
+
+        [Test]
+        public void SelfPopRule_OnlyTheOwnersNonDecoyBird()
+        {
+            Assert.IsTrue(FloatingCombatText.ShouldSpawnSelfPop(hasInputAuthority: true,  isDecoy: false));
+            Assert.IsFalse(FloatingCombatText.ShouldSpawnSelfPop(hasInputAuthority: false, isDecoy: false), "rival peer");
+            Assert.IsFalse(FloatingCombatText.ShouldSpawnSelfPop(hasInputAuthority: true,  isDecoy: true),  "own decoy");
+            Assert.IsFalse(FloatingCombatText.ShouldSpawnSelfPop(hasInputAuthority: false, isDecoy: true));
+            Assert.IsFalse(FloatingCombatText.IsSelfPopTarget(null));
+            Assert.IsFalse(FloatingCombatText.SpawnSelfPop(null, UiKeys.HudPopFast, UnityEngine.Color.white));
+        }
+
+        [Test]
+        public void ShellPops_WaddleThenEggThenHatch()
+        {
+            bool was = false, inEgg = false;
+            Assert.AreEqual(UiKeys.HudPopWaddle, ControlStateVFX.ShellPopKey(true, false, ref was, ref inEgg));
+            Assert.IsNull(ControlStateVFX.ShellPopKey(true, false, ref was, ref inEgg), "walk continuing");
+            Assert.AreEqual(UiKeys.HudPopEgg, ControlStateVFX.ShellPopKey(true, true, ref was, ref inEgg));
+            Assert.IsNull(ControlStateVFX.ShellPopKey(true, true, ref was, ref inEgg), "egg continuing");
+            Assert.AreEqual(UiKeys.HudPopHatch, ControlStateVFX.ShellPopKey(false, false, ref was, ref inEgg));
+            Assert.IsNull(ControlStateVFX.ShellPopKey(false, false, ref was, ref inEgg));
+        }
+
+        [Test]
+        public void ShellPops_HatchOnceOnEitherEdge_NoHatchWithoutEgg()
+        {
+            // Immunity closes first (second press / another cast) while the slot still runs: one HATCH!.
+            bool was = false, inEgg = false;
+            ControlStateVFX.ShellPopKey(true, false, ref was, ref inEgg);
+            ControlStateVFX.ShellPopKey(true, true, ref was, ref inEgg);
+            Assert.AreEqual(UiKeys.HudPopHatch, ControlStateVFX.ShellPopKey(true, false, ref was, ref inEgg));
+            Assert.IsNull(ControlStateVFX.ShellPopKey(false, false, ref was, ref inEgg), "no second HATCH!");
+
+            // A walk that ends before the egg (stunned out of it) gets no HATCH!.
+            was = false; inEgg = false;
+            ControlStateVFX.ShellPopKey(true, false, ref was, ref inEgg);
+            Assert.IsNull(ControlStateVFX.ShellPopKey(false, false, ref was, ref inEgg));
+        }
+
+        [Test]
+        public void SelfPops_GoThroughSpawnSelfPop_PushDoesNot()
+        {
+            string[] selfKeys =
+            {
+                "HudPopWaddle", "HudPopEgg", "HudPopHatch", "HudPopPoof", "HudPopFast", "HudPopHop",
+                "HudPopRobbed", "HudPopGrabbed",
+            };
+            var users = Directory.GetFiles(Scripts, "*.cs", SearchOption.AllDirectories)
+                .Select(f => f.Replace('\\', '/'))
+                .Where(f => !f.Contains("/Editor/Tests/") && !f.EndsWith("Localization/UiKeys.cs"))
+                .Where(f => selfKeys.Any(k => File.ReadAllText(f).Contains("UiKeys." + k)))
+                .Select(Path.GetFileName).OrderBy(n => n).ToArray();
+            CollectionAssert.AreEqual(new[] { "ControlStateVFX.cs", "FloatingCombatText.cs" }, users,
+                "self-pop words may only be used by the self-pop path");
+
+            string vfx = Read("Visuals/ControlStateVFX.cs");
+            StringAssert.DoesNotContain("FloatingCombatText.Spawn(", vfx, "ControlStateVFX must not use the all-peers Spawn");
+            StringAssert.Contains("FloatingCombatText.SpawnSelfPop(", vfx);
+            foreach (var call in new[] { "SelfPop(UiKeys.HudPopFast", "SelfPop(UiKeys.HudPopPoof", "SelfPop(UiKeys.HudPopHop", "SelfPop(shellKey" })
+                StringAssert.Contains(call, vfx);
+
+            string fct = Read("Visuals/FloatingCombatText.cs");
+            int start = fct.IndexOf("public static void SpawnCargoPop", System.StringComparison.Ordinal);
+            Assert.Greater(start, 0);
+            string cargoPop = fct.Substring(start, fct.IndexOf("// ── Lifecycle", start, System.StringComparison.Ordinal) - start);
+            StringAssert.Contains("SpawnSelfPop(", cargoPop);
+            Assert.Less(cargoPop.IndexOf("SpawnSelfPop(", System.StringComparison.Ordinal),
+                        cargoPop.IndexOf("SpawnCargoDelta(", System.StringComparison.Ordinal),
+                        "the owner's word must be tried before the remote cargo popup");
+
+            string cargo = Read("Gameplay/ChickenCargo.cs");
+            StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", cargo);
+            StringAssert.DoesNotContain("SpawnCargoDelta(", cargo, "one cargo pop per event: no direct delta popup");
+
+            var pushLines = Read("Visuals/HitFeedback.cs").Split('\n').Where(l => l.Contains("UiKeys.HudPopPush")).ToArray();
+            Assert.AreEqual(1, pushLines.Length);
+            StringAssert.Contains("FloatingCombatText.Spawn(", pushLines[0], "PUSH is the victim's pop on every peer");
+            StringAssert.DoesNotContain("SelfPop", pushLines[0]);
+        }
+    }
+}

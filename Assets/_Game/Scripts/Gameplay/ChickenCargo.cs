@@ -277,7 +277,7 @@ namespace CluckWars.Gameplay
                 // A drain into a base is not a loss to anyone — it is the point of the game.
                 if (delta < 0f && IsDepositing) continue;
 
-                FloatingCombatText.SpawnCargoDelta(
+                FloatingCombatText.SpawnCargoPop(_controller,
                     transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight, delta);
 
                 if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);

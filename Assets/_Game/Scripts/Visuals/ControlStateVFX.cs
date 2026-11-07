@@ -1,4 +1,6 @@
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Localization;
 using CluckWars.Settings;
 using UnityEngine;
 
@@ -105,6 +107,13 @@ namespace CluckWars.Visuals
         private float _windupTimer;
         private byte  _lastChargingSlot;
 
+        // Self-pop edges (B4, spec D7b) — see ObserveSelfPops. Seeded on first observation.
+        private bool _popsInitialized;
+        private bool _wasSpeedActive;
+        private bool _wasFaded;
+        private bool _wasShellActive;
+        private bool _inEgg;
+
         // Observed-maximum duration trackers — see TrackRemaining.
         private float _stunObservedMax;
         private float _rootObservedMax;
@@ -140,7 +149,76 @@ namespace CluckWars.Visuals
             UpdateBuffRing();
             UpdateImpactShockwave();
             UpdateWindupGlow();
+            ObserveSelfPops();
         }
+
+        // ---- Self-pops (B4, spec 2026-11-06 section 12 D7b) -------------------
+
+        /// <summary>
+        /// FAST! / POOF! / WADDLE / EGG! / HATCH! over this bird on its owner's screen only
+        /// (<see cref="FloatingCombatText.SpawnSelfPop"/> does the gate). Every edge is read from
+        /// replicated state — the slot active mask, <c>IsControlImmune</c>, <c>VisualOpacity</c> — and
+        /// tracked on every peer so the baseline stays current; the first observation only seeds, so a
+        /// spawn, a pooled object or a late join never pops. HOP! rides <see cref="ObserveJumpLandingEdge"/>.
+        /// </summary>
+        private void ObserveSelfPops()
+        {
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid || _abilities == null) return;
+            var abilitiesObj = _abilities.Object;
+            if (abilitiesObj == null || !abilitiesObj.IsValid) return;
+
+            bool speed  = ActiveSlotOf<SpeedBurstAbilitySO>() != AbilityController.InvalidSlot;
+            bool shell  = ActiveSlotOf<TurtleModeAbilitySO>() != AbilityController.InvalidSlot;
+            bool immune = _controller.IsControlImmune;
+            bool faded  = IsFadedOpacity(_controller.VisualOpacity);
+
+            if (!_popsInitialized)
+            {
+                _popsInitialized = true;
+                _wasSpeedActive  = speed;
+                _wasFaded        = faded;
+                _wasShellActive  = shell;
+                _inEgg           = shell && immune;
+                return;
+            }
+
+            if (speed && !_wasSpeedActive) SelfPop(UiKeys.HudPopFast, AccentKey.Speed);
+            if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide);
+            _wasSpeedActive = speed;
+            _wasFaded       = faded;
+
+            string shellKey = ShellPopKey(shell, immune, ref _wasShellActive, ref _inEgg);
+            if (shellKey != null) SelfPop(shellKey, AccentKey.EggShell);
+        }
+
+        /// <summary>
+        /// The Egg Shell phase pops (spec section 4.7), pure so it is testable: WADDLE on the slot's
+        /// rising edge, EGG! when control immunity opens while the slot runs, HATCH! when the egg ends by
+        /// either edge (slot over, or immunity closed: timeout, second press, another cast). A walk that
+        /// ends without an egg gets no HATCH!. Returns the key to pop, or null.
+        /// </summary>
+        public static string ShellPopKey(bool shellActive, bool controlImmune, ref bool wasShellActive, ref bool inEgg)
+        {
+            string key = null;
+            if (shellActive && !wasShellActive) { key = UiKeys.HudPopWaddle; inEgg = false; }
+
+            if (shellActive && controlImmune && !inEgg) { inEgg = true; key = UiKeys.HudPopEgg; }
+            else if (inEgg && (!shellActive || !controlImmune)) { inEgg = false; key = UiKeys.HudPopHatch; }
+
+            wasShellActive = shellActive;
+            return key;
+        }
+
+        private int ActiveSlotOf<T>() where T : AbilityBaseSO
+        {
+            for (int i = 0; i < AbilityController.SlotCount; i++)
+                if (_abilities.GetSlot(i) is T && _abilities.IsSlotActive(i)) return i;
+            return AbilityController.InvalidSlot;
+        }
+
+        private void SelfPop(string key, AccentKey accent) =>
+            FloatingCombatText.SpawnSelfPop(_controller, key, FeedbackPalette.Current.Accent(accent));
 
         // ---- §5.1 status ring + depleting arc (cases 17 / 18 / 21) ------------
 
@@ -434,6 +512,8 @@ namespace CluckWars.Visuals
             if (id == _lastJumpEventId) return;
 
             _lastJumpEventId = id;
+            // HOP! is a word, not motion, so it is not gated by Reduced Motion (owner's screen only).
+            SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
             if (PlayerPreferences.ReducedMotionEnabled) return;
 
             _jumpImpactDelay = FeedbackTuning.JumpTravelSettleSeconds;

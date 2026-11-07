@@ -1,3 +1,5 @@
+using CluckWars.Gameplay;
+using CluckWars.Localization;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -111,6 +113,55 @@ namespace CluckWars.Visuals
                   (gain ? "+" : "-") + whole + " " + CargoGlyph,
                   gain ? FeedbackTuning.FloatingTextCargoGainColor
                        : FeedbackTuning.FloatingTextCargoLossColor);
+        }
+
+        /// <summary>
+        /// The self-pop rule (spec 2026-11-06 section 12 D7b): a self-pop is drawn only on the peer that
+        /// owns the bird, never for rivals, and never over a decoy (a decoy shares its caster's input
+        /// authority, so the authority test alone would let it pop on the caster's screen).
+        /// </summary>
+        public static bool ShouldSpawnSelfPop(bool hasInputAuthority, bool isDecoy) => hasInputAuthority && !isDecoy;
+
+        /// <summary>True when <paramref name="controller"/> is a valid, non-decoy bird this peer owns.</summary>
+        public static bool IsSelfPopTarget(ChickenController controller)
+        {
+            if (controller == null) return false;
+            var obj = controller.Object;
+            return obj != null && obj.IsValid && ShouldSpawnSelfPop(controller.HasInputAuthority, controller.IsDecoy);
+        }
+
+        /// <summary>
+        /// A catalog word (<paramref name="key"/>) over <paramref name="controller"/>'s head, on its owner's
+        /// screen only (see <see cref="ShouldSpawnSelfPop"/>). Returns whether it was spawned. Format the
+        /// args only here, on the event, never per frame.
+        /// </summary>
+        public static bool SpawnSelfPop(ChickenController controller, string key, Color color,
+                                        params (string name, object value)[] args)
+        {
+            if (!IsSelfPopTarget(controller)) return false;
+            string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
+            Spawn(controller.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight, text, color);
+            return true;
+        }
+
+        /// <summary>
+        /// The cargo popup for <paramref name="controller"/>'s change of <paramref name="delta"/>: on the
+        /// owner's own screen it is the catalog word (<c>ROB -n</c> / <c>+n</c>, D7b), everywhere else the
+        /// unchanged <see cref="SpawnCargoDelta"/>. Exactly one pop per event on any peer.
+        /// </summary>
+        public static void SpawnCargoPop(ChickenController controller, Vector3 worldPos, float delta)
+        {
+            int whole = Mathf.RoundToInt(Mathf.Abs(delta));
+            if (whole <= 0) return;
+
+            bool gain = delta > 0f;
+            if (SpawnSelfPop(controller,
+                             gain ? UiKeys.HudPopGrabbed : UiKeys.HudPopRobbed,
+                             gain ? FeedbackTuning.FloatingTextCargoGainColor : FeedbackTuning.FloatingTextCargoLossColor,
+                             ("n", whole)))
+                return;
+
+            SpawnCargoDelta(worldPos, delta);
         }
 
         // ── Lifecycle ──────────────────────────────────────────────────────────

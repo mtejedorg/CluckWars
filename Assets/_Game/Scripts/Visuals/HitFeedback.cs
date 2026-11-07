@@ -359,6 +359,11 @@ namespace CluckWars.Visuals
             _lastKnockEventId = id;
 
             TriggerVictimHit();
+
+            // PUSH over the victim on every peer, gated exactly like the STUN pop in ObserveControlStates
+            // (no text on a decoy, no hidden-bird gate: STUN has none either). Spec section 5.
+            if (!_controller.IsDecoy)
+                FloatingCombatText.Spawn(TextAnchorPoint(), UiText.Get(UiKeys.HudPopPush), FeedbackPalette.Current.Accent(AccentKey.Shove));
         }
 
         /// <summary>
