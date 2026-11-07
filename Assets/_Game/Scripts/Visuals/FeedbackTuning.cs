@@ -1727,6 +1727,43 @@ namespace CluckWars.Visuals
         public const float SlowAuraPuffLifeSeconds = 0.5f;
         public const float SlowAuraPuffHeight = 0.12f;
 
+        // ---- Hide beats (D9, vfx.md 2.8) ------------------------------------------------------------
+
+        /// <summary>The two Hide poofs (enter = cream, break = Hide accent): 8 dust puffs at 0.6 m flying radially at 1.2 m/s for
+        /// 0.35 s, sized 0.3 to 0.6 (the family has no size curve, so each puff takes one size from the range), plus 3 feathers
+        /// drifting up on the enter edge. Reduced Motion: half the puffs, no travel (they fade in place).</summary>
+        public const int HidePoofDustCount = 8;
+        public const int HidePoofDustCountReduced = 4;
+        public const int HidePoofFeatherCount = 3;
+        public const int HidePoofFeatherCountReduced = 1;
+        public const float HidePoofHeight = 0.6f;
+        public const float HidePoofSpeed = 1.2f;
+        public const float HidePoofLifeSeconds = 0.35f;
+        public const float HidePoofSizeMin = 0.3f;
+        public const float HidePoofSizeMax = 0.6f;
+        public const float HidePoofScatterRadius = 0.2f;
+        public const float HidePoofFeatherSpeed = 0.7f;
+        public const float HidePoofFeatherLifeSeconds = 0.8f;
+        public const float HidePoofFeatherSizeMin = 0.28f;
+        public const float HidePoofFeatherSizeMax = 0.38f;
+
+        /// <summary>The local bird's dashed cream ring under it for the whole Hide: radius is <see cref="SelfRingRadius"/> (0.62),
+        /// order 0, turning 0.25 lap/s (static under Reduced Motion), at this ground height and alpha.</summary>
+        public const float HideRingLapsPerSecond = 0.25f;
+        public const float HideRingAlpha = 0.8f;
+        public const float HideRingY = 0.05f;
+        public const float HideRingWidth = 0.12f;
+        public const int HideRingSortingOrder = 0;
+        public const int HideRingSegments = 48;
+
+        /// <summary>The ring blinks twice in the last <see cref="HideBlinkLeadSeconds"/> of the Hide (each blink one
+        /// <see cref="HideBlinkPeriodSeconds"/>: dim for the first half, lit for the second). Reduced Motion replaces the blink with
+        /// a steady dip to <see cref="HideBlinkSteadyAlpha"/> over the same last 0.25 s (no flicker).</summary>
+        public const float HideBlinkLeadSeconds = 0.25f;
+        public const float HideBlinkPeriodSeconds = 0.125f;
+        public const float HideBlinkDimAlpha = 0.15f;
+        public const float HideBlinkSteadyAlpha = 0.5f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

@@ -371,10 +371,10 @@ namespace CluckWars.Visuals
 
             TriggerVictimHit();
 
-            // PUSH over the victim on every peer, gated exactly like the STUN pop in ObserveControlStates
-            // (no text on a decoy, no hidden-bird gate: STUN has none either). Spec section 5.
+            // PUSH over the victim on every peer (no text on a decoy). Spec section 5. D9: like every pop AT a bird it is
+            // dropped on a faded remote bird (the controller overload of the gated spawn holds the rule).
             if (!_controller.IsDecoy)
-                FloatingCombatText.Spawn(TextAnchorPoint(), UiText.Get(UiKeys.HudPopPush), FeedbackPalette.Current.Accent(AccentKey.Shove));
+                FloatingCombatText.Spawn(_controller, TextAnchorPoint(), UiText.Get(UiKeys.HudPopPush), FeedbackPalette.Current.Accent(AccentKey.Shove));
         }
 
         /// <summary>
@@ -565,7 +565,7 @@ namespace CluckWars.Visuals
                         // A pure-control ability bounced off control immunity: IMMUNE. Anything else
                         // that is nullified was a steal refused by the steal-proof state: SAFE.
                         FloatingCombatText.Spawn(
-                            victim.PopAnchor,
+                            victim, victim.PopAnchor,
                             ability.TargetEffectIsPurelyControl ? UiText.Get(UiKeys.HudPopImmune) : UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                         continue;
@@ -576,7 +576,7 @@ namespace CluckWars.Visuals
                     if (ability.TargetEffectIncludesSteal && victim.IsStealProof)
                     {
                         FloatingCombatText.Spawn(
-                            victim.PopAnchor,
+                            victim, victim.PopAnchor,
                             UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                     }
@@ -668,7 +668,7 @@ namespace CluckWars.Visuals
                 if (!ability.WouldAffect(_controller, candidate)) continue;
 
                 FloatingCombatText.Spawn(
-                    candidate.PopAnchor,
+                    candidate, candidate.PopAnchor,
                     UiText.Get(UiKeys.HudPopImmune),
                     FeedbackTuning.NeutralNoEffectColor);
             }
@@ -1191,7 +1191,7 @@ namespace CluckWars.Visuals
         private void SpawnControlText(string label, float seconds, Color color)
         {
             string text = seconds > 0.05f ? $"{label} {seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}s" : label;
-            FloatingCombatText.Spawn(TextAnchorPoint(), text, color);
+            FloatingCombatText.Spawn(_controller, TextAnchorPoint(), text, color);
         }
 
         /// <summary>
@@ -1219,7 +1219,7 @@ namespace CluckWars.Visuals
                 int percent = Mathf.Clamp(Mathf.RoundToInt(_controller.SlowMultiplier * 100f), 0, 100);
                 text = $"{text} {percent}%";
             }
-            FloatingCombatText.Spawn(TextAnchorPoint(), text, FeedbackTuning.CanonicalSlowColor);
+            FloatingCombatText.Spawn(_controller, TextAnchorPoint(), text, FeedbackTuning.CanonicalSlowColor);
         }
 
         private Vector3 TextAnchorPoint() => _controller.PopAnchor;
@@ -1235,7 +1235,9 @@ namespace CluckWars.Visuals
         /// </summary>
         private void HandleRemoval()
         {
-            if (_vfx != null) _vfx.EmitFeathers(in _featherEmit, 0.7f);
+            // D9 re-verify: the removal feathers obey the same hidden-bird gate as the rest of the tells (a faded remote bird that
+            // is removed shows nothing here; ChickenVFX's own removal burst is gated the same way).
+            if (_vfx != null && !HiddenVisibilityRules.IsHiddenFor(_controller)) _vfx.EmitFeathers(in _featherEmit, 0.7f);
 
             // Knocked out: the long buzz, on the victim's own peer (a decoy shares its caster's input authority).
             if (HasInputAuthority && _controller != null && !_controller.IsDecoy) _haptics?.Buzz(HapticKind.Stun);

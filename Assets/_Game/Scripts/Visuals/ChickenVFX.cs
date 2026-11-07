@@ -202,6 +202,12 @@ namespace CluckWars.Visuals
         private FxEmit  _skidDust, _shoveRing;
         private FxEmit  _stealArrival;
 
+        // ── Hide poofs (D9): edge of "is this bird faded", seeded on first observation ──
+        private bool _hideInitialized;
+        private bool _wasHideFaded;
+        private FxEmit _hidePoofDust, _hidePoofFeather;
+        private AbilityRangeIndicator _castFlash;
+
         // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
         // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
         // flags in Spawned() because they are NetworkBehaviours and Spawned() is the
@@ -225,6 +231,7 @@ namespace CluckWars.Visuals
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
             _animator   = GetComponent<ChickenAnimator>();
+            _castFlash  = GetComponent<AbilityRangeIndicator>();
 
             if (_particleMaterial != null) s_sharedMaterial = _particleMaterial;
             var mat = _particleMaterial != null ? _particleMaterial : BuildMaterial();
@@ -291,6 +298,23 @@ namespace CluckWars.Visuals
                 SpeedMin = FeedbackTuning.ShoveRingSpeed, SpeedMax = FeedbackTuning.ShoveRingSpeed,
                 LifeMin = FeedbackTuning.ShoveRingLifeSeconds, LifeMax = FeedbackTuning.ShoveRingLifeSeconds,
                 Shape = FxShape.Ring, Radius = FeedbackTuning.ShoveRingRadius, Gravity = 0f,
+            };
+            // Hide poofs (D9): colour overwritten per edge (cream on enter, the Hide accent on break).
+            _hidePoofDust = new FxEmit
+            {
+                Count = FeedbackTuning.HidePoofDustCount, Color = cream,
+                SizeMin = FeedbackTuning.HidePoofSizeMin, SizeMax = FeedbackTuning.HidePoofSizeMax,
+                SpeedMin = FeedbackTuning.HidePoofSpeed, SpeedMax = FeedbackTuning.HidePoofSpeed,
+                LifeMin = FeedbackTuning.HidePoofLifeSeconds, LifeMax = FeedbackTuning.HidePoofLifeSeconds,
+                Shape = FxShape.Disc, Radius = FeedbackTuning.HidePoofScatterRadius, Gravity = 0f, RandomRotation = true,
+            };
+            _hidePoofFeather = new FxEmit
+            {
+                Count = FeedbackTuning.HidePoofFeatherCount, Color = cream,
+                SizeMin = FeedbackTuning.HidePoofFeatherSizeMin, SizeMax = FeedbackTuning.HidePoofFeatherSizeMax,
+                SpeedMin = FeedbackTuning.HidePoofFeatherSpeed, SpeedMax = FeedbackTuning.HidePoofFeatherSpeed,
+                LifeMin = FeedbackTuning.HidePoofFeatherLifeSeconds, LifeMax = FeedbackTuning.HidePoofFeatherLifeSeconds,
+                Shape = FxShape.Cone, Radius = 0.1f, ConeAngle = 25f, Axis = Vector3.up, Gravity = 0f, RandomRotation = true,
             };
             // Steal arrival (D7): gold sparkles at the thief when the kernels land.
             _stealArrival = new FxEmit
@@ -379,6 +403,7 @@ namespace CluckWars.Visuals
             ObserveSpeedBody(hidden, isRemoved);
             ObserveJumpBeats(hidden);
             ObserveShoveVictim(hidden);
+            ObserveHideBeats();
 
             // Ability activation: AccentColor burst + caster micro-shake on cast. Detection used to be a rising-edge
             // test on the old single ActiveSlot (since retired: abilities now run concurrently on a per-slot mask).
@@ -419,6 +444,64 @@ namespace CluckWars.Visuals
                 _lastCargo    = cargo;
                 _wasCargoFull = isCargoFull;
             }
+        }
+
+        // ---- Hide poofs (D9, vfx.md 2.8) ----------------------------------------------------------
+
+        /// <summary>
+        /// The two Hide poofs, observed on every peer from the replicated <c>VisualOpacity</c> through
+        /// <see cref="ControlStateVFX.IsFadedOpacity"/> (the same predicate every other gate uses): the faded edge is the enter poof
+        /// (cream, where the bird vanished: fair, the cast was visible), the reverse edge the break poof (the Hide accent, plus the
+        /// self-ring cast flash: "revealed"). The first observation only seeds the baseline, so a late join never poofs for a Hide
+        /// already running. Nothing here consults the hidden gate: see <see cref="EmitHidePoof"/>.
+        /// </summary>
+        private void ObserveHideBeats()
+        {
+            if (_controller == null) return;
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid) return;
+
+            bool faded = ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity);
+            if (!_hideInitialized)
+            {
+                _hideInitialized = true;
+                _wasHideFaded = faded;
+                return;
+            }
+
+            var edge = HideBeatRules.PoofEdge(_wasHideFaded, faded);
+            _wasHideFaded = faded;
+            if (edge == HideBeatRules.Edge.None || _combat == null || _combat.IsRemoved) return;
+            EmitHidePoof(edge == HideBeatRules.Edge.Break);
+        }
+
+        /// <summary>
+        /// HIDE-POOF-BYPASS. The ONE emission in the VFX layer that deliberately skips the faded-bird gate
+        /// (<see cref="HiddenVisibilityRules"/>): the poofs mark the moment of vanishing and of reappearing, by design, and reveal
+        /// nothing a rival did not already see (the cast was visible). <c>HiddenBirdTests</c> pins that this marker appears once,
+        /// here, and that only <see cref="ObserveHideBeats"/> calls this method.
+        /// </summary>
+        private void EmitHidePoof(bool breakPoof)
+        {
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            Color accent = FeedbackPalette.Current.Accent(AccentKey.Hide);
+
+            var dust = _hidePoofDust;
+            dust.Count = HideBeatRules.DustCount(reduced);
+            dust.SpeedMin = dust.SpeedMax = HideBeatRules.DustSpeed(reduced);
+            if (breakPoof) dust.Color = accent;
+            EmitDust(in dust, FeedbackTuning.HidePoofHeight);
+
+            if (breakPoof)
+            {
+                if (_castFlash != null) _castFlash.PlaySelfFlash(accent);
+                return;
+            }
+
+            var feathers = _hidePoofFeather;
+            feathers.Count = HideBeatRules.FeatherCount(reduced);
+            feathers.SpeedMin = feathers.SpeedMax = HideBeatRules.FeatherSpeed(reduced);
+            EmitFeathers(in feathers, FeedbackTuning.HidePoofHeight);
         }
 
         // ---- Shove beats (D6, vfx.md 2.3) --------------------------------------------

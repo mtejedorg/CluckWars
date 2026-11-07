@@ -25,7 +25,7 @@ namespace CluckWars.Visuals
     /// camera. A world-space Canvas would add a second UI batch and a layout pass per
     /// popup for no gain — §10's budget is 30 fps on a 2021 mid-range Android.
     ///
-    /// <b>Never throws.</b> <see cref="Spawn"/> is safe to call from anywhere, including
+    /// <b>Never throws.</b> <see cref="SpawnUngated"/> is safe to call from anywhere, including
     /// EditMode tests and scenes with no pool: outside play mode it returns silently
     /// instead of creating a GameObject, and in play mode it lazily creates the single
     /// pool object on first use. Nothing needs to be wired in the Inspector.
@@ -88,12 +88,34 @@ namespace CluckWars.Visuals
         /// over the remaining <see cref="FeedbackTuning.FloatingTextFadeFraction"/>.
         /// Silently does nothing for null/empty text or outside play mode; never throws.
         /// </summary>
-        public static void Spawn(Vector3 worldPos, string text, Color color)
+        public static void SpawnUngated(Vector3 worldPos, string text, Color color)
         {
             if (string.IsNullOrEmpty(text)) return;
             var pool = EnsureInstance();
             if (pool == null) return;
             pool.SpawnInternal(worldPos, text, color);
+        }
+
+        /// <summary>
+        /// Pure form of the hidden-bird gate (D9, spec 2026-11-06 section 3.2): text AT a faded remote bird is never drawn (it would
+        /// mark where the hidden bird is); the faded local bird's own screen keeps its text. Same predicate as every other tell
+        /// (<see cref="HiddenVisibilityRules"/>).
+        /// </summary>
+        public static bool IsSuppressed(float visualOpacity, bool isLocal) => HiddenVisibilityRules.AlphaFor(visualOpacity, isLocal) <= 0f;
+
+        /// <summary>True when text over <paramref name="at"/> must not be drawn on this peer (a faded remote bird).</summary>
+        public static bool IsSuppressedAt(ChickenController at) => HiddenVisibilityRules.IsHiddenFor(at);
+
+        /// <summary>
+        /// THE spawn for any text drawn at a chicken (PUSH, STUN / SLOW digits, IMMUNE / SAFE, HUNT!, cargo text): shows
+        /// <paramref name="text"/> unless <paramref name="at"/> is a faded remote bird (<see cref="IsSuppressedAt"/>). Returns whether it
+        /// was spawned. The raw <see cref="SpawnUngated"/> is for the pop helpers below, which gate themselves.
+        /// </summary>
+        public static bool Spawn(ChickenController at, Vector3 worldPos, string text, Color color)
+        {
+            if (IsSuppressedAt(at)) return false;
+            SpawnUngated(worldPos, text, color);
+            return true;
         }
 
         /// <summary>
@@ -109,7 +131,7 @@ namespace CluckWars.Visuals
             if (whole <= 0) return;
 
             bool gain = delta > 0f;
-            Spawn(worldPos,
+            SpawnUngated(worldPos,
                   (gain ? "+" : "-") + whole + " " + CargoGlyph,
                   gain ? FeedbackTuning.FloatingTextCargoGainColor
                        : FeedbackTuning.FloatingTextCargoLossColor);
@@ -140,7 +162,7 @@ namespace CluckWars.Visuals
         {
             if (!IsSelfPopTarget(controller)) return false;
             string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
-            Spawn(controller.PopAnchor, text, color);
+            SpawnUngated(controller.PopAnchor, text, color);
             return true;
         }
 
@@ -164,6 +186,7 @@ namespace CluckWars.Visuals
         {
             int whole = Mathf.RoundToInt(Mathf.Abs(delta));
             if (whole <= 0) return;
+            if (IsSuppressedAt(controller)) return;   // D9: no +n / -n drawn AT a faded remote bird
 
             bool gain = delta > 0f;
             if (SpawnSelfPop(controller,

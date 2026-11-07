@@ -188,6 +188,23 @@ namespace CluckWars.Visuals
             _flashTimer      = 0f;
         }
 
+        /// <summary>
+        /// The self-ring cast flash (radius <see cref="FeedbackTuning.SelfRingRadius"/>) in <paramref name="accent"/> at the caster's
+        /// feet right now, without a cast event: the Hide break beat (D9) reuses the cast flash instead of building a second ring.
+        /// </summary>
+        public void PlaySelfFlash(Color accent)
+        {
+            _flashShape      = AbilityAimShape.None;
+            _flashRadius     = FeedbackTuning.SelfRingRadius;
+            _flashOffset     = 0f;
+            _flashConeAngle  = 360f;
+            _flashOrigin     = transform.position;
+            _flashForward    = transform.forward;
+            _flashColor      = accent;
+            _flashAlphaScale = 1f;
+            _flashTimer      = 0f;
+        }
+
         private void AnimateFlash()
         {
             if (_flashTimer < 0f) return;

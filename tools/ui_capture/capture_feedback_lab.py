@@ -227,7 +227,8 @@ def main():
                                         (3.1, "6_eggend"), (3.3, "6b_hatch"), (4.5, "7_over")))
             cs("Stick", "0", "0")
         if want("hide"):
-            ability(3, "hide", after=((0.8, "3_hidden"), (3.5, "4_mid"), (7.5, "5_end")))
+            # The Hide is 2 s of Fusion time: enter poof at the cast, ring turning, blink in the last 0.25 s (~1.85 s), break poof + flash at ~2 s.
+            ability(3, "hide", after=((0.8, "3_hidden"), (1.85, "3b_blink"), (2.2, "3c_break"), (3.5, "4_mid"), (7.5, "5_end")))
     # Loadout C: Peck on the Warrior (Death Mark needs the Assassin; separate pass)
     if want("peck"):
         log(cs("Loadout", "Peck", "WingSlam", "Snatch", "SpeedBurst"))

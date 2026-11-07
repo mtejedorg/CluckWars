@@ -40,6 +40,10 @@ namespace CluckWars.Visuals
 
         private static Material s_dashedMaterial;
 
+        /// <summary>The one dashed-ribbon material (Fx_DashedRing) shared by every ring on the peer; built when the first chicken wakes.
+        /// <see cref="HideLocalCue"/> borrows it (colour is per-vertex, so one material serves every tint).</summary>
+        internal static Material SharedDashedMaterial => s_dashedMaterial;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { s_dashedMaterial = null; }
 

@@ -137,7 +137,7 @@ namespace CluckWars.Visuals
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if (ShowsHuntPop(o) && _localHunter != null)
-                FloatingCombatText.Spawn(_localHunter.PopAnchor,
+                FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor,
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
         }
 
