@@ -35,12 +35,12 @@ namespace CluckWars.Visuals
     /// <list type="bullet">
     ///   <item>1.16 — cargo bar (<see cref="ChickenWorldBars"/>)</item>
     ///   <item>1.70 — nameplate (<see cref="ChickenNameplate"/>)</item>
-    ///   <item><b>1.78 → 2.00 — this badge stack</b></item>
-    ///   <item>2.05 → 3.15 — floating combat text (<see cref="FloatingCombatText"/>,
+    ///   <item><b>2.12 → 2.40 — this badge stack, wholly above the nameplate pill (1.48-1.93)</b></item>
+    ///   <item>2.50 → 3.60 — floating combat text (<see cref="FloatingCombatText"/>,
     ///   spawning at <see cref="FeedbackTuning.FloatingTextSpawnHeight"/> and rising by
     ///   <see cref="FeedbackTuning.FloatingTextRiseDistance"/>)</item>
     /// </list>
-    /// That leaves a 0.35-unit gap between the nameplate and the floating-text floor, and
+    /// That leaves a 0.10-unit gap between the stack top and the floating-text floor, and
     /// the stack is sized to fit inside it: bottom row at
     /// <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/>, growing upward by
     /// <see cref="FeedbackTuning.StatusBadgeRowSpacing"/>, capped at
@@ -83,14 +83,13 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite _glyphHidden;
         [SerializeField] private Sprite _glyphSpeeding;
 
-        /// <summary>Sorting order of the glyph sprite and the row text: 0, as shipped. At the shipped
-        /// heights (1.78-2.00) the stack overlaps the nameplate pill, which draws above it; raising the
-        /// order paints the rows over the name instead. Where the stack sits is an open layout decision
-        /// (feedback batch C3, STATE), so the order stays as shipped until it is made.</summary>
+        /// <summary>Sorting order of the glyph sprite and the row text: 0, as shipped. The stack
+        /// (2.12-2.40) sits above the nameplate pill, so nothing overlaps and no sorting fight exists
+        /// (feedback batch D0).</summary>
         public const int SortingOrder = 0;
 
         /// <summary>Badge text size. About half the nameplate's characterSize (0.05) so
-        /// three rows fit the 0.35-unit gap the layout budget allows — see the class
+        /// three rows fit the band between the nameplate and the floating text — see the class
         /// remarks.</summary>
         private const float CharacterSize = 0.026f;
         private const int   FontSize      = 64;

@@ -140,9 +140,13 @@ namespace CluckWars.Visuals
         {
             if (!IsSelfPopTarget(controller)) return false;
             string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
-            Spawn(controller.transform.position + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight, text, color);
+            Spawn(PopSpawnPosition(controller.transform.position), text, color);
             return true;
         }
+
+        /// <summary>Where a pop over a bird at <paramref name="pivot"/> starts: <see cref="FeedbackTuning.FloatingTextSpawnHeight"/>
+        /// above it, over the whole badge stack.</summary>
+        public static Vector3 PopSpawnPosition(Vector3 pivot) => pivot + Vector3.up * FeedbackTuning.FloatingTextSpawnHeight;
 
         /// <summary>
         /// The cargo popup for <paramref name="controller"/>'s change of <paramref name="delta"/>: on the
