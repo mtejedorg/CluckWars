@@ -15,12 +15,21 @@ MonoBehaviour:
   DisplayName: Hide
   ShortLabel: HIDE
   Description: Fades you to a ghostly outline for 2s. Using a move breaks it.
-  AccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
+  AccentKey: 8
+  CustomAccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3
   TerrainTraversal: 0
-  SlotKind: 1
+  JumpTier: 0
   AllowedClasses: 15
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
+  BotRole: 0
   Duration: 2
   Cooldown: 4.5
   CastMotion: 6
+  AreaKind: 0
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  Retired: 0
   Opacity: 0.2

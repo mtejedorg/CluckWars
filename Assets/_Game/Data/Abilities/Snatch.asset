@@ -15,21 +15,23 @@ MonoBehaviour:
   DisplayName: Steal
   ShortLabel: ROB
   Description: Robs 5 food from every rival within 5.16m.
-  Icon: 
-  AccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
+  AccentKey: 1
+  CustomAccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 15
+  PeckSlotPreEquippedBy: 0
   SignaturePreEquippedBy: 130
   BotRole: 0
   Duration: 0.3
   Cooldown: 4
-  SearchMask:
   CastMotion: 3
+  AreaKind: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 0
   SnatchRange: 5.16
   StealAmount: 5
   KnockbackStrength: 0

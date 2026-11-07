@@ -772,7 +772,7 @@ namespace CluckWars.Visuals
         /// <summary>The marker while a base wall stands between Assassin and target (#8D8D8D).</summary>
         public static readonly Color MarkWalledColor = new Color(0.553f, 0.553f, 0.553f, 1f);
         /// <summary>HUD cream (#FEF5E0) and HUD ink (#2A1A0C), the lit / KILL hex rim and icon.</summary>
-        public static readonly Color MarkCream = new Color(0.996f, 0.961f, 0.878f, 1f);
+        public static Color MarkCream => FeedbackPalette.Current.CreamColor;
         public static readonly Color MarkHexIconInk = new Color(0.086f, 0.063f, 0.11f, 1f);
 
         /// <summary>The draw: a highlight steps down the standings for this long (never longer than the mark's arm), one row
@@ -1109,7 +1109,7 @@ namespace CluckWars.Visuals
 
         /// <summary>The ink colour shared by the ground guides' under-stroke and the HUD's hex rim
         /// (#2a1a0c, the menu's "Ink").</summary>
-        public static readonly Color InkColor = new Color(0.165f, 0.102f, 0.047f, 1f);
+        public static Color InkColor => FeedbackPalette.Current.InkColor;
 
         /// <summary>
         /// Alpha for a ready slot with nothing in its shape — the resting tier. Phase 6 (A2)
@@ -1153,6 +1153,10 @@ namespace CluckWars.Visuals
         // Colours — canonical control-state set
         // ================================================================
         //
+        // Since B1 (spec D3a) the stun / slow / knock / no-effect / ink / cream values live in
+        // Assets/_Game/Data/FeedbackPalette.asset (FeedbackPaletteSO); the properties here read
+        // FeedbackPalette.Current so every existing reader keeps its name.
+        //
         // ControlStateVFX.cs and ChickenStateOverlays.cs currently define their own,
         // slightly different RGB values for the same two states (see the report for
         // the exact numbers). Both are correct on *hue* (root = green, slow = cyan,
@@ -1177,7 +1181,7 @@ namespace CluckWars.Visuals
         /// <summary>Canonical stun colour — matches <c>ControlStateVFX.StunColor</c>
         /// exactly (no change needed there); reproduced so every future consumer
         /// has one named source instead of a local literal.</summary>
-        public static readonly Color CanonicalStunColor = new Color(1.00f, 0.85f, 0.20f, 1f);
+        public static Color CanonicalStunColor => FeedbackPalette.Current.StunColor;
 
         /// <summary>Canonical root colour. Matches <c>ControlStateVFX.RootColor</c>;
         /// diverges from <c>ChickenStateOverlays.RootColor</c> (0.32, 0.72, 0.28) —
@@ -1187,11 +1191,11 @@ namespace CluckWars.Visuals
         /// <summary>Canonical slow colour. Matches <c>ControlStateVFX.SlowColor</c>;
         /// diverges from <c>ChickenStateOverlays.SlowColor</c> (0.35, 0.62, 1.0) —
         /// see the delete/replace instruction in the report.</summary>
-        public static readonly Color CanonicalSlowColor = new Color(0.30f, 0.75f, 1.00f, 1f);
+        public static Color CanonicalSlowColor => FeedbackPalette.Current.SlowColor;
 
         /// <summary>Canonical knockback shockwave colour — already consistent
         /// (white) wherever it appears; reproduced for completeness.</summary>
-        public static readonly Color CanonicalKnockColor = new Color(1f, 1f, 1f, 1f);
+        public static Color CanonicalKnockColor => FeedbackPalette.Current.KnockColor;
 
         // ---- Threat-overlay colours (§2.2) --------------------------------
         //
@@ -1210,7 +1214,7 @@ namespace CluckWars.Visuals
         /// the dark arena background (<c>MatchCamera</c>'s solid clear colour is
         /// ≈(0.10, 0.12, 0.16)).
         /// </summary>
-        public static readonly Color NeutralNoEffectColor = new Color(0.58f, 0.58f, 0.62f, 0.85f);
+        public static Color NeutralNoEffectColor => FeedbackPalette.Current.NeutralNoEffectColor;
 
         /// <summary>
         /// Desaturated red-grey wash for a hold that is REALLY refused: the caster is stunned,
@@ -1246,12 +1250,12 @@ namespace CluckWars.Visuals
         /// <summary>Caster-to-centre stalk colour while the preview is in its no-target dashed state:
         /// the same cream the dashes carry, so the connector does not read as a solid accent line
         /// leading to a dashed shape.</summary>
-        public static readonly Color NoTargetPreviewStalkColor = new Color(0.996f, 0.961f, 0.878f, 0.9f);
+        public static Color NoTargetPreviewStalkColor => new Color(MarkCream.r, MarkCream.g, MarkCream.b, 0.9f);
 
         // ---- Held-move readability on grass (Phase 7 B1) -----------------------------
 
         /// <summary>Cream of the filled shape drawn under a held move's outline (the same cream as the dashed ring).</summary>
-        public static readonly Color HeldFillColor = new Color(0.996f, 0.961f, 0.878f, 1f);
+        public static Color HeldFillColor => FeedbackPalette.Current.CreamColor;
 
         /// <summary>Fill opacity of the held shape (~25%); eased to <see cref="HeldFillAlphaCancelArmed"/> while the
         /// cancel is armed, so "this will NOT fire" reads as a fainter shape as well as a grey dashed one.</summary>
@@ -1260,7 +1264,7 @@ namespace CluckWars.Visuals
 
         /// <summary>Ink under-stroke beneath the held shape's outline (solid, dashed no-target and grey cancel alike):
         /// near opaque, so the edge keeps &gt;= 3:1 against the lightest grass (see <c>Phase7ChunkBTests</c>).</summary>
-        public static readonly Color PreviewInkUnderStrokeColor = new Color(InkColor.r, InkColor.g, InkColor.b, 0.9f);
+        public static Color PreviewInkUnderStrokeColor => new Color(InkColor.r, InkColor.g, InkColor.b, 0.9f);
 
         /// <summary>Total extra width of the ink under-stroke over the stroke it backs: 0.06 world units, about 3 px a
         /// side at the arena camera (96 px per world unit at 1080p).</summary>

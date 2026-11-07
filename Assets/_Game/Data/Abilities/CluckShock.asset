@@ -15,19 +15,22 @@ MonoBehaviour:
   DisplayName: Shove
   ShortLabel: PUSH
   Description: Shoves every rival within 5.4m away.
-  AccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
+  AccentKey: 3
+  CustomAccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0
-  SlotKind: 1
+  JumpTier: 0
   AllowedClasses: 15
+  PeckSlotPreEquippedBy: 0
   SignaturePreEquippedBy: 1
   BotRole: 0
   Duration: 0.5
   Cooldown: 5
-  SearchMask:
   CastMotion: 2
+  AreaKind: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 0
   ShockRadius: 5.4
   KnockbackForce: 16.2
-  ShockDamage: 35

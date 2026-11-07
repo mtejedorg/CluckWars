@@ -483,10 +483,15 @@ namespace CluckWars.Editor
 
                 a.Duration   = FloatField(a.Duration,  wF, minVal: 0.05f);
                 a.Cooldown   = FloatField(a.Cooldown,  wF, minVal: 0f);
-                a.AccentColor = EditorGUILayout.ColorField(
-                    GUIContent.none, a.AccentColor,
-                    showEyedropper: false, showAlpha: false, hdr: false,
-                    GUILayout.Width(wColor));
+                // A palette-keyed accent is edited in FeedbackPalette.asset, so only a Custom literal is editable here.
+                using (new EditorGUI.DisabledScope(a.AccentKey != CluckWars.Visuals.AccentKey.Custom))
+                {
+                    var accent = EditorGUILayout.ColorField(
+                        GUIContent.none, a.AccentColor,
+                        showEyedropper: false, showAlpha: false, hdr: false,
+                        GUILayout.Width(wColor));
+                    if (a.AccentKey == CluckWars.Visuals.AccentKey.Custom) a.CustomAccentColor = accent;
+                }
 
                 EditorGUILayout.EndHorizontal();
 
@@ -542,7 +547,8 @@ namespace CluckWars.Editor
                 case "DisplayName":
                 case "ShortLabel":
                 case "Description":
-                case "AccentColor":
+                case "AccentKey":
+                case "CustomAccentColor":
                 case "Duration":
                 case "Cooldown":
                 case "AllowedClasses":

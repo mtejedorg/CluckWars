@@ -182,24 +182,20 @@ slice left / right only. The leaderboard dots carry a cream ring too (P4 teal al
 
 ### Ability Accent Colors & Icons
 
-Each ability has a unique accent color (used on hex buttons, cooldown overlays, and VFX) and an **icon glyph**. The accent is authored per `AbilityBaseSO.AccentColor`; the glyph per `AbilityBaseSO.Icon` (blank falls back to the subclass `DefaultIcon`, surfaced via `ResolveIcon()`). 14 abilities across 4 categories (GDD §7.2). Cooldown tier: **S** = short 3–6 s, **M** = medium 8–12 s.
+Each active ability wears an accent colour (range guides, telegraphs, cast VFX; the hex button is tinted by **category**, `UI/AbilityPalette`) and an **icon glyph**. Since B1 (spec 2026-11-06 §12 D3a) an ability asset carries an `AccentKey` and `AbilityBaseSO.AccentColor` reads the palette; `AccentKey.Custom` (retired assets) keeps the asset's own `CustomAccentColor` literal. **The values live in `Assets/_Game/Data/FeedbackPalette.asset`** (`FeedbackPaletteSO`, bound by `ProjectInstaller`), together with the state colours (stun, slow, knock, no-effect grey, ink, cream) that `FeedbackTuning` exposes. The table mirrors the asset; the asset wins. Every accent stays >= 12 CIEDE2000 from every other accent, every state colour and the four player colours (`FeedbackPaletteTests`). The glyph is authored per `AbilityBaseSO.Icon` (blank falls back to the subclass `DefaultIcon`, surfaced via `ResolveIcon()`).
 
-| Category | Ability | Icon | Accent | Hex | CD |
-|---|---|---|---|---|---|
-| Damage  | Flying Peck   | 🪽 | Orange      | #FF7043 | S |
-| Damage  | Cluck Shock   | ⚡ | Deep Orange | #FF5722 | M |
-| Damage  | Peck          | 🐦 | Burnt Orange| #E64A19 | S |
-| Control | Roll & Push   | 🌀 | Light Purple| #AB47BC | S |
-| Control | Feather Trap  | 🪤 | Purple      | #9C27B0 | M |
-| Control | Feather Aura  | 💨 | Deep Purple | #8E24AA | M |
-| Control | Sticky Egg (was Root Egg; ShortLabel STKY) | 🌱 | Dark Purple | #7B1FA2 | M |
-| Defense | Egg Shell     | 🥚 | Light Green | #66BB6A | S |
-| Defense | Turtle Mode   | 🐢 | Green       | #4CAF50 | S |
-| Defense | Spine Coat    | 🦔 | Dark Green  | #43A047 | M |
-| Utility | Speed Burst   | 💨 | Cyan        | #26C6DA | S |
-| Utility | Invisibility  | 👻 | Light Blue  | #00ACC1 | M |
-| Utility | Doppelganger  | 👥 | Teal        | #0097A7 | M |
-| Utility | Sneaky Steal  | 🤏 | Cyan        | #00BCD4 | S |
+| AccentKey | Ability (asset) | Accent (RGB) | Hex | Note |
+|---|---|---|---|---|
+| Steal | Steal (`Snatch`) | (1, 0.3, 0.1) | #FF4C1A |  |
+| Stun | Stun (`WingSlam`) | (1, 0.85, 0.2) | #FFD933 | = the stun state colour |
+| Shove | Shove / Push (`CluckShock`) | (1, 0.55, 0.15) | #FF8C26 |  |
+| Slow | Slow (`FeatherAura`) | (0.3, 0.75, 1) | #4CBFFF | = the slow state colour |
+| Speed | Speed / Zoom (`SpeedBurst`) | (1, 0.93, 0.65) | #FFEDA6 | pale gold-white, kept off stun yellow |
+| Jump | Jump (`Shadowstep`) | (0.4, 0.2, 0.9) | #6633E6 |  |
+| EggShell | Egg Shell (`TurtleMode`) | (0.996, 0.961, 0.878) | #FEF5E0 | = the cream state colour (the egg's colour) |
+| Hide | Hide (`Invisibility`) | (0.6, 0.57, 0.78) | #9991C7 | violet-grey, kept off the no-effect grey |
+| Peck | Peck (`Peck`) | (0.92, 0.66, 0.2) | #EBA833 | warm straw, kept off stun yellow |
+| Hunt | Hunt / Death Mark (`MarkKill`) | (0.9, 0.1, 0.2) | #E61A33 |  |
 
 > **Note on glyph rendering:** the icons are stored on each ability asset and wired into the hex buttons and character-select cards in code. Color-emoji rendering needs a TMP sprite/emoji font (see §9 TBD #11); under the current legacy `UnityEngine.UI.Text` + built-in font, glyphs not in the base font fall back to the short label.
 

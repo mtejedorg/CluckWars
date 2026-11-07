@@ -54,6 +54,10 @@ namespace CluckWars.Installers
                  "and Performance Mode keeps the full fence.")]
         [SerializeField] private FencePerformanceMeshesSO _fencePerformanceMeshes;
 
+        [Tooltip("Drop the FeedbackPalette asset here (Assets/_Game/Data/FeedbackPalette.asset): the state colours and per-job " +
+                 "ability accents (spec D3a). If null, the palette's built-in defaults (the pre-palette colours) apply and a warning is logged.")]
+        [SerializeField] private FeedbackPaletteSO _feedbackPalette;
+
         public override void InstallBindings()
         {
             // Logger bound first so other bindings can complain through it during install if they need to.
@@ -211,6 +215,14 @@ namespace CluckWars.Installers
             // Ability SOs read the targeting rule from static code with no context, so it is pushed once, here, before any
             // scene loads (AbilityTargeting remarks). Every peer installs the same asset.
             CluckWars.Abilities.AbilityTargeting.Mode = matchConfig.TargetingMode;
+            // Same reason for the feedback palette: FeedbackTuning's colours and AbilityBaseSO.AccentColor are static reads.
+            FeedbackPalette.Current = _feedbackPalette;
+            if (_feedbackPalette == null)
+            {
+                Debug.LogWarning(
+                    "[ProjectInstaller] FeedbackPalette not assigned — state colours and ability accents use " +
+                    "FeedbackPaletteSO's built-in defaults, NOT FeedbackPalette.asset. Assign it here.");
+            }
             if (_matchConfig == null)
             {
                 Debug.LogWarning(

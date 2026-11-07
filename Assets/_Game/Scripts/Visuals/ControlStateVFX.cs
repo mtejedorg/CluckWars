@@ -58,10 +58,10 @@ namespace CluckWars.Visuals
 
         // Canonical control-state colours. Previously duplicated as local literals here;
         // FeedbackTuning is now the single source so future tuning has one place to happen.
-        private static readonly Color StunColor  = FeedbackTuning.CanonicalStunColor;
+        private static Color StunColor  => FeedbackTuning.CanonicalStunColor;
         private static readonly Color RootColor  = FeedbackTuning.CanonicalRootColor;
-        private static readonly Color SlowColor  = FeedbackTuning.CanonicalSlowColor;
-        private static readonly Color KnockColor = FeedbackTuning.CanonicalKnockColor;
+        private static Color SlowColor  => FeedbackTuning.CanonicalSlowColor;
+        private static Color KnockColor => FeedbackTuning.CanonicalKnockColor;
 
         [Tooltip("World diameter of the wind-up foot glow at full charge. This is the " +
                  "\"1.0 = full authored scale\" that FeedbackTuning.WindupGlowMaxScale refers to. " +

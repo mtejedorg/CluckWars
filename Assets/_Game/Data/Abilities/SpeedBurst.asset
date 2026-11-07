@@ -15,18 +15,21 @@ MonoBehaviour:
   DisplayName: Speed
   ShortLabel: FAST
   Description: A 1.5s sprint at 1.3x movement speed.
-  Icon: 
-  AccentColor: {r: 0.3, g: 0.85, b: 0.95, a: 1}
+  AccentKey: 5
+  CustomAccentColor: {r: 0.3, g: 0.85, b: 0.95, a: 1}
   Category: 3
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 15
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
   BotRole: 0
   Duration: 1.5
   Cooldown: 4
   CastMotion: 6
+  AreaKind: 0
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 0
   SpeedMultiplier: 1.3

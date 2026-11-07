@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1762d170b36a37c41849ee144cfc0ce9, type: 3}
+  m_Name: FeedbackPalette
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.FeedbackPaletteSO
+  StunColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  SlowColor: {r: 0.3, g: 0.75, b: 1, a: 1}
+  KnockColor: {r: 1, g: 1, b: 1, a: 1}
+  NeutralNoEffectColor: {r: 0.58, g: 0.58, b: 0.62, a: 0.85}
+  InkColor: {r: 0.165, g: 0.102, b: 0.047, a: 1}
+  CreamColor: {r: 0.996, g: 0.961, b: 0.878, a: 1}
+  StealAccent: {r: 1, g: 0.3, b: 0.1, a: 1}
+  StunAccent: {r: 1, g: 0.85, b: 0.2, a: 1}
+  ShoveAccent: {r: 1, g: 0.55, b: 0.15, a: 1}
+  SlowAccent: {r: 0.3, g: 0.75, b: 1, a: 1}
+  SpeedAccent: {r: 1, g: 0.93, b: 0.65, a: 1}
+  JumpAccent: {r: 0.4, g: 0.2, b: 0.9, a: 1}
+  EggShellAccent: {r: 0.996, g: 0.961, b: 0.878, a: 1}
+  HideAccent: {r: 0.6, g: 0.57, b: 0.78, a: 1}
+  PeckAccent: {r: 0.92, g: 0.66, b: 0.2, a: 1}
+  HuntAccent: {r: 0.9, g: 0.1, b: 0.2, a: 1}

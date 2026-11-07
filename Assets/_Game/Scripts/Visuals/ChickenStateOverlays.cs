@@ -94,10 +94,10 @@ namespace CluckWars.Visuals
 
         // Canonical hues (FeedbackTuning), local alphas preserved from the original
         // literals so the blobs stay as soft as they have always been.
-        private static readonly Color SlowColor    = WithAlpha(FeedbackTuning.CanonicalSlowColor, 0.42f);
+        private static Color SlowColor   => WithAlpha(FeedbackTuning.CanonicalSlowColor, 0.42f);
         private static readonly Color RootColor    = WithAlpha(FeedbackTuning.CanonicalRootColor, 0.60f);
         private static readonly Color ShackleColor = WithAlpha(FeedbackTuning.CanonicalRootColor, 0.88f);
-        private static readonly Color StreakColor  = WithAlpha(FeedbackTuning.CanonicalSlowColor, 0.55f);
+        private static Color StreakColor => WithAlpha(FeedbackTuning.CanonicalSlowColor, 0.55f);
 
         private static Sprite _starSprite;
         private static Sprite _discSprite;

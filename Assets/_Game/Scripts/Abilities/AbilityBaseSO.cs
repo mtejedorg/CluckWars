@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
+using CluckWars.Visuals;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace CluckWars.Abilities
 {
@@ -75,8 +77,16 @@ namespace CluckWars.Abilities
         [Tooltip("One-line effect text for the character-select preview and the ability pick cards. " +
                  "Say what the ability does to the player, not how it is implemented.")]
         [TextArea(2, 4)] public string Description;
-        [Tooltip("Accent color for VFX / UI highlight. Phase 6 uses it for the cooldown overlay tint.")]
-        public Color AccentColor = new Color(0.45f, 0.7f, 1f, 1f);
+        [Tooltip("Which FeedbackPalette accent this ability wears (spec D3a). Custom = use Custom Accent Color below " +
+                 "(retired abilities keep their literal).")]
+        public AccentKey AccentKey = AccentKey.Custom;
+        [Tooltip("Accent used only when Accent Key is Custom.")]
+        [FormerlySerializedAs("AccentColor")]
+        public Color CustomAccentColor = new Color(0.45f, 0.7f, 1f, 1f);
+
+        /// <summary>Accent colour for VFX / range guides / telegraphs: the palette accent for <see cref="AccentKey"/>,
+        /// or <see cref="CustomAccentColor"/> when the key is Custom.</summary>
+        public Color AccentColor => AccentKey == AccentKey.Custom ? CustomAccentColor : FeedbackPalette.Current.Accent(AccentKey);
         [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
         public AbilityCategory Category = AbilityCategory.Utility;
 

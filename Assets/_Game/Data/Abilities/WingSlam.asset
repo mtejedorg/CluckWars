@@ -15,18 +15,22 @@ MonoBehaviour:
   DisplayName: Stun
   ShortLabel: STUN
   Description: Stuns every rival within 5.4m for 1.3s.
-  AccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
+  AccentKey: 2
+  CustomAccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
   Category: 1
   TerrainTraversal: 0
-  SlotKind: 1
+  JumpTier: 0
   AllowedClasses: 15
+  PeckSlotPreEquippedBy: 0
   SignaturePreEquippedBy: 32
   BotRole: 0
   Duration: 1.3
   Cooldown: 7
-  SearchMask:
   CastMotion: 1
+  AreaKind: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 0
   StunRadius: 5.4
   StunDuration: 1.3

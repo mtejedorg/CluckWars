@@ -15,18 +15,20 @@ MonoBehaviour:
   DisplayName: Peck
   ShortLabel: PECK
   Description: Take a beakful of food from the pile you are standing at.
-  Icon: 
-  AccentColor: {r: 0.96, g: 0.8, b: 0.3, a: 1}
+  AccentKey: 9
+  CustomAccentColor: {r: 0.96, g: 0.8, b: 0.3, a: 1}
   Category: 3
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 0
   AllowedClasses: 0
+  PeckSlotPreEquippedBy: 63
+  SignaturePreEquippedBy: 0
   BotRole: 6
   Duration: 0.4
   Cooldown: 0.8
+  CastMotion: 0
+  AreaKind: 0
   SearchMask:
     serializedVersion: 2
     m_Bits: 256
-  PeckSlotPreEquippedBy: 63
-  SignaturePreEquippedBy: 0
+  Retired: 0

@@ -15,17 +15,21 @@ MonoBehaviour:
   DisplayName: Jump
   ShortLabel: JUMP
   Description: Dashes forward at 3x speed for 0.18s, straight over walls.
-  AccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
+  AccentKey: 6
+  CustomAccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
   Category: 3
   TerrainTraversal: 3
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 13
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
   BotRole: 0
   Duration: 0.18
   Cooldown: 2
-  SearchMask:
   CastMotion: 7
+  AreaKind: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 0
   SpeedMultiplier: 3

@@ -14,15 +14,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
   DisplayName: Shield
   ShortLabel: SHLD
-  Description: "Walk 1s immune to slows, then be an egg for 2s: no stun, slow, shove, theft or kill. Press again to stop."
-  AccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
+  Description: 'Walk 1s immune to slows, then be an egg for 2s: no stun, slow, shove,
+    theft or kill. Press again to stop.'
+  AccentKey: 7
+  CustomAccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2
   TerrainTraversal: 0
-  SlotKind: 1
+  JumpTier: 0
   AllowedClasses: 15
-  Duration: 3.0
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
+  BotRole: 0
+  Duration: 3
   Cooldown: 8
   CastMotion: 5
+  AreaKind: 0
+  SearchMask:
+    serializedVersion: 2
+    m_Bits: 256
+  Retired: 0
   SpeedMultiplier: 0.5
   WalkSeconds: 1
   EggSeconds: 2
