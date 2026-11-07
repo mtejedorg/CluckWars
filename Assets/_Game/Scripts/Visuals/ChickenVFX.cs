@@ -1042,7 +1042,7 @@ namespace CluckWars.Visuals
         /// Attaches a <c>colorOverLifetime</c> module that fades alpha from 1 to 0 over the last 25% of each particle's
         /// life. RGB is held constant so the emitted start colour drives the tint.
         /// </summary>
-        private static void AddFadeOut(ParticleSystem ps)
+        internal static void AddFadeOut(ParticleSystem ps)
         {
             var col = ps.colorOverLifetime;
             col.enabled = true;

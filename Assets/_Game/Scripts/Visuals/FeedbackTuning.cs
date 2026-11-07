@@ -1674,6 +1674,59 @@ namespace CluckWars.Visuals
         public const float StealArrivalSparkleSpeed = 1.2f;
         public const float StealArrivalSparkleHeight = 1.0f;
 
+        // ---- Slow aura (D8, vfx.md 2.4) --------------------------------------------------------------
+
+        /// <summary>Ground heights of the aura outline (the order-0 band, same floor as every ring) and the edge band (order 1).</summary>
+        public const float SlowAuraOutlineY = 0.05f;
+        public const float SlowAuraBandY = 0.06f;
+        public const int SlowAuraOutlineSortingOrder = 0;
+        public const int SlowAuraBandSortingOrder = 1;
+
+        /// <summary>The outline is the dashed ribbon (<see cref="NoTargetPreviewLineWidth"/> wide) in the Slow accent at this alpha,
+        /// turning at <see cref="SlowAuraOutlineLapsPerSecond"/> (0.1 lap/s = one lap per 10 s; the dashes travel along the ring).</summary>
+        public const float SlowAuraOutlineAlpha = 0.55f;
+        public const float SlowAuraOutlineLapsPerSecond = 0.1f;
+        public const int SlowAuraOutlineSegments = 72;
+
+        /// <summary>Edge band (<c>Fx_AuraEdge</c>, outer radius = aura radius, fading inward): alpha, and its Reduced Motion alpha.
+        /// Never a fill: a filled 13 m disc would wash the arena and hide the identity rings.</summary>
+        public const float SlowAuraBandAlpha = 0.20f;
+        public const float SlowAuraBandAlphaReduced = 0.14f;
+
+        /// <summary>The feather-fall PS (<c>VFX_AuraFeather</c>): spawn disc radius is the aura radius minus this margin, rate per
+        /// second (and Reduced Motion), spawn height, lifetime, gravity modifier, size range, alpha, Noise sway.</summary>
+        public const float SlowAuraFeatherInsetMetres = 0.28f;
+        public const float SlowAuraFeatherRate = 10f;
+        public const float SlowAuraFeatherRateReduced = 6f;
+        public const float SlowAuraFeatherSpawnHeight = 1.6f;
+        public const float SlowAuraFeatherLifeSeconds = 1.6f;
+        public const float SlowAuraFeatherGravity = 0.03f;
+        public const float SlowAuraFeatherSizeMin = 0.18f;
+        public const float SlowAuraFeatherSizeMax = 0.26f;
+        public const float SlowAuraFeatherAlpha = 0.8f;
+        public const float SlowAuraFeatherNoiseStrength = 0.3f;
+        public const float SlowAuraFeatherNoiseFrequency = 0.4f;
+        /// <summary>The aura system's own maxParticles (counted outside the five ChickenVFX families; see ChickenParticleBudgetTests).</summary>
+        public const int SlowAuraFeatherMaxParticles = 24;
+
+        /// <summary>Lavender-tinted cream of the falling feathers: the palette cream pulled toward the Slow accent.</summary>
+        public static Color SlowAuraFeatherColor
+        {
+            get
+            {
+                var p = FeedbackPalette.Current;
+                Color c = Color.Lerp(p.CreamColor, p.SlowAccent, 0.35f);
+                c.a = SlowAuraFeatherAlpha;
+                return c;
+            }
+        }
+
+        /// <summary>The caster's foot puffs: this many feathers (halved under Reduced Motion) every this many seconds while the aura runs.</summary>
+        public const int SlowAuraPuffCount = 4;
+        public const float SlowAuraPuffIntervalSeconds = 0.4f;
+        public const float SlowAuraPuffLifeSeconds = 0.5f;
+        public const float SlowAuraPuffHeight = 0.12f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

@@ -107,6 +107,14 @@ namespace CluckWars.Visuals
                 return;
             }
 
+            // A caster-anchored zone (the Slow aura) is drawn by the caster's SlowAuraFeedback (dashed turning outline, edge
+            // band, feather-fall, gated on the caster's opacity), so this cyan edge ring would be a second ring on the same edge.
+            if (_zone.Anchor == ZoneAnchor.Caster)
+            {
+                _ring.Hide();
+                return;
+            }
+
             // A different zone is now living on this instance — start its drain from
             // scratch. Hide() also drops the built-fraction sentinel, so the first frame
             // of the new zone cannot flash the previous one's arc.

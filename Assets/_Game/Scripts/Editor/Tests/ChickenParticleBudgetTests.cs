@@ -13,7 +13,7 @@ namespace CluckWars.Tests
     /// D1 (textured particles): every chicken ParticleSystem renders the one shared <c>Fx_Particles.mat</c> in sprite mode over
     /// <c>Fx_Atlas</c>, carries an explicit maxParticles within the vfx.md 0.2 caps, and the per-chicken system count stays
     /// within the budget. The systems are built in <c>Awake</c> at runtime (the prefab holds none), so the test wakes the
-    /// two builders (<see cref="ChickenVFX"/>, <see cref="HitFeedback"/>) on a throwaway instance of the shipped prefab.
+    /// builders (<see cref="ChickenVFX"/>, <see cref="HitFeedback"/>, <see cref="SlowAuraFeedback"/>) on a throwaway instance of the shipped prefab.
     /// </summary>
     public sealed class ChickenParticleBudgetTests
     {
@@ -31,8 +31,8 @@ namespace CluckWars.Tests
             Assert.IsNotNull(prefab, "Chicken.prefab missing");
             _chicken = Object.Instantiate(prefab);
             _chicken.hideFlags = HideFlags.HideAndDontSave;
-            // Awake does not run in EditMode: wake the two components that build particle systems.
-            foreach (var t in new[] { typeof(ChickenVFX), typeof(HitFeedback) })
+            // Awake does not run in EditMode: wake the components that build particle systems.
+            foreach (var t in new[] { typeof(ChickenVFX), typeof(HitFeedback), typeof(SlowAuraFeedback) })
             {
                 var c = _chicken.GetComponent(t);
                 Assert.IsNotNull(c, t.Name + " missing on Chicken.prefab");
@@ -110,9 +110,12 @@ namespace CluckWars.Tests
         {
             var names = _systems.Select(p => p.name).ToArray();
             CollectionAssert.AreEquivalent(
-                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName, ChickenVFX.StreakSystemName }, names,
-                "D5 families: Dust, Feather, Sparkle, Shard, Streak (Kernel arrives with its item)");
-            int total = _systems.Sum(p => p.main.maxParticles);
+                new[] { ChickenVFX.DustSystemName, ChickenVFX.FeatherSystemName, ChickenVFX.SparkleSystemName, ChickenVFX.ShardSystemName, ChickenVFX.StreakSystemName, SlowAuraFeedback.SystemName }, names,
+                "D8 systems: the five families (Dust, Feather, Sparkle, Shard, Streak) plus the Slow aura's own feather-fall (Kernel arrives with its item)");
+            // The five ChickenVFX families are pinned to the 64 cap; the aura system is counted separately because its live
+            // peak is proven below (SlowAuraTests.TheCasterWorstCoincidence_StaysWithinTheChickenCap).
+            var families = _systems.Where(p => p.name != SlowAuraFeedback.SystemName).ToArray();
+            int total = families.Sum(p => p.main.maxParticles);
             Assert.LessOrEqual(total, FeedbackTuning.ParticlesPerChickenCap,
                 "sum of maxParticles over the families must stay within the per-chicken cap");
             Assert.AreEqual(2, _systems.Single(p => p.name == ChickenVFX.DustSystemName).GetComponent<ParticleSystemRenderer>().sortingOrder, "dust is the ground band");
