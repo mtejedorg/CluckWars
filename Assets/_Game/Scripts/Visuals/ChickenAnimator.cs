@@ -319,6 +319,16 @@ namespace CluckWars.Visuals
         /// </summary>
         public float ExtraUniformScale { get; set; } = 1f;
 
+        /// <summary>
+        /// Per-axis scale multiplier composed into the model's scale by another component (the Shove victim squash, D6). 1 = rest.
+        /// Multiplies on top of <see cref="ExtraUniformScale"/>; a plain value its owner rewrites, so the animator stays the only writer
+        /// of the model transform.
+        /// </summary>
+        public Vector3 ExtraScale { get; set; } = Vector3.one;
+
+        /// <summary>True once the skeletal rig is driving the model (the legacy procedural fallback squashes on its own hit timer).</summary>
+        public bool IsSkeletal => _skeletalActive;
+
         private void LateUpdate()
         {
             // A null model root means the class had no ModelPrefab. ChickenController.AttachClassModel
@@ -524,7 +534,7 @@ namespace CluckWars.Visuals
             // ---- The single write ----
             _modelRoot.localPosition = _restPosition + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
-            _modelRoot.localScale    = _restScale * ExtraUniformScale;
+            _modelRoot.localScale    = Vector3.Scale(_restScale * ExtraUniformScale, ExtraScale);
         }
 
         /// <summary>
@@ -609,9 +619,9 @@ namespace CluckWars.Visuals
             _modelRoot.localPosition = _restPosition + Vector3.up * riseY + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
             _modelRoot.localScale    = new Vector3(
-                _restScale.x * scaleXZ * ExtraUniformScale,
-                _restScale.y * scaleY * ExtraUniformScale,
-                _restScale.z * scaleXZ * ExtraUniformScale);
+                _restScale.x * scaleXZ * ExtraUniformScale * ExtraScale.x,
+                _restScale.y * scaleY * ExtraUniformScale * ExtraScale.y,
+                _restScale.z * scaleXZ * ExtraUniformScale * ExtraScale.z);
         }
 
         private void UpdateSpeed(float dt)

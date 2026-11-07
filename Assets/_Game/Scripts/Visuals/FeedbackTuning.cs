@@ -1582,6 +1582,39 @@ namespace CluckWars.Visuals
         /// <summary>Per-frame distance clamp for the emitters (a respawn teleport must not dump a thousand particles).</summary>
         public const float SpeedCueMaxStepMetres = 1.5f;
 
+        // ---- Shove beats (batch D6, vfx.md 2.3) ------------------------------------------------------
+
+        /// <summary>Victim skid dust runs this long after the KnockbackEventId edge (and only while planar speed is above the gate).</summary>
+        public const float ShoveSkidWindowSeconds = 0.3f;
+        /// <summary>The skid needs more than this planar speed (m/s): the knockback decays under it in about 0.17 s, and a bird merely walking does not skid.</summary>
+        public const float ShoveSkidMinSpeed = 4f;
+        public const float ShoveSkidPerMetre = 4f;
+        public const float ShoveSkidSizeMin = 0.18f;
+        public const float ShoveSkidSizeMax = 0.24f;
+        public const float ShoveSkidLifeSeconds = 0.25f;
+        /// <summary>Scatter radius of a puff around the feet path.</summary>
+        public const float ShoveSkidScatter = 0.12f;
+        /// <summary>Most skid puffs one knockback may emit: with a 0.25 s life and a 0.3 s window this is also the most live at once.</summary>
+        public const int ShoveSkidMaxLive = 10;
+        /// <summary>Brown-cream ground dust (vfx.md 2.3), alpha 0.6.</summary>
+        public static readonly Color ShoveSkidColor = new Color(0.85f, 0.75f, 0.55f, 0.6f);
+
+        /// <summary>Caster shock ring: accent sparkles on a circle around the caster, flying outward.</summary>
+        public const int ShoveRingCount = 8;
+        /// <summary>Reduced Motion: fewer sparkles, fading in place (no travel).</summary>
+        public const int ShoveRingCountReduced = 4;
+        public const float ShoveRingRadius = 0.6f;
+        public const float ShoveRingSpeed = 3f;
+        public const float ShoveRingLifeSeconds = 0.2f;
+        public const float ShoveRingSizeMin = 0.24f;
+        public const float ShoveRingSizeMax = 0.32f;
+        /// <summary>Height of the ring above the caster's feet (the cast flash is on the ground, the ring is at body level).</summary>
+        public const float ShoveRingHeight = 0.35f;
+
+        /// <summary>Victim squash on the knockback edge, composed through ChickenAnimator.ExtraScale: this scale returns to 1 over the duration.</summary>
+        public static readonly Vector3 ShoveSquashScale = new Vector3(1.12f, 0.88f, 1.12f);
+        public const float ShoveSquashSeconds = 0.12f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

@@ -187,6 +187,16 @@ namespace CluckWars.Visuals
         private float   _jumpLandAt = -1f;       // Time.time of the pending landing dust; < 0 = none
         private FxEmit  _jumpLaunchDust, _jumpLaunchFeather, _jumpLandDust;
 
+        // ── Shove beats (D6): victim skid + squash off KnockbackEventId, caster ring off the cast edge ──
+        private bool    _shoveInitialized;
+        private byte    _lastKnockId;
+        private Vector3 _shovePrevPos;
+        private float   _shoveEdgeTime = -1f;     // Time.unscaledTime of the last knockback edge; < 0 = none
+        private float   _squashStart = -1f;       // Time.unscaledTime the squash began; < 0 = none
+        private float   _skidAccum;
+        private int     _skidBudget;
+        private FxEmit  _skidDust, _shoveRing;
+
         // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
         // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
         // flags in Spawned() because they are NetworkBehaviours and Spawned() is the
@@ -259,6 +269,22 @@ namespace CluckWars.Visuals
                 Count = FeedbackTuning.JumpLandingDustCount, Color = cream, SizeMin = 0.30f, SizeMax = 0.45f,
                 SpeedMin = 0.8f, SpeedMax = 1.6f, LifeMin = FeedbackTuning.JumpLandingDustSeconds, LifeMax = FeedbackTuning.JumpLandingDustSeconds,
                 Shape = FxShape.Disc, Radius = 0.25f, Gravity = 0f,
+            };
+            _skidDust = new FxEmit
+            {
+                Count = 1, Color = FeedbackTuning.ShoveSkidColor,
+                SizeMin = FeedbackTuning.ShoveSkidSizeMin, SizeMax = FeedbackTuning.ShoveSkidSizeMax,
+                SpeedMin = 0f, SpeedMax = 0f, LifeMin = FeedbackTuning.ShoveSkidLifeSeconds, LifeMax = FeedbackTuning.ShoveSkidLifeSeconds,
+                Shape = FxShape.Disc, Radius = FeedbackTuning.ShoveSkidScatter, Gravity = 0f,
+            };
+            // Colour overwritten per cast with the Shove accent.
+            _shoveRing = new FxEmit
+            {
+                Count = FeedbackTuning.ShoveRingCount, Color = Color.white,
+                SizeMin = FeedbackTuning.ShoveRingSizeMin, SizeMax = FeedbackTuning.ShoveRingSizeMax,
+                SpeedMin = FeedbackTuning.ShoveRingSpeed, SpeedMax = FeedbackTuning.ShoveRingSpeed,
+                LifeMin = FeedbackTuning.ShoveRingLifeSeconds, LifeMax = FeedbackTuning.ShoveRingLifeSeconds,
+                Shape = FxShape.Ring, Radius = FeedbackTuning.ShoveRingRadius, Gravity = 0f,
             };
             _speedDust = new FxEmit
             {
@@ -337,6 +363,7 @@ namespace CluckWars.Visuals
 
             ObserveSpeedBody(hidden, isRemoved);
             ObserveJumpBeats(hidden);
+            ObserveShoveVictim(hidden);
 
             // Ability activation: AccentColor burst + caster micro-shake on cast. Detection used to be a rising-edge
             // test on the old single ActiveSlot (since retired: abilities now run concurrently on a per-slot mask).
@@ -379,11 +406,91 @@ namespace CluckWars.Visuals
             }
         }
 
+        // ---- Shove beats (D6, vfx.md 2.3) --------------------------------------------
+
+        /// <summary>
+        /// The victim half of the Shove, observed from the replicated <c>KnockbackEventId</c> (it does bump for the shipped Shove: the
+        /// CluckShock target RPC lands in <c>ApplyKnockback</c> with the Hit origin). On the edge: open the skid window and start the
+        /// squash. While the window is open and the own planar speed of the bird is above the gate, brown-cream dust is emitted per metre
+        /// travelled along the frame path (rate over distance accumulated here, the root moves through Fusion). The squash goes through
+        /// <see cref="ChickenAnimator.ExtraScale"/> (single writer) and only on the skeletal path, whose Hit clip carries no scale curve;
+        /// the legacy fallback already squashes on its hit timer. Nothing emits or squashes on a hidden or faded bird; Reduced Motion has
+        /// no skid and no squash. Seeded on first observation so a late join never replays a shove.
+        /// </summary>
+        private void ObserveShoveVictim(bool hidden)
+        {
+            if (_controller == null) return;
+            Vector3 pos = transform.position;
+            Vector3 prev = _shovePrevPos;
+            Vector3 delta = pos - prev;
+            _shovePrevPos = pos;
+            delta.y = 0f;
+
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid) return;
+
+            byte id = _controller.KnockbackEventId;
+            if (!_shoveInitialized)
+            {
+                _shoveInitialized = true;
+                _lastKnockId = id;
+                return;
+            }
+
+            float now = Time.unscaledTime;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            bool quiet = hidden || ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity) || (_combat != null && _combat.IsRemoved);
+
+            if (id != _lastKnockId)
+            {
+                _lastKnockId = id;
+                _shoveEdgeTime = now;
+                _skidBudget = FeedbackTuning.ShoveSkidMaxLive;
+                _skidAccum = 0f;
+                _squashStart = !quiet && _animator != null && ShoveBeatRules.SquashApplies(_animator.IsSkeletal) ? now : -1f;
+            }
+
+            float dt = Time.unscaledDeltaTime;
+            float planar = dt > 1e-5f ? delta.magnitude / dt : 0f;
+            bool window = ShoveBeatRules.SkidWindowOpen(now, _shoveEdgeTime);
+            if (!quiet && ShoveBeatRules.SkidShouldRun(reduced, window, planar))
+            {
+                float step = SpeedBodyCueRules.StepMetres(delta.magnitude);
+                int n = SpeedBodyCueRules.Take(ref _skidAccum, step, ShoveBeatRules.SkidPerMetre(reduced));
+                n = ShoveBeatRules.SpendSkidBudget(n, ref _skidBudget);
+                for (int i = 0; i < n; i++)
+                    EmitDustAt(in _skidDust, Vector3.Lerp(prev, pos, (i + 1f) / (n + 1f)) + Vector3.up * 0.05f);
+            }
+            else if (!window)
+            {
+                _skidAccum = 0f;
+            }
+
+            if (_animator != null)
+            {
+                bool squashing = _squashStart >= 0f;
+                _animator.ExtraScale = squashing ? ShoveBeatRules.SquashScale(now - _squashStart, reduced) : Vector3.one;
+                if (squashing && now - _squashStart >= FeedbackTuning.ShoveSquashSeconds) _squashStart = -1f;
+            }
+        }
+
+        /// <summary>The caster half: accent sparkles in a ring at body height (8, or 4 fading in place under Reduced Motion).</summary>
+        private void EmitShoveRing(Color accent)
+        {
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            var ring = _shoveRing;
+            ring.Color = accent;
+            ring.Count = ShoveBeatRules.RingCount(reduced);
+            float speed = ShoveBeatRules.RingSpeed(reduced);
+            ring.SpeedMin = ring.SpeedMax = speed;
+            EmitSparklesAt(in ring, transform.position + Vector3.up * FeedbackTuning.ShoveRingHeight);
+        }
+
         // ---- Speed body cue (D4, vfx.md 2.5) ---------------------------------------
 
         private void OnDisable()
         {
-            if (_animator != null) _animator.ExtraPitchDegrees = 0f;
+            if (_animator != null) { _animator.ExtraPitchDegrees = 0f; _animator.ExtraScale = Vector3.one; }
         }
 
         /// <summary>
@@ -741,6 +848,11 @@ namespace CluckWars.Visuals
             _lastCastEventId = id;
 
             var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
+
+            // Shove (D6): the shock ring goes out BEFORE the burst, so when the sparkle family is full it is the burst that
+            // loses its last sparkles (a sphere of 16), never the ring that carries the "burst out from me" read.
+            if (ability is CluckShockAbilitySO && !hidden && !ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity))
+                EmitShoveRing(ability.AccentColor);
 
             // The burst needs AccentColor, so an unresolved ability means no burst. None on a hidden bird (A1).
             if (ability != null && !hidden)

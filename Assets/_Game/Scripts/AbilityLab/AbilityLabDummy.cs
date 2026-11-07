@@ -130,7 +130,14 @@ namespace CluckWars.AbilityLab
         private void FixedUpdate()
         {
             if (_controller == null || !_controller.HasStateAuthority) return;
-            if (Frozen || !Patrol) return;
+
+            // A dummy has no input, so nothing ticks its movement and a shove would never slide it (the lab could not show a
+            // knockback). Let a live knockback integrate and decay exactly as on a real bird; a still dummy stays put.
+            if (Frozen || !Patrol)
+            {
+                if (_controller.ExternalDisplacement.sqrMagnitude > 0.001f) _controller.BotTick(Vector2.zero, Time.fixedDeltaTime);
+                return;
+            }
 
             // Flip at the ends of the line. Compared along world X because the patrol line
             // is authored as "left and right of the mark" from the player's fixed viewpoint.
