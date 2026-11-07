@@ -183,6 +183,21 @@ Still to build (implementation, not this pass): `CW_EggShell.shadergraph` (URP L
 
 Rule questions raised by the lenses, for later (no redesign proposed): should a stun break Hide (avoids a ghost-with-stars picture); should the waddle refuse pile and bump slows too (one sentence: "nothing slows an egg"); should "another cast ends the egg" stay (three exits, one HATCH! beat).
 
+## 12. Decisions recorded 2026-11-07 (binding; they override §4-§9 where they differ)
+
+Maestro's answers on the review page: `d1 later d2a d3a d4b d5b d6a d7b d8b`.
+
+| Decision | Answer | Effect on this spec |
+|---|---|---|
+| D1 names/labels | **Later.** He did not like Push / Zoom / MARK. | DisplayNames and labels stay generic as shipped (Steal/ROB, Stun/STUN, Shove/PUSH, Slow/SLOW, Speed/FAST, Jump/JUMP, Hide/HIDE, Peck/PECK) until the definitive names are chosen. §4.3 "Push" and §4.5 "Zoom" are void; the pops use the shipped labels (PUSH, FAST!). |
+| D2 Egg Shell | **a.** "Egg Shell" / EGG on `TurtleMode.asset`; rename the retired `EggShell.asset` ("Egg Shell (old)"). | §4.7 stands. |
+| D3 accents | **a, with a condition:** retune as §6, but the colours live in a **config ScriptableObject** (stunColor, slowColor, …). | New `FeedbackPaletteSO` (state colours + per-job accents) pushed to a static by `ProjectInstaller`; `FeedbackTuning`'s canonical colours and `AbilityBaseSO.AccentColor` read from it (ability assets carry an `AccentKey`, retired assets keep their literal). See the plan, item B1. |
+| D4 buff ring | **b.** Keep the ring on everyone, opacity-gated, as a secondary cue. | §3.1 and §4.8: the ring is gated, not removed; each self-state still gets its own body cue. |
+| D5 Death Mark | **b.** Hunt / HUNT then POUNCE with an eye or paw icon; internally still "Death Mark". | UI only: DisplayName "Hunt", label HUNT, second press POUNCE, paw icon (`alts/Hunt_paw.png`) and paw hunting badge; code names unchanged; MARKED! stays for the victim for now. |
+| D6 icons | **a.** Palm, snail, mallet; fine-tune later with the definitive abilities. | §7 set as proposed; Steal claw + cob, Jump chicken + dashes, whole egg. |
+| D7 self-pops | **b.** All of them. | WADDLE, EGG!, HATCH!, POOF!, FAST!, HOP!, HUNT!, ROB -n, +n; never drawn for rivals. |
+| D8 refusals | **b.** Keep IMMUNE and SAFE; keep the STUCK! rows. | §5 unchanged; no NOPE!. |
+
 ## 10. Implementation order (after sign-off)
 
 1. **Bug:** opacity gate on every world-space tell (buff ring, identity ring, cargo bar, nameplate, badges, all particle owners). Test: a faded bird renders no ring/badge/particles on a remote peer.
