@@ -45,9 +45,9 @@ namespace CluckWars.Abilities
 
         public TurtleModeAbilitySO()
         {
-            DisplayName = "Shield";
-            ShortLabel = "SHLD";
-            Description = "Walk 1s immune to slows, then be an egg for 2s: no stun, slow, shove, theft or kill. Press again to stop.";
+            DisplayName = "Egg Shell";
+            ShortLabel = "EGG";
+            Description = "Waddle 1s - slows bounce off. Then be an egg 2s: no stun, slow, shove, theft or kill. Press again to hatch.";
             Category = AbilityCategory.Defense;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 3f;

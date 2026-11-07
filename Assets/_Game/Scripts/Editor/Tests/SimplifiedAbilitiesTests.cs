@@ -242,7 +242,7 @@ namespace CluckWars.Tests
             { "Slow", typeof(FeatherAuraAbilitySO) },
             { "Speed", typeof(SpeedBurstAbilitySO) },
             { "Jump", typeof(ShadowstepAbilitySO) },
-            { "Shield", typeof(TurtleModeAbilitySO) },
+            { "Egg Shell", typeof(TurtleModeAbilitySO) },
             { "Hide", typeof(InvisibilityAbilitySO) },
             { "Death Mark", typeof(MarkKillAbilitySO) },
         };
@@ -279,8 +279,8 @@ namespace CluckWars.Tests
         [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Steal", "Slow", "Speed")]
         [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Shove")]   // Maestro 2026-11-05: Speedys do not steal
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
-        [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Shield")]
-        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Shield", "Slow", "Steal")]
+        [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Egg Shell")]
+        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Egg Shell", "Slow", "Steal")]
         [TestCase(ChickenSubclass.Assassin_Spoiler, "Death Mark", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
         [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow")]        // Slow replaced Shove, 2026-11-05
         public void TheKit_ResolvesExactlyAsRuled(ChickenSubclass subclass, string s0, string s1, string s2, string s3)

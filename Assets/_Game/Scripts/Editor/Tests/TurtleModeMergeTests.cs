@@ -39,7 +39,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(0.5f, t.SpeedMultiplier, "walk speed");
             Assert.AreEqual(8f, t.Cooldown);
             Assert.AreEqual(ChickenClassFlags.All, t.AllowedClasses);
-            Assert.AreEqual("Shield", t.DisplayName);
+            Assert.AreEqual("Egg Shell", t.DisplayName);
+            Assert.AreEqual("EGG", t.ShortLabel);
             Assert.IsTrue(t.AcceptsPressWhileActive);
             Assert.IsTrue(t.HasFollowUpPhase);
             Assert.IsFalse(t.EndsOnNextMove, "another cast ends the egg only, never the walk");
@@ -53,6 +54,18 @@ namespace CluckWars.Tests
                 Assert.AreEqual(t.Description, fresh.Description);
             }
             finally { UnityEngine.Object.DestroyImmediate(fresh); }
+        }
+
+        [Test]
+        public void TheLiveMove_IsNamedEggShell_AndTheRetiredOneIsMarkedOld()
+        {
+            // Spec 2026-11-06 D2a: the live move takes the name, the retired asset steps aside so no two shown names collide.
+            Assert.AreEqual("Egg Shell", Turtle.DisplayName);
+            Assert.AreEqual("EGG", Turtle.ShortLabel);
+            var old = TestAssets.Load<AbilityBaseSO>(TestAssets.AbilitiesDir + "/EggShell.asset");
+            Assert.IsTrue(old.Retired, "EggShell.asset is the retired one");
+            Assert.AreEqual("Egg Shell (old)", old.DisplayName);
+            Assert.AreEqual("OLD", old.ShortLabel, "EGG belongs to the live move; the label guard counts retired assets too");
         }
 
         // ---- Phase 1: the walk blocks slows only -----------------------------------------------------------------

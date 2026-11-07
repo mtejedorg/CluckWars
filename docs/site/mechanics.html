@@ -121,8 +121,8 @@
           <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow aura 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Steal, Slow, Speed</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>You bank food 10% faster; immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (the Slow aura holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Shove, Shield</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Shield, Slow, Steal</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Shove, Egg Shell</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Egg Shell, Slow, Steal</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Death Mark, Stun, Jump, Hide</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>Every steal takes 1.6&times; more</td><td>Steal, Hide, Jump, Slow</td></tr>
         </tbody>
@@ -136,7 +136,7 @@
     <!-- Source: docs/GDD.md §6.2 -->
     <p>All chicken-to-chicken interaction is steal or control. There is no basic attack. A steal moves cargo directly from victim to thief; nothing drops on the floor. The amount is capped three ways:</p>
     <pre><code>stolen = min(steal value, free space, defender cargo)   // never negative</code></pre>
-    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (a Shield egg) refuses every steal, so the formula never runs against it.</p>
+    <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (an Egg Shell egg) refuses every steal, so the formula never runs against it.</p>
 
     <form class="calc" id="calc" hidden aria-label="Steal calculator">
       <label>Steal value<input type="number" id="c-steal" min="0" step="1" value="6" inputmode="numeric"></label>
@@ -170,7 +170,7 @@
         </tbody>
       </table>
     </div>
-    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. The Shield egg is immune to the whole ladder, while the Shield walk is immune to ability slows only; steal-proofing is separate and only stops cargo being taken. A Relentless caster lengthens the stuns and slows it applies by 30% (a Relentless stun lasts 1.69 s), applied before the victim's own shortening; roots and placed zones are not lengthened.</p>
+    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. The Egg Shell egg is immune to the whole ladder, while the Egg Shell walk is immune to ability slows only; steal-proofing is separate and only stops cargo being taken. A Relentless caster lengthens the stuns and slows it applies by 30% (a Relentless stun lasts 1.69 s), applied before the victim's own shortening; roots and placed zones are not lengthened.</p>
   </section>
 
   <section id="deathmark">
@@ -188,7 +188,7 @@
         </tbody>
       </table>
     </div>
-    <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. A Shield's egg (the last 2 of its 3 seconds) makes you unkillable and unstunnable; its first-second walk does not. Stun reach (5.4 m) plus kill range (6.2 m) is 11.6 m.</p>
+    <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. An Egg Shell's egg (the last 2 of its 3 seconds) makes you unkillable and unstunnable; its first-second walk does not. Stun reach (5.4 m) plus kill range (6.2 m) is 11.6 m.</p>
     <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Death Mark takes a reduced cooldown (4 s) so the Assassin can re-mark quickly; after a kill it is 8 s, so a round holds at most four kills.</p>
     <p>What each player sees: the Assassin gets one marker in the target's own colour (a skull, a draining ring and the distance), a skull on the target's standings row, and a big yellow KILL button exactly while a kill is possible (until the arm the marker shows a countdown digit and KILL stays dark). The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3, 2, 1 while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
@@ -213,7 +213,7 @@
           <tr data-c="everyone"><td>Shove <span class="tag t-shared">Everyone</span></td><td class="num">5 s</td><td>Shoves every rival within 5.4 m away.</td></tr>
           <tr data-c="everyone"><td>Slow <span class="tag t-shared">Everyone</span></td><td class="num">6 s</td><td>Slows every rival within 6.48 m to 55% speed for 3 s.</td></tr>
           <tr data-c="everyone"><td>Speed <span class="tag t-shared">Everyone</span></td><td class="num">4 s</td><td>A 1.5 s sprint at 1.3&times; movement speed.</td></tr>
-          <tr data-c="everyone"><td>Shield <span class="tag t-shared">Everyone</span></td><td class="num">8 s</td><td>Walk, then egg, on one press. First second: walk at half speed and slows (the Slow aura included) do not work, but a stun, a shove, a steal or a kill still lands. Then an egg for 2 s that starts by itself: you cannot move, and nobody can rob, kill, stun, slow or shove you. Press again to stop; using another move ends the egg. Cooldown from the cast.</td></tr>
+          <tr data-c="everyone"><td>Egg Shell <span class="tag t-shared">Everyone</span></td><td class="num">8 s</td><td>Walk, then egg, on one press. First second: walk at half speed and slows (the Slow aura included) do not work, but a stun, a shove, a steal or a kill still lands. Then an egg for 2 s that starts by itself: you cannot move, and nobody can rob, kill, stun, slow or shove you. Press again to stop; using another move ends the egg. Cooldown from the cast.</td></tr>
           <tr data-c="everyone"><td>Hide <span class="tag t-shared">Everyone</span></td><td class="num">4.5 s</td><td>Fades you to a ghostly outline for 2 s. Using a move breaks it.</td></tr>
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">2 s</td><td>Dashes forward at 3&times; speed for 0.18 s (about 6 m for Sneaky, 5.5 m for Warrior), straight over walls.</td></tr>
@@ -231,11 +231,11 @@
         <tbody>
           <tr><td>Low</td><td class="num">1 to 3 s</td><td>Jump</td></tr>
           <tr><td>Medium</td><td class="num">4 to 6 s</td><td>Steal, Speed, Hide, Shove, Slow, Death Mark after a miss</td></tr>
-          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Shield, Death Mark after a kill</td></tr>
+          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Egg Shell, Death Mark after a kill</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Shortened on 2026-11-05 so a 45 s match stays busy. The High band holds the immunity move (Shield) and the one hard stun (Stun, which also sets up a Death Mark kill). Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
+    <p>Shortened on 2026-11-05 so a 45 s match stays busy. The High band holds the immunity move (Egg Shell) and the one hard stun (Stun, which also sets up a Death Mark kill). Peck is foraging cadence set by the Solo Clear Time axiom, not a tiered move.</p>
   </section>
 
   <section id="casting">

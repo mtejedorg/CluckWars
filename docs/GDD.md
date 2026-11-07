@@ -495,8 +495,8 @@ current, shipped state.
 | | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Steal**, **Slow**, **Speed** |
 | **Speedy** | The Anxious (Featherfoot) | You bank food 10% faster (`DepositRateMultiplier` 1.1, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Shove** |
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
-| **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Shield** |
-| | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Shield**, **Slow**, **Steal** |
+| **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Egg Shell** |
+| | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Egg Shell**, **Slow**, **Steal** |
 | **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Death Mark**, **Stun**, **Jump**, **Hide** |
 | | The Thief | Every steal takes 1.6x more | **Steal**, **Hide**, **Jump**, **Slow** |
 
@@ -763,7 +763,7 @@ specializations therefore need **ordinary signature abilities** assigned (see §
 
 ### 7.2 The pool - 10 active abilities, one per job (2026-11-05)
 
-Ability text follows the `Description` field of each shipped `.asset`. Every number below is read from `Assets/_Game/Data/Abilities/*.asset` (before passives). The asset file names are the old ones (the survivor keeps its asset, GUID and icon): Steal is `Snatch.asset`, Stun `WingSlam.asset`, Shove `CluckShock.asset`, Slow `FeatherAura.asset`, Speed `SpeedBurst.asset`, Jump `Shadowstep.asset`, Shield `TurtleMode.asset`, Hide `Invisibility.asset`, Death Mark `MarkKill.asset`. Generic names, short labels (ROB, STUN, PUSH, SLOW, FAST, JUMP, SHLD, HIDE) and description templates came in the same change. All reach figures are a radius around the caster (range-only targeting, §6.1).
+Ability text follows the `Description` field of each shipped `.asset`. Every number below is read from `Assets/_Game/Data/Abilities/*.asset` (before passives). The asset file names are the old ones (the survivor keeps its asset, GUID and icon): Steal is `Snatch.asset`, Stun `WingSlam.asset`, Shove `CluckShock.asset`, Slow `FeatherAura.asset`, Speed `SpeedBurst.asset`, Jump `Shadowstep.asset`, Egg Shell `TurtleMode.asset`, Hide `Invisibility.asset`, Death Mark `MarkKill.asset`. Generic names, short labels (ROB, STUN, PUSH, SLOW, FAST, JUMP, SHLD, HIDE; SHLD became EGG and Shield became Egg Shell on 2026-11-07) and description templates came in the same change. All reach figures are a radius around the caster (range-only targeting, §6.1).
 
 | Ability | Short | Cooldown | Who can pick it | Effect |
 |---|---|---|---|---|
@@ -773,7 +773,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | **Slow** | SLOW | 6 s | everyone | Aura: slows every rival within 6.48 m to 55% speed for 3 s (a Slippery bird: to 73%, and only for the first 1.8 s). Was Feather Aura (5.4 m, "every chicken"). |
 | **Speed** | FAST | 4 s | everyone | A 1.5 s sprint at 1.3x movement speed (1.5x until 2026-11-05). Was Speed Burst; no longer Speedy-only. |
 | **Jump** | JUMP | 2 s | everyone but Speedy | Dashes forward at 3x speed for 0.18 s (about 6 m for the Sneaky at 11.1, 5.5 m for the Warrior), straight over walls. Unchanged (Shadowstep); Speedy never gets terrain traversal (§5.2). |
-| **Shield** | SHLD | 8 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove, theft and execution still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 8 s from the cast. Press again to end it. Was Turtle Mode (Fatty-only). |
+| **Egg Shell** | EGG | 8 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove, theft and execution still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 8 s from the cast. Press again to end it. Was Shield (until 2026-11-07), before that Turtle Mode (Fatty-only). |
 | **Hide** | HIDE | 4.5 s | everyone | Fades you to a ghostly outline for 2 s (opacity 0.2; 4 s until 2026-11-05). Using a move breaks it. Was Invisibility (Sneaky-only). |
 | **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
 | **Death Mark** | EXEC | 4 s after a miss, 8 s after a kill | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 6.2 m, then press again to take everything they carry. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
@@ -782,14 +782,14 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 
 Control ceilings: with no root and no RPC slow in the registry, a populated registry yields a known 0 s ceiling for those kinds, so every such claim is refused at Debug level (it used to log an Error per spawn and leave an Unknown ceiling that trusted the sender).
 
-**Shield has a real defensive half (Phase 7, Maestro decision 6; reworked into walk-then-egg 2026-11-05).** It grants the **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a networked timer; recasting keeps the later end). While steal-proof, nothing can take the bird's cargo: Steal and Death Mark's execute check it *before* crediting the thief, so no food is created or duplicated; the victim's side re-checks in `RPC_DrainStolen` / `RPC_TransferAllToBountyBag` (sub-RTT race, logged; a refused optimistic drain is refunded). Details:
+**Egg Shell has a real defensive half (Phase 7, Maestro decision 6; reworked into walk-then-egg 2026-11-05).** It grants the **steal-proof** state (`ChickenController.IsStealProof` / `GrantStealProof`, a networked timer; recasting keeps the later end). While steal-proof, nothing can take the bird's cargo: Steal and Death Mark's execute check it *before* crediting the thief, so no food is created or duplicated; the victim's side re-checks in `RPC_DrainStolen` / `RPC_TransferAllToBountyBag` (sub-RTT race, logged; a refused optimistic drain is refunded). Details:
 
 - **Steal** takes nothing from a steal-proof bird.
 - **Death Mark's execute** cannot touch a steal-proof bird (a shelled chicken cannot be executed: caster gate and the victim's authority; a sub-round-trip race refunds the Kill cooldown and restores the mark).
-- **Shield phases** (`TurtleMode.asset`, 2026-11-05 later):
+- **Egg Shell phases** (`TurtleMode.asset`, 2026-11-05 later):
   - **Walk** (`WalkSeconds` 1): 0.5x speed. A new networked slow-immunity window makes the timed ability slow and the zone / aura slow refuse the bird; stun, root, shove, theft and execution still land (only the egg is steal-proof). Pile and bump slows still apply (the immunity covers ability slows only).
   - **Egg** (`EggSeconds` 2): starts on its own when the walk ends. The bird cannot move, is immune to stun, slow, root and shove, and steal-proof (so unkillable). Control immunity also refuses zone slows (`CheckAbilityZoneSlow`).
-  - **Ending it:** pressing Shield again ends the whole Shield in either phase. Casting any other ability ends only the egg: during the egg the Shield ends; during the walk the pending egg is dropped and the walk runs out. Auto-Peck never fires during a live Shield, while a manual Peck counts as a cast. The old second-press lock is removed; bots no longer press-lock and leave a running Shield alone.
+  - **Ending it:** pressing Egg Shell again ends the whole Egg Shell in either phase. Casting any other ability ends only the egg: during the egg the Egg Shell ends; during the walk the pending egg is dropped and the walk runs out. Auto-Peck never fires during a live Egg Shell, while a manual Peck counts as a cast. The old second-press lock is removed; bots no longer press-lock and leave a running Egg Shell alone.
   - Duration 3 s (walk + egg), cooldown 8 s from the cast.
 - **Telegraph:** a rival aiming a steal at a steal-proof bird sees the grey no-effect mark and a **SAFE** pop (`hud.pop.safe`).
 - **Bots** raise a shell when a rival with a steal ability is within 5.4 m and the bot carries 5 or more food.
