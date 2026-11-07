@@ -788,6 +788,16 @@ namespace CluckWars.Visuals
         /// <summary>An executed chicken's body while it is out (0 = gone; it reappears at its base). Its nameplate keeps the skull.</summary>
         public const float ExecutedOutAlpha = 0f;
 
+        /// <summary>
+        /// Floor on the LOCAL player's own faded bird (Hide / Invisibility, Smoke Roost): it renders at
+        /// <c>max(VisualOpacity, this)</c> so you never lose your own chicken, and its world tells (rings,
+        /// bars, nameplate, badges, particles) draw at the same alpha. Remote peers see the real
+        /// <c>VisualOpacity</c> body and no tells at all (spec 2026-11-06 section 3.2 / 4.8, D9). Must stay
+        /// above the Hide opacity on the shipped assets (0.2) and below 1, or "hidden" stops reading on your
+        /// own screen; <c>HiddenBirdTests</c> pins both.
+        /// </summary>
+        public const float LocalHiddenOpacityFloor = 0.45f;
+
         /// <summary>Any ending: every output fades to 0 over this long, then the presentation is clean.</summary>
         public const float MarkEndFadeSeconds = 0.3f;
         /// <summary>The standings skull fades in over this long.</summary>

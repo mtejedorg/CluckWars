@@ -301,8 +301,12 @@ namespace CluckWars.Visuals
             float fraction = _abilities.ActiveRemaining01For(ringSlot);
             if (fraction <= 0f) { _buffRing.Hide(); return; }
 
+            // A hidden bird must not leak its buff (A1): none for remote peers, floored alpha for its owner.
+            float hiddenAlpha = HiddenVisibilityRules.AlphaFor(_controller);
+            if (hiddenAlpha <= 0f) { _buffRing.Hide(); return; }
+
             Color c = ability.AccentColor;
-            c.a = SelfBuffRingAlpha;
+            c.a = SelfBuffRingAlpha * hiddenAlpha;
 
             Vector3 center = _controller.transform.position;
             center.y = GroundY;

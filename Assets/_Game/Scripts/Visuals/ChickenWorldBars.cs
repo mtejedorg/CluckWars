@@ -54,6 +54,7 @@ namespace CluckWars.Visuals
         private float _ringDrawRadius;       // live outer radius of the colour stroke, root-local
 
         private int _appliedRingCorner = -2;
+        private float _appliedHiddenAlpha = 1f; // HiddenVisibilityRules alpha baked into _ringBaseColor (A1)
         private Color _ringBaseColor = Color.white;
         private float _youEmphasis;          // 0..1, GET READY "this is you" marker (YouMarkerRules)
         private bool _ringEmphasised;        // last frame wrote an emphasised scale/alpha
@@ -190,12 +191,17 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             bool live = obj != null && obj.IsValid;
 
-            RefreshRing(live);
+            // A hidden bird shows no ring or cargo bar to a remote peer; its owner sees them floored (A1).
+            float hiddenAlpha = HiddenVisibilityRules.AlphaFor(_controller);
+            bool ringShown = hiddenAlpha > 0f;
+            if (_ring != null && _ring.gameObject.activeSelf != ringShown) _ring.gameObject.SetActive(ringShown);
+
+            RefreshRing(live, hiddenAlpha);
             RefreshYouMarker(live);
             GroundRingStyle.SyncGhost(_ring, _ringGhost, RingAlpha);
 
             bool stunned = _combat != null && _combat.IsRemoved;
-            bool show    = live && !stunned;
+            bool show    = live && !stunned && ringShown;
             if (_barRoot.gameObject.activeSelf != show)
                 _barRoot.gameObject.SetActive(show);
             if (!show) return;
@@ -255,20 +261,22 @@ namespace CluckWars.Visuals
             }
         }
 
-        private void RefreshRing(bool live)
+        private void RefreshRing(bool live, float hiddenAlpha)
         {
             if (_ring == null) return;
 
             int corner = live ? _controller.HomeCornerIndex : -1;
-            if (corner == _appliedRingCorner) return;
+            if (corner == _appliedRingCorner && Mathf.Approximately(hiddenAlpha, _appliedHiddenAlpha)) return;
             _appliedRingCorner = corner;
+            _appliedHiddenAlpha = hiddenAlpha;
 
             // The corner's player colour (PlayerPalette, same as the HUD, menus and podium); neutral and
             // fainter until the spawn stamps a corner.
             var c = PlayerPalette.ForCorner(corner);
-            c.a = corner < 0 ? 0.5f : RingAlpha;
+            c.a = (corner < 0 ? 0.5f : RingAlpha) * hiddenAlpha;
             _ringBaseColor = c;
             _ring.color = c;
+            GroundRingStyle.SetEdgeAlpha(_ringEdge, GroundRingStyle.IdentityEdgeAlpha * hiddenAlpha);
         }
 
         /// <summary>

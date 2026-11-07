@@ -198,7 +198,8 @@ namespace CluckWars.Visuals
             // decoy badge honestly needs a decoy-side ControlFlags derivation, which is a
             // real feature, not a guard removal.
             var obj = _controller.Object;
-            if (obj == null || !obj.IsValid || _controller.IsDecoy)
+            // A1: a hidden bird (Hide / Smoke Roost) shows no badges to a remote peer; its owner keeps them.
+            if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller))
             {
                 HideStack();
                 return;

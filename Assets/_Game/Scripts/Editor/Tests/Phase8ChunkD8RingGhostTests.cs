@@ -151,7 +151,7 @@ namespace CluckWars.Tests
 
                 // The ring half of LateUpdate (the bar half needs a spawned ChickenCombat): unstamped corner -> neutral at 0.5,
                 // then the same SyncGhost call LateUpdate makes; the ghost takes the RGB and the alpha relative to the stamped 0.75.
-                typeof(ChickenWorldBars).GetMethod("RefreshRing", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(bars, new object[] { false });
+                typeof(ChickenWorldBars).GetMethod("RefreshRing", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(bars, new object[] { false, 1f });
                 GroundRingStyle.SyncGhost(ring, ghost, ChickenWorldBars.RingAlpha);
                 Assert.AreEqual(ring.color.r, ghost.color.r, 1e-4f);
                 Assert.AreEqual(ring.color.g, ghost.color.g, 1e-4f);

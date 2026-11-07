@@ -69,7 +69,7 @@ namespace CluckWars.Visuals
 
         // WP7 info-zone rule: a rival mostly under the HUD hides its label (RivalIndicator decides, from this plate's rect).
         private RivalIndicator _rivalIndicator;
-        private bool _hiddenByHud;
+        private bool _labelHidden;
         private Vector2 _plateCentreLocal;   // the visible pill's centre and half size in label space, set by FitMarks
         private Vector2 _plateHalfSize;
 
@@ -183,10 +183,12 @@ namespace CluckWars.Visuals
             if (_text == null || _controller == null) return;
 
             // ── Under the HUD (WP7): hide the whole label while a rival is mostly inside an info zone ──
-            bool hide = _rivalIndicator != null && _rivalIndicator.isActiveAndEnabled && _rivalIndicator.HidesNameplate;
-            if (hide != _hiddenByHud)
+            // A1: and while the bird is hidden (Hide / Smoke Roost) for this peer; its owner keeps the label.
+            bool hide = (_rivalIndicator != null && _rivalIndicator.isActiveAndEnabled && _rivalIndicator.HidesNameplate)
+                        || HiddenVisibilityRules.IsHiddenFor(_controller);
+            if (hide != _labelHidden)
             {
-                _hiddenByHud = hide;
+                _labelHidden = hide;
                 _textTransform.gameObject.SetActive(!hide);
                 // A label that changed while hidden was fitted against an inactive mesh: refit it now it shows again.
                 if (!hide) _appliedPlayerId = -2;

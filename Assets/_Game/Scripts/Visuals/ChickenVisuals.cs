@@ -179,6 +179,10 @@ namespace CluckWars.Visuals
             // and the first snapshot.
             float raw = _controller.VisualOpacity;
             float effective = raw > 0f ? raw : 1f;
+            // A1: your own hidden bird never fades below FeedbackTuning.LocalHiddenOpacityFloor; remote peers see the
+            // real VisualOpacity. Only the floor is taken from the rule: a remote bird's tells hide, its body does not.
+            if (ControlStateVFX.IsFadedOpacity(raw) && IsLocalBird())
+                effective = HiddenVisibilityRules.AlphaFor(raw, isLocal: true);
 
             bool isStunned  = _combat != null && _combat.IsRemoved;
             bool stunChanged = isStunned != _isDeadState;
@@ -205,6 +209,12 @@ namespace CluckWars.Visuals
                 }
                 PushColor(c);
             }
+        }
+
+        private bool IsLocalBird()
+        {
+            var obj = _controller.Object;
+            return obj != null && obj.IsValid && _controller.HasInputAuthority;
         }
 
         private void OnDestroy() => RestoreOriginalMaterials();

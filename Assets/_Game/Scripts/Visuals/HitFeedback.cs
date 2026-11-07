@@ -754,7 +754,8 @@ namespace CluckWars.Visuals
         /// </summary>
         private void TriggerVictimHit(HapticKind haptic = HapticKind.Hit)
         {
-            StartFlash();
+            // A1: a white flash on a hidden bird (Hide / Smoke Roost) would point a remote peer straight at it.
+            if (!HiddenVisibilityRules.IsHiddenFor(_controller)) StartFlash();
 
             // The body squash is the flash's physical sibling — same beat, same trigger. Driving
             // it from here rather than from a ChangeDetector of its own is deliberate: this method
@@ -802,7 +803,7 @@ namespace CluckWars.Visuals
                     FeedbackTuning.HitAttributionMinSeparation, out var direction))
                 return;
 
-            StartMotionLines(direction);
+            if (!HiddenVisibilityRules.IsHiddenFor(_controller)) StartMotionLines(direction);   // A1, as the flash
 
             if (_controller.HasInputAuthority && !_controller.IsDecoy)
                 RaiseLocalPlayerHit(attackerPos);
@@ -1135,6 +1136,7 @@ namespace CluckWars.Visuals
         public void PlayHitSpark()
         {
             CluckWars.Diagnostics.FirstUseMarkers.Note(CluckWars.Diagnostics.FirstUseKind.HitSpark);   // breadcrumb only
+            if (HiddenVisibilityRules.IsHiddenFor(_controller)) return;   // A1: no spark on a hidden victim for a remote peer
             _sparkPS?.Play();
         }
 

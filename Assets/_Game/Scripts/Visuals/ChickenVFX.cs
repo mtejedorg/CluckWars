@@ -102,9 +102,11 @@ namespace CluckWars.Visuals
             if (_combat == null) return;
 
             bool isStunned = _combat.IsRemoved;
+            // A1: nothing emits on a hidden bird (Hide / Smoke Roost) for a remote peer; its owner still sees it all.
+            bool hidden = HiddenVisibilityRules.IsHiddenFor(_controller);
 
             // ── Death → stun begin ───────────────────────────────────────────
-            if (isStunned && !_wasStunned)
+            if (isStunned && !_wasStunned && !hidden)
             {
                 _deathPS?.Play();
                 _stunPS?.Play();
@@ -129,7 +131,7 @@ namespace CluckWars.Visuals
             // both fixed by keying off the replicated one-shot LastCastEventId instead of a
             // slot transition — this does the same. Do not revert to an active-flag
             // edge-detect; it will silently reintroduce all three bugs.
-            if (_abilities != null) ObserveCastEvent();
+            if (_abilities != null) ObserveCastEvent(hidden);
 
             // ── Food deposit + cargo-full ring ────────────────────────────────
             // [Networked] Cargo replicates to every peer so both effects fire
@@ -137,10 +139,10 @@ namespace CluckWars.Visuals
             if (_cargo != null)
             {
                 float cargo       = _cargo.Cargo;
-                bool  isCargoFull = _cargo.IsFull && !isStunned;
+                bool  isCargoFull = _cargo.IsFull && !isStunned && !hidden;   // hiding stops the loop, revealing restarts it
 
                 // Deposit burst: cargo just dropped from a meaningful amount to empty.
-                if (!float.IsNaN(_lastCargo) && _lastCargo > 1f && cargo < 0.1f && !isStunned)
+                if (!float.IsNaN(_lastCargo) && _lastCargo > 1f && cargo < 0.1f && !isStunned && !hidden)
                     _depositPS?.Play();
 
                 // Cargo-full ring: looping orbit that turns on/off with capacity state.
@@ -160,7 +162,7 @@ namespace CluckWars.Visuals
         /// <c>HitFeedback.ObserveOwnCast</c> and <c>AbilityRangeIndicator.ObserveCast</c>,
         /// whose burst/flash halves of the same event this deliberately does not duplicate.
         /// </summary>
-        private void ObserveCastEvent()
+        private void ObserveCastEvent(bool hidden)
         {
             // TryActivate clears ChargingSlot in the same tick it fires, and a very short
             // ability's active flag may already have cleared by the time this observes the
@@ -185,8 +187,8 @@ namespace CluckWars.Visuals
 
             var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
 
-            // The burst needs AccentColor, so an unresolved ability means no burst.
-            if (ability != null && _abilityPS != null)
+            // The burst needs AccentColor, so an unresolved ability means no burst. None on a hidden bird (A1).
+            if (ability != null && _abilityPS != null && !hidden)
             {
                 var main = _abilityPS.main;
                 main.startColor = new ParticleSystem.MinMaxGradient(ability.AccentColor);
