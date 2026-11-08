@@ -15,7 +15,7 @@ MonoBehaviour:
   DisplayName: Egg Shell
   ShortLabel: EGG
   Description: 'Waddle 1s - slows bounce off. Then be an egg 2s: no stun, slow, shove,
-    theft or kill. Press again to hatch.'
+    theft or pounce. Press again to hatch.'
   AccentKey: 7
   CustomAccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2

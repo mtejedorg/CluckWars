@@ -113,7 +113,7 @@ namespace CluckWars.Tests
 
         [Test]
         public void ASpoilerWithoutTheMark_IsAProblem() =>
-            StringAssert.Contains("Death Mark", Only(Broken(ChickenSubclass.Assassin_Spoiler, k => { k[0] = Pool<SnatchAbilitySO>(); return k; })));
+            StringAssert.Contains("Hunt", Only(Broken(ChickenSubclass.Assassin_Spoiler, k => { k[0] = Pool<SnatchAbilitySO>(); return k; })));
 
         [Test]
         public void TheMarkWithoutAStunSource_IsAProblem() =>

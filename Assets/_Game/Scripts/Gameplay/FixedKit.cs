@@ -56,10 +56,10 @@ namespace CluckWars.Gameplay
                     problems.Add($"{who}: Speedy kits grant no terrain traversal, but '{a.name}' has {a.TerrainTraversal}.");
 
             if (passive.Subclass == ChickenSubclass.Assassin_Spoiler && !kit.Any(a => a is MarkKillAbilitySO))
-                problems.Add($"{who}: the Spoiler kit must hold Death Mark (its execute is the class's income).");
+                problems.Add($"{who}: the Spoiler kit must hold Hunt (its execute is the class's income).");
             // An execute only qualifies on a stunned target, so the mark without a stun source of its own waits for luck.
             if (kit.Any(a => a is MarkKillAbilitySO) && !kit.Any(EmitsStun))
-                problems.Add($"{who}: Death Mark needs a stun source in the same kit (none emits ControlKind.Stun).");
+                problems.Add($"{who}: Hunt needs a stun source in the same kit (none emits ControlKind.Stun).");
 
             return problems;
         }

@@ -270,7 +270,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(3f, turtle.Duration, 1e-5f);
             Assert.AreEqual(8f, turtle.Cooldown, 1e-5f);
             Assert.AreEqual(0.5f, turtle.SpeedMultiplier, 1e-5f);
-            Assert.AreEqual("Waddle 1s - slows bounce off. Then be an egg 2s: no stun, slow, shove, theft or kill. Press again to hatch.", turtle.DescriptionText);
+            Assert.AreEqual("Waddle 1s - slows bounce off. Then be an egg 2s: no stun, slow, shove, theft or pounce. Press again to hatch.", turtle.DescriptionText);
             Assert.AreEqual(turtle.DescriptionText, turtle.Description, "stale .asset Description");
             StringAssert.DoesNotContain("DamageResistance", File.ReadAllText("Assets/_Game/Data/Abilities/TurtleMode.asset"));
         }

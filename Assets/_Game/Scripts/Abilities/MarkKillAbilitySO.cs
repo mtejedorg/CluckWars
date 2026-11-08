@@ -27,7 +27,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Hunt";   // UI name (spec D5b); internally still Death Mark
             ShortLabel = "HUNT";
-            Description = "Marks a rival, likelier far from home. Stun them within 6.2m, then press again to take everything they carry.";
+            Description = "Hunt a rival far from home. Stun them within 6.2m, then press again to pounce and take all they carry.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;

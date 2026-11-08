@@ -497,7 +497,7 @@ current, shipped state.
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Egg Shell** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Egg Shell**, **Slow**, **Steal** |
-| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Death Mark**, **Stun**, **Jump**, **Hide** |
+| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Hunt**, **Stun**, **Jump**, **Hide** |
 | | The Thief | Every steal takes 1.6x more | **Steal**, **Hide**, **Jump**, **Slow** |
 
 The old signatures (Scrap, Headbutt, Ground Quake, Sneaky Steal) are retired (2026-11-05). The class shows as Sneaky; in code it is still `ChickenClass.Assassin`.

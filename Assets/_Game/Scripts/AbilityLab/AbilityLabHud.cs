@@ -2,6 +2,7 @@ using System.Text;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Input;
+using CluckWars.Localization;
 using CluckWars.Logging;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -271,7 +272,7 @@ namespace CluckWars.AbilityLab
             }
 
             _sb.Clear();
-            _sb.Append("Class: ").Append(_lab.SpawnedClass)
+            _sb.Append("Class: ").Append(ClassShort(_lab.SpawnedClass))
                .Append("   Passive: ").AppendLine(Name(abilities.Passive));
 
             _sb.Append("Press to cast: ")
@@ -356,6 +357,15 @@ namespace CluckWars.AbilityLab
             }
             return null;
         }
+
+        /// <summary>Player-facing class short name (class.*.short), the same keys the menus use.</summary>
+        private static string ClassShort(ChickenClass cls) => UiText.Get(cls switch
+        {
+            ChickenClass.Speedy   => UiKeys.ClassSpeedyShort,
+            ChickenClass.Fatty    => UiKeys.ClassFattyShort,
+            ChickenClass.Assassin => UiKeys.ClassAssassinShort,
+            _                     => UiKeys.ClassWarriorShort,
+        });
 
         private static string Name(AbilityBaseSO ability) =>
             ability != null ? ability.DisplayName : "(none)";
