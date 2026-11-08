@@ -427,12 +427,12 @@ namespace CluckWars.Visuals
                 anyEntered = true;
                 stunEntered = true;
                 if (_vfx != null) _vfx.EmitStunBonk();   // D10: gates on the hidden / faded bird itself
-                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), _controller.StunRemaining, FeedbackTuning.CanonicalStunColor, ChickenStatusBadges.Badge.Stun);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), FeedbackTuning.CanonicalStunColor, ChickenStatusBadges.Badge.Stun);
             }
             if (rooted && !_wasRooted)
             {
                 anyEntered = true;
-                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStuck), _controller.RootRemaining, FeedbackTuning.CanonicalRootColor, ChickenStatusBadges.Badge.Root);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStuck), FeedbackTuning.CanonicalRootColor, ChickenStatusBadges.Badge.Root);
             }
             // Snare edge: an enemy did this, so it is a real impact and keeps the full
             // treatment. Edge-derived from _wasSnared rather than from _wasSlowed on purpose —
@@ -1231,38 +1231,21 @@ namespace CluckWars.Visuals
 
         // ---- Control-state floating text --------------------------------------
 
-        private void SpawnControlText(string label, float seconds, Color color, ChickenStatusBadges.Badge entering)
+        /// <summary>The control pop is the word only (spec section 12 E2): the badge row owns the countdown.</summary>
+        private void SpawnControlText(string label, Color color, ChickenStatusBadges.Badge entering)
         {
-            string text = seconds > 0.05f ? $"{label} {seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}s" : label;
-            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(entering), text, color);
+            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(entering), label, color);
         }
 
         /// <summary>
-        /// <b>Carried-forward design decision — do not "fix" this into a countdown.</b>
-        /// Slow shows its <i>magnitude</i>, never a time. Unlike stun and root, which are
-        /// backed by real <c>[Networked] TickTimer</c>s
-        /// (<see cref="ChickenController.StunRemaining"/> /
-        /// <see cref="ChickenController.RootRemaining"/>), slow is re-derived from scratch
-        /// every tick from whatever is currently touching the chicken — collision, a food
-        /// pile, a zone, an aura — and has no end time at all to count down to (see the
-        /// remarks on <see cref="ChickenController.SlowMultiplier"/>). Two overlapping slow
-        /// sources with different remaining durations would make any single "time left"
-        /// number meaningless anyway. So it renders as <c>SLOW 45%</c>, meaning "moving at
-        /// 45% of normal speed", matching §5.2's <c>×0.45</c> control-consequence label.
-        ///
-        /// The multiplier itself is StateAuthority-side only, so a remote peer watching a
-        /// rival cannot read the number and gets the bare <c>SLOW</c> — still two coding
-        /// channels (word + cyan) per §1.3.
+        /// The bare SLOW word on every peer, with no number (spec section 12 E2, 2026-11-08, supersedes the old
+        /// SLOW 45% magnitude pop). Pops are words only: the badge row and the snail glyph carry the slow state,
+        /// and the cyan colour plus the word keep the two coding channels.
         /// </summary>
         private void SpawnSlowText()
         {
-            string text = UiText.Get(UiKeys.HudPopSlow);
-            if (HasStateAuthority)
-            {
-                int percent = Mathf.Clamp(Mathf.RoundToInt(_controller.SlowMultiplier * 100f), 0, 100);
-                text = $"{text} {percent}%";
-            }
-            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(ChickenStatusBadges.Badge.Slow), text, FeedbackTuning.CanonicalSlowColor);
+            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(ChickenStatusBadges.Badge.Slow),
+                UiText.Get(UiKeys.HudPopSlow), FeedbackTuning.CanonicalSlowColor);
         }
 
         private Vector3 TextAnchorPoint() => _controller.PopAnchor;

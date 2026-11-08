@@ -159,6 +159,39 @@ namespace CluckWars.Tests
             Assert.AreEqual("FAST", UiText.Get(UiKeys.HudBadgeFast), "D1: the shipped generic Speed word, not Zoom");
         }
 
+        // ---- E2 (spec section 12, 2026-11-08): the badge row owns the countdown ---------------------------
+
+        private static string Compose(ChickenStatusBadges.Badge badge, int quantity)
+        {
+            var compose = typeof(ChickenStatusBadges).GetMethod("Compose", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(compose);
+            return (string)compose.Invoke(null, new object[] { badge, quantity });
+        }
+
+        [Test]
+        public void E2_StunRow_IsTheWordThenTheCountdown()
+        {
+            string word = UiText.Get(UiKeys.HudStatusStun);
+            Assert.AreEqual("STUN", word);
+            Assert.AreEqual(word + " " + HudFeedbackStyle.Seconds(15), Compose(ChickenStatusBadges.Badge.Stun, 15));
+            Assert.AreEqual("STUN 1.5s", Compose(ChickenStatusBadges.Badge.Stun, 15), "reads like EGG 1.0s");
+            Assert.AreEqual(word, Compose(ChickenStatusBadges.Badge.Stun, 0), "no deadline left: the word alone");
+        }
+
+        [Test]
+        public void E2_RootRow_IsTheGlyphThenStuckThenTheCountdown()
+        {
+            string row = Compose(ChickenStatusBadges.Badge.Root, 12);
+            string stuck = UiText.Get(UiKeys.HudStatusStuck);
+            Assert.AreEqual("STUCK", stuck);
+            Assert.AreEqual(HudFeedbackStyle.RootGlyph + " " + stuck + " " + HudFeedbackStyle.Seconds(12), row);
+            int glyph = row.IndexOf(HudFeedbackStyle.RootGlyph, StringComparison.Ordinal);
+            int word  = row.IndexOf(stuck, StringComparison.Ordinal);
+            int secs  = row.IndexOf("1.2s", StringComparison.Ordinal);
+            Assert.IsTrue(glyph == 0 && word > glyph && secs > word, row);
+            Assert.AreEqual(HudFeedbackStyle.RootGlyph + " " + stuck, Compose(ChickenStatusBadges.Badge.Root, 0));
+        }
+
         // ---- layout ----------------------------------------------------------------------------------------
 
         [Test]

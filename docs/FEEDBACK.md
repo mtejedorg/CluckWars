@@ -159,7 +159,7 @@ Fired the instant the ability resolves. All peers.
   direction, so the victim reads *where it came from*.
 - **Floating combat text** at the victim, rising and fading over 0.9 s:
   - Steal: `-5 🌽` at victim (warm red), `+5 🌽` at thief (green).
-  - Control: `STUN 1.5s`, `STUCK! 2.0s`, `SLOW 45%` (one kid word, STUCK, for root / pin; all pop words live in UiText `hud.pop.*`: STUN, STUCK!, SLOW, IMMUNE, FULL!, SAFE).
+  - Control: pops are words only, `STUN`, `STUCK!`, `SLOW` (spec section 12 E2, 2026-11-08: the badge row owns the countdown, `STUN 1.5s` / `STUCK 1.2s`; one kid word, STUCK, for root / pin; all pop words live in UiText `hud.pop.*`: STUN, STUCK!, SLOW, IMMUNE, FULL!, SAFE).
   - Blocked: `BLOCKED` / `IMMUNE` in grey.
 - **Directional damage indicator** for the local player — an arc at the screen
   edge pointing at the attacker, fading over 1.2 s. This is the only reliable way
@@ -439,7 +439,7 @@ finding.
 
 **Ruled out upstream — do not "fix" it by re-adding the Drag text.** Suppressing the
 popup for Drag is precisely what makes the Snare popup mean something: a floating
-`SLOW 45%` now reliably says *an enemy did this to you*. Restoring it for Drag would
+`SLOW` (a word only since E2, 2026-11-08) now reliably says *an enemy did this to you*. Restoring it for Drag would
 restore the ambiguity the split was built to remove. If the playtest confirms the
 problem, the fix has to come from a different channel (a stronger onset transition on the
 existing streaks, an audio tell, a one-shot on the stick tint) — not from the text.
@@ -526,7 +526,7 @@ Two new components, three extended, one new service. No RPCs added.
 - `TargetHighlight` (MonoBehaviour on every chicken) — the threat overlay
   requested by the brief; additive sprite + tint, never touches the body material
   so it cannot fight the hit-flash (same discipline as `ChickenStateOverlays`).
-- `FloatingTextService` — pooled world-space text popups (`-5 🌽`, `STUN 1.5s`).
+- `FloatingTextService` — pooled world-space text popups (`-5 🌽`, `STUN`).
 - `HitFeedback` — hit flash, impact lines, hit-confirm SFX, screen-edge
   direction arc.
 

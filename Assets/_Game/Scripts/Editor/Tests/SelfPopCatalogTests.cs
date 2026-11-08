@@ -146,5 +146,46 @@ namespace CluckWars.Tests
             StringAssert.Contains("FloatingCombatText.Spawn(", pushLines[0], "PUSH is the victim's pop on every peer");
             StringAssert.DoesNotContain("SelfPop", pushLines[0]);
         }
+
+        // ---- E2 (spec section 12, 2026-11-08): pops are words only, the badge row owns the number --------
+
+        /// <summary>Every <c>hud.pop.*</c> word that takes no argument (the self-pop catalog plus STUN / STUCK / SLOW and
+        /// the refusal words) carries no digit and no percent. The argument rows (ROB -n, +n) are the cargo numbers.</summary>
+        [Test]
+        public void E2_EveryWordPop_CarriesNoDigitOrPercent()
+        {
+            var keys = typeof(UiKeys).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .Where(f => f.IsLiteral && f.Name.StartsWith("HudPop", System.StringComparison.Ordinal))
+                .Where(f => !f.IsDefined(typeof(UiArgsAttribute), false))
+                .Select(f => (string)f.GetRawConstantValue()).ToArray();
+            CollectionAssert.IsSupersetOf(keys, new[] { UiKeys.HudPopStun, UiKeys.HudPopStuck, UiKeys.HudPopSlow,
+                UiKeys.HudPopWaddle, UiKeys.HudPopEgg, UiKeys.HudPopHatch, UiKeys.HudPopPoof, UiKeys.HudPopFast, UiKeys.HudPopHop });
+            foreach (var key in keys)
+            {
+                string word = UiText.Get(key);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(word), key);
+                Assert.IsFalse(word.Any(char.IsDigit), key + " = " + word + ": a pop is a word, the badge row owns the number");
+                StringAssert.DoesNotContain("%", word, key);
+            }
+        }
+
+        /// <summary>The control pops spawn their label untouched: no seconds suffix, no percent branch, on every peer.</summary>
+        [Test]
+        public void E2_ControlPops_SpawnTheBareWord()
+        {
+            string hit = Read("Visuals/HitFeedback.cs");
+            foreach (var method in new[] { "private void SpawnControlText(", "private void SpawnSlowText(" })
+            {
+                int start = hit.IndexOf(method, System.StringComparison.Ordinal);
+                Assert.Greater(start, 0, method);
+                int end = hit.IndexOf("\n        }", start, System.StringComparison.Ordinal);
+                string body = hit.Substring(start, end - start);
+                StringAssert.Contains("FloatingCombatText.Spawn(", body, method);
+                foreach (var banned in new[] { "%", "ToString(", "$\"", "HasStateAuthority", "SlowMultiplier", "Remaining" })
+                    StringAssert.DoesNotContain(banned, body, method + " must emit the word only");
+            }
+            StringAssert.Contains("SpawnControlText(UiText.Get(UiKeys.HudPopStun), FeedbackTuning.CanonicalStunColor", hit);
+            StringAssert.Contains("SpawnControlText(UiText.Get(UiKeys.HudPopStuck), FeedbackTuning.CanonicalRootColor", hit);
+        }
     }
 }

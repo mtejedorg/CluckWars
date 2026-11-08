@@ -637,10 +637,11 @@ namespace CluckWars.Visuals
             string secs = quantity > 0 ? CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : string.Empty;
             switch (badge)
             {
+                // E2 (spec section 12): the row owns the countdown, word first like EGG 1.0s; pops are words only.
                 case Badge.Stun:
-                    return secs;
+                    return WordWithCountdown(UiText.Get(UiKeys.HudStatusStun), secs);
                 case Badge.Root:
-                    return quantity > 0 ? RootGlyph + " " + secs : RootGlyph;
+                    return RootGlyph + " " + WordWithCountdown(UiText.Get(UiKeys.HudStatusStuck), secs);
                 case Badge.Slow:
                     // Icon only: slow has no deadline and a x0.45 means nothing to a kid (Phase 7 A12).
                     return string.Empty;
