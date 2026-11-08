@@ -6,7 +6,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 🛠 2026-11-07 - Feedback implementation (`simplify-abilities`, batches A, B and C of `docs/superpowers/plans/2026-11-07-ability-feedback-implementation-plan.md`, not merged, not pushed)
+## 🛠 2026-11-07 - Feedback implementation (`simplify-abilities`, batches A, B, C and D of `docs/superpowers/plans/2026-11-07-ability-feedback-implementation-plan.md`, not merged, not pushed)
 
 | Item | Status | Commit | Notes |
 |---|---|---|---|
