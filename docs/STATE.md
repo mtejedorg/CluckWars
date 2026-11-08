@@ -13,6 +13,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 | Item | Status | Commit | Notes |
 |---|---|---|---|
 | G2 badge row owns the number (E2a) | done | `3b1eafd7` | `ChickenStatusBadges.Compose`: Stun row `STUN 1.5s` (`HudStatusStun`), Root row glyph + `STUCK 1.2s` (`HudStatusStuck`); `HitFeedback.SpawnControlText` word only, `SpawnSlowText` bare SLOW on every peer (percent branch + carried-forward remark replaced by the E2 rationale); caster hex digit unchanged; FEEDBACK.md lines 162/442/529. Tests: `SelfPopCatalogTests.E2_*` (no digit/% in any `HudPop*` word, source guard), `StatusBadgeSpriteTests.E2_*Row*`. Capture `G2/` (phone): stun_3_impact row `STUN 1.2s`, pop `STUN`; slow_3_impact pop `SLOW`. Suite 3183/3183 |
+| G3 one glyph per state (E3a) | done | `2bd67333` | `ChickenNameplate.ShowsPillSnail(flags, slowRowShown)`: pill snail only on the replicated `ControlVfx.Snared` bit and only while `ChickenStatusBadges.IsRowVisible(Badge.Slow)` is false (live re-collect, no frame lag; false when the stack is hidden or the row is cut by `StatusBadgeMaxRows`); `SlowMultiplier`/`IsPileSlow` no longer read; unused `_cargo` removed. Tests `StatusBadgeLayoutTests.PillSnail_*`, `IsRowShown_*`. Capture `G3/` (phone): slow_3_impact one snail (the row), P2 pill bare; peck_0_parked no pill snail (the Slow badge row still shows for pile drag, unchanged by E3). Suite 3187/3187 |
 
 ## 🛠 2026-11-08 - Feedback fix batch F (`simplify-abilities`, verified no-decision fixes from the 8 Nov re-audit, E1-E4 untouched, not merged, not pushed)
 
