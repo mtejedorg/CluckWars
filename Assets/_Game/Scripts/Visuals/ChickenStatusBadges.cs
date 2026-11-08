@@ -179,21 +179,41 @@ namespace CluckWars.Visuals
         /// scaled in Y). With no rows (or a hidden bird or a decoy, which show none) it is the fallback base
         /// (<see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> plus the head lift).
         /// </summary>
-        public float CurrentStackTopLocalY
+        public float CurrentStackTopLocalY => StackTopLocalY(Badge.None);
+
+        /// <summary>
+        /// <see cref="CurrentStackTopLocalY"/> counting the row <paramref name="entering"/> that is added on this frame, for a
+        /// state-entry pop spawned on the edge, before the layout (or, for a hit's control flag, the replicated state) shows it:
+        /// the pop then starts above that row instead of on it. A row already shown adds nothing (<see cref="RowsWithEntry"/>).
+        /// </summary>
+        public float StackTopLocalYEntering(Badge entering) => StackTopLocalY(entering);
+
+        private float StackTopLocalY(Badge entering)
         {
-            get
-            {
-                float baseY = FeedbackTuning.StatusBadgeStackBaseHeight + _headLift;
-                if (_controller == null || _stackRoot == null) return baseY;
-                var obj = _controller.Object;
-                if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return baseY;
-                int count = CollectActive();
-                if (count == 0) return baseY;
-                float bottomY = _nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world)
-                    ? world.y - transform.position.y
-                    : baseY;
-                return bottomY + StackTopInRoot(count) * _stackRoot.up.y;
-            }
+            float baseY = FeedbackTuning.StatusBadgeStackBaseHeight + _headLift;
+            if (_controller == null || _stackRoot == null) return baseY;
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return baseY;
+            int count = RowsWithEntry(_active, CollectActive(), entering, _active.Length);
+            if (count == 0) return baseY;
+            float bottomY = _nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world)
+                ? world.y - transform.position.y
+                : baseY;
+            return bottomY + StackTopInRoot(count) * _stackRoot.up.y;
+        }
+
+        /// <summary>
+        /// Rows shown once <paramref name="entering"/> joins the <paramref name="count"/> live ones in <paramref name="active"/>:
+        /// unchanged for <see cref="Badge.None"/>, when that row (or, for the shield's walk and egg, which replace each other,
+        /// its twin) is already live, or at the <paramref name="maxRows"/> cap; otherwise one more.
+        /// </summary>
+        public static int RowsWithEntry(Badge[] active, int count, Badge entering, int maxRows)
+        {
+            if (entering == Badge.None || count >= maxRows) return count;
+            Badge twin = entering == Badge.Egg ? Badge.Waddle : entering == Badge.Waddle ? Badge.Egg : entering;
+            for (int i = 0; i < count; i++)
+                if (active[i] == entering || active[i] == twin) return count;
+            return count + 1;
         }
 
         /// <summary>Raises the badge stack for a class model drawn taller than the collider (Phase 8 D6).

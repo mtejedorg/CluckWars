@@ -119,5 +119,121 @@ namespace CluckWars.Tests
             Assert.GreaterOrEqual(FeedbackTuning.MarkMarkerClearHeight, FeedbackTuning.StatusBadgeStackBaseHeight,
                 "the marker floor clears the badge stack fallback base");
         }
+
+        // ---- F1: state-entry pops clear the row added this frame; self-pops follow the bird -------------
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void AnEntryPopSpawnsAboveTheRowAddedThisFrame(int shownRows)
+        {
+            var active = new ChickenStatusBadges.Badge[FeedbackTuning.StatusBadgeMaxRows];
+            var fill = new[] { ChickenStatusBadges.Badge.Stun, ChickenStatusBadges.Badge.Slow, ChickenStatusBadges.Badge.Speed };
+            for (int i = 0; i < shownRows; i++) active[i] = fill[i];
+
+            int rows = ChickenStatusBadges.RowsWithEntry(active, shownRows, ChickenStatusBadges.Badge.Hidden, active.Length);
+            Assert.AreEqual(shownRows + 1, rows, "the entering row counts");
+
+            float pillTop = LocalPillTop();
+            float newRowTop = StackTop(pillTop, rows);
+            float spawn = FloatingCombatText.PopSpawnHeight(newRowTop);
+            Assert.GreaterOrEqual(spawn, newRowTop + FeedbackTuning.FloatingTextStackClearance - 1e-5f, "starts above the new row's top");
+            Assert.GreaterOrEqual(spawn, FeedbackTuning.FloatingTextSpawnHeight, "the 2.50 floor holds");
+            Assert.GreaterOrEqual(spawn, FloatingCombatText.PopSpawnHeight(StackTop(pillTop, shownRows)) - 1e-5f);
+        }
+
+        [Test]
+        public void ARowAlreadyShownOrCappedAddsNothing()
+        {
+            var active = new[] { ChickenStatusBadges.Badge.Stun, ChickenStatusBadges.Badge.Waddle, ChickenStatusBadges.Badge.None };
+            Assert.AreEqual(2, ChickenStatusBadges.RowsWithEntry(active, 2, ChickenStatusBadges.Badge.Stun, 3), "already shown");
+            Assert.AreEqual(2, ChickenStatusBadges.RowsWithEntry(active, 2, ChickenStatusBadges.Badge.Egg, 3), "egg replaces the waddle row");
+            Assert.AreEqual(2, ChickenStatusBadges.RowsWithEntry(active, 2, ChickenStatusBadges.Badge.None, 3), "no entry");
+            Assert.AreEqual(2, ChickenStatusBadges.RowsWithEntry(active, 2, ChickenStatusBadges.Badge.Hidden, 2), "at the row cap");
+            Assert.AreEqual(3, ChickenStatusBadges.RowsWithEntry(active, 2, ChickenStatusBadges.Badge.Hidden, 3));
+        }
+
+        private static readonly System.Reflection.BindingFlags NonPublic =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+
+        /// <summary>A pool built the way Awake builds it (edit mode never runs Awake), plus a way to spawn and tick it.</summary>
+        private sealed class PoolHarness
+        {
+            public readonly GameObject Go = new GameObject("FloatingTextTestPool");
+            private readonly FloatingCombatText _pool;
+            public PoolHarness()
+            {
+                _pool = Go.AddComponent<FloatingCombatText>();
+                typeof(FloatingCombatText).GetMethod("BuildPool", NonPublic).Invoke(_pool, null);
+            }
+            public void Spawn(Vector3 pos, Transform follow) =>
+                typeof(FloatingCombatText).GetMethod("SpawnInternal", NonPublic)
+                    .Invoke(_pool, new object[] { pos, "TEST", Color.white, follow });
+            public void Tick() => typeof(FloatingCombatText).GetMethod("LateUpdate", NonPublic).Invoke(_pool, null);
+            public Vector3 PopPosition(int slot) => Go.transform.GetChild(slot).position;
+        }
+
+        [Test]
+        public void ASelfPopStaysWithinTwentyCentimetresOfItsMovingBird()
+        {
+            var bird = new GameObject("Bird");
+            var h = new PoolHarness();
+            try
+            {
+                bird.transform.position = new Vector3(1f, 0f, 2f);
+                Vector3 spawnAt = FloatingCombatText.PopSpawnPosition(bird.transform.position, 0f);
+                h.Spawn(spawnAt, bird.transform);
+
+                Vector3 anchorBefore = spawnAt;
+                bird.transform.position += new Vector3(2f, 0f, 0f);            // the bird moves 2 m
+                h.Tick();
+                Vector3 popped = h.PopPosition(0);
+                Vector3 anchorNow = FloatingCombatText.PopSpawnPosition(bird.transform.position, 0f);
+                Vector2 flat = new Vector2(popped.x - anchorNow.x, popped.z - anchorNow.z);
+                Assert.Less(flat.magnitude, 0.2f, "the pop is over the bird, not " + (popped - anchorBefore).magnitude + " m from its spawn point");
+
+                Object.DestroyImmediate(bird);                                 // owner removed mid-pop
+                bird = null;
+                Assert.DoesNotThrow(h.Tick);
+                Vector3 frozen = h.PopPosition(0);
+                Assert.DoesNotThrow(h.Tick);
+                Assert.AreEqual(frozen.x, h.PopPosition(0).x, 1e-4f, "freezes at the last anchor");
+                Assert.AreEqual(frozen.z, h.PopPosition(0).z, 1e-4f);
+            }
+            finally { if (bird != null) Object.DestroyImmediate(bird); Object.DestroyImmediate(h.Go); }
+        }
+
+        [Test]
+        public void AVictimPopStaysWorldFixedAndAReusedSlotDropsItsFollowTarget()
+        {
+            var bird = new GameObject("Bird");
+            var h = new PoolHarness();
+            try
+            {
+                Vector3 at = new Vector3(0f, 2.5f, 0f);
+                h.Spawn(at, null);                                             // a victim pop: no follow target
+                bird.transform.position = new Vector3(5f, 0f, 0f);
+                h.Tick();
+                Assert.AreEqual(at.x, h.PopPosition(0).x, 1e-4f, "world-fixed");
+
+            }
+            finally { Object.DestroyImmediate(bird); Object.DestroyImmediate(h.Go); }
+
+            // Recycling: slot 0 follows a bird, then the pool is filled so slot 0 (the oldest) is reused for a follow-less pop.
+            var bird2 = new GameObject("Bird2");
+            var h2 = new PoolHarness();
+            try
+            {
+                Vector3 at = new Vector3(0f, 2.5f, 0f);
+                h2.Spawn(at, bird2.transform);
+                for (int i = 0; i < FloatingCombatText.Capacity; i++) h2.Spawn(at, null);
+                bird2.transform.position = new Vector3(9f, 0f, 0f);
+                h2.Tick();
+                for (int i = 0; i < FloatingCombatText.Capacity; i++)
+                    Assert.AreEqual(at.x, h2.PopPosition(i).x, 1e-4f, "slot " + i + " did not keep a stale follow target");
+            }
+            finally { Object.DestroyImmediate(bird2); Object.DestroyImmediate(h2.Go); }
+
+        }
     }
 }

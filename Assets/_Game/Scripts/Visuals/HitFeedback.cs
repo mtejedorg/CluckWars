@@ -427,12 +427,12 @@ namespace CluckWars.Visuals
                 anyEntered = true;
                 stunEntered = true;
                 if (_vfx != null) _vfx.EmitStunBonk();   // D10: gates on the hidden / faded bird itself
-                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), _controller.StunRemaining, FeedbackTuning.CanonicalStunColor);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStun), _controller.StunRemaining, FeedbackTuning.CanonicalStunColor, ChickenStatusBadges.Badge.Stun);
             }
             if (rooted && !_wasRooted)
             {
                 anyEntered = true;
-                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStuck), _controller.RootRemaining, FeedbackTuning.CanonicalRootColor);
+                if (showText) SpawnControlText(UiText.Get(UiKeys.HudPopStuck), _controller.RootRemaining, FeedbackTuning.CanonicalRootColor, ChickenStatusBadges.Badge.Root);
             }
             // Snare edge: an enemy did this, so it is a real impact and keeps the full
             // treatment. Edge-derived from _wasSnared rather than from _wasSlowed on purpose —
@@ -1231,10 +1231,10 @@ namespace CluckWars.Visuals
 
         // ---- Control-state floating text --------------------------------------
 
-        private void SpawnControlText(string label, float seconds, Color color)
+        private void SpawnControlText(string label, float seconds, Color color, ChickenStatusBadges.Badge entering)
         {
             string text = seconds > 0.05f ? $"{label} {seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}s" : label;
-            FloatingCombatText.Spawn(_controller, TextAnchorPoint(), text, color);
+            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(entering), text, color);
         }
 
         /// <summary>
@@ -1262,7 +1262,7 @@ namespace CluckWars.Visuals
                 int percent = Mathf.Clamp(Mathf.RoundToInt(_controller.SlowMultiplier * 100f), 0, 100);
                 text = $"{text} {percent}%";
             }
-            FloatingCombatText.Spawn(_controller, TextAnchorPoint(), text, FeedbackTuning.CanonicalSlowColor);
+            FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(ChickenStatusBadges.Badge.Slow), text, FeedbackTuning.CanonicalSlowColor);
         }
 
         private Vector3 TextAnchorPoint() => _controller.PopAnchor;

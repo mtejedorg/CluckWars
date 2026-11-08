@@ -61,6 +61,10 @@ namespace CluckWars.Visuals
             public Transform Root;
             public TextMesh  Text;
             public Vector3   Origin;
+            /// <summary>Owner's transform for a self-pop (it tracks the bird); null for a world-fixed pop, and cleared on reuse.</summary>
+            public Transform Follow;
+            /// <summary>Spawn point relative to <see cref="Follow"/>'s position (the pop height, clear of the badge rows at spawn).</summary>
+            public Vector3   FollowOffset;
             public Color     BaseColor;
             public float     Age;
             public bool      Live;
@@ -88,13 +92,29 @@ namespace CluckWars.Visuals
         /// over the remaining <see cref="FeedbackTuning.FloatingTextFadeFraction"/>.
         /// Silently does nothing for null/empty text or outside play mode; never throws.
         /// </summary>
-        public static void SpawnUngated(Vector3 worldPos, string text, Color color)
+        public static void SpawnUngated(Vector3 worldPos, string text, Color color) =>
+            SpawnUngated(worldPos, text, color, null);
+
+        /// <summary>
+        /// As <see cref="SpawnUngated(Vector3,string,Color)"/>, but a non-null <paramref name="follow"/> makes the pop track that
+        /// transform: it keeps its spawn offset from it for its whole life (plus the rise), so it stays over a moving bird. If
+        /// <paramref name="follow"/> is destroyed mid-pop the pop freezes at its last position. Null: world-fixed.
+        /// </summary>
+        public static void SpawnUngated(Vector3 worldPos, string text, Color color, Transform follow)
         {
             if (string.IsNullOrEmpty(text)) return;
             var pool = EnsureInstance();
             if (pool == null) return;
-            pool.SpawnInternal(worldPos, text, color);
+            pool.SpawnInternal(worldPos, text, color, follow);
         }
+
+        /// <summary>
+        /// Where a pop that follows an owner sits this frame: the owner's position plus its spawn offset, or
+        /// <paramref name="lastOrigin"/> once the owner is gone (a destroyed Unity object reads null), so a bird removed mid-pop
+        /// leaves its text frozen where it was, with no exception and no log.
+        /// </summary>
+        public static Vector3 FollowedOrigin(Transform follow, Vector3 offset, Vector3 lastOrigin) =>
+            follow != null ? follow.position + offset : lastOrigin;
 
         /// <summary>
         /// Pure form of the hidden-bird gate (D9, spec 2026-11-06 section 3.2): text AT a faded remote bird is never drawn (it would
@@ -158,11 +178,21 @@ namespace CluckWars.Visuals
         /// args only here, on the event, never per frame.
         /// </summary>
         public static bool SpawnSelfPop(ChickenController controller, string key, Color color,
+                                        params (string name, object value)[] args) =>
+            SpawnSelfPop(controller, key, color, ChickenStatusBadges.Badge.None, args);
+
+        /// <summary>
+        /// <see cref="SpawnSelfPop(ChickenController,string,Color,(string name, object value)[])"/> for a state-entry pop: the
+        /// spawn height clears the badge row <paramref name="entering"/> that appears on this same frame
+        /// (<see cref="ChickenController.PopAnchorEntering"/>). The pop follows the bird (see <see cref="SpawnUngated(Vector3,string,Color,Transform)"/>).
+        /// </summary>
+        public static bool SpawnSelfPop(ChickenController controller, string key, Color color,
+                                        ChickenStatusBadges.Badge entering,
                                         params (string name, object value)[] args)
         {
             if (!IsSelfPopTarget(controller)) return false;
             string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
-            SpawnUngated(controller.PopAnchor, text, color);
+            SpawnUngated(controller.PopAnchorEntering(entering), text, color, controller.transform);
             return true;
         }
 
@@ -275,15 +305,17 @@ namespace CluckWars.Visuals
 
         // ── Spawn / recycle ────────────────────────────────────────────────────
 
-        private void SpawnInternal(Vector3 worldPos, string text, Color color)
+        private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow)
         {
             if (_pool == null) BuildPool();
 
             var popup = TakeFreeSlot() ?? TakeOldestLiveSlot();
             if (popup == null) return; // capacity 0 — impossible via Capacity's Max(1,…)
 
-            popup.Origin    = worldPos;
-            popup.BaseColor = color;
+            popup.Origin       = worldPos;
+            popup.Follow       = follow;   // always overwritten, so a recycled slot never keeps its previous owner
+            popup.FollowOffset = follow != null ? worldPos - follow.position : Vector3.zero;
+            popup.BaseColor    = color;
             popup.Age       = 0f;
 
             popup.Text.text  = text;
@@ -358,6 +390,8 @@ namespace CluckWars.Visuals
                     continue;
                 }
 
+                // World-fixed pops (no Follow) and pops whose owner was destroyed both keep their Origin.
+                p.Origin = FollowedOrigin(p.Follow, p.FollowOffset, p.Origin);
                 p.Root.position = p.Origin + Vector3.up * (rise * t);
 
                 float alpha = t <= hold ? 1f : 1f - Mathf.Clamp01((t - hold) / fade);

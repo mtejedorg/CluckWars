@@ -187,7 +187,7 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            if (speed && !_wasSpeedActive) SelfPop(UiKeys.HudPopFast, AccentKey.Speed);
+            if (speed && !_wasSpeedActive) SelfPop(UiKeys.HudPopFast, AccentKey.Speed, ChickenStatusBadges.Badge.Speed);
             // HOP! for the shipped Jump (a dash with no JumpEventId): the rising edge of its slot. The event path skips inside the dedupe window.
             if (JumpBeatRules.SlotEdge(_wasJumpSlotActive, jump) == JumpBeatRules.Edge.Launch)
             {
@@ -195,12 +195,16 @@ namespace CluckWars.Visuals
                 SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
             }
             _wasJumpSlotActive = jump;
-            if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide);
+            if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide, ChickenStatusBadges.Badge.Hidden);
             _wasSpeedActive = speed;
             _wasFaded       = faded;
 
             string shellKey = ShellPopKey(shell, immune, ref _wasShellActive, ref _inEgg);
-            if (shellKey != null) SelfPop(shellKey, AccentKey.EggShell);
+            if (shellKey != null)
+                SelfPop(shellKey, AccentKey.EggShell,
+                        shellKey == UiKeys.HudPopWaddle ? ChickenStatusBadges.Badge.Waddle
+                      : shellKey == UiKeys.HudPopEgg    ? ChickenStatusBadges.Badge.Egg
+                                                        : ChickenStatusBadges.Badge.None);
         }
 
         /// <summary>
@@ -228,8 +232,8 @@ namespace CluckWars.Visuals
             return AbilityController.InvalidSlot;
         }
 
-        private void SelfPop(string key, AccentKey accent) =>
-            FloatingCombatText.SpawnSelfPop(_controller, key, FeedbackPalette.Current.Accent(accent));
+        private void SelfPop(string key, AccentKey accent, ChickenStatusBadges.Badge entering = ChickenStatusBadges.Badge.None) =>
+            FloatingCombatText.SpawnSelfPop(_controller, key, FeedbackPalette.Current.Accent(accent), entering);
 
         // ---- §5.1 status ring + depleting arc (cases 17 / 18 / 21) ------------
 
