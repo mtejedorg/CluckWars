@@ -619,7 +619,7 @@ namespace CluckWars.Visuals
             var e = _stunBonk;
             e.Count = StunBeatRules.BonkCount(reduced);
             e.SpeedMin = e.SpeedMax = StunBeatRules.BonkSpeed(reduced);
-            EmitDust(in e, FeedbackTuning.StunBonkHeight);
+            EmitDust(in e, FeedbackTuning.StunBonkHeight / Mathf.Max(1e-4f, transform.lossyScale.y));   // FxPoint is root-local: keep the bonk at world head height
         }
 
         /// <summary>

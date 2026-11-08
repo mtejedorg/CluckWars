@@ -14,11 +14,12 @@ namespace CluckWars.Tests
         [Test]
         public void LocalOrders_AreAboveEveryRivalOrder()
         {
-            Assert.AreEqual(11, ChickenNameplate.LocalPillOrder);
-            Assert.AreEqual(12, ChickenNameplate.LocalTextOrder);
+            Assert.AreEqual(13, ChickenNameplate.LocalPillOrder);
+            Assert.AreEqual(14, ChickenNameplate.LocalTextOrder);
             Assert.Less(ChickenNameplate.RivalTextOrder, ChickenNameplate.LocalPillOrder);
-            Assert.LessOrEqual(ChickenNameplate.RivalTextOrder, 3);
-            Assert.LessOrEqual(ChickenNameplate.RivalPillOrder, 3);
+            Assert.GreaterOrEqual(ChickenNameplate.RivalTextOrder, 10, "F3: rival marks live in the 10-12 label band");
+            Assert.GreaterOrEqual(ChickenNameplate.RivalPillOrder, 10);
+            Assert.Less(FeedbackTuning.RivalDotSortingOrder, ChickenNameplate.LocalPillOrder, "a rival dot or glyph never draws over the local pill");
         }
 
         [Test]
@@ -45,7 +46,10 @@ namespace CluckWars.Tests
                 Assert.AreEqual(ChickenNameplate.RivalTextOrder, textRenderer.sortingOrder, "rival text");
                 foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
                     if (sr != youPill)
-                        Assert.LessOrEqual(sr.sortingOrder, 3, sr.name + " (rival part)");
+                    {
+                        Assert.GreaterOrEqual(sr.sortingOrder, 10, sr.name + " (rival part, label band)");
+                        Assert.Less(sr.sortingOrder, ChickenNameplate.LocalPillOrder, sr.name + " (rival part under the local pill)");
+                    }
             }
             finally { Object.DestroyImmediate(go); }
         }

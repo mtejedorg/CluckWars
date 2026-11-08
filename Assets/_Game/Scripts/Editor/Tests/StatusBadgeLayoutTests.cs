@@ -1,3 +1,5 @@
+using System.Reflection;
+using CluckWars.Gameplay;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -234,6 +236,147 @@ namespace CluckWars.Tests
             }
             finally { Object.DestroyImmediate(bird2); Object.DestroyImmediate(h2.Go); }
 
+        }
+
+        // ---- F3: stars under the pill, the sorting band, the countdown refresh -----------------------
+
+        private static float LowestPillBottomLocal(float headLift)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            var so = new SerializedObject(prefab.GetComponent<ChickenNameplate>());
+            Vector3 offset = so.FindProperty("_offset").vector3Value;
+            int fontSize = so.FindProperty("_fontSize").intValue;
+            float charSize = so.FindProperty("_characterSize").floatValue;
+            float bottom = float.MaxValue;
+            foreach (string label in new[] { "You", "DashFox", "PeckNoir" })
+            {
+                var go = new GameObject("PillProbe") { hideFlags = HideFlags.HideAndDontSave };
+                try
+                {
+                    var tm = go.AddComponent<TextMesh>();
+                    tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center;
+                    tm.fontSize = fontSize; tm.characterSize = charSize; tm.fontStyle = FontStyle.Bold; tm.text = label;
+                    var b = go.GetComponent<MeshRenderer>().localBounds;
+                    float h = b.size.y > 0f ? b.size.y : 0.3f;
+                    float half = ChickenNameplate.YouPillHeight(h) * 0.5f;   // the rival pill adds the same vertical padding
+                    bottom = Mathf.Min(bottom, offset.y + headLift + b.center.y - half);
+                }
+                finally { Object.DestroyImmediate(go); }
+            }
+            return bottom;
+        }
+
+        [TestCase(ChickenClass.Warrior)]
+        [TestCase(ChickenClass.Speedy)]
+        [TestCase(ChickenClass.Fatty)]
+        [TestCase(ChickenClass.Assassin)]
+        public void StunStarsStayUnderThePillBottom_ForEveryClassScale(ChickenClass cls)
+        {
+            var registry = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            Assert.IsTrue(registry.TryGet(cls, out var entry), cls + " in the registry");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            float lift = prefab.GetComponent<CharacterController>().height * (entry.ResolvedModelScale.y - 1f);
+
+            float centre = ChickenStateOverlays.StarLocalY(1f, lift);
+            float starTop = centre + ChickenStateOverlays.StarBaseScale * 0.5f;   // steady size; the 0.15 s pop overshoot (x1.25) briefly draws behind the pill (order 8 < 10)
+            float pillBottom = LowestPillBottomLocal(lift);
+            Assert.Less(starTop, pillBottom, cls + ": a star tops out under the pill bottom " + pillBottom);
+            Assert.Greater(centre, 0.9f + lift, cls + ": the stars still frame the head, not the belly");
+        }
+
+        [Test]
+        public void StarHeightIsAWorldMetreConstant_DividedByTheRootScale()
+        {
+            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight, ChickenStateOverlays.StarLocalY(2f, 0f) * 2f, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight + 0.5f, ChickenStateOverlays.StarLocalY(1f, 0.5f), 1e-5f, "head lift is root-local");
+            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight, ChickenStateOverlays.StarLocalY(0f, 0f), 1e-5f, "an unauthored zero scale is one");
+            StringAssert.Contains("lossyScale.y", System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ChickenVFX.cs"), "the bonk height divides by the root scale too");
+        }
+
+        private static int MaxOrder(Transform root, string childName)
+        {
+            var t = root.Find(childName);
+            Assert.IsNotNull(t, childName + " built");
+            int max = int.MinValue;
+            foreach (var r in t.GetComponentsInChildren<Renderer>(true)) max = Mathf.Max(max, r.sortingOrder);
+            Assert.AreNotEqual(int.MinValue, max, childName + " has renderers");
+            return max;
+        }
+
+        private static int MinOrder(Transform root, string childName)
+        {
+            var t = root.Find(childName);
+            Assert.IsNotNull(t, childName + " built");
+            int min = int.MaxValue;
+            foreach (var r in t.GetComponentsInChildren<Renderer>(true)) min = Mathf.Min(min, r.sortingOrder);
+            return min;
+        }
+
+        [Test]
+        public void SortingBand_StarsUnderPillUnderTextUnderBadgesUnderBarsUnderPopups()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            var root = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            try
+            {
+                foreach (var type in new[] { typeof(ChickenNameplate), typeof(ChickenWorldBars), typeof(ChickenStatusBadges), typeof(ChickenStateOverlays) })
+                    type.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(root.GetComponent(type), null);
+                var plate = root.GetComponent<ChickenNameplate>();
+                typeof(ChickenNameplate).GetMethod("FitMarks", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(plate, new object[] { false, Color.white });
+
+                var rt = root.transform;
+                int stars = MaxOrder(rt, "StunStars");
+                int rivalPill = rt.Find("Nameplate/RivalMark").GetComponent<SpriteRenderer>().sortingOrder;
+                int rivalText = rt.Find("Nameplate").GetComponent<MeshRenderer>().sortingOrder;
+                int dotRing = rt.Find("Nameplate/RivalDotRing").GetComponent<SpriteRenderer>().sortingOrder;
+                int dot = rt.Find("Nameplate/RivalDot").GetComponent<SpriteRenderer>().sortingOrder;
+                int glyph = rt.Find("Nameplate/SlowGlyph").GetComponent<SpriteRenderer>().sortingOrder;
+                int badgesMin = MinOrder(rt, "StatusBadges"), badgesMax = MaxOrder(rt, "StatusBadges");
+                int barsTop = MaxOrder(rt, "WorldBars");
+                int popup = (int)typeof(FloatingCombatText).GetField("PopupSortingOrder", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null);
+                int localPill = ChickenNameplate.LocalPillOrder, localText = ChickenNameplate.LocalTextOrder;
+
+                Assert.AreEqual(8, stars, "stars sit on the head-overlay layer");
+                Assert.Less(stars, rivalPill, "stars under the pill");
+                Assert.Less(rivalPill, rivalText, "pill under its text");
+                Assert.Less(rivalPill, dotRing);
+                Assert.Less(dotRing, dot, "dot over its ring");
+                Assert.Less(rivalText, glyph, "slow glyph over the text");
+                Assert.Less(rivalText, badgesMin, "badges over the pill text");
+                foreach (int o in new[] { rivalPill, rivalText, dotRing, dot, glyph, badgesMin, badgesMax })
+                    Assert.That(o, Is.InRange(10, 12), "the label band is 10-12");
+                Assert.Less(dot, localPill, "a rival label never draws over the local pill");
+                Assert.Less(localPill, localText);
+                Assert.Less(localText + 1, barsTop, "the local label (glyph one above its text) stays under the cargo bars");
+                Assert.Less(badgesMax, barsTop, "badges under the bars");
+                Assert.AreEqual(101, barsTop, "cargo bars keep 100/101");
+                Assert.Less(barsTop, popup, "bars under the floating popups");
+                Assert.AreEqual(210, popup);
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void CountdownRefreshesOnEveryTenthChange_NotOnAGate()
+        {
+            const ChickenStatusBadges.Badge stun = ChickenStatusBadges.Badge.Stun;
+            Assert.AreEqual(14, ChickenStatusBadges.Quantize(stun, 1.31f));
+            Assert.AreEqual(13, ChickenStatusBadges.Quantize(stun, 1.30f));
+            Assert.IsFalse(ChickenStatusBadges.RowNeedsWrite(false, 14, 14), "same tenth: no rebuild");
+            Assert.IsTrue(ChickenStatusBadges.RowNeedsWrite(false, 14, 13), "tenth moved: rebuild this frame");
+            Assert.IsTrue(ChickenStatusBadges.RowNeedsWrite(true, 14, 14), "new badge: rebuild");
+
+            // 3 s of 60 fps frames: the shown tenth never lags the true one, and rebuilds are one per tenth (not per frame).
+            int shown = int.MinValue, writes = 0;
+            for (float v = 3f; v > 0f; v -= 1f / 60f)
+            {
+                int q = ChickenStatusBadges.Quantize(stun, v);
+                if (ChickenStatusBadges.RowNeedsWrite(false, shown, q)) { shown = q; writes++; }
+                Assert.AreEqual(q, shown, "the row shows the current tenth at v=" + v);
+            }
+            Assert.LessOrEqual(writes, 31, "at most one rebuild per displayed tenth");
+            Assert.Greater(writes, 25);
+            StringAssert.DoesNotContain("_nextTextUpdate", System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ChickenStatusBadges.cs"), "the 5 Hz gate is gone from the world badges");
         }
     }
 }

@@ -144,11 +144,13 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// Sorting orders of the label parts. Rival marks stay in 1-3; the local bird's "You" pill and text sit above them
-        /// so a rival nameplate never draws over it where two overlap on screen.
+        /// Sorting orders of the label parts (<see cref="FeedbackTuning.RivalPillSortingOrder"/> and friends): rival marks
+        /// in the 10-12 label band, the local bird's "You" pill and text above them so a rival nameplate never draws over
+        /// it where two overlap on screen.
         /// </summary>
-        public const int RivalPillOrder = 1, RivalTextOrder = 2;
-        public const int LocalPillOrder = 11, LocalTextOrder = 12;
+        public const int RivalPillOrder = FeedbackTuning.RivalPillSortingOrder, RivalTextOrder = FeedbackTuning.RivalTextSortingOrder;
+        public const int LocalPillOrder = FeedbackTuning.LocalPillSortingOrder, LocalTextOrder = FeedbackTuning.LocalTextSortingOrder;
+        private const int RivalDotRingOrder = FeedbackTuning.RivalTextSortingOrder, RivalDotOrder = FeedbackTuning.RivalDotSortingOrder;
 
         private void BuildLabel()
         {
@@ -190,9 +192,9 @@ namespace CluckWars.Visuals
             // A rival's mark (round-4 finding 4): the same capsule in ink with a cream rim, cream text on it (so the label
             // never depends on the ground behind it) and the player colour as a dot on the left, ringed in cream.
             _rivalPill = AddSprite(_textTransform, "RivalMark", PillSprite(rival: true), RivalPillOrder, SpriteDrawMode.Sliced);
-            _rivalDotRing = AddSprite(_textTransform, "RivalDotRing", DotSprite(), 2, SpriteDrawMode.Simple);
+            _rivalDotRing = AddSprite(_textTransform, "RivalDotRing", DotSprite(), RivalDotRingOrder, SpriteDrawMode.Simple);
             _rivalDotRing.color = PlayerPalette.RivalPillRim;
-            _rivalDot = AddSprite(_textTransform, "RivalDot", DotSprite(), 3, SpriteDrawMode.Simple);
+            _rivalDot = AddSprite(_textTransform, "RivalDot", DotSprite(), RivalDotOrder, SpriteDrawMode.Simple);
 
             // The slow state glyph, drawn right of the name inside the pill (a sprite, not an emoji; the sprite is
             // wired on ChickenStatusBadges). One order above the text (set in FitMarks) so it never hides under the pill.

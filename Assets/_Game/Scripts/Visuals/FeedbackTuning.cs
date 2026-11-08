@@ -1722,6 +1722,24 @@ namespace CluckWars.Visuals
         public const float StunBonkSizeMax = 0.40f;
         public const float StunBonkScatter = 0.18f;
 
+        /// <summary>Stun stars (F3): orbit at beak height, <see cref="StunStarBeakHeight"/> world metres above the pivot (plus the
+        /// class head lift), radius <see cref="StunStarOrbitRadius"/>, so they frame the head BELOW the nameplate pill (which
+        /// starts about 1.5 m up) instead of crossing it. Sorting order 8 is the head-overlay layer (vfx.md 0.1), under the
+        /// 10-12 label band.</summary>
+        public const float StunStarBeakHeight = 1.20f;
+        public const float StunStarOrbitRadius = 0.34f;
+        public const int StunStarSortingOrder = 8;
+
+        /// <summary>Label band (vfx.md 0.1, orders 10-12), bottom to top: rival pill, rival text (and dot ring), rival dot and slow
+        /// glyph (and the badges: glyph + row text). The local "You" pill and text sit above every rival part (13 to 15), and
+        /// everything stays under the cargo bars (100) and the floating popups (210). Stars (8) sit below the whole band.</summary>
+        public const int RivalPillSortingOrder = 10;
+        public const int RivalTextSortingOrder = 11;
+        public const int RivalDotSortingOrder = 12;
+        public const int StatusBadgeSortingOrder = 12;
+        public const int LocalPillSortingOrder = 13;
+        public const int LocalTextSortingOrder = 14;
+
         // ---- Slow aura (D8, vfx.md 2.4) --------------------------------------------------------------
 
         /// <summary>Ground heights of the aura outline (the order-0 band, same floor as every ring) and the edge band (order 1).</summary>

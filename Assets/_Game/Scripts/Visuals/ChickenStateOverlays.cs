@@ -50,18 +50,11 @@ namespace CluckWars.Visuals
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenStateOverlays : MonoBehaviour
     {
-        [Tooltip("Height above the pivot at which the stun stars orbit.")]
-        [SerializeField] private float _starHeight = 1.62f;
-
-        [Tooltip("Radius of the stun-star orbit.")]
-        [Range(0.05f, 1f)]
-        [SerializeField] private float _starOrbitRadius = 0.26f;
-
         [Tooltip("Stun-star orbit speed, degrees/second.")]
         [SerializeField] private float _starSpinSpeed = 180f;
 
         private const int StarCount   = 3;
-        private const float StarBaseScale = 0.26f;
+        public const float StarBaseScale = 0.26f;
         private const int StreakCount = 4;
 
         /// <summary>How fast a streak travels from the chicken's heel out to its tail, in
@@ -150,14 +143,25 @@ namespace CluckWars.Visuals
         public void SetHeadLift(float lift)
         {
             _headLift = lift;
-            if (_starRoot != null) _starRoot.localPosition = new Vector3(0f, _starHeight + lift, 0f);
+            if (_starRoot != null) _starRoot.localPosition = new Vector3(0f, StarY(), 0f);
         }
+
+        /// <summary>Root-local Y of the star orbit centre: the beak height (a world-metre constant, so divided by the root's
+        /// lossy Y scale), plus the class head lift (root-local, as the nameplate carries it), plus the world-metre
+        /// <paramref name="offsetY"/> of a drop. A root scale of zero (never authored) is treated as one.</summary>
+        public static float StarLocalY(float lossyScaleY, float headLift, float offsetY = 0f)
+        {
+            float inv = lossyScaleY > 1e-4f ? 1f / lossyScaleY : 1f;
+            return (FeedbackTuning.StunStarBeakHeight + offsetY) * inv + headLift;
+        }
+
+        private float StarY(float offsetY = 0f) => StarLocalY(transform.lossyScale.y, _headLift, offsetY);
 
         private void BuildStars()
         {
             var root = new GameObject("StunStars");
             root.transform.SetParent(transform, worldPositionStays: false);
-            root.transform.localPosition = new Vector3(0f, _starHeight, 0f);
+            root.transform.localPosition = new Vector3(0f, StarY(), 0f);
             _starRoot = root.transform;
             _stars = new SpriteRenderer[StarCount];
 
@@ -167,13 +171,13 @@ namespace CluckWars.Visuals
                 var go = new GameObject("Star" + i);
                 go.transform.SetParent(_starRoot, worldPositionStays: false);
                 go.transform.localPosition = new Vector3(
-                    Mathf.Cos(ang) * _starOrbitRadius, 0f, Mathf.Sin(ang) * _starOrbitRadius);
+                    Mathf.Cos(ang) * FeedbackTuning.StunStarOrbitRadius, 0f, Mathf.Sin(ang) * FeedbackTuning.StunStarOrbitRadius);
                 go.transform.localScale = Vector3.one * 0.26f;
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite       = StarSprite();
                 sr.color        = new Color(1f, 0.86f, 0.25f, 1f); // cartoon gold
-                sr.sortingOrder = 120;
+                sr.sortingOrder = FeedbackTuning.StunStarSortingOrder;
                 _stars[i] = sr;
             }
 
@@ -301,7 +305,7 @@ namespace CluckWars.Visuals
             SetActive(_starRoot.gameObject, f.Visible);
             if (!f.Visible) return;
 
-            _starRoot.localPosition = new Vector3(0f, _starHeight + _headLift + f.OffsetY, 0f);
+            _starRoot.localPosition = new Vector3(0f, StarY(f.OffsetY), 0f);
             if (f.Orbit && !PlayerPreferences.ReducedMotionEnabled) _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
             ApplyStars(f.Scale, f.Alpha);
             FaceStars(!f.Orbit);

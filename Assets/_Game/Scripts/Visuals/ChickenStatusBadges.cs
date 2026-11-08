@@ -84,10 +84,10 @@ namespace CluckWars.Visuals
         [SerializeField] private Sprite _glyphHidden;
         [SerializeField] private Sprite _glyphSpeeding;
 
-        /// <summary>Sorting order of the glyph sprite and the row text: 0, as shipped. The stack
-        /// (pill top + 0.08 and up) sits above the nameplate pill, so nothing overlaps and no sorting fight exists
-        /// (feedback batch D0).</summary>
-        public const int SortingOrder = 0;
+        /// <summary>Sorting order of the glyph sprite and the row text: the top of the 10-12 label band
+        /// (<see cref="FeedbackTuning.StatusBadgeSortingOrder"/>), over the rival pill and text and under the cargo bars. The stack
+        /// sits above the nameplate pill, so it rarely overlaps one, but a neighbour's label must never draw over a badge.</summary>
+        public const int SortingOrder = FeedbackTuning.StatusBadgeSortingOrder;
 
         /// <summary>Badge text size: 0.0338 (D0b) x 0.30/0.17 (D0c) to match the 0.30 glyph, so the row text cap height
         /// tracks the glyph; about 1.2x the nameplate's characterSize (0.05).</summary>
@@ -142,7 +142,6 @@ namespace CluckWars.Visuals
 
         private readonly bool[] _warnedMissingSprite = new bool[8];
 
-        private float _nextTextUpdate;
         private byte  _lastActiveMask;
         private float _punchTimer = -1f;
 
@@ -496,16 +495,11 @@ namespace CluckWars.Visuals
         /// <summary>
         /// Positions the live rows (most severe on top of a bottom-anchored stack) and
         /// refreshes their text. Text is only rewritten when the row's state changed or
-        /// when the <see cref="FeedbackTuning.BadgeCountdownTextUpdateHz"/> gate opens
-        /// <i>and</i> the value has actually moved by a displayed digit — a countdown
-        /// showing one decimal has nothing to say between two frames 33 ms apart.
+        /// when the displayed tenth changes (<see cref="RowNeedsWrite"/>): at most 10 string rebuilds a second per row, never
+        /// per frame, and the row never lags the hex digit by a gate interval.
         /// </summary>
         private void LayoutAndFill(int count)
         {
-            bool textGateOpen = Time.time >= _nextTextUpdate;
-            if (textGateOpen)
-                _nextTextUpdate = Time.time + 1f / Mathf.Max(1f, FeedbackTuning.BadgeCountdownTextUpdateHz);
-
             for (int i = 0; i < _rows.Length; i++)
             {
                 var rowGo = _rowTransforms[i].gameObject;
@@ -525,7 +519,7 @@ namespace CluckWars.Visuals
                 int quantity = Quantize(badge, _value[i]);
 
                 bool badgeChanged = _rowBadge[i] != badge;
-                if (badgeChanged || (textGateOpen && _rowQuantity[i] != quantity))
+                if (RowNeedsWrite(badgeChanged, _rowQuantity[i], quantity))
                 {
                     _rowBadge[i]    = badge;
                     _rowQuantity[i] = quantity;
@@ -536,6 +530,11 @@ namespace CluckWars.Visuals
                 LayoutRow(i);
             }
         }
+
+        /// <summary>A row's text is rebuilt when its badge changed or the displayed (quantised) value moved: compares ints, so
+        /// the unchanged frames allocate nothing.</summary>
+        public static bool RowNeedsWrite(bool badgeChanged, int shownQuantity, int quantity) =>
+            badgeChanged || shownQuantity != quantity;
 
         /// <summary>Writes one row: the sprite (or, with none wired, the text fallback glyph) and the text.</summary>
         private void ApplyRow(int i, Badge badge, int quantity)
@@ -625,7 +624,7 @@ namespace CluckWars.Visuals
         /// <summary>Reduces a raw value to the integer the label actually shows, so the
         /// string is only rebuilt when a visible digit moves. Tenths of a second for the
         /// timed states, hundredths of a multiplier for slow.</summary>
-        private static int Quantize(Badge badge, float value)
+        public static int Quantize(Badge badge, float value)
         {
             if (value <= 0f) return 0;
             return badge == Badge.Slow ? 1 : Mathf.CeilToInt(value * 10f);
@@ -676,9 +675,6 @@ namespace CluckWars.Visuals
         {
             _lastActiveMask = 0;
             _punchTimer     = -1f;
-            // Re-open the text gate so the first frame of the next status writes a fresh
-            // countdown rather than showing the last one for up to 200 ms.
-            _nextTextUpdate = 0f;
             if (_stackRoot.gameObject.activeSelf) _stackRoot.gameObject.SetActive(false);
         }
 
