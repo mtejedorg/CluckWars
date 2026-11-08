@@ -1,4 +1,5 @@
 using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Logging;
@@ -204,6 +205,9 @@ namespace CluckWars.Input
         // Phase 6 chunk 6: layout mode (A10), haptics (A9) and the first-time hold hint (A1).
         private IInputProvider  _input;
         private IHapticsService _haptics;
+        private IAudioService   _audio;     // E1: the denied-press click (local HUD sound)
+        private AudioRegistrySO _sfx;
+        private bool            _missingAudioReported;
         private HudDeviceMode   _mode = HudDeviceMode.Touch;
         private bool            _modeApplied;
         private VisualElement   _hudRoot;
@@ -322,11 +326,14 @@ namespace CluckWars.Input
         public static HudDeviceMode? DebugForceMode;
 
         [Inject]
-        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics, [InjectOptional] IInputProvider input)
+        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics, [InjectOptional] IInputProvider input,
+                              [InjectOptional] IAudioService audio, [InjectOptional] AudioRegistrySO sfx)
         {
             _log = log;
             _haptics = haptics;
             _input = input;
+            _audio = audio;
+            _sfx = sfx;
         }
 
         private void Awake()
@@ -1325,6 +1332,22 @@ namespace CluckWars.Input
 
         // ---- Denied-press bump (FEEDBACK.md §6, case 29) -----------------------
 
+        /// <summary>E1: the muted click under the bump, once per consumed refused press (the flag is one-shot). Local only:
+        /// this HUD only ever reads the local chicken. A null clip is silent; a missing service is reported once.</summary>
+        private void PlayDeniedClick()
+        {
+            if (_audio == null || _sfx == null)
+            {
+                if (!_missingAudioReported)
+                {
+                    _missingAudioReported = true;
+                    _log?.Warn(Source, "No IAudioService / AudioRegistrySO injected: the denied-press click is silent.");
+                }
+                return;
+            }
+            AudioRegistrySO.TryPlay(_audio, _sfx.DeniedClick);
+        }
+
         /// <summary>
         /// A press that was refused must never be absorbed silently. <c>AbilityController</c>
         /// latches one flag per refused press; this consumes it and shakes that hex.
@@ -1335,6 +1358,7 @@ namespace CluckWars.Input
                 && denied >= 0 && denied < SlotCount)
             {
                 StartBump(denied);
+                PlayDeniedClick();
             }
 
             // A fizzle (target-gated move released with nobody in range) is its own one-shot: the plain bump plus

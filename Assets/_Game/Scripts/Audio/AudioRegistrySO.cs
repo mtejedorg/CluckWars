@@ -35,6 +35,20 @@ namespace CluckWars.Audio
         [Tooltip("Soft low tick: a held move cancelled (edge band, Esc, right mouse) (local only).")]
         public AudioClip AbilityCancel;
 
+        [Header("Ability feedback")]
+        [Tooltip("Short rising tick (~90 ms) when the local player's own cast lands on at least one rival (HitFeedback; local only).")]
+        public AudioClip HitConfirm;
+        [Tooltip("Muted swish (~120 ms) when the local player's own cast hits nobody; played at WhiffSfxVolumeMultiplier (HitFeedback; local only).")]
+        public AudioClip CastWhiff;
+        [Tooltip("Muted click (~40 ms) when a press is refused, with the hex bump (TouchControlsController; local only).")]
+        public AudioClip DeniedClick;
+        [Tooltip("Wooden clack (~120 ms) on the Egg Shell close edge, on every peer that sees the egg; silent while faded (ChickenShellVisuals; local only).")]
+        public AudioClip ShellClose;
+        [Tooltip("Two-note crack-pop (~200 ms) on the Egg Shell hatch edge, on every peer that sees the egg; silent while faded (ChickenShellVisuals; local only).")]
+        public AudioClip ShellOpen;
+        [Tooltip("Short sting (~250 ms) on the hunter's own peer when the Death Mark kill goes live (the HUNT! pop); never on the victim (MarkFeedback; local only).")]
+        public AudioClip HuntLive;
+
         [Header("Match")]
         public AudioClip MatchStart;
         public AudioClip MatchEnd;
@@ -56,5 +70,17 @@ namespace CluckWars.Audio
         [Tooltip("Same length, tempo and phase as MatchMusic: crossfaded in at the current play position " +
                  "when the comeback event fires (GameManager, MatchAudioCueTracker.Cue.Intensify).")]
         public AudioClip MatchMusicIntense;
+
+        /// <summary>
+        /// Null-safe one-shot: plays <paramref name="clip"/> through <paramref name="audio"/> and returns true, or returns
+        /// false without throwing when either is null (an unfilled registry slot is a legal silent no-op). Callers that must
+        /// report a missing service do so themselves, once.
+        /// </summary>
+        public static bool TryPlay(IAudioService audio, AudioClip clip, float volume = 1f, float pitch = 1f)
+        {
+            if (audio == null || clip == null) return false;
+            audio.PlaySFX(clip, volume, pitch);
+            return true;
+        }
     }
 }

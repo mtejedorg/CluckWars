@@ -1,6 +1,8 @@
 using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.Services;
 using CluckWars.Settings;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -124,6 +126,10 @@ namespace CluckWars.Visuals
         private static readonly int StripeColorId = Shader.PropertyToID("_StripeColor");
 
         private ILogService _log;
+        private IAudioService _audio;         // E1: the clack / crack-pop one-shots (local, observed off the edges)
+        private AudioRegistrySO _sfx;
+        private IHapticsService _haptics;     // E1: the caster's close tick
+        private bool _missingAudioReported;
         private ChickenController _controller;
         private ChickenCombat _combat;
         private AbilityController _abilities;
@@ -183,7 +189,14 @@ namespace CluckWars.Visuals
         }
 
         [Inject]
-        public void Construct(ILogService log) => _log = log;
+        public void Construct(ILogService log, [InjectOptional] IAudioService audio, [InjectOptional] AudioRegistrySO sfx,
+                              [InjectOptional] IHapticsService haptics)
+        {
+            _log = log;
+            _audio = audio;
+            _sfx = sfx;
+            _haptics = haptics;
+        }
 
         // ---- Lifecycle ------------------------------------------------------------------
 
@@ -446,6 +459,11 @@ namespace CluckWars.Visuals
             _crack = 0f;
             _stripeAlpha = 1f;
             PushBlock();
+
+            PlayEdgeSfx(open: false);
+            // Reuses the 15 ms cancel tick (HapticRules.CancelArm) on the caster's own phone only; reveals nothing to anyone else.
+            if (_controller.HasInputAuthority && !_controller.IsBot && !_controller.IsDecoy)
+                _haptics?.Buzz(HapticKind.CancelArm);
         }
 
         private void EnterIdle(float remaining, float eggSeconds)
@@ -473,6 +491,31 @@ namespace CluckWars.Visuals
             _capVisible = true;
             _cupVisible = true;
             EmitOpenBurst();
+            PlayEdgeSfx(open: true);
+        }
+
+        /// <summary>
+        /// E1: an edge one-shot, on every peer that sees the egg (the shell is drawn for everyone). Silent while the bird is
+        /// faded, under the same opacity rule as every emission here, so Hide never leaks a position through audio. Reached only
+        /// from the edge switch in <see cref="Observe"/>, never from the seeding pass, so a late join stays silent. An unfilled
+        /// clip slot is a legal silent no-op; a missing service is reported once.
+        /// </summary>
+        private void PlayEdgeSfx(bool open)
+        {
+            // Self-injection on first use (Fusion spawns the chicken outside the container), as Warn does below.
+            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            if (ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity) || HiddenVisibilityRules.IsHiddenFor(_controller))
+                return;
+            if (_audio == null || _sfx == null)
+            {
+                if (!_missingAudioReported)
+                {
+                    _missingAudioReported = true;
+                    _log?.Warn(Source, "No IAudioService / AudioRegistrySO injected: the Egg Shell clack and hatch are silent.");
+                }
+                return;
+            }
+            AudioRegistrySO.TryPlay(_audio, open ? _sfx.ShellOpen : _sfx.ShellClose);
         }
 
         private void ResetPose()

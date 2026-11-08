@@ -1,4 +1,5 @@
 using CluckWars.Abilities;
+using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Logging;
@@ -159,6 +160,9 @@ namespace CluckWars.Visuals
         private ChickenVisuals    _visuals;
         private ILogService       _log;
         private IHapticsService   _haptics;   // local phone buzz (Phase 6 chunk 6): the victim's own peer only
+        private IAudioService     _audio;     // E1: hit-confirm / whiff one-shots, the caster's own peer only
+        private AudioRegistrySO   _sfx;
+        private bool              _missingAudioReported;
 
         // ---- Body flash -------------------------------------------------------
 
@@ -225,10 +229,13 @@ namespace CluckWars.Visuals
         private readonly System.Collections.Generic.List<ChickenController> _castTargets = new(4);
 
         [Inject]
-        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics)
+        public void Construct(ILogService log, [InjectOptional] IHapticsService haptics,
+                              [InjectOptional] IAudioService audio, [InjectOptional] AudioRegistrySO sfx)
         {
             _log = log;
             _haptics = haptics;
+            _audio = audio;
+            _sfx = sfx;
         }
 
         // ---- Lifecycle --------------------------------------------------------
@@ -496,12 +503,37 @@ namespace CluckWars.Visuals
             if (!ability.ReportsCastHits) return;
 
             int hitCount = _abilities.LastCastHitCount;
-            if (hitCount > 0) ConfirmHits(ability, hitCount);
+            if (hitCount > 0)
+            {
+                ConfirmHits(ability, hitCount);
+                PlayCasterSfx(_sfx != null ? _sfx.HitConfirm : null, 1f);
+            }
             else
             {
                 if (ability is SnatchAbilitySO) PlayStealWhiff();
                 MarkImmuneTargets(ability);
+                PlayCasterSfx(_sfx != null ? _sfx.CastWhiff : null, FeedbackTuning.WhiffSfxVolumeMultiplier);
             }
+        }
+
+        /// <summary>
+        /// E1: the hit-confirm / whiff one-shot, heard only by the human who cast (the same peer that feels the caster
+        /// micro-punch; bots excluded like <c>AbilityController.PlayLocalSfx</c>). Local, observed off the replicated
+        /// cast event, never RPC'd. A null clip is a silent no-op; a missing service is reported once.
+        /// </summary>
+        private void PlayCasterSfx(AudioClip clip, float volume)
+        {
+            if (!_controller.HasInputAuthority || _controller.IsBot) return;
+            if (_audio == null || _sfx == null)
+            {
+                if (!_missingAudioReported)
+                {
+                    _missingAudioReported = true;
+                    _log?.Warn(Source, "No IAudioService / AudioRegistrySO injected: hit-confirm and whiff sounds are silent.");
+                }
+                return;
+            }
+            AudioRegistrySO.TryPlay(_audio, clip, volume);
         }
 
         /// <summary>
