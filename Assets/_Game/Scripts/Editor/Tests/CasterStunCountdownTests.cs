@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using CluckWars.Abilities;
+using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Visuals;
 using NUnit.Framework;
@@ -80,6 +82,49 @@ namespace CluckWars.Tests
             Assert.AreEqual(ours, secs, 1e-5f);
         }
 
+        // Relentless lengthens the stun the caster sends; the HUD must feed the rules that RESOLVED length, or the digit
+        // stops early. The multiplier comes from the shipped passive through the same resolver the cast uses.
+        private static float ResolvedRelentless(float baseSeconds)
+        {
+            var registry = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var relentless = registry.Passives.OfType<RelentlessPassiveSO>().Single();
+            Assert.Greater(relentless.OutgoingControlMultiplier, 1f, "Relentless should lengthen outgoing stuns.");
+            return AbilityBaseSO.ResolveOutgoingControlSeconds(baseSeconds, relentless);
+        }
+
+        [Test]
+        public void ARelentlessStun_KeepsTheDigitPastTheBaseLength()
+        {
+            float s = StunSeconds();
+            float resolved = ResolvedRelentless(s);
+            float since = s * 0.5f;
+            float victim = resolved - since;   // what a Relentless stun really has left at this moment
+            var values = new[] { victim };
+
+            Assert.IsTrue(CasterStunCountdownRules.TryGetSeconds(true, 1, since, resolved, values, values.Length, out float secs));
+            Assert.AreEqual(victim, secs, 1e-5f);
+            // The base length alone (the old HUD input) caps the digit at s - since + slack, which drops this victim
+            // whenever the passive adds more than the slack.
+            if (resolved - s > FeedbackTuning.CasterStunCountdownSlackSeconds)
+                Assert.IsFalse(CasterStunCountdownRules.TryGetSeconds(true, 1, since, s, values, values.Length, out _));
+        }
+
+        [Test]
+        public void ARelentlessStun_SlackWindowAndCeilingFollowTheResolvedLength()
+        {
+            float s = StunSeconds();
+            float resolved = ResolvedRelentless(s);
+            float slack = FeedbackTuning.CasterStunCountdownSlackSeconds;
+            var values = new[] { 0.2f };
+
+            // Past the base length plus slack, but inside the resolved length: still counting.
+            float since = s + slack + 0.05f;
+            Assert.Less(since, resolved + slack);
+            Assert.IsTrue(CasterStunCountdownRules.TryGetSeconds(true, 1, since, resolved, values, values.Length, out _));
+            // Past the resolved length plus slack: gone.
+            Assert.IsFalse(CasterStunCountdownRules.TryGetSeconds(true, 1, resolved + slack + 0.01f, resolved, values, values.Length, out _));
+        }
+
         [Test]
         public void Format_IsOneDecimal_InvariantCulture()
         {
@@ -102,6 +147,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("CasterStunCountdownRules.Format(", src);
             StringAssert.Contains("ChickenController.ActiveControllers", src);
             StringAssert.Contains("LastCastAbility as WingSlamAbilitySO", src);
+            StringAssert.Contains("AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken)", src);   // never the bare base stun
             StringAssert.Contains("FeedbackTuning.CanonicalStunColor", src);
 
             // The desktop / pad strip and the touch arc share RefreshCenterMark; the digit is decided before the
