@@ -215,6 +215,32 @@ namespace CluckWars.Visuals
             return count + 1;
         }
 
+        /// <summary>
+        /// Whether <paramref name="badge"/> has a row on this bird right now, for this peer (E3: the nameplate's pill snail
+        /// stands in only when the Slow row is not shown). Live, like <see cref="CurrentStackTopLocalY"/>: it re-runs the same
+        /// collection <c>LateUpdate</c> lays out (<see cref="CollectActive"/>, then <see cref="IsRowShown"/>) instead of reading
+        /// last frame's layout, so a caller ahead of this component in the frame gets no one-frame lag. False whenever the
+        /// whole stack is hidden (invalid object, decoy, a bird hidden for this peer) and for a row cut by the
+        /// <see cref="FeedbackTuning.StatusBadgeMaxRows"/> cap. Allocation-free.
+        /// </summary>
+        public bool IsRowVisible(Badge badge)
+        {
+            if (badge == Badge.None || _controller == null || _stackRoot == null) return false;
+            var obj = _controller.Object;
+            if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return false;
+            return IsRowShown(_active, CollectActive(), badge);
+        }
+
+        /// <summary>Whether <paramref name="badge"/> is among the first <paramref name="count"/> (laid-out) entries of
+        /// <paramref name="active"/>, the buffer <see cref="Collect"/> filled and capped at the row count.</summary>
+        public static bool IsRowShown(Badge[] active, int count, Badge badge)
+        {
+            if (badge == Badge.None) return false;
+            for (int i = 0; i < count && i < active.Length; i++)
+                if (active[i] == badge) return true;
+            return false;
+        }
+
         /// <summary>Raises the badge stack for a class model drawn taller than the collider (Phase 8 D6).
         /// Root-local metres; presentation only.</summary>
         public void SetHeadLift(float lift)

@@ -49,7 +49,6 @@ namespace CluckWars.Visuals
 
         private ChickenController _controller;
         private ChickenCombat     _combat;
-        private ChickenCargo      _cargo;
         private TextMesh  _text;
         private MeshRenderer _textRenderer;
         private Transform _textTransform;
@@ -137,7 +136,6 @@ namespace CluckWars.Visuals
         {
             _controller = GetComponent<ChickenController>();
             _combat     = GetComponent<ChickenCombat>();
-            _cargo      = GetComponent<ChickenCargo>();
             _badges     = GetComponent<ChickenStatusBadges>();
             _rivalIndicator = GetComponent<RivalIndicator>();   // absent: the label never hides for the HUD
             BuildLabel();
@@ -459,17 +457,23 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// Control-state badge for the nameplate (ART.md §6.10).
+        /// E3 (one glyph per state): the pill snail marks an enemy snare (the replicated <see cref="ControlVfx.Snared"/> bit,
+        /// raised by the victim's StateAuthority, so every peer agrees) and only while the Slow badge row is not shown for
+        /// this bird (cut by the row cap). Pile and bump drag set <see cref="ControlVfx.Slowed"/> without
+        /// <see cref="ControlVfx.Snared"/> and never draw it.
         /// </summary>
+        public static bool ShowsPillSnail(ControlVfx flags, bool slowRowShown) =>
+            (flags & ControlVfx.Snared) != 0 && !slowRowShown;
+
+        /// <summary>Control-state badge for the nameplate (ART.md §6.10).</summary>
         private string StateIcon()
         {
             _slowGlyphWanted = false;
             if (_controller == null) return string.Empty;
             if (_controller.Rooted) return "🌱";
 
-            bool slowed = _controller.SlowMultiplier < 0.999f
-                          || (_cargo != null && _cargo.IsPileSlow);
-            if (!slowed) return string.Empty;
+            bool slowRowShown = _badges != null && _badges.IsRowVisible(ChickenStatusBadges.Badge.Slow);
+            if (!ShowsPillSnail(_controller.ControlFlags, slowRowShown)) return string.Empty;
 
             // Sprite when the badges component carries one; the emoji is the fallback (the badge row logs the
             // missing wiring once, ChickenStatusBadges.WarnMissingSprite).

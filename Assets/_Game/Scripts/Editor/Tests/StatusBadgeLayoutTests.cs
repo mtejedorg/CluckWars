@@ -378,5 +378,78 @@ namespace CluckWars.Tests
             Assert.Greater(writes, 25);
             StringAssert.DoesNotContain("_nextTextUpdate", System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ChickenStatusBadges.cs"), "the 5 Hz gate is gone from the world badges");
         }
+
+        // ---- G3 (E3a): one glyph per state, the pill snail stands in only for a cut Slow row -------------------
+
+        /// <summary>The badge flags a slowed bird publishes, through the same pure rule LateUpdate lays out
+        /// (<see cref="ChickenStatusBadges.Collect"/>, capped at the shipped row count).</summary>
+        private static bool SlowRowShown(ControlVfx flags, bool stunned = false, bool shell = false, bool hiddenRow = false)
+        {
+            var active = new ChickenStatusBadges.Badge[FeedbackTuning.StatusBadgeMaxRows];
+            int n = ChickenStatusBadges.Collect(stunned, false, (flags & ControlVfx.Slowed) != 0, shell, false, hiddenRow, false, active);
+            return ChickenStatusBadges.IsRowShown(active, n, ChickenStatusBadges.Badge.Slow);
+        }
+
+        [Test]
+        public void PillSnail_HiddenWhileTheSlowRowShows()
+        {
+            const ControlVfx snare = ControlVfx.Slowed | ControlVfx.Snared;
+            Assert.IsTrue(SlowRowShown(snare), "a snared bird shows the Slow row");
+            Assert.IsFalse(ChickenNameplate.ShowsPillSnail(snare, SlowRowShown(snare)), "one snail: the row's, not the pill's");
+        }
+
+        [Test]
+        public void PillSnail_NeverForPileOrBumpDrag()
+        {
+            // Pile slow and bump drag (SlowSource.Pile / Collision) raise Slowed without Snared (SlowSourceTests).
+            const ControlVfx drag = ControlVfx.Slowed;
+            Assert.IsFalse(ChickenNameplate.ShowsPillSnail(drag, false), "drag with no Slow row");
+            Assert.IsFalse(ChickenNameplate.ShowsPillSnail(drag, true), "drag with the Slow row");
+            Assert.IsFalse(ChickenNameplate.ShowsPillSnail(ControlVfx.None, false));
+
+            string body = MethodBody(System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ChickenNameplate.cs"), "private string StateIcon()");
+            StringAssert.DoesNotContain("IsPileSlow", body, "pile slow never draws the pill snail");
+            StringAssert.DoesNotContain("SlowMultiplier", body, "StateAuthority-only magnitude: the pill reads the replicated flags");
+            StringAssert.Contains("IsRowVisible(ChickenStatusBadges.Badge.Slow)", body, "the pill defers to the live Slow row");
+        }
+
+        [Test]
+        public void PillSnail_ShownWhenTheSlowRowIsCutByTheRowCap()
+        {
+            const ControlVfx snare = ControlVfx.Slowed | ControlVfx.Snared;
+            // Every non-root state that outranks Slow (stun, shell, hidden): root is left out because the pill shows the
+            // rooted sprout instead of any snail.
+            var active = new ChickenStatusBadges.Badge[FeedbackTuning.StatusBadgeMaxRows];
+            int above = ChickenStatusBadges.Collect(true, false, false, true, false, true, false, active);
+            Assert.AreEqual(FeedbackTuning.StatusBadgeMaxRows, above,
+                "the higher-priority non-root rows fill the cap; if the cap grew past them this case needs a new way to cut Slow");
+
+            bool shown = SlowRowShown(snare, stunned: true, shell: true, hiddenRow: true);
+            Assert.IsFalse(shown, "Slow is dropped below the cap");
+            Assert.IsTrue(ChickenNameplate.ShowsPillSnail(snare, shown), "the pill snail stands in for the cut row");
+        }
+
+        [Test]
+        public void IsRowShown_ReadsOnlyTheLaidOutRows()
+        {
+            var active = new[] { ChickenStatusBadges.Badge.Stun, ChickenStatusBadges.Badge.Slow, ChickenStatusBadges.Badge.None };
+            Assert.IsTrue(ChickenStatusBadges.IsRowShown(active, 2, ChickenStatusBadges.Badge.Slow));
+            Assert.IsFalse(ChickenStatusBadges.IsRowShown(active, 1, ChickenStatusBadges.Badge.Slow), "a stale entry past count is not a row");
+            Assert.IsFalse(ChickenStatusBadges.IsRowShown(active, 3, ChickenStatusBadges.Badge.None));
+        }
+
+        private static string MethodBody(string src, string signature)
+        {
+            int start = src.IndexOf(signature, System.StringComparison.Ordinal);
+            Assert.GreaterOrEqual(start, 0, signature);
+            int open = src.IndexOf('{', start), depth = 0;
+            for (int k = open; k < src.Length; k++)
+            {
+                if (src[k] == '{') depth++;
+                else if (src[k] == '}' && --depth == 0) return src.Substring(open, k - open + 1);
+            }
+            Assert.Fail("unbalanced " + signature);
+            return string.Empty;
+        }
     }
 }
