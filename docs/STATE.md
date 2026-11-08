@@ -14,6 +14,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 - **Decisions open (page):** E1 egg fit for the Warrior (rec. per-class tuck 0.70 + 0.06 m sink), E2 badge row owns the countdown and pops are words only (rec.), E3 one snail per slowed bird and none for pile drag (rec.), E4 rivals keep the bare -n at a robbed victim (rec.).
 - **Device / multi-client owed:** remote view of a hidden bird, Hunt mark + skull, stun/slow on the local bird (HUD strip rows), Peck on a laggy peer, Android atlas + draw calls, 4-bird storm.
 - **Downgraded:** mechanics lens's "stale WADDLE badge row" (it is the world-fixed pop); brief's "timeScale 1" claim (false, see above).
+- Compendium  (Egg Shell / Hunt renames from B2/B3) republished 2026-11-08 to its Artifact (version 16).
 - Backlog: BL-130 SetPage null guard, BL-131 FixedKit Death Mark strings, BL-132 test runner filter + TestRunnerApi path, BL-133 author the six SFX clips.
 
 ## 🛠 2026-11-07 - Feedback implementation (`simplify-abilities`, batches A-E of `docs/superpowers/plans/2026-11-07-ability-feedback-implementation-plan.md`, not merged, not pushed)
