@@ -50,7 +50,10 @@ namespace CluckWars.Visuals
         // and the cargo readout (48 / 0.025): a combat number must out-read the cargo
         // count without competing with the player's own identity label.
         private const int   PopupFontSize      = 72;
-        private const float PopupCharacterSize = 0.032f;
+        /// <summary>Bare ±n cargo numbers (rivals' cargo change, <see cref="SpawnCargoDelta"/>).</summary>
+        public const float PopupCharacterSize = 0.032f;
+        /// <summary>Every catalog word pop (STUN, PUSH, SLOW, ROB, EGG!, IMMUNE, HUNT!, …) and the own-screen ROB/+n self-pop; ~1.8x the number size: sized so the word STUN is >= 30 px tall on a 2400x1080 phone (F6; 0.048 measured 25 px).</summary>
+        public const float WordCharacterSize = 0.058f;
 
         /// <summary>Above <see cref="ChickenNameplate"/>'s renderer so a number never
         /// disappears behind a name it is spawned on top of.</summary>
@@ -100,12 +103,16 @@ namespace CluckWars.Visuals
         /// transform: it keeps its spawn offset from it for its whole life (plus the rise), so it stays over a moving bird. If
         /// <paramref name="follow"/> is destroyed mid-pop the pop freezes at its last position. Null: world-fixed.
         /// </summary>
-        public static void SpawnUngated(Vector3 worldPos, string text, Color color, Transform follow)
+        public static void SpawnUngated(Vector3 worldPos, string text, Color color, Transform follow) =>
+            SpawnSized(worldPos, text, color, follow, WordCharacterSize);
+
+        /// <summary>Shared body of every spawn: <paramref name="characterSize"/> is written on each spawn, so a recycled slot never keeps the previous pop's size.</summary>
+        private static void SpawnSized(Vector3 worldPos, string text, Color color, Transform follow, float characterSize)
         {
             if (string.IsNullOrEmpty(text)) return;
             var pool = EnsureInstance();
             if (pool == null) return;
-            pool.SpawnInternal(worldPos, text, color, follow);
+            pool.SpawnInternal(worldPos, text, color, follow, characterSize);
         }
 
         /// <summary>
@@ -151,10 +158,11 @@ namespace CluckWars.Visuals
             if (whole <= 0) return;
 
             bool gain = delta > 0f;
-            SpawnUngated(worldPos,
+            SpawnSized(worldPos,
                   (gain ? "+" : "-") + whole + " " + CargoGlyph,
                   gain ? FeedbackTuning.FloatingTextCargoGainColor
-                       : FeedbackTuning.FloatingTextCargoLossColor);
+                       : FeedbackTuning.FloatingTextCargoLossColor,
+                  null, PopupCharacterSize);
         }
 
         /// <summary>
@@ -305,7 +313,7 @@ namespace CluckWars.Visuals
 
         // ── Spawn / recycle ────────────────────────────────────────────────────
 
-        private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow)
+        private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow, float characterSize)
         {
             if (_pool == null) BuildPool();
 
@@ -318,8 +326,9 @@ namespace CluckWars.Visuals
             popup.BaseColor    = color;
             popup.Age       = 0f;
 
-            popup.Text.text  = text;
-            popup.Text.color = color;
+            popup.Text.text          = text;
+            popup.Text.color         = color;
+            popup.Text.characterSize = characterSize;   // always overwritten, so a recycled slot never keeps a stale size
 
             popup.Root.position = worldPos;
             if (!popup.Root.gameObject.activeSelf) popup.Root.gameObject.SetActive(true);

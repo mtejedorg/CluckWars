@@ -170,7 +170,7 @@ namespace CluckWars.Tests
             }
             public void Spawn(Vector3 pos, Transform follow) =>
                 typeof(FloatingCombatText).GetMethod("SpawnInternal", NonPublic)
-                    .Invoke(_pool, new object[] { pos, "TEST", Color.white, follow });
+                    .Invoke(_pool, new object[] { pos, "TEST", Color.white, follow, FloatingCombatText.WordCharacterSize });
             public void Tick() => typeof(FloatingCombatText).GetMethod("LateUpdate", NonPublic).Invoke(_pool, null);
             public Vector3 PopPosition(int slot) => Go.transform.GetChild(slot).position;
         }

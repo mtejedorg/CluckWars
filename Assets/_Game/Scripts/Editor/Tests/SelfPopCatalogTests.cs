@@ -67,6 +67,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void PopSize_CatalogWordsLargerThanBareCargoNumbers()
+        {
+            Assert.AreEqual(0.058f, FloatingCombatText.WordCharacterSize, 1e-6f, "catalog word pops");
+            Assert.AreEqual(0.032f, FloatingCombatText.PopupCharacterSize, 1e-6f, "bare +n / -n cargo numbers");
+            Assert.Greater(FloatingCombatText.WordCharacterSize, FloatingCombatText.PopupCharacterSize);
+
+            // Bare cargo numbers are the only pop drawn at the number size; every other spawn goes through the word path.
+            string fct = Read("Visuals/FloatingCombatText.cs");
+            StringAssert.Contains("null, PopupCharacterSize);", fct, "SpawnCargoDelta draws at the number size");
+        }
+
+        [Test]
         public void ShellPops_WaddleThenEggThenHatch()
         {
             bool was = false, inEgg = false;
