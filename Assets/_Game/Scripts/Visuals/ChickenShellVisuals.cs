@@ -73,11 +73,11 @@ namespace CluckWars.Visuals
         public static float BurstRadius(float classScale) => FeedbackTuning.ShellBurstRadius * EggScale(classScale);
 
         /// <summary>
-        /// The uniform scale the bird wears inside the egg: <see cref="FeedbackTuning.ShellBodyScale"/>, or less when a capped egg
-        /// (the largest class) would otherwise leave more than the comb allowance above it.
+        /// The uniform scale the bird wears inside the egg: the class's tuck (<see cref="FeedbackTuning.ShellBodyTuckFor"/>, E1a),
+        /// or less when a capped egg (the largest class) would otherwise leave more than the comb allowance above it.
         /// </summary>
-        public static float BodyScaleFor(float classScale) =>
-            Mathf.Min(FeedbackTuning.ShellBodyScale,
+        public static float BodyScaleFor(float classScale, ChickenClass cls) =>
+            Mathf.Min(FeedbackTuning.ShellBodyTuckFor(cls),
                 (EggWorldHeight(classScale) / Mathf.Max(0.01f, classScale) + FeedbackTuning.ShellBodyTopAllowance) / FeedbackTuning.ShellModelHeight);
 
         /// <summary>Fraction of the egg phase already elapsed, from the slot's remaining seconds.</summary>
@@ -141,6 +141,8 @@ namespace CluckWars.Visuals
         private CharacterController _cc;
         private ChickenWorldBars _bars;
         private float _bodyScale = 1f;
+        private float _bodySink;              // E1a: world metres the bird sinks into the egg, eased with the tuck
+        private float _bodySqueezeZ = 1f;     // E1a: front-back squeeze (model local z), eased with the tuck
 
         private Transform _shellRoot, _cupPivot, _capPivot;
         private MeshRenderer _cupRenderer, _capRenderer;
@@ -218,8 +220,10 @@ namespace CluckWars.Visuals
 
         private void OnDisable()
         {
-            if (_animator != null) { _animator.ExtraRollDegrees = 0f; _animator.ExtraUniformScale = 1f; }
+            if (_animator != null) { _animator.ExtraRollDegrees = 0f; _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
             _bodyScale = 1f;
+            _bodySink = 0f;
+            _bodySqueezeZ = 1f;
             _waddleBlend = 0f;
             _seeded = false;
             _state = State.Off;
@@ -532,6 +536,8 @@ namespace CluckWars.Visuals
             _cupRise = 0f; _cupYScale = 1f; _capSeatFactor = 1f; _capLift = _capDrift = _capTumble = 0f; _capScale = 1f;
             _squash = Vector3.one; _uniform = 1f; _rootRoll = 0f; _breath = 1f;
             _bodyScale = 1f;
+            _bodySink = 0f;
+            _bodySqueezeZ = 1f;
         }
 
         private void GoOff()
@@ -542,7 +548,7 @@ namespace CluckWars.Visuals
             _stripeAlpha = 1f;
             PushBlock();   // F2: the renderers carry a clean block while off, so nothing re-shows a stale crack web
             _capVisible = _cupVisible = false;
-            if (_animator != null) _animator.ExtraUniformScale = 1f;
+            if (_animator != null) { _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
             if (_shellRoot != null && _rootActive) { _shellRoot.gameObject.SetActive(false); _rootActive = false; }
         }
 
@@ -584,21 +590,30 @@ namespace CluckWars.Visuals
             }
 
             // The waddle: a roll handed to the animator's bank accumulator, blended in and out.
-            // The bird shrinks to fit inside the egg: eased over the close, held through the idle, eased back over the open.
+            // The bird shrinks to fit inside the egg (and the Warrior sinks, E1a): eased over the close, held through the idle,
+            // eased back over the open. tuck01 is how much of the class's egg pose is applied; scale and sink share it.
+            float tuck01;
             switch (_state)
             {
                 case State.Close:
-                    _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x),
-                        Mathf.SmoothStep(0f, 1f, _stateT / (_reduced ? FeedbackTuning.ShellCloseReducedSeconds : FeedbackTuning.ShellCloseSeconds)));
+                    tuck01 = Mathf.SmoothStep(0f, 1f, _stateT / (_reduced ? FeedbackTuning.ShellCloseReducedSeconds : FeedbackTuning.ShellCloseSeconds));
                     break;
-                case State.Idle: _bodyScale = BodyScaleFor(transform.localScale.x); break;
+                case State.Idle: tuck01 = 1f; break;
                 case State.Open:
-                    _bodyScale = Mathf.Lerp(BodyScaleFor(transform.localScale.x), 1f,
-                        Mathf.SmoothStep(0f, 1f, _stateT / (_reduced ? FeedbackTuning.ShellOpenReducedSeconds : FeedbackTuning.ShellOpenSeconds)));
+                    tuck01 = 1f - Mathf.SmoothStep(0f, 1f, _stateT / (_reduced ? FeedbackTuning.ShellOpenReducedSeconds : FeedbackTuning.ShellOpenSeconds));
                     break;
-                default: _bodyScale = 1f; break;
+                default: tuck01 = 0f; break;
             }
-            if (_animator != null) _animator.ExtraUniformScale = _bodyScale;
+            var cls = _controller.Class;   // Tick only runs after ReadShell found the object valid
+            _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x, cls), tuck01);
+            _bodySink = FeedbackTuning.ShellBodySinkFor(cls) * tuck01;
+            _bodySqueezeZ = Mathf.Lerp(1f, FeedbackTuning.ShellBodySqueezeZFor(cls), tuck01);
+            if (_animator != null)
+            {
+                _animator.ExtraUniformScale = _bodyScale;
+                _animator.ExtraZScale = _bodySqueezeZ;
+                _animator.ExtraYOffset = -_bodySink;
+            }
 
             float rate = 1f / FeedbackTuning.ShellWaddleBlendSeconds;
             _waddleBlend = Mathf.MoveTowards(_waddleBlend, waddleTarget, dt * rate);

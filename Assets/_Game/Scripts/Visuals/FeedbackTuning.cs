@@ -1515,6 +1515,38 @@ namespace CluckWars.Visuals
         public const float ShellReducedGrowFrom = 0.85f;
         /// <summary>The bird shrinks uniformly to this inside the egg (eased over the close, back over the open) so tail and wings fit.</summary>
         public const float ShellBodyScale = 0.82f;
+        /// <summary>E1a (2026-11-08): the Warrior tucks deeper than the default so wings and tail stay inside the egg (comb tip may peek).</summary>
+        public const float ShellBodyTuckWarrior = 0.70f;
+        /// <summary>E1a: the Warrior also sinks this far (world m) into the egg, eased with the tuck. Every other class sinks 0.</summary>
+        public const float ShellBodySinkWarrior = 0.06f;
+
+        /// <summary>E1a follow-up: the Warrior is squeezed along its own front-back axis (model local z) inside the egg so the tail and
+        /// folded wing tips at the seam band stay in; the sides already fit, so x stays 1. Every other class 1.</summary>
+        public const float ShellBodySqueezeZWarrior = 0.76f;
+
+        /// <summary>The egg-phase front-back squeeze per class (model local z, eased with the tuck): Warrior <see cref="ShellBodySqueezeZWarrior"/>, others 1.</summary>
+        public static float ShellBodySqueezeZFor(CluckWars.Gameplay.ChickenClass cls) => cls switch
+        {
+            CluckWars.Gameplay.ChickenClass.Warrior => ShellBodySqueezeZWarrior,
+            _ => 1f,
+        };
+
+        /// <summary>
+        /// The egg-phase body tuck per class (E1a): Warrior <see cref="ShellBodyTuckWarrior"/>, every other class the default
+        /// <see cref="ShellBodyScale"/>. <c>ChickenShellVisuals.BodyScaleFor</c> still caps it for a capped egg (the Fatty).
+        /// </summary>
+        public static float ShellBodyTuckFor(CluckWars.Gameplay.ChickenClass cls) => cls switch
+        {
+            CluckWars.Gameplay.ChickenClass.Warrior => ShellBodyTuckWarrior,
+            _ => ShellBodyScale,
+        };
+
+        /// <summary>The egg-phase body sink per class in world metres (E1a): Warrior <see cref="ShellBodySinkWarrior"/>, others 0.</summary>
+        public static float ShellBodySinkFor(CluckWars.Gameplay.ChickenClass cls) => cls switch
+        {
+            CluckWars.Gameplay.ChickenClass.Warrior => ShellBodySinkWarrior,
+            _ => 0f,
+        };
         /// <summary>Authored height of every class model (m at root scale 1: the 1.6 m capsule) and how far the comb may peek above the egg.</summary>
         public const float ShellModelHeight = 1.6f;
         public const float ShellBodyTopAllowance = 0.10f;

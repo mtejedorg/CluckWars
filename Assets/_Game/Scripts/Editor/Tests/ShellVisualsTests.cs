@@ -89,42 +89,324 @@ namespace CluckWars.Tests
                 Assert.GreaterOrEqual(ChickenShellVisuals.EggWorldHeight(ordered[i].Scale), ChickenShellVisuals.EggWorldHeight(ordered[i - 1].Scale));
         }
 
+        /// <summary>The shipped class asset and baked model top (model units) for one class, from the registry.</summary>
+        private static (ChickenStatsSO stats, float modelTop) ShippedClass(ChickenClassRegistrySO reg, ChickenClass cls)
+        {
+            Assert.IsTrue(reg.TryGet(cls, out var e) && e.Stats != null && e.ModelPrefab != null, cls + ": registry entry with stats and model");
+            float modelTop = 0f;
+            var go = Object.Instantiate(e.ModelPrefab);
+            go.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    var m = new Mesh();
+                    smr.BakeMesh(m);
+                    var mx = smr.transform.localToWorldMatrix;
+                    foreach (var v in m.vertices) modelTop = Mathf.Max(modelTop, mx.MultiplyPoint3x4(v).y);
+                    Object.DestroyImmediate(m);
+                }
+            }
+            finally { Object.DestroyImmediate(go); }
+            return (e.Stats, modelTop);
+        }
+
+        private static ChickenClass[] AllClasses() => (ChickenClass[])System.Enum.GetValues(typeof(ChickenClass));
+
         [Test]
         public void TheBird_FitsInsideTheEgg_HeightWise_ForEveryClass()
         {
-            // Class models are 1.6 m tall in model space (checked on the baked mesh below); the bird wears BodyScaleFor inside the egg,
-            // so its top may exceed the egg top by at most the comb allowance. (Width is judged on the captures: the rest pose of the
-            // prefab is spread out, so its horizontal extent is not the animated idle silhouette.)
+            // Class models are 1.6 m tall in model space (checked on the baked mesh); inside the egg the bird wears its class tuck
+            // (BodyScaleFor, E1a) and sinks by its class sink, so its top (model units, root-local) is modelTop x tuck - sink / classScale,
+            // and may exceed the egg top by at most the comb allowance. (Width is judged on the captures: the rest pose of the prefab
+            // is spread out, so its horizontal extent is not the animated idle silhouette.)
             var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
             Assert.IsNotNull(reg);
-            foreach (var c in Classes())
+            Assert.AreEqual(4, AllClasses().Length);
+            foreach (var cls in AllClasses())
             {
-                float modelTop = 0f;
-                foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
-                {
-                    if (!reg.TryGet(cls, out var e) || e.Stats != c || e.ModelPrefab == null) continue;
-                    var go = Object.Instantiate(e.ModelPrefab);
-                    go.hideFlags = HideFlags.HideAndDontSave;
-                    try
-                    {
-                        foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>())
-                        {
-                            var m = new Mesh();
-                            smr.BakeMesh(m);
-                            var mx = smr.transform.localToWorldMatrix;
-                            foreach (var v in m.vertices) modelTop = Mathf.Max(modelTop, mx.MultiplyPoint3x4(v).y);
-                            Object.DestroyImmediate(m);
-                        }
-                    }
-                    finally { Object.DestroyImmediate(go); }
-                }
+                var (c, modelTop) = ShippedClass(reg, cls);
                 Assert.AreEqual(FeedbackTuning.ShellModelHeight, modelTop, 0.05f, c.DisplayName + ": authored model height changed, retune ShellModelHeight");
+                float tuck = ChickenShellVisuals.BodyScaleFor(c.Scale, cls);
+                float sink = FeedbackTuning.ShellBodySinkFor(cls);
+                Assert.GreaterOrEqual(sink, 0f, c.DisplayName + ": the sink lowers the bird, never lifts it");
                 float eggTopModelUnits = ChickenShellVisuals.EggWorldHeight(c.Scale) / c.Scale;
-                float birdTop = modelTop * ChickenShellVisuals.BodyScaleFor(c.Scale);
+                float birdTop = modelTop * tuck - sink / c.Scale;
                 Assert.LessOrEqual(birdTop, eggTopModelUnits + FeedbackTuning.ShellBodyTopAllowance + 1e-3f, c.DisplayName + " pokes out of the egg");
-                Assert.LessOrEqual(ChickenShellVisuals.BodyScaleFor(c.Scale), FeedbackTuning.ShellBodyScale + 1e-6f);
+                Assert.LessOrEqual(tuck, FeedbackTuning.ShellBodyTuckFor(cls) + 1e-6f, c.DisplayName + ": the cap only ever tucks deeper");
+                Assert.Greater(tuck, 0.5f, c.DisplayName + ": a tuck this deep would read as a different bird");
             }
-            Assert.AreEqual(FeedbackTuning.ShellBodyScale, ChickenShellVisuals.BodyScaleFor(1f), 0.01f, "the Warrior wears the ruled 0.82");
+        }
+
+        [Test]
+        public void TheEggTuckTable_IsTheE1aRuling()
+        {
+            // E1a (2026-11-08): only the Warrior changes (0.82 -> 0.70 plus a 0.06 m sink); the other three keep exactly what they wore.
+            Assert.AreEqual(FeedbackTuning.ShellBodyTuckWarrior, FeedbackTuning.ShellBodyTuckFor(ChickenClass.Warrior), 1e-6f);
+            Assert.That(FeedbackTuning.ShellBodyTuckWarrior, Is.InRange(0.64f, 0.70f), "E1a: 0.70, lowered in 0.02 steps on captures, never below 0.64");
+            Assert.AreEqual(0.06f, FeedbackTuning.ShellBodySinkFor(ChickenClass.Warrior), 1e-6f);
+            foreach (var cls in new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin })
+            {
+                Assert.AreEqual(FeedbackTuning.ShellBodyScale, FeedbackTuning.ShellBodyTuckFor(cls), 1e-6f, cls + " keeps the default tuck");
+                Assert.AreEqual(0f, FeedbackTuning.ShellBodySinkFor(cls), 1e-6f, cls + " does not sink");
+            }
+            Assert.AreEqual(0.82f, FeedbackTuning.ShellBodyScale, 1e-6f, "the default tuck");
+
+            // Effective values from the shipped class scales: the Warrior wears 0.70, the Fatty stays capped below 0.82 as before.
+            var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            foreach (var cls in AllClasses())
+            {
+                Assert.IsTrue(reg.TryGet(cls, out var e) && e.Stats != null);
+                float before = Mathf.Min(FeedbackTuning.ShellBodyScale,
+                    (ChickenShellVisuals.EggWorldHeight(e.Stats.Scale) / e.Stats.Scale + FeedbackTuning.ShellBodyTopAllowance) / FeedbackTuning.ShellModelHeight);
+                float now = ChickenShellVisuals.BodyScaleFor(e.Stats.Scale, cls);
+                if (cls == ChickenClass.Warrior) Assert.AreEqual(FeedbackTuning.ShellBodyTuckWarrior, now, 1e-5f, "the Warrior wears the ruled tuck");
+                else Assert.AreEqual(before, now, 1e-6f, cls + ": unchanged by E1a");
+            }
+        }
+
+        [Test]
+        public void TheWarrior_SitsDeeper_AndItsCombMayPeekButNoMore()
+        {
+            var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            var (w, modelTop) = ShippedClass(reg, ChickenClass.Warrior);
+            float eggTopWorld = ChickenShellVisuals.EggWorldHeight(w.Scale);
+            float topBefore = w.Scale * modelTop * FeedbackTuning.ShellBodyScale;
+            float topNow = w.Scale * modelTop * ChickenShellVisuals.BodyScaleFor(w.Scale, ChickenClass.Warrior) - FeedbackTuning.ShellBodySinkFor(ChickenClass.Warrior);
+            Assert.Less(topNow, topBefore - 0.15f, "E1a lowers the Warrior top by the tuck and the sink (about 0.25 m)");
+            Assert.LessOrEqual(topNow, eggTopWorld + FeedbackTuning.ShellBodyTopAllowance * w.Scale + 1e-3f, "at most the comb tip above the egg");
+        }
+
+        [Test]
+        public void TheEggCapAndTop_AreUnchangedByTheTuck()
+        {
+            // E1a keeps the egg itself: scale cap 1.27, the capped egg top 1.22 x 1.27 = 1.55 m (strictly under ShellEggTopMaxHeight).
+            Assert.AreEqual(1.27f, FeedbackTuning.ShellEggScaleCap, 1e-6f);
+            Assert.AreEqual(1.55f, FeedbackTuning.ShellEggTopMaxHeight, 1e-6f);
+            Assert.AreEqual(1.22f, FeedbackTuning.ShellEggBaseHeight, 1e-6f);
+            float biggest = Classes().Max(c => c.Scale);
+            Assert.AreEqual(FeedbackTuning.ShellEggBaseHeight * FeedbackTuning.ShellEggScaleCap, ChickenShellVisuals.EggWorldHeight(biggest), 1e-5f,
+                "the largest shipped class wears the capped egg");
+            Assert.Less(ChickenShellVisuals.EggWorldHeight(biggest), FeedbackTuning.ShellEggTopMaxHeight);
+        }
+
+        [Test]
+        public void ExtraYOffset_ComposesIntoTheSingleWrite_InWorldMetres_AndReturnsToRest()
+        {
+            var root = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(TestAssets.ChickenPrefabPath));
+            root.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                root.transform.localScale = Vector3.one * 1.35f;   // the root carries the class scale
+                var anim = root.GetComponent<ChickenAnimator>();
+                Assert.IsNotNull(anim);
+                var model = new GameObject("model").transform;
+                model.SetParent(root.transform, false);
+                model.localPosition = new Vector3(0f, -0.8f, 0f);
+                anim.SetModelRoot(model);
+                anim.SetSkeletalActive(true);
+                Assert.AreEqual(0f, anim.ExtraYOffset, "rest value");
+                var apply = typeof(ChickenAnimator).GetMethod("ApplySkeletalOffsets", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(apply);
+
+                apply.Invoke(anim, null);
+                Vector3 restWorld = model.position;
+                anim.ExtraYOffset = -0.06f;
+                apply.Invoke(anim, null);
+                Assert.AreEqual(restWorld.y - 0.06f, model.position.y, 1e-4f, "the sink is world metres whatever the class scale");
+                Assert.AreEqual(restWorld.x, model.position.x, 1e-5f);
+                anim.ExtraYOffset = 0f;
+                apply.Invoke(anim, null);
+                Assert.AreEqual(restWorld, model.position, "writing 0 returns the model exactly to rest");
+            }
+            finally { Object.DestroyImmediate(root); }
+
+            string shell = File.ReadAllText(SourcePath);
+            Assert.IsTrue(shell.Contains("_animator.ExtraYOffset = -_bodySink"), "the shell writes the eased sink");
+            Assert.GreaterOrEqual(System.Text.RegularExpressions.Regex.Matches(shell, @"_animator\.ExtraYOffset = 0f").Count, 2,
+                "OnDisable and GoOff clear the sink");
+        }
+
+        // ---- Lateral fit (E1a follow-up): the triangle-cut egg profile vs the baked, animated bird --------------------------
+
+        /// <summary>The egg's radius about its axis at height <paramref name="y"/> in direction <paramref name="dir"/>: the farthest
+        /// point where a triangle edge crosses that horizontal plane, inside a 14 degree cone around the direction.</summary>
+        private static float EggRadiusAt(System.Collections.Generic.List<Vector3[]> tris, float y, Vector2 dir)
+        {
+            float best = 0f;
+            foreach (var tri in tris)
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 a = tri[k], b = tri[(k + 1) % 3];
+                    if ((a.y - y) * (b.y - y) > 0f || a.y == b.y) continue;
+                    var p = Vector3.Lerp(a, b, (y - a.y) / (b.y - a.y));
+                    var d = new Vector2(p.x, p.z);
+                    if (d.sqrMagnitude < 1e-8f || Vector2.Dot(d.normalized, dir) < 0.97f) continue;
+                    best = Mathf.Max(best, d.magnitude);
+                }
+            return best;
+        }
+
+        /// <summary>
+        /// The worst amount (world m) the class's body pokes past the seated idle egg per direction (+X, -X, +Z front, -Z back), over
+        /// the Idle clip and the Shield's cast clip, in the egg phase pose (class tuck, squeeze, sink) at the shipped class scale. Band:
+        /// from a quarter of the egg's height (above it is the feet, which stand on the ground through the egg's pointed bottom) up to
+        /// the seam + 0.04 m for the back and sides, and up to the seam for the front: above the seam the cap narrows and the head and
+        /// beak peek out, ACCEPTED by E1a (the comb tip may peek), so the front above the seam is never asserted.
+        /// </summary>
+        private (float px, float nx, float pz, float nz, string where) EggOvershoot(ChickenClass cls)
+        {
+            var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            Assert.IsTrue(reg.TryGet(cls, out var e) && e.Stats != null && e.ModelPrefab != null && e.Clips.Idle != null, cls + ": registry entry");
+            var turtle = AssetDatabase.LoadAssetAtPath<CluckWars.Abilities.AbilityBaseSO>("Assets/_Game/Data/Abilities/TurtleMode.asset");
+            Assert.IsNotNull(turtle, "the shipped Shield (TurtleMode.asset)");
+            float cs = e.Stats.Scale;
+
+            var shell = Wake();
+            var root = _chicken.transform;
+            root.position = Vector3.zero; root.rotation = Quaternion.identity; root.localScale = Vector3.one * cs;
+            var cc = _chicken.GetComponent<CharacterController>();
+            // The seated idle egg exactly as Apply poses it: cup risen, cap on the seam, no squash or breath.
+            var shellRoot = root.Find("EggShell");
+            shellRoot.gameObject.SetActive(true);
+            shellRoot.localPosition = new Vector3(0f, ChickenGround.LocalFeetY(cc) - cc.skinWidth / cs, 0f);
+            shellRoot.localRotation = Quaternion.identity;
+            shellRoot.localScale = Vector3.one * (ChickenShellVisuals.EggWorldHeight(cs) / cs);
+            var cap = shellRoot.Find("Cap");
+            float seamLocal = (float)typeof(ChickenShellVisuals).GetField("_seamY", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(shell);
+            shellRoot.Find("Cup").localPosition = Vector3.zero;
+            cap.localPosition = new Vector3(0f, seamLocal, 0f);
+            var tris = new System.Collections.Generic.List<Vector3[]>();
+            float eggMin = float.MaxValue, eggMax = float.MinValue;
+            foreach (var mf in shellRoot.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mx = mf.transform.localToWorldMatrix; var vs = mf.sharedMesh.vertices; var ts = mf.sharedMesh.triangles;
+                foreach (var v in vs) { float y = mx.MultiplyPoint3x4(v).y; eggMin = Mathf.Min(eggMin, y); eggMax = Mathf.Max(eggMax, y); }
+                for (int i = 0; i < ts.Length; i += 3)
+                    tris.Add(new[] { mx.MultiplyPoint3x4(vs[ts[i]]), mx.MultiplyPoint3x4(vs[ts[i + 1]]), mx.MultiplyPoint3x4(vs[ts[i + 2]]) });
+            }
+            float seam = cap.position.y, bandLo = eggMin + 0.25f * (eggMax - eggMin);
+
+            // The bird in the egg pose, the way ChickenAnimator composes it on the model root.
+            var model = Object.Instantiate(e.ModelPrefab, root, false);
+            model.hideFlags = HideFlags.HideAndDontSave;
+            var nested = model.GetComponent<Animator>();
+            if (nested != null) Object.DestroyImmediate(nested);
+            float tuck = ChickenShellVisuals.BodyScaleFor(cs, cls);
+            model.transform.localPosition = new Vector3(0f, ChickenGround.LocalFeetY(cc) - FeedbackTuning.ShellBodySinkFor(cls) / cs, 0f);
+            model.transform.localScale = Vector3.Scale(e.ResolvedModelScale * tuck, new Vector3(1f, 1f, FeedbackTuning.ShellBodySqueezeZFor(cls)));
+
+            var dirs = new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1), new Vector2(0, -1) };
+            var worst = new[] { -9f, -9f, -9f, -9f };
+            string where = "";
+            var poses = new System.Collections.Generic.List<(AnimationClip clip, float t)>();
+            for (int i = 0; i <= 8; i++) poses.Add((e.Clips.Idle, e.Clips.Idle.length * i / 8f));
+            var cast = e.Clips.CastFor(turtle.CastMotion);
+            if (cast != null) for (int i = 0; i <= 8; i++) poses.Add((cast, cast.length * i / 8f));
+            try
+            {
+                foreach (var (clip, t) in poses)
+                {
+                    clip.SampleAnimation(model, t);
+                    var pts = new System.Collections.Generic.List<Vector3>();
+                    foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>())
+                    {
+                        var m = new Mesh();
+                        smr.BakeMesh(m);   // the bones already carry the model-root scale: place with position + rotation only
+                        var mx = Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+                        foreach (var v in m.vertices) pts.Add(mx.MultiplyPoint3x4(v));
+                        Object.DestroyImmediate(m);
+                    }
+                    for (float y = bandLo; y <= seam + 0.04f; y += 0.02f)
+                        for (int d = 0; d < 4; d++)
+                        {
+                            if (d == 2 && y > seam) continue;   // the front above the seam: the accepted head/beak peek (E1a)
+                            float body = 0f;
+                            foreach (var p in pts)
+                            {
+                                if (Mathf.Abs(p.y - y) >= 0.01f) continue;
+                                var q = new Vector2(p.x, p.z);
+                                if (q.sqrMagnitude > 1e-8f && Vector2.Dot(q.normalized, dirs[d]) >= 0.97f) body = Mathf.Max(body, q.magnitude);
+                            }
+                            if (body == 0f) continue;
+                            float over = body - EggRadiusAt(tris, y, dirs[d]);
+                            if (over > worst[d]) { worst[d] = over; if (d == 3) where = clip.name + " t=" + t.ToString("F2") + " y=" + y.ToString("F2"); }
+                        }
+                }
+            }
+            finally { Object.DestroyImmediate(model); }
+            return (worst[0], worst[1], worst[2], worst[3], where);
+        }
+
+        [Test]
+        public void TheWarrior_FitsTheEgg_AtTheBackAndSides_InEveryIdleAndShieldCastPose()
+        {
+            // E1a follow-up: the tail and folded wing tips at the seam band poked through the back of the shell (captures G1*).
+            // The front-back squeeze takes them in; the sides already fit, so x stays unsqueezed. The front is asserted only up to
+            // the seam (above it the head/beak peek out where the cap narrows, accepted by E1a).
+            var (px, nx, pz, nz, where) = EggOvershoot(ChickenClass.Warrior);
+            Assert.LessOrEqual(nz, 0f, "the Warrior back pokes " + nz.ToString("F3") + " m out of the egg at " + where);
+            Assert.LessOrEqual(px, 0f, "the Warrior right side pokes out by " + px.ToString("F3") + " m");
+            Assert.LessOrEqual(nx, 0f, "the Warrior left side pokes out by " + nx.ToString("F3") + " m");
+            Assert.LessOrEqual(pz, 0.02f, "the Warrior breast below the seam pokes out by " + pz.ToString("F3") + " m");
+        }
+
+        [Test]
+        public void TheOtherClasses_EggFit_IsMeasured_NotAsserted()
+        {
+            // E1a only rules the Warrior: the other three keep their tuck and wear no squeeze, so their measured overshoot is reported
+            // here (test output) for a later ruling instead of being pinned. Only the shape of the table is asserted.
+            foreach (var cls in new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin })
+            {
+                Assert.AreEqual(1f, FeedbackTuning.ShellBodySqueezeZFor(cls), 1e-6f, cls + " wears no squeeze");
+                var (px, nx, pz, nz, where) = EggOvershoot(cls);
+                TestContext.WriteLine(cls + " egg overshoot (m): +X " + px.ToString("F3") + "  -X " + nx.ToString("F3") +
+                                      "  front " + pz.ToString("F3") + "  back " + nz.ToString("F3") + " (" + where + ")");
+                if (_chicken != null) { Object.DestroyImmediate(_chicken); _chicken = null; }
+            }
+        }
+
+        [Test]
+        public void TheWarriorSqueeze_IsOnlyFrontBack_AndInTheRuledRange()
+        {
+            float sq = FeedbackTuning.ShellBodySqueezeZWarrior;
+            Assert.AreEqual(sq, FeedbackTuning.ShellBodySqueezeZFor(ChickenClass.Warrior), 1e-6f);
+            Assert.GreaterOrEqual(sq, 0.76f, "E1a floor: deeper reads as a different bird");
+            Assert.LessOrEqual(sq, 0.85f, "E1a: at 0.85 the back still pokes out in the Shield cast pose");
+        }
+
+        [Test]
+        public void ExtraZScale_ComposesIntoTheScaleWrite_AndReturnsToRest()
+        {
+            var root = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(TestAssets.ChickenPrefabPath));
+            root.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                var anim = root.GetComponent<ChickenAnimator>();
+                var model = new GameObject("model").transform;
+                model.SetParent(root.transform, false);
+                model.localScale = new Vector3(2f, 3f, 4f);
+                anim.SetModelRoot(model);
+                anim.SetSkeletalActive(true);
+                Assert.AreEqual(1f, anim.ExtraZScale, "rest value");
+                var apply = typeof(ChickenAnimator).GetMethod("ApplySkeletalOffsets", BindingFlags.Instance | BindingFlags.NonPublic);
+                anim.ExtraUniformScale = 0.7f;
+                anim.ExtraZScale = 0.8f;
+                apply.Invoke(anim, null);
+                Assert.AreEqual(2f * 0.7f, model.localScale.x, 1e-4f, "x untouched by the squeeze");
+                Assert.AreEqual(3f * 0.7f, model.localScale.y, 1e-4f);
+                Assert.AreEqual(4f * 0.7f * 0.8f, model.localScale.z, 1e-4f, "z = rest x uniform x squeeze");
+                anim.ExtraUniformScale = 1f;
+                anim.ExtraZScale = 1f;
+                apply.Invoke(anim, null);
+                Assert.AreEqual(new Vector3(2f, 3f, 4f), model.localScale, "the squeeze leaves nothing behind");
+            }
+            finally { Object.DestroyImmediate(root); }
+
+            string shell = File.ReadAllText(SourcePath);
+            Assert.IsTrue(shell.Contains("_animator.ExtraZScale = _bodySqueezeZ"), "the shell writes the eased squeeze");
+            Assert.GreaterOrEqual(System.Text.RegularExpressions.Regex.Matches(shell, @"_animator\.ExtraZScale = 1f").Count, 2,
+                "OnDisable and GoOff clear the squeeze");
         }
 
         [Test]

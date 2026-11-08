@@ -417,8 +417,8 @@ namespace CluckWars.Visuals
             // Floating combat text is suppressed on a decoy (see Render). Not only because
             // it is a local-player-facing channel: a decoy is never really slowed or rooted
             // either — ChickenController.FixedUpdateNetwork early-returns on IsDecoy before
-            // any of that is re-derived — so "SLOW 45%" over its head would be a number that
-            // does not exist. The flash and the impact lines below still run, because those
+            // any of that is re-derived — so a slow or root pop over its head would report a
+            // state that does not exist. The flash and the impact lines below still run, because those
             // report the hit itself, which did happen.
             bool showText = !_controller.IsDecoy;
 

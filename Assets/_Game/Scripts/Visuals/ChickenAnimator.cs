@@ -320,11 +320,36 @@ namespace CluckWars.Visuals
         public float ExtraUniformScale { get; set; } = 1f;
 
         /// <summary>
+        /// Vertical offset in WORLD metres (negative = down) composed into the model's position by another component (the Egg
+        /// Shell sinks the Warrior 0.06 m into the egg, E1a). 0 = rest. Converted to the model's parent space and added inside the
+        /// single position write, so it composes additively with the rest pose, the legacy rise and the jump travel, and returns
+        /// exactly to rest when its owner writes 0. The one deliberate exception to "nothing here lowers a chicken": it only runs
+        /// while the egg hides the feet.
+        /// </summary>
+        public float ExtraYOffset { get; set; }
+
+        /// <summary><see cref="ExtraYOffset"/> in the model's parent space (the root carries the class scale).</summary>
+        private Vector3 ExtraYOffsetLocal()
+        {
+            if (ExtraYOffset == 0f) return Vector3.zero;
+            var parent = _modelRoot.parent;
+            float s = parent != null ? Mathf.Max(0.01f, Mathf.Abs(parent.lossyScale.y)) : 1f;
+            return Vector3.up * (ExtraYOffset / s);
+        }
+
+        /// <summary>
         /// Per-axis scale multiplier composed into the model's scale by another component (the Shove victim squash, D6). 1 = rest.
         /// Multiplies on top of <see cref="ExtraUniformScale"/>; a plain value its owner rewrites, so the animator stays the only writer
         /// of the model transform.
         /// </summary>
         public Vector3 ExtraScale { get; set; } = Vector3.one;
+
+        /// <summary>
+        /// Front-back (model local z) scale multiplier composed into the model's scale by another component (the Egg Shell squeezes
+        /// the Warrior's tail and wing tips into the egg, E1a). 1 = rest. Multiplies on top of <see cref="ExtraUniformScale"/> and
+        /// <see cref="ExtraScale"/>; a plain value its owner rewrites, so the animator stays the only writer of the model transform.
+        /// </summary>
+        public float ExtraZScale { get; set; } = 1f;
 
         /// <summary>True once the skeletal rig is driving the model (the legacy procedural fallback squashes on its own hit timer).</summary>
         public bool IsSkeletal => _skeletalActive;
@@ -532,9 +557,9 @@ namespace CluckWars.Visuals
             float roll  = -_bankMaxDegrees * _smoothedYawRate01 + ExtraRollDegrees;
 
             // ---- The single write ----
-            _modelRoot.localPosition = _restPosition + CurrentTravelOffset();
+            _modelRoot.localPosition = _restPosition + ExtraYOffsetLocal() + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
-            _modelRoot.localScale    = Vector3.Scale(_restScale * ExtraUniformScale, ExtraScale);
+            _modelRoot.localScale    = Vector3.Scale(_restScale * ExtraUniformScale, new Vector3(ExtraScale.x, ExtraScale.y, ExtraScale.z * ExtraZScale));
         }
 
         /// <summary>
@@ -616,12 +641,12 @@ namespace CluckWars.Visuals
             // The travel offset is shared with the skeletal path rather than re-derived: it is a
             // correction for a networking artefact, not a piece of the procedural fallback, and
             // the degraded mode should travel the same way the real one does.
-            _modelRoot.localPosition = _restPosition + Vector3.up * riseY + CurrentTravelOffset();
+            _modelRoot.localPosition = _restPosition + Vector3.up * riseY + ExtraYOffsetLocal() + CurrentTravelOffset();
             _modelRoot.localRotation = _restRotation * Quaternion.Euler(pitch, 0f, roll);
             _modelRoot.localScale    = new Vector3(
                 _restScale.x * scaleXZ * ExtraUniformScale * ExtraScale.x,
                 _restScale.y * scaleY * ExtraUniformScale * ExtraScale.y,
-                _restScale.z * scaleXZ * ExtraUniformScale * ExtraScale.z);
+                _restScale.z * scaleXZ * ExtraUniformScale * ExtraScale.z * ExtraZScale);
         }
 
         private void UpdateSpeed(float dt)
