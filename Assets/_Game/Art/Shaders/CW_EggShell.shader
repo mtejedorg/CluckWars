@@ -5,10 +5,13 @@
 //
 // Surface = albedo -> stripe bands -> crack lines -> ink rim:
 //   albedo   = _BaseColor * speckle (Fx_EggSpeckle tiled 2x, frac()-wrapped so the Clamp import of the texture is irrelevant)
-//   stripes  = two bands centred at 30 % and 70 % of the WHOLE egg height, 6 % tall, ~2 px ink edge, _StripeColor.rgb
-//              (alpha = how much of the stripe shows; the driver fades it for the last-0.3 s jitter)
-//   cracks   = step(Fx_EggCrackMask.r, _Crack): grey = order of appearance (0 = first, the seam), white = no crack;
-//              cracked texels go to _InkColor with smoothness 0
+//   stripes  = two bands centred at 30 % and 77 % of the WHOLE (closed) egg height, 6 % tall, ~2 px ink edge, _StripeColor.rgb
+//              (alpha = how much of the stripe shows; the driver fades it for the last-0.3 s jitter). F2: the upper band sat at
+//              70 %, exactly on the zigzag seam (the cup reaches v 0.70, the cap starts at v 0.59), so it was cut in two and read
+//              as "one band near the seam"; 0.77 puts it, ink edge included, wholly on the cap. Pinned by EggShellShaderTests.
+//   cracks   = 1 - smoothstep(_Crack - fwidth(mask), _Crack, mask), i.e. mask <= _Crack anti-aliased over one screen pixel
+//              (F2: a hard step() on the 256 px mask gave stair-stepped ink blocks): grey = order of appearance (0 = first,
+//              the seam), white = no crack; cracked texels go to _InkColor with smoothness 0
 //   rim      = (1 - saturate(N.V))^3 lerps the albedo 25 % toward _InkColor (cartoon edge, no outline pass)
 //
 // HEIGHT: EggShell.fbx maps UV.v = normalised height of the WHOLE egg (EggShell_Bottom v 0..0.7, EggShell_Top v 0.6..1),
@@ -32,7 +35,7 @@ Shader "Cluck Wars/Egg Shell"
         _Smoothness("Smoothness", Range(0, 1)) = 0.35
         _RimStrength("Ink Rim Strength", Range(0, 1)) = 0.25
         _RimPower("Ink Rim Power", Range(1, 8)) = 3
-        _StripeCenters("Stripe Centres (v)", Vector) = (0.30, 0.70, 0, 0)
+        _StripeCenters("Stripe Centres (v)", Vector) = (0.30, 0.77, 0, 0)
         _StripeHalfHeight("Stripe Half Height (v)", Range(0.005, 0.1)) = 0.03
         _StripeEdgePixels("Stripe Ink Edge (px)", Range(0, 6)) = 2
     }
@@ -149,7 +152,9 @@ Shader "Cluck Wars/Egg Shell"
 
                 // ---- cracks -----------------------------------------------------------------
                 half mask = SAMPLE_TEXTURE2D(_CrackTex, sampler_CrackTex, i.uv).r;
-                half crack = step(mask, _Crack) * step(mask, 0.98h) * step(0.001h, _Crack);   // white (> 0.98) is "no crack"
+                float crackAA = max(fwidth(mask), 1e-3);                                  // one screen pixel of mask
+                half crack = (1.0h - smoothstep(_Crack - crackAA, _Crack, mask))
+                           * step(mask, 0.98h) * step(0.001h, _Crack);                         // white (> 0.98) is "no crack"
                 albedo = lerp(albedo, _InkColor.rgb, crack);
                 half smoothness = lerp(_Smoothness, 0.0h, crack);
 

@@ -69,6 +69,9 @@ namespace CluckWars.Visuals
         /// <summary>The seated egg's world height for a class (m).</summary>
         public static float EggWorldHeight(float classScale) => FeedbackTuning.ShellEggBaseHeight * EggScale(classScale);
 
+        /// <summary>F2: the hatch debris disc radius in metres, scaled per class exactly like the egg.</summary>
+        public static float BurstRadius(float classScale) => FeedbackTuning.ShellBurstRadius * EggScale(classScale);
+
         /// <summary>
         /// The uniform scale the bird wears inside the egg: <see cref="FeedbackTuning.ShellBodyScale"/>, or less when a capped egg
         /// (the largest class) would otherwise leave more than the comb allowance above it.
@@ -289,23 +292,27 @@ namespace CluckWars.Visuals
                 Count = FeedbackTuning.ShellClosePuffs, Color = cream, SizeMin = 0.30f, SizeMax = 0.45f, SpeedMin = 0.6f, SpeedMax = 1.0f,
                 LifeMin = 0.25f, LifeMax = 0.35f, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellClosePuffRadius,
             };
+            // F2: the whole hatch leaves from a seam-height disc (radius scaled per class in EmitOpenBurst), flying outward with a
+            // constant lift and a light 0.3 g pull, so it clears the shell outline before it drops instead of pooling under the ring.
             _fx.Shard = new ChickenVFX.FxEmit
             {
                 Count = FeedbackTuning.ShellShardCount, Color = cream, SizeMin = 0.14f, SizeMax = 0.20f, SpeedMin = 2f, SpeedMax = 4f,
-                LifeMin = 0.55f, LifeMax = 0.65f, Shape = ChickenVFX.FxShape.Cone, Radius = 0.05f, Axis = Vector3.up,
-                ConeMinAngle = 45f, ConeAngle = 65f,   // 25-45 degrees of elevation
-                Gravity = 0f,                          // the shard system carries real gravity 1
+                LifeMin = 0.55f, LifeMax = 0.65f, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellBurstRadius,
+                Lift = FeedbackTuning.ShellBurstLift,
+                Gravity = FeedbackTuning.ShellBurstGravity - 1f,   // the shard system carries real gravity 1: bake back all but 0.3 g
             };
             _fx.Feather = new ChickenVFX.FxEmit
             {
                 Count = FeedbackTuning.ShellFeatherCount, Color = Color.white, SizeMin = 0.30f, SizeMax = 0.50f, SpeedMin = 2.0f, SpeedMax = 4.5f,
-                LifeMin = 0.45f, LifeMax = 0.55f, Shape = ChickenVFX.FxShape.Sphere, Radius = 0.30f, Gravity = 0.6f, RandomRotation = true,
+                LifeMin = 0.45f, LifeMax = 0.55f, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellBurstRadius,
+                Lift = FeedbackTuning.ShellBurstLift, Gravity = FeedbackTuning.ShellBurstGravity, RandomRotation = true,
             };
             var yolk = FeedbackPalette.Current.YolkColor; yolk.a = FeedbackTuning.ShellYolkAlpha;
             _fx.Yolk = new ChickenVFX.FxEmit
             {
                 Count = FeedbackTuning.ShellYolkPuffs, Color = yolk, SizeMin = 0.30f, SizeMax = 0.45f, SpeedMin = 1.2f, SpeedMax = 1.2f,
-                LifeMin = 0.30f, LifeMax = 0.40f, Shape = ChickenVFX.FxShape.Disc, Radius = 0.10f,
+                LifeMin = 0.30f, LifeMax = 0.40f, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellBurstRadius,
+                Lift = FeedbackTuning.ShellBurstLift, Gravity = FeedbackTuning.ShellBurstGravity,
             };
         }
 
@@ -439,6 +446,8 @@ namespace CluckWars.Visuals
             _cupVisible = true;
             _cupRise = seeded ? FeedbackTuning.ShellWalkCupRise : 0f;
             _crack = 0f;
+            _stripeAlpha = 1f;
+            PushBlock();   // F2: a walk re-cast after an early-ended egg must not keep the last egg's cracks on the cup
         }
 
         private void EnterClose()
@@ -529,6 +538,9 @@ namespace CluckWars.Visuals
         {
             _state = State.Off;
             ResetPose();
+            _crack = 0f;
+            _stripeAlpha = 1f;
+            PushBlock();   // F2: the renderers carry a clean block while off, so nothing re-shows a stale crack web
             _capVisible = _cupVisible = false;
             if (_animator != null) _animator.ExtraUniformScale = 1f;
             if (_shellRoot != null && _rootActive) { _shellRoot.gameObject.SetActive(false); _rootActive = false; }
@@ -779,18 +791,22 @@ namespace CluckWars.Visuals
             if (_combat.IsRemoved || !CanEmit()) return;   // never double-burst with the death VFX
             float seam = _seamY * _eggUnitWorld;
             Vector3 seamPoint = GroundPoint(seam);
+            float radius = BurstRadius(Mathf.Abs(transform.localScale.x));   // class-scaled like the egg
 
             var shard = _fx.Shard;
+            shard.Radius = radius;
             if (_reduced)
             {
-                // Two shards, no pull: a short drift (the shard system's gravity is cancelled by the baked lift).
+                // Two shards, no pull, no lift: a short outward drift (the shard system's gravity is cancelled by the baked lift).
                 shard.Count = Mathf.Max(1, shard.Count - 1);
                 shard.SpeedMin = shard.SpeedMax = 0.5f;
                 shard.Gravity = -1f;
+                shard.Lift = 0f;
             }
             _vfx.EmitShards(in shard, seamPoint);
 
             var feathers = _fx.Feather;
+            feathers.Radius = radius;
             var tint = _controller.ClassBodyTint;
             tint.a = FeedbackTuning.ShellFeatherAlpha;
             feathers.Color = tint;
@@ -798,8 +814,9 @@ namespace CluckWars.Visuals
             _vfx.EmitFeathersAt(in feathers, seamPoint);
 
             var yolk = _fx.Yolk;
+            yolk.Radius = radius;
             if (_reduced) yolk.Count = Mathf.Max(1, yolk.Count / 2);
-            _vfx.EmitDustAt(in yolk, GroundPoint(0.5f));
+            _vfx.EmitDustAt(in yolk, seamPoint);
         }
 
         private void Warn(string message)

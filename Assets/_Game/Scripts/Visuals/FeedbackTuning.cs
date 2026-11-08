@@ -1546,6 +1546,13 @@ namespace CluckWars.Visuals
         public const int ShellYolkPuffs = 6;
         public const float ShellYolkAlpha = 0.7f;
         public const float ShellFeatherAlpha = 0.9f;
+        /// <summary>F2: the hatch debris (shards, feathers, yolk puffs) leaves from a seam-height disc of this radius (metres at
+        /// egg scale 1, multiplied by <c>ChickenShellVisuals.EggScale</c> like the egg), so it starts at the shell outline, not inside it.</summary>
+        public const float ShellBurstRadius = 0.45f;
+        /// <summary>F2: the constant upward speed (m/s) every hatch particle gets on top of its outward speed, so it rises off the seam.</summary>
+        public const float ShellBurstLift = 0.8f;
+        /// <summary>F2: the hatch debris falls at this fraction of g (a slow, floaty drop), so it clears the shell before it lands.</summary>
+        public const float ShellBurstGravity = 0.3f;
 
         // ---- Speed body cue (D4, vfx.md 2.5) --------------------------------------------------------
 

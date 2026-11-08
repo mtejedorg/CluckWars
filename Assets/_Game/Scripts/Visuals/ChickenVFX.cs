@@ -60,6 +60,8 @@ namespace CluckWars.Visuals
             public Vector3 Axis;
             public float Gravity;
             public bool RandomRotation;
+            /// <summary>A constant upward speed (m/s) added after the shape's direction and before the baked gravity (0 = none).</summary>
+            public float Lift;
         }
 
         private const float EarthG = 9.81f;
@@ -994,6 +996,7 @@ namespace CluckWars.Visuals
                     }
                 }
                 Vector3 v = dir * Random.Range(e.SpeedMin, e.SpeedMax);
+                v.y += e.Lift;
                 v.y -= 0.5f * e.Gravity * EarthG * life;   // gravity as an end-of-life-equivalent constant lift/drop
                 _ep.position = world + offset;
                 _ep.velocity = v;

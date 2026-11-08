@@ -220,6 +220,52 @@ namespace CluckWars.Tests
             Assert.IsFalse(_chicken.GetComponentsInChildren<Transform>(true).Any(t => t.name == "EggShell_Whole"));
         }
 
+        private static void Invoke(ChickenShellVisuals shell, string method, params object[] args) =>
+            typeof(ChickenShellVisuals).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(shell, args);
+
+        private static void SetField(ChickenShellVisuals shell, string field, object value) =>
+            typeof(ChickenShellVisuals).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(shell, value);
+
+        private float BlockCrack(string rendererName)
+        {
+            var r = _chicken.transform.Find("EggShell").GetComponentsInChildren<MeshRenderer>(true).Single(x => x.name == rendererName);
+            var block = new MaterialPropertyBlock();
+            r.GetPropertyBlock(block);
+            return block.GetFloat("_Crack");
+        }
+
+        [Test]
+        public void AWalkAfterAnEarlyEndedEgg_ShowsAnUncrackedCup()
+        {
+            // storm_1B_a (F2): an egg ended early snaps the cracks to ShellCrackOnEarlyEnd and pushes them to both renderers
+            // (EnterOpen); the hatch then runs out (GoOff) and the next cast starts a walk. The cup must come back clean.
+            var shell = Wake();
+            SetField(shell, "_crack", FeedbackTuning.ShellCrackOnEarlyEnd);
+            Invoke(shell, "PushBlock");
+            Assert.AreEqual(FeedbackTuning.ShellCrackOnEarlyEnd, BlockCrack("EggShell_Bottom"), 1e-5f, "precondition: the early end cracked the cup");
+
+            Invoke(shell, "GoOff");
+            Assert.AreEqual(0f, BlockCrack("EggShell_Bottom"), 1e-6f, "an Off shell carries no stale cracks");
+            Assert.AreEqual(0f, BlockCrack("EggShell_Top"), 1e-6f);
+
+            // Even if something dirtied the block while off, the walk itself pushes a clean one.
+            SetField(shell, "_crack", 1f);
+            Invoke(shell, "PushBlock");
+            Invoke(shell, "EnterWalk", false);
+            Assert.AreEqual(0f, BlockCrack("EggShell_Bottom"), 1e-6f, "the re-cast walk's cup block has _Crack 0");
+        }
+
+        [Test]
+        public void TheHatchDisc_ScalesWithTheClassLikeTheEgg()
+        {
+            foreach (float classScale in new[] { 0.8f, 1f, 1.2f, 1.5f })
+                Assert.AreEqual(FeedbackTuning.ShellBurstRadius / FeedbackTuning.ShellEggBaseHeight,
+                    ChickenShellVisuals.BurstRadius(classScale) / ChickenShellVisuals.EggWorldHeight(classScale), 1e-5f,
+                    "burst radius / egg height is one constant at class scale " + classScale);
+            Assert.Greater(FeedbackTuning.ShellBurstLift, 0f, "the debris rises off the seam");
+            Assert.Less(FeedbackTuning.ShellBurstGravity, 1f, "a lighter-than-g fall, so it clears the outline first");
+        }
+
         [Test]
         public void ShadowsAreOnlyOnThePcTier()
         {
