@@ -451,7 +451,6 @@ namespace CluckWars.Tests
             Assert.Fail("unbalanced " + signature);
             return string.Empty;
         }
-    }
 
         // ---- E5a (2026-11-08): the Slow row is ability-only, like the pill snail --------------------------
 
@@ -471,4 +470,6 @@ namespace CluckWars.Tests
             Assert.IsTrue(ChickenStatusBadges.ShowSlowRow(aura));
             Assert.IsTrue(SlowRowShown(aura), "an aura or trap slow draws the row on every peer");
         }
+    }
+
 }
