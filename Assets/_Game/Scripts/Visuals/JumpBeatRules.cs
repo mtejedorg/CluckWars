@@ -19,6 +19,21 @@ namespace CluckWars.Visuals
         public static bool EventPathDeduped(float now, float lastSlotEdgeTime) =>
             now - lastSlotEdgeTime < FeedbackTuning.JumpPathDedupeSeconds;
 
+        /// <summary>
+        /// Bystander landing shockwave from the shipped Jump (a dash: its slot edge, not JumpEventId, is the signal). One ring per landing
+        /// edge; not under Reduced Motion (a world ring is emphasis on a move the player made), not while the bird is hidden/faded, and
+        /// not when the teleport event path already armed a ring for this same jump.
+        /// </summary>
+        public static bool SlotLandingShockwave(Edge edge, bool reducedMotion, bool hidden, float now, float lastEventShockTime) =>
+            edge == Edge.Land && !reducedMotion && !hidden && !EventPathDeduped(now, lastEventShockTime);
+
+        /// <summary>
+        /// Shockwave from the teleport-jump event path (JumpTier above None bumps JumpEventId): skipped under Reduced Motion, while
+        /// hidden, or inside the dedupe window of a slot edge (the slot path owns that jump).
+        /// </summary>
+        public static bool EventShockwave(bool reducedMotion, bool hidden, float now, float lastSlotEdgeTime) =>
+            !reducedMotion && !hidden && !EventPathDeduped(now, lastSlotEdgeTime);
+
         /// <summary>Launch dust puffs: 6, or 3 fading in place under Reduced Motion.</summary>
         public static int LaunchDustCount(bool reducedMotion) =>
             reducedMotion ? FeedbackTuning.JumpReducedDustCount : FeedbackTuning.JumpLaunchDustCount;

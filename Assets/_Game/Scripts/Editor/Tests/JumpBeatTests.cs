@@ -171,5 +171,70 @@ namespace CluckWars.Tests
             Assert.AreEqual("Jump", so.DisplayName);
             Assert.AreEqual(CluckWars.Gameplay.JumpLengthTier.None, so.JumpTier, "the shipped Jump is a dash: this is why the slot edge is the trigger");
         }
+
+        // ---- F9: the bystander landing shockwave rides the slot landing edge ----------------------------------------
+
+        private static int CountShockwaves(float dt, bool reduced, bool hidden, bool eventBumpsAtLaunch)
+        {
+            var so = AssetDatabase.LoadAssetAtPath<CluckWars.Abilities.ShadowstepAbilitySO>("Assets/_Game/Data/Abilities/Shadowstep.asset");
+            Assert.IsNotNull(so);
+            float lastEvent = -100f, lastSlotEdge = -100f;
+            bool was = false;
+            int rings = 0;
+            // 0.5 s idle, one dash of the shipped Duration, 1 s idle.
+            for (float t = 0f; t < 0.5f + so.Duration + 1f; t += dt)
+            {
+                bool active = t >= 0.5f && t < 0.5f + so.Duration;
+                if (eventBumpsAtLaunch && active && !was && JumpBeatRules.EventShockwave(reduced, hidden, t, lastSlotEdge))
+                {
+                    lastEvent = t; rings++;   // the delayed event ring, counted at arming
+                }
+                var edge = JumpBeatRules.SlotEdge(was, active);
+                if (JumpBeatRules.SlotLandingShockwave(edge, reduced, hidden, t, lastEvent)) rings++;
+                if (edge != JumpBeatRules.Edge.None) lastSlotEdge = t;
+                was = active;
+            }
+            return rings;
+        }
+
+        [Test]
+        public void LandingShockwave_FiresOncePerShippedJump_At30And60And120Hz()
+        {
+            foreach (float dt in new[] { 1f / 120f, 1f / 60f, 1f / 30f })
+                Assert.AreEqual(1, CountShockwaves(dt, false, false, false), $"one ring per dash at dt={dt}");
+        }
+
+        [Test]
+        public void LandingShockwave_IsNotDoubled_WhenJumpEventIdAlsoBumps()
+        {
+            foreach (float dt in new[] { 1f / 120f, 1f / 60f, 1f / 30f })
+                Assert.AreEqual(1, CountShockwaves(dt, false, false, true), $"event + slot path for one jump = one ring at dt={dt}");
+        }
+
+        [Test]
+        public void LandingShockwave_IsGatedByReducedMotionAndHidden()
+        {
+            Assert.AreEqual(0, CountShockwaves(1f / 60f, true, false, false), "Reduced Motion: no ring");
+            Assert.AreEqual(0, CountShockwaves(1f / 60f, false, true, false), "hidden bird: no ring");
+            Assert.AreEqual(0, CountShockwaves(1f / 60f, true, false, true), "Reduced Motion: neither path rings");
+        }
+
+        [Test]
+        public void LandingShockwave_TwoDashesSeparatedByTheCooldown_RingTwice()
+        {
+            var so = AssetDatabase.LoadAssetAtPath<CluckWars.Abilities.ShadowstepAbilitySO>("Assets/_Game/Data/Abilities/Shadowstep.asset");
+            float gap = so.Cooldown;   // the soonest the next dash can start
+            Assert.Greater(gap + so.Duration, FeedbackTuning.JumpPathDedupeSeconds, "the dedupe window must not swallow back-to-back dashes");
+            Assert.IsFalse(JumpBeatRules.EventShockwave(false, false, 0f, 0f - 0.1f) , "inside the window the slot owns the jump");
+            Assert.IsTrue(JumpBeatRules.EventShockwave(false, false, so.Duration + gap, so.Duration), "a later teleport jump rings");
+        }
+
+        [Test]
+        public void ControlStateVFX_ArmsTheRingFromTheSlotLandingEdge()
+        {
+            var src = System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ControlStateVFX.cs");
+            StringAssert.Contains("JumpBeatRules.SlotLandingShockwave", src);
+            StringAssert.Contains("JumpBeatRules.EventShockwave", src);
+        }
     }
 }

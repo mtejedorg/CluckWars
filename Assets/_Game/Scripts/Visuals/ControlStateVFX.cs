@@ -112,6 +112,8 @@ namespace CluckWars.Visuals
         private bool _wasSpeedActive;
         private bool _wasJumpSlotActive;
         private float _lastSlotHopTime = -100f;
+        private float _lastSlotEdgeTime = -100f;      // last Jump slot launch or landing (shockwave dedupe vs the event path)
+        private float _lastEventShockTime = -100f;    // last ring armed by the teleport event path
         private bool _wasFaded;
         private bool _wasShellActive;
         private bool _inEgg;
@@ -189,10 +191,18 @@ namespace CluckWars.Visuals
 
             if (speed && !_wasSpeedActive) SelfPop(UiKeys.HudPopFast, AccentKey.Speed, ChickenStatusBadges.Badge.Speed);
             // HOP! for the shipped Jump (a dash with no JumpEventId): the rising edge of its slot. The event path skips inside the dedupe window.
-            if (JumpBeatRules.SlotEdge(_wasJumpSlotActive, jump) == JumpBeatRules.Edge.Launch)
+            var jumpEdge = JumpBeatRules.SlotEdge(_wasJumpSlotActive, jump);
+            if (jumpEdge == JumpBeatRules.Edge.Launch)
             {
                 _lastSlotHopTime = Time.time;
                 SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
+            }
+            if (jumpEdge != JumpBeatRules.Edge.None)
+            {
+                // The landing ring for the shipped dash (no JumpEventId): once per landing, every peer, the body is already there (no settle delay).
+                if (JumpBeatRules.SlotLandingShockwave(jumpEdge, PlayerPreferences.ReducedMotionEnabled, faded, Time.time, _lastEventShockTime))
+                    _knockTimer = 0f;
+                _lastSlotEdgeTime = Time.time;
             }
             _wasJumpSlotActive = jump;
             if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide, ChickenStatusBadges.Badge.Hidden);
@@ -529,8 +539,10 @@ namespace CluckWars.Visuals
             _lastJumpEventId = id;
             // HOP! is a word, not motion, so it is not gated by Reduced Motion (owner's screen only).
             if (!JumpBeatRules.EventPathDeduped(Time.time, _lastSlotHopTime)) SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
-            if (PlayerPreferences.ReducedMotionEnabled) return;
+            bool hidden = IsFadedOpacity(_controller.VisualOpacity);
+            if (!JumpBeatRules.EventShockwave(PlayerPreferences.ReducedMotionEnabled, hidden, Time.time, _lastSlotEdgeTime)) return;
 
+            _lastEventShockTime = Time.time;
             _jumpImpactDelay = FeedbackTuning.JumpTravelSettleSeconds;
         }
 
