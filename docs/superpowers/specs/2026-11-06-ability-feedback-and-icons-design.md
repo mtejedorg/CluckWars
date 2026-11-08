@@ -201,6 +201,7 @@ Maestro's answers on the review page: `d1 later d2a d3a d4b d5b d6a d7b d8b`.
 | E2 who owns the number (2026-11-08) | **a.** The badge row owns the countdown (STUN 1.5s, STUCK 1.2s, refreshed per tenth); pops are words only (STUN, SLOW, STUCK, no seconds, no %). The caster hex digit keeps its ceil-tenths. | Supersedes the SLOW 45% magnitude pop; the snail + cyan carry the slow state. |
 | E3 one glyph per state (2026-11-08) | **a.** The nameplate snail shows only when no Slow badge row is visible for that bird, and never for pile or bump drag. | ChickenNameplate.StateIcon reads the badge stack. |
 | E4 rivals and a robbery (2026-11-08) | **a.** Rivals keep the bare -n at the robbed victim (it is the victim cargo change); ROB -n stays on the victim own screen. D7b is about self-pops only. | No change. |
+| E5 Slow row for pile drag (2026-11-08) | **a.** The Slow badge row, like the pill snail, shows only for ability slows (the replicated Snared bit); pile and bump drag draw no row on any peer. | ChickenStatusBadges.ShowSlowRow. |
 
 ## 10. Implementation order (after sign-off)
 

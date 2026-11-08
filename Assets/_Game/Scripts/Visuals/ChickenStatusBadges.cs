@@ -107,8 +107,8 @@ namespace CluckWars.Visuals
         /// <summary>
         /// Threshold below which <c>SlowMultiplier</c> is treated as a real, printable
         /// magnitude. Note this is *not* the presence test — presence comes from the
-        /// replicated <c>ControlVfx.Slowed</c> bit, which <c>ChickenController</c> raises
-        /// at &lt; 0.92. This is only "is the local value meaningful enough to print",
+        /// replicated <c>ControlVfx.Snared</c> bit (<see cref="ShowSlowRow"/>, E5a; the plain
+        /// <c>Slowed</c> bit that pile drag raises draws no row). This is only "is the local value meaningful enough to print",
         /// which is why it sits at the floating-point noise floor instead: a peer without
         /// state authority reads exactly 1 and must print nothing.
         /// </summary>
@@ -382,6 +382,13 @@ namespace CluckWars.Visuals
         /// bird and its replicated <c>VisualOpacity</c> reads as faded. A remote peer never builds it (and
         /// never sees the bird's badges at all, A1).
         /// </summary>
+        /// <summary>
+        /// E5a (2026-11-08): the Slow row, like the pill snail (E3a), shows only for a slow with enemy agency
+        /// behind it: the replicated <c>ControlVfx.Snared</c> bit (aura, trap). Pile drag and bump drag raise
+        /// <c>Slowed</c> alone and are ambient: no row, on any peer.
+        /// </summary>
+        public static bool ShowSlowRow(ControlVfx flags) => (flags & ControlVfx.Snared) != 0;
+
         public static bool ShowHiddenRow(bool isLocal, float visualOpacity) =>
             isLocal && ControlStateVFX.IsFadedOpacity(visualOpacity);
 
@@ -445,7 +452,7 @@ namespace CluckWars.Visuals
             bool immune = _controller.IsControlImmune;
 
             int n = Collect((flags & ControlVfx.Stunned) != 0, (flags & ControlVfx.Rooted) != 0,
-                            (flags & ControlVfx.Slowed) != 0, shell, immune,
+                            ShowSlowRow(flags), shell, immune,
                             ShowHiddenRow(_controller.HasInputAuthority, _controller.VisualOpacity), speeding, _active);
 
             for (int i = 0; i < n; i++)

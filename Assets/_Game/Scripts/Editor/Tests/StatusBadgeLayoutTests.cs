@@ -386,7 +386,7 @@ namespace CluckWars.Tests
         private static bool SlowRowShown(ControlVfx flags, bool stunned = false, bool shell = false, bool hiddenRow = false)
         {
             var active = new ChickenStatusBadges.Badge[FeedbackTuning.StatusBadgeMaxRows];
-            int n = ChickenStatusBadges.Collect(stunned, false, (flags & ControlVfx.Slowed) != 0, shell, false, hiddenRow, false, active);
+            int n = ChickenStatusBadges.Collect(stunned, false, ChickenStatusBadges.ShowSlowRow(flags), shell, false, hiddenRow, false, active);
             return ChickenStatusBadges.IsRowShown(active, n, ChickenStatusBadges.Badge.Slow);
         }
 
@@ -452,4 +452,23 @@ namespace CluckWars.Tests
             return string.Empty;
         }
     }
+
+        // ---- E5a (2026-11-08): the Slow row is ability-only, like the pill snail --------------------------
+
+        [Test]
+        public void PileDrag_RaisesSlowedWithoutSnared_AndDrawsNoSlowRow_AndNoPillSnail()
+        {
+            var pileDrag = ControlVfx.Slowed;
+            Assert.IsFalse(ChickenStatusBadges.ShowSlowRow(pileDrag), "pile and bump drag are ambient: no row");
+            Assert.IsFalse(SlowRowShown(pileDrag), "Collect must not add a Slow row for a bare Slowed bit");
+            Assert.IsFalse(ChickenNameplate.ShowsPillSnail(pileDrag, slowRowShown: false), "and the pill stays bare too (E3a)");
+        }
+
+        [Test]
+        public void AbilitySlow_RaisesSnared_AndDrawsTheSlowRow()
+        {
+            var aura = ControlVfx.Slowed | ControlVfx.Snared;
+            Assert.IsTrue(ChickenStatusBadges.ShowSlowRow(aura));
+            Assert.IsTrue(SlowRowShown(aura), "an aura or trap slow draws the row on every peer");
+        }
 }
