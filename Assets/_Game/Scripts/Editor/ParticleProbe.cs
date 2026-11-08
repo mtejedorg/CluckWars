@@ -24,6 +24,10 @@ namespace CluckWars.EditorTools
         private static int _systemsPerChickenMax;
         private static int _sceneTotalPeak;
         private static string _peakChicken = "";
+        private static int _pileKernelPeak;
+        private static int _chunkMoversPeak;
+        private static int _arenaExclPilesPeak;
+        private static string _perChickenBreakdown = "";
         private static readonly List<ParticleSystem> Scratch = new List<ParticleSystem>(16);
 
         /// <summary>Starts a fresh window named <paramref name="tag"/> (replaces any open one).</summary>
@@ -35,6 +39,10 @@ namespace CluckWars.EditorTools
             _systemsPerChickenMax = 0;
             _sceneTotalPeak = 0;
             _peakChicken = "";
+            _pileKernelPeak = 0;
+            _chunkMoversPeak = 0;
+            _arenaExclPilesPeak = 0;
+            _perChickenBreakdown = "";
             if (!_active)
             {
                 _active = true;
@@ -52,8 +60,20 @@ namespace CluckWars.EditorTools
                 EditorApplication.update -= Sample;
             }
             return string.Format(CultureInfo.InvariantCulture,
-                "perChickenPeak={0} peakChicken={1} systemsPerChickenMax={2} sceneTotalPeak={3} samples={4}",
-                _perChickenPeak, _peakChicken, _systemsPerChickenMax, _sceneTotalPeak, _samples);
+                "perChickenPeak={0} peakChicken={1} systemsPerChickenMax={2} sceneTotalPeak={3} samples={4} pileKernelPeak={5} stealMoversPeak={6} sceneExclPileKernelPeak={7} peakChickenSystems=[{8}]",
+                _perChickenPeak, _peakChicken, _systemsPerChickenMax, _sceneTotalPeak, _samples, _pileKernelPeak, _chunkMoversPeak, _arenaExclPilesPeak, _perChickenBreakdown);
+        }
+
+        /// <summary>The system names and live counts of the chicken currently held in <see cref="Scratch"/>, for the peak line.</summary>
+        private static string Breakdown()
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int k = 0; k < Scratch.Count; k++)
+            {
+                if (k > 0) sb.Append(' ');
+                sb.Append(Scratch[k].name).Append('=').Append(Scratch[k].particleCount);
+            }
+            return sb.ToString();
         }
 
         private static void Sample()
@@ -74,13 +94,23 @@ namespace CluckWars.EditorTools
                 {
                     _perChickenPeak = live;
                     _peakChicken = c.name;
+                    _perChickenBreakdown = Breakdown();
                 }
             }
 
-            int total = 0;
+            int total = 0, kernels = 0;
             var all = Object.FindObjectsByType<ParticleSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < all.Length; i++) total += all[i].particleCount;
+            for (int i = 0; i < all.Length; i++)
+            {
+                int n = all[i].particleCount;
+                total += n;
+                if (all[i].name == "VFX_PileKernel") kernels += n;
+            }
             if (total > _sceneTotalPeak) _sceneTotalPeak = total;
+            if (kernels > _pileKernelPeak) _pileKernelPeak = kernels;
+            if (total - kernels > _arenaExclPilesPeak) _arenaExclPilesPeak = total - kernels;
+            int movers = CluckWars.Visuals.FoodChunkFlight.LiveCount;
+            if (movers > _chunkMoversPeak) _chunkMoversPeak = movers;
         }
     }
 }

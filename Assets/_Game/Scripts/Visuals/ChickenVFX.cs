@@ -694,6 +694,8 @@ namespace CluckWars.Visuals
             {
                 var edge = _speedEdge;
                 edge.Color = speedSO.AccentColor;
+                edge.Count = SpeedBodyCueRules.EdgeSparkleCount(reduced);
+                if (reduced) edge.SpeedMin = edge.SpeedMax = 0f;
                 EmitSparkles(in edge, 0.1f);
             }
             _wasSpeedActive = active;
@@ -845,6 +847,8 @@ namespace CluckWars.Visuals
             int dots = JumpBeatRules.ArcDotCount(reduced);
             Vector3 chord = landing - launch; chord.y = 0f;
             if (dots <= 0 || !JumpBeatRules.DrawsArc(chord.magnitude) || _sparklePS == null) return;
+            dots = Mathf.Min(dots, EmitRoom());
+            if (dots <= 0) return;
             Color accent = FeedbackPalette.Current.Accent(AccentKey.Jump);
             _ep.applyShapeToPosition = false;
             _ep.velocity = Vector3.zero;
@@ -861,7 +865,7 @@ namespace CluckWars.Visuals
 
         private void EmitStreak(Vector3 rootPos, Vector3 moveDir, Color color)
         {
-            if (_streakPS == null) return;
+            if (_streakPS == null || EmitRoom() <= 0) return;
             Vector3 right = new Vector3(moveDir.z, 0f, -moveDir.x);
             Vector3 p = rootPos - moveDir * (FeedbackTuning.SpeedStreakTailOffset + Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAlong)
                         + right * (Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAcross);
@@ -924,11 +928,34 @@ namespace CluckWars.Visuals
         public void EmitFeathersAt(in FxEmit e, Vector3 world) => Emit(_featherPS, in e, world);
         public void EmitSparklesAt(in FxEmit e, Vector3 world) => Emit(_sparklePS, in e, world);
 
+        private SlowAuraFeedback _auraFeedback;
+        private bool _auraLookedUp;
+
+        /// <summary>
+        /// Live particles across all six systems of this bird: the five families plus the Slow aura feather system (D12). Six native
+        /// reads, called once per emission (not per particle), no allocation.
+        /// </summary>
+        public int LiveParticles()
+        {
+            int n = (_dustPS != null ? _dustPS.particleCount : 0) + (_featherPS != null ? _featherPS.particleCount : 0)
+                  + (_sparklePS != null ? _sparklePS.particleCount : 0) + (_shardPS != null ? _shardPS.particleCount : 0)
+                  + (_streakPS != null ? _streakPS.particleCount : 0);
+            if (!_auraLookedUp) { _auraLookedUp = true; _auraFeedback = GetComponent<SlowAuraFeedback>(); }
+            var aura = _auraFeedback != null ? _auraFeedback.FeatherSystem : null;
+            return n + (aura != null ? aura.particleCount : 0);
+        }
+
+        /// <summary>Particles this bird may still add before the per-chicken cap (minus the aura headroom). Never negative.</summary>
+        public int EmitRoom() =>
+            Mathf.Max(0, FeedbackTuning.ParticlesPerChickenCap - FeedbackTuning.ParticleBudgetMargin - LiveParticles());
+
         private void Emit(ParticleSystem ps, in FxEmit e, Vector3 world)
         {
             if (ps == null || e.Count <= 0) return;
+            int count = Mathf.Min(e.Count, EmitRoom());   // the per-chicken cap: late emissions clip, they never push the bird over 64
+            if (count <= 0) return;
             _ep.applyShapeToPosition = false;
-            for (int i = 0; i < e.Count; i++)
+            for (int i = 0; i < count; i++)
             {
                 float life = Random.Range(e.LifeMin, e.LifeMax);
                 Vector3 offset, dir;

@@ -136,6 +136,40 @@ namespace CluckWars.Tests
             Assert.AreEqual(64, total, "the five families are pinned to the 64 per-chicken cap (12+12+20+3+17)");
         }
 
+        private static ChickenVFX.FxEmit Burst(int count) => new ChickenVFX.FxEmit
+        {
+            Count = count, Color = Color.white, SizeMin = 0.2f, SizeMax = 0.2f, LifeMin = 30f, LifeMax = 30f,
+            Shape = ChickenVFX.FxShape.Disc, Radius = 0.2f, SpeedMin = 0f, SpeedMax = 0f,
+        };
+
+        [Test]
+        public void TheEmissionGuard_ClipsLateBursts_SoABirdNeverPassesTheChickenCap()
+        {
+            // D12: the cast-storm census peaked at 75 live on one bird (families 12+12+20+3+17 = 64 before the Slow aura adds its
+            // own 16..24). The guard counts all six systems and clips the burst that would cross the cap.
+            var vfx = _chicken.GetComponent<ChickenVFX>();
+            var aura = _chicken.GetComponent<SlowAuraFeedback>().FeatherSystem;
+            Assert.IsNotNull(aura, "aura system not built");
+
+            Assert.AreEqual(FeedbackTuning.ParticlesPerChickenCap - FeedbackTuning.ParticleBudgetMargin, vfx.EmitRoom(), "an empty bird has the whole budget");
+            vfx.EmitDust(Burst(8), 0.5f);
+            Assert.AreEqual(8, vfx.LiveParticles(), "an unsaturated bird is never clipped");
+
+            aura.Emit(FeedbackTuning.SlowAuraFeatherMaxParticles);
+            for (int i = 0; i < 6; i++)
+            {
+                vfx.EmitDust(Burst(12), 0.5f);
+                vfx.EmitFeathers(Burst(12), 0.5f);
+                vfx.EmitSparkles(Burst(20), 0.5f);
+                vfx.EmitSparkles(Burst(20), 0.5f);
+            }
+            Assert.LessOrEqual(vfx.LiveParticles(), FeedbackTuning.ParticlesPerChickenCap, "live particles on one bird");
+            Assert.AreEqual(0, vfx.EmitRoom(), "the storm used the whole budget");
+            int before = vfx.LiveParticles();
+            vfx.EmitSparkles(Burst(6), 0.5f);
+            Assert.AreEqual(before, vfx.LiveParticles(), "a burst at the cap is dropped, not squeezed in");
+        }
+
         [Test]
         public void TheStunOrbitSystem_IsGone()
         {

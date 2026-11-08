@@ -18,6 +18,10 @@ namespace CluckWars.Visuals
         public static float DustPerMetre(bool reducedMotion) =>
             reducedMotion ? FeedbackTuning.SpeedDustPerMetreReduced : FeedbackTuning.SpeedDustPerMetre;
 
+        /// <summary>Active-edge sparkle count: halved, and fading in place (no outward speed), under Reduced Motion.</summary>
+        public static int EdgeSparkleCount(bool reducedMotion) =>
+            reducedMotion ? FeedbackTuning.SpeedEdgeSparkleCountReduced : FeedbackTuning.SpeedEdgeSparkleCount;
+
         /// <summary>Adds <paramref name="metres"/> x <paramref name="perMetre"/> to the accumulator and returns the whole
         /// particles earned (the remainder stays in the accumulator).</summary>
         public static int Take(ref float accumulator, float metres, float perMetre)

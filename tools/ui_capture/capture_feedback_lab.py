@@ -2,6 +2,8 @@
 screenshots hold / cast / impact / aftermath for every active ability and state.
 
 Usage (Editor open, bridge up, not in Play mode): python tools/ui_capture/capture_feedback_lab.py [out_dir] [--only a,b]
+  --storm                       D12 cast-storm census instead of the per-ability shots: stacks every effect on the local bird while
+                                the probe samples; writes <out_dir>/particles_storm.txt (see storm()).
   --only <ability>[,<ability>]  runs only those abilities' shots plus the 00_rest frame. Names: steal, stun, shove, slow
                                 (loadout A), speed, jump, shield, hide (loadout B), peck (C), hunt (D, Assassin).
                                 Without the flag the whole run is unchanged.
@@ -25,6 +27,11 @@ if "--only" in _args:
     if _bad:
         sys.exit("unknown --only ability: " + ",".join(sorted(_bad)))
     del _args[_i:_i + 2]
+
+
+STORM = "--storm" in _args
+if STORM:
+    _args.remove("--storm")
 
 
 def want(*names):
@@ -69,6 +76,7 @@ public class FB {
   static FoodPile NearestPile() { var l = Local(); return FoodPile.ActivePiles.Where(p => p != null && p.Object != null && p.Object.IsValid).OrderBy(p => p.DistanceToSurface(l.transform.position)).FirstOrDefault(); }
   public static string Park() { var l = Local(); var pile = NearestPile(); if (l == null || pile == null) return "no pile"; var pos = pile.SurfaceApproachPoint(l.transform.position, 0.4f); pos.y = l.transform.position.y; typeof(ChickenController).GetMethod("QueueTeleport", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(l, new object[] { pos }); return "park -> " + pos.ToString("0.00") + " pile " + pile.transform.position.ToString("0.00"); }
   public static string FacePile() { var l = Local(); var pile = NearestPile(); if (l == null || pile == null) return "no pile"; l.FaceNow(pile.transform.position - l.transform.position); return "face reach=" + pile.IsWithinCollectRange(l.transform.position) + " dist=" + pile.DistanceToSurface(l.transform.position).ToString("0.00") + " amount=" + pile.Amount.ToString("0.0"); }
+  public static string NearDummy() { var l = Local(); var d = Others().OrderBy(c => Vector3.Distance(c.transform.position, l.transform.position)).FirstOrDefault(); if (l == null || d == null) return "no dummy"; var dir = (l.transform.position - d.transform.position); dir.y = 0f; dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector3.right; var pos = d.transform.position + dir * 1.6f; pos.y = l.transform.position.y; typeof(ChickenController).GetMethod("QueueTeleport", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(l, new object[] { pos }); l.FaceNow(d.transform.position - pos); return "near dummy -> " + pos.ToString("0.00"); }
   public static string PeckProbeBegin() { return CluckWars.EditorTools.PeckEdgeProbe.Begin(); }
   public static string PeckProbeEnd() { return CluckWars.EditorTools.PeckEdgeProbe.End(); }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
@@ -181,6 +189,59 @@ def stun_then_slow(tag):
     time.sleep(1.5)
 
 
+def storm():
+    """D12 cast-storm census (PC tier): the local bird casts as many effects as it can in a short window while the dummies take the
+    hits, with the particle probe sampling every Editor update. Wave 1 stacks Speed + Slow aura + Steal + Stun while running; wave 2
+    stacks Shove + Jump + Egg Shell (hatch) + Peck at the pile; every wave runs 3 rounds of 3 bursts. Peaks go to
+    <out_dir>/particles_storm.txt. Run with the Reduced Motion preference OFF (the worst case); nothing is shot but a few frames."""
+    waves = [
+        ("A", ("SpeedBurst", "FeatherAura", "Snatch", "WingSlam"), False),
+        ("B", ("CluckShock", "Shadowstep", "TurtleMode", "Peck"), True),
+        ("C", ("SpeedBurst", "FeatherAura", "CluckShock", "Shadowstep"), False),   # Speed + Slow + Shove + Jump on one bird
+        ("D", ("Snatch", "FeatherAura", "CluckShock", "SpeedBurst"), False),       # Steal + Slow + Shove + Speed on one bird
+    ]
+    probe_begin("storm")
+    cs("TimeScale", "1")
+    for rnd in range(3):
+        for name, kit, at_pile in waves:
+            log("== storm round", rnd, "wave", name)
+            log(" ", cs("Loadout", *kit))
+            time.sleep(1.0)
+            log(" ", cs("ResetDummies"))
+            if at_pile:
+                for attempt in range(4):
+                    log(" ", cs("Park"))
+                    time.sleep(1.0)
+                    if "reach=True" in str(cs("FacePile")):
+                        break
+            for burst in range(3):
+                log(" ", cs("ClearCooldowns"))
+                if not at_pile:
+                    log(" ", cs("NearDummy"))   # the dummies stand still, far from where the bird ends up: bring it into reach each burst
+                    time.sleep(0.5)
+                for slot in range(4):
+                    # Real press path (touch HUD): the bots activation refuses while another cast is resolving. Pace the
+                    # bird back and forth so the Speed cue runs and the dummies stay in reach.
+                    cs("Stick", "1" if (burst + slot) % 2 == 0 else "-1", "0")
+                    cs("Hold", str(slot))
+                    time.sleep(0.25)
+                    cs("Release", str(slot))
+                    time.sleep(0.1)
+                if burst == 0:
+                    shot("storm_%d%s_a" % (rnd, name))
+                time.sleep(0.5)
+                if burst == 1:
+                    shot("storm_%d%s_b" % (rnd, name))
+            cs("Stick", "0", "0")
+            time.sleep(3.2 if at_pile else 1.0)   # let the egg hatch (3 s) / the aura feathers finish
+    PEAKS["storm"] = str(cs("ProbeEnd", "storm"))
+    log("  particles storm |", PEAKS["storm"])
+    with open(os.path.join(OUT, "particles_storm.txt"), "w", encoding="utf-8") as f:
+        f.write("# cast-storm peaks, PC tier, Reduced Motion off (ParticleSystem.particleCount sampled every Editor update)\n")
+        f.write("# caps: <= 64 live and <= 7 ParticleSystems per chicken, <= 400 arena (FeedbackTuning); steal sprite movers and the pile kernel system are listed separately\n")
+        f.write("storm: " + PEAKS["storm"] + "\n")
+
+
 def wait_player(cls):
     for _ in range(60):
         s = str(cs("State"))
@@ -207,6 +268,10 @@ def main():
     log("ready:", cs("State"))
     time.sleep(3)
     shot("00_rest")
+    if STORM:
+        storm()
+        log("done:", cs("Info"))
+        return
     # Loadout A: the four targeted moves (every rival in range)
     if want("steal", "stun", "shove", "slow"):
         log(cs("Loadout", "Snatch", "WingSlam", "CluckShock", "FeatherAura"))

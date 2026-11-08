@@ -1575,6 +1575,8 @@ namespace CluckWars.Visuals
         public const float SpeedDustAlpha = 0.5f;
         /// <summary>Active edge: accent sparkles at the feet ("go!").</summary>
         public const int SpeedEdgeSparkleCount = 6;
+        /// <summary>Reduced Motion: half the active-edge sparkles, fading in place.</summary>
+        public const int SpeedEdgeSparkleCountReduced = 3;
         public const float SpeedEdgeSparkleLifeSeconds = 0.20f;
         /// <summary>Extra forward pitch while the cue runs (the animator lean saturates at the base MoveSpeed, so a 1.3x burst adds none).</summary>
         public const float SpeedLeanExtraDegrees = 6f;
@@ -1844,6 +1846,14 @@ namespace CluckWars.Visuals
 
         /// <summary>Hard cap on live particles per chicken at the worst coincidence.</summary>
         public const int ParticlesPerChickenCap = 64;
+
+        /// <summary>
+        /// Headroom the per-chicken emission guard (<c>ChickenVFX.EmitRoom</c>) keeps under <see cref="ParticlesPerChickenCap"/> for the one
+        /// emitter it cannot throttle, the rate-driven Slow aura feather system (10/s, so at most a particle or two lands between guard
+        /// checks). D12: the cast-storm census peaked at 75 live on one bird (Speed + Slow aura + Shove + Jump, every family saturated)
+        /// because the five families already sum to 64 before the aura adds its steady 16; the guard clips late emissions instead.
+        /// </summary>
+        public const int ParticleBudgetMargin = 2;
 
         /// <summary>Hard cap on live particles across the arena (4 birds, piles, the Slow aura, egg opens).</summary>
         public const int ParticlesPerArenaCap = 400;

@@ -302,7 +302,7 @@ namespace CluckWars.Visuals
             if (!f.Visible) return;
 
             _starRoot.localPosition = new Vector3(0f, _starHeight + _headLift + f.OffsetY, 0f);
-            if (f.Orbit) _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
+            if (f.Orbit && !PlayerPreferences.ReducedMotionEnabled) _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
             ApplyStars(f.Scale, f.Alpha);
             FaceStars(!f.Orbit);
         }

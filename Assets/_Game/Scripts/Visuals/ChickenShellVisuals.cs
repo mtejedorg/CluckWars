@@ -143,6 +143,10 @@ namespace CluckWars.Visuals
         private Phase _prevPhase;
         private bool _seeded;
         private bool _reduced;
+
+        /// <summary>The live preference, for the CONTINUOUS motion (waddle, idle wobble/breath, heel dust): a mid-match toggle takes effect on
+        /// the next frame. The per-state transition variants stay latched in <c>_reduced</c> at their edge so one close/open never mixes both.</summary>
+        private static bool Reduced => PlayerPreferences.ReducedMotionEnabled;
         private bool _built;
         private bool _warned;
 
@@ -545,7 +549,7 @@ namespace CluckWars.Visuals
             _waddleBlend = Mathf.MoveTowards(_waddleBlend, waddleTarget, dt * rate);
             if (_animator != null)
             {
-                float deg = _reduced ? FeedbackTuning.ShellWaddleReducedDegrees : FeedbackTuning.ShellWaddleDegrees;
+                float deg = Reduced ? FeedbackTuning.ShellWaddleReducedDegrees : FeedbackTuning.ShellWaddleDegrees;
                 _animator.ExtraRollDegrees = _waddleBlend > 0f
                     ? deg * Mathf.Sin(2f * Mathf.PI * FeedbackTuning.ShellWaddleHz * Time.time) * _waddleBlend
                     : 0f;
@@ -590,7 +594,7 @@ namespace CluckWars.Visuals
             _cupRise = 1f; _capSeatFactor = 1f; _squash = Vector3.one; _uniform = 1f;
             bool jitter = remaining > 0f && remaining <= FeedbackTuning.ShellJitterSeconds;
             float t = Time.time;
-            if (_reduced)
+            if (Reduced)
             {
                 // Cracks only; the stripe pulses alpha 1 -> 0.6 at 2 Hz over the last 0.3 s instead of any motion.
                 _rootRoll = 0f; _breath = 1f;
@@ -709,7 +713,7 @@ namespace CluckWars.Visuals
             float step = d.magnitude;
             if (step > 1.5f) return;                            // a teleport, not a walk
             _dustDist += step;
-            float spacing = 1f / (FeedbackTuning.ShellWalkDustPerMeter * (_reduced ? 0.5f : 1f));
+            float spacing = 1f / (FeedbackTuning.ShellWalkDustPerMeter * (Reduced ? 0.5f : 1f));
             while (_dustDist >= spacing)
             {
                 _dustDist -= spacing;
