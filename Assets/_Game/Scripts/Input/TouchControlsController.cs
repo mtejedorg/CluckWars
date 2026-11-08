@@ -378,6 +378,9 @@ namespace CluckWars.Input
 
         private void TryBind()
         {
+            // A duplicate controller (Awake returned before allocating the row arrays and scheduled its own
+            // Destroy) still gets OnEnable and a frame of Update: binding it threw every frame (BL-134).
+            if (Instance != null && Instance != this) return;
             var doc = GetComponent<UIDocument>();
             _root = doc != null ? doc.rootVisualElement : null;
             if (_root == null) return;
@@ -798,6 +801,7 @@ namespace CluckWars.Input
 
         private void Update()
         {
+            if (Instance != null && Instance != this) return;
             if (!_bound)
             {
                 TryBind();
