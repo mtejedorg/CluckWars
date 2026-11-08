@@ -71,6 +71,24 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EveryStateGlyph_HasStrokesThatSurviveA9pxOpen()
+        {
+            // Same stroke contract as the ability icons: a 9 px open at 256 keeps >= 90 % of the ink, so the
+            // outline matches the kept set and no hairline detail disappears on a 24-40 px badge.
+            var problems = new List<string>();
+            foreach (var s in States)
+            {
+                string path = StateGlyphStyle.SpritePathFor(s);
+                if (!path.StartsWith(StateGlyphStyle.GlyphFolder)) continue;   // Marked reuses the shipped skull
+                var m = IconStrokeMetrics.Load(path);
+                if (m == null) { problems.Add($"{path}: not a readable PNG"); continue; }
+                float kept = IconStrokeMetrics.InkKeptByOpen(m);
+                if (kept < 0.90f) problems.Add($"{path}: a 9 px open keeps {kept:P0} of the ink");
+            }
+            Assert.IsEmpty(problems, "Glyph ink strokes too thin for the locked icon style:\n" + string.Join("\n", problems));
+        }
+
+        [Test]
         public void EveryUssClass_IsUniqueAndWellFormed()
         {
             var classes = States.Select(StateGlyphStyle.UssClassFor).ToList();

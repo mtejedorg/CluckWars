@@ -101,6 +101,36 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EveryIcon_HasStrokesThatSurviveA9pxOpen()
+        {
+            // The kept set's outline is ~17 px with no hairlines; the 2026-11-07 redraws shipped 5-7 px
+            // outlines and 2 px details that vanished on a 48 px hex. A 9 px open at 256 must keep >= 90 %
+            // of the ink (kept set: 0.91-1.00).
+            var problems = new List<string>();
+            foreach (var typeName in AbilityIconStyle.Entries.Keys)
+            {
+                string path = AbilityIconStyle.SpriteFileFor(typeName);
+                var m = IconStrokeMetrics.Load(path);
+                if (m == null) { problems.Add($"{path}: not a readable PNG"); continue; }
+                float kept = IconStrokeMetrics.InkKeptByOpen(m);
+                if (kept < 0.90f) problems.Add($"{path}: a 9 px open keeps {kept:P0} of the ink");
+            }
+            Assert.IsEmpty(problems, "Ink strokes too thin for the locked icon style:\n" + string.Join("\n", problems));
+        }
+
+        [Test]
+        public void JumpIcon_HasNoTrailingSpeedDashes()
+        {
+            // Spec A6: the Jump icon is a bird over one solid arc. Trailing dashes made it read as the Speed bolt
+            // or a running bird; three or more thin horizontal bars behind the bird is that picture again.
+            string path = AbilityIconStyle.SpriteFileFor(nameof(ShadowstepAbilitySO));
+            var m = IconStrokeMetrics.Load(path);
+            Assert.IsNotNull(m, $"{path}: not a readable PNG");
+            var bars = IconStrokeMetrics.ThinHorizontalBarsLeftHalf(m);
+            Assert.Less(bars.Count, 3, $"{path} has speed dashes behind the bird:\n" + string.Join("\n", bars));
+        }
+
+        [Test]
         public void IconTextures_AreImportedSmall_OnEveryPlatform()
         {
             const int limit = 512;
