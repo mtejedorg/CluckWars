@@ -9,8 +9,10 @@ Usage (Editor open, bridge up, not in Play mode): python tools/ui_capture/captur
                                 Without the flag the whole run is unchanged.
 Every ability's sequence is also probed for particle counts (CluckWars.EditorTools.ParticleProbe): the peaks per ability,
 per chicken (live particles, ParticleSystem count) and for the whole scene, are written to <out_dir>/particles.txt.
-Note: Fusion tick timers ignore Time.timeScale, so the TimeScale calls only slow the visuals; the
-ability timings in capture.log are real-time. Shoot at timeScale 1 when frame timing matters."""
+Time scale: shots run at Time.timeScale 1 by default. --slowmo sets the per-ability scale to 0.3 (visual slow motion only).
+  --slowmo                      per-ability shots at timeScale 0.3 instead of 1.
+Note: Fusion tick timers ignore Time.timeScale, so --slowmo only slows the visuals; the ability timings in capture.log
+are real-time either way. Shoot at the default timeScale 1 when frame timing matters."""
 import sys, os, time, json
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +34,11 @@ if "--only" in _args:
 STORM = "--storm" in _args
 if STORM:
     _args.remove("--storm")
+
+SLOWMO = "--slowmo" in _args
+if SLOWMO:
+    _args.remove("--slowmo")
+DEFAULT_TS = "0.3" if SLOWMO else "1"   # per-ability Time.timeScale
 
 
 def want(*names):
@@ -135,7 +142,7 @@ def write_particles():
             f.write(tag + ": " + line + "\n")
 
 
-def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts="0.3", hook=None):
+def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts=DEFAULT_TS, hook=None):
     log("==", tag, "slot", slot)
     probe_begin(tag)
     cs("TimeScale", ts)
@@ -299,7 +306,7 @@ def main():
             cs("Stick", "0", "0")
         if want("jump"):
             # The shipped Jump is a 3x dash: it only moves while the stick is held. Hold it through the cast. Launch puffs at the
-            # edge, arc dots + landing dust at the 0.18 s end (0.6 s real at timeScale 0.3).
+            # edge, arc dots + landing dust at the 0.18 s end (a Fusion timer, so 0.18 s real at any timeScale).
             cs("Stick", "-1", "0")
             time.sleep(0.3)
             ability(1, "jump", after=((0.25, "3_impact"), (0.5, "3b_air"), (0.8, "3c_landing"), (1.4, "4_after")))

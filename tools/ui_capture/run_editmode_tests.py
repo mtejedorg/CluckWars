@@ -2,7 +2,10 @@
 
 Usage (Editor open, every scene saved, not in Play mode):
     python tools/ui_capture/run_editmode_tests.py [filter]
-Optional filter = a test class or namespace name (passed as testFilter). Exit code 0 when green.
+Optional filter = a substring of the test full name (class, namespace or method), sent to the bridge as an RQL
+`query` (the bridge's tests-run has no `testFilter` parameter; its own params are testClass/testNamespace/testMethod/query).
+Exit code 0 when green.
+For the FULL suite use run_suite_api.py instead: the bridge tests-run times out at 5 minutes on ~3000 tests.
 """
 import sys, os, json
 sys.stdout.reconfigure(encoding="utf-8")
@@ -11,7 +14,11 @@ import bridge
 
 args = {"testMode": "EditMode"}
 if len(sys.argv) > 1:
-    args["testFilter"] = sys.argv[1]
+    flt = sys.argv[1].replace('"', "")
+    args["query"] = 'tests | where fullName contains "%s" and mode == "EditMode"' % flt
+else:
+    print("hint: this runs through the bridge tests-run, which times out at 5 min on the full suite (~3000 tests); "
+          "use tools/ui_capture/run_suite_api.py for a full run.")
 try:
     bridge.init()
     m = bridge.call("tests-run", args, timeout=1800)
