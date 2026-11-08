@@ -1466,7 +1466,8 @@ namespace CluckWars.Visuals
         /// <summary>Accent sparkles along the chord at the animator's half-sine height (t = 0.1..0.9).</summary>
         public const int JumpArcDotCount = 5;
         public const float JumpArcDotSeconds = 0.25f;
-        public const float JumpArcDotSize = 0.12f;
+        /// <summary>F4: 0.12 to 0.20 (the dots were sub-readable at the play camera).</summary>
+        public const float JumpArcDotSize = 0.20f;
         /// <summary>Body-centre height the arc lift is added to (the dots ride the bird, not the ground).</summary>
         public const float JumpArcDotBaseHeight = 0.4f;
         /// <summary>A jump that moved the model less than this draws no arc dots (a proxy whose pivot already slid).</summary>
@@ -1562,7 +1563,8 @@ namespace CluckWars.Visuals
         public const float SpeedStreakPerMetre = 6f;
         public const float SpeedStreakLifeSeconds = 0.25f;
         public const float SpeedStreakSize = 0.30f;
-        public const float SpeedStreakAlpha = 0.7f;
+        /// <summary>F4: 0.7 to 0.9 so the cream streak (with the Fx_SpeedLine ink edge) reads on the green floor.</summary>
+        public const float SpeedStreakAlpha = 0.9f;
         /// <summary>Streaks spawn between these heights (hip height) in a 0.3 (across) x 0.1 (along) box at the tail.</summary>
         public const float SpeedStreakMinHeight = 0.55f;
         public const float SpeedStreakMaxHeight = 0.80f;
@@ -1598,15 +1600,16 @@ namespace CluckWars.Visuals
         /// <summary>The skid needs more than this planar speed (m/s): the knockback decays under it in about 0.17 s, and a bird merely walking does not skid.</summary>
         public const float ShoveSkidMinSpeed = 4f;
         public const float ShoveSkidPerMetre = 4f;
-        public const float ShoveSkidSizeMin = 0.18f;
-        public const float ShoveSkidSizeMax = 0.24f;
+        /// <summary>F4: x1.3 of the D6 0.18-0.24 so the fainter puff (alpha 0.45) keeps its footprint.</summary>
+        public const float ShoveSkidSizeMin = 0.234f;
+        public const float ShoveSkidSizeMax = 0.312f;
         public const float ShoveSkidLifeSeconds = 0.25f;
         /// <summary>Scatter radius of a puff around the feet path.</summary>
         public const float ShoveSkidScatter = 0.12f;
         /// <summary>Most skid puffs one knockback may emit: with a 0.25 s life and a 0.3 s window this is also the most live at once.</summary>
         public const int ShoveSkidMaxLive = 10;
-        /// <summary>Brown-cream ground dust (vfx.md 2.3), alpha 0.6.</summary>
-        public static readonly Color ShoveSkidColor = new Color(0.85f, 0.75f, 0.55f, 0.6f);
+        /// <summary>Brown-cream ground dust (vfx.md 2.3); F4 alpha 0.6 to 0.45 (the brown read as mud on the green floor).</summary>
+        public static readonly Color ShoveSkidColor = new Color(0.85f, 0.75f, 0.55f, 0.45f);
 
         /// <summary>Caster shock ring: accent sparkles on a circle around the caster, flying outward.</summary>
         public const int ShoveRingCount = 8;
@@ -1767,9 +1770,11 @@ namespace CluckWars.Visuals
         public const float SlowAuraFeatherSpawnHeight = 1.6f;
         public const float SlowAuraFeatherLifeSeconds = 1.6f;
         public const float SlowAuraFeatherGravity = 0.03f;
-        public const float SlowAuraFeatherSizeMin = 0.18f;
-        public const float SlowAuraFeatherSizeMax = 0.26f;
-        public const float SlowAuraFeatherAlpha = 0.8f;
+        /// <summary>F4: feather-fall 0.18-0.26 to 0.30-0.40 and alpha 0.8 to 0.95 (rate and max unchanged). The caster foot puffs keep the
+        /// old size through <see cref="SlowAuraPuffSizeMin"/>.</summary>
+        public const float SlowAuraFeatherSizeMin = 0.30f;
+        public const float SlowAuraFeatherSizeMax = 0.40f;
+        public const float SlowAuraFeatherAlpha = 0.95f;
         public const float SlowAuraFeatherNoiseStrength = 0.3f;
         public const float SlowAuraFeatherNoiseFrequency = 0.4f;
         /// <summary>The aura system's own maxParticles (counted outside the five ChickenVFX families; see ChickenParticleBudgetTests).</summary>
@@ -1792,6 +1797,9 @@ namespace CluckWars.Visuals
         public const float SlowAuraPuffIntervalSeconds = 0.4f;
         public const float SlowAuraPuffLifeSeconds = 0.5f;
         public const float SlowAuraPuffHeight = 0.12f;
+        /// <summary>Caster foot-puff feather size (the pre-F4 feather-fall size; F4 enlarged only the falling feathers).</summary>
+        public const float SlowAuraPuffSizeMin = 0.18f;
+        public const float SlowAuraPuffSizeMax = 0.26f;
 
         // ---- Hide beats (D9, vfx.md 2.8) ------------------------------------------------------------
 

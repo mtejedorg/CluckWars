@@ -32,6 +32,21 @@ namespace CluckWars.Visuals
             return n;
         }
 
+        /// <summary>What one earned streak does (F4).</summary>
+        public enum StreakSlot { Emit, Recycle, Skip }
+
+        /// <summary>
+        /// F4: a streak earned while the Streak family is full (or the bird has no room left under its per-chicken cap) takes over the
+        /// oldest live streak instead of being dropped, so the wind lines always ride the bird and never pile up at the start of a
+        /// sprint. Recycling never changes the live count, so the family cap and the per-chicken cap hold. Skip only when there is
+        /// nothing to recycle and no room.
+        /// </summary>
+        public static StreakSlot StreakAction(int streaksLive, int streakCap, int chickenRoom)
+        {
+            if (streaksLive < streakCap && chickenRoom > 0) return StreakSlot.Emit;
+            return streaksLive > 0 ? StreakSlot.Recycle : StreakSlot.Skip;
+        }
+
         /// <summary>The planar distance of one frame, clamped so a teleport emits a bounded burst.</summary>
         public static float StepMetres(float planarDelta) => planarDelta > FeedbackTuning.SpeedCueMaxStepMetres
             ? FeedbackTuning.SpeedCueMaxStepMetres : planarDelta;

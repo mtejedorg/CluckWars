@@ -109,6 +109,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void FeatherFall_IsTheF4SizeAndAlpha_WithRateAndCapUnchanged()
+        {
+            Assert.AreEqual(0.30f, FeedbackTuning.SlowAuraFeatherSizeMin, "F4 feather-fall size min");
+            Assert.AreEqual(0.40f, FeedbackTuning.SlowAuraFeatherSizeMax, "F4 feather-fall size max");
+            Assert.AreEqual(0.95f, FeedbackTuning.SlowAuraFeatherAlpha, "F4 feather-fall alpha");
+            Assert.AreEqual(0.95f, FeedbackTuning.SlowAuraFeatherColor.a, 1e-5f, "the feather colour carries the alpha");
+            Assert.AreEqual(10f, FeedbackTuning.SlowAuraFeatherRate, "rate unchanged");
+            Assert.AreEqual(24, FeedbackTuning.SlowAuraFeatherMaxParticles, "max unchanged");
+            Assert.Less(FeedbackTuning.SlowAuraPuffSizeMax, FeedbackTuning.SlowAuraFeatherSizeMin, "the caster foot puffs keep their smaller size");
+        }
+
+        [Test]
         public void TheCasterWorstCoincidence_StaysWithinTheChickenCap()
         {
             // The aura system is counted outside the five ChickenVFX families, so the per-chicken live peak is proven from the
@@ -230,7 +242,7 @@ namespace CluckWars.Tests
         public void TheFeatherColour_IsALavenderTintedCream()
         {
             Color c = FeedbackTuning.SlowAuraFeatherColor;
-            Assert.AreEqual(0.8f, c.a, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.SlowAuraFeatherAlpha, c.a, 1e-5f, "the colour carries the feather alpha (F4 0.95)");
             Assert.Greater(c.b, c.g, "pulled toward the Slow accent (blue above green)");
             Assert.Greater(c.r, 0.75f, "still a cream, not a saturated purple");
         }

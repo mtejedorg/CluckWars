@@ -130,7 +130,8 @@ namespace CluckWars.Visuals
         /// Streak family cap (the Speed wind lines): 6 per metre x 0.25 s lifetime is 20 live at the boosted Warrior's 13 m/s
         /// and 24 at the boosted Speedy, so 17 thins the very fastest sprint by under a third (streaks live 0.25 s, the density
         /// loss is not readable). Spec max was 24; the five families are pinned to sum 64 (12 + 12 + 20 + 3 + 17); the D5 cut to 17 is the least the
-        /// density test accepts (70 % of the 24 live at the boosted Speedy).
+        /// density test accepts (70 % of the 24 live at the boosted Speedy). F4: a streak earned while the family is full recycles the
+        /// oldest one (<see cref="SpeedBodyCueRules.StreakAction"/>) instead of being dropped, so the 17 always ride the bird.
         /// </summary>
         public const int StreakMaxParticles = 17;
 
@@ -867,14 +868,22 @@ namespace CluckWars.Visuals
 
         private void EmitStreak(Vector3 rootPos, Vector3 moveDir, Color color)
         {
-            if (_streakPS == null || EmitRoom() <= 0) return;
+            if (_streakPS == null) return;
+            var slot = SpeedBodyCueRules.StreakAction(_streakPS.particleCount, StreakMaxParticles, EmitRoom());
+            if (slot == SpeedBodyCueRules.StreakSlot.Skip) return;
             Vector3 right = new Vector3(moveDir.z, 0f, -moveDir.x);
             Vector3 p = rootPos - moveDir * (FeedbackTuning.SpeedStreakTailOffset + Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAlong)
                         + right * (Random.Range(-0.5f, 0.5f) * FeedbackTuning.SpeedStreakBoxAcross);
             p.y = rootPos.y + Random.Range(FeedbackTuning.SpeedStreakMinHeight, FeedbackTuning.SpeedStreakMaxHeight);
+            Vector3 v = -moveDir * FeedbackTuning.SpeedStreakBackSpeed;
+            if (slot == SpeedBodyCueRules.StreakSlot.Recycle)
+            {
+                RecycleOldestStreak(p, v, color);
+                return;
+            }
             _ep.applyShapeToPosition = false;
             _ep.position = p;
-            _ep.velocity = -moveDir * FeedbackTuning.SpeedStreakBackSpeed;
+            _ep.velocity = v;
             _ep.startLifetime = FeedbackTuning.SpeedStreakLifeSeconds;
             _ep.startSize = FeedbackTuning.SpeedStreakSize;
             _ep.startColor = color;
@@ -883,8 +892,38 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
+        /// F4: the family is full (or the bird is at its cap), so the oldest live streak (least remaining life) is re-spawned as the new
+        /// one in place. The live count never changes. Reads into a buffer sized once to the family cap: no per-frame allocation.
+        /// </summary>
+        private void RecycleOldestStreak(Vector3 position, Vector3 velocity, Color color)
+        {
+            _streakBuffer ??= new ParticleSystem.Particle[StreakMaxParticles];
+            int n = _streakPS.GetParticles(_streakBuffer);
+            int oldest = -1;
+            float least = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                float r = _streakBuffer[i].remainingLifetime;
+                if (r < least) { least = r; oldest = i; }
+            }
+            if (oldest < 0) return;
+            var q = _streakBuffer[oldest];
+            q.position = position;
+            q.velocity = velocity;
+            q.startLifetime = FeedbackTuning.SpeedStreakLifeSeconds;
+            q.remainingLifetime = FeedbackTuning.SpeedStreakLifeSeconds;
+            q.startSize = FeedbackTuning.SpeedStreakSize;
+            q.startColor = color;
+            q.rotation = 0f;
+            _streakBuffer[oldest] = q;
+            _streakPS.SetParticles(_streakBuffer, n);
+        }
+
+        private ParticleSystem.Particle[] _streakBuffer;
+
+        /// <summary>
         /// Streak family: Stretched Billboard (speed scale 0.12, length scale raised from the spec 1 so the streak reads
-        /// as a line), size 0.30 to 0 and alpha 0.7 to 0 over the life (linear), instead of the shared late fade.
+        /// as a line), size 0.30 to 0 and alpha 0.9 (F4) to 0 over the life (linear), instead of the shared late fade.
         /// </summary>
         private static void ConfigureStreakFamily(ParticleSystem ps)
         {

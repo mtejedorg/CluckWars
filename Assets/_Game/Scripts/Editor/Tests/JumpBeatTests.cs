@@ -87,7 +87,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(0.3f, FeedbackTuning.JumpLandingDustSeconds);
             Assert.AreEqual(0.4f, FeedbackTuning.JumpLaunchFeatherSeconds);
             Assert.AreEqual(0.25f, FeedbackTuning.JumpArcDotSeconds);
-            Assert.AreEqual(0.12f, FeedbackTuning.JumpArcDotSize);
+            Assert.AreEqual(0.20f, FeedbackTuning.JumpArcDotSize, "F4: 0.12 to 0.20");
             Assert.AreEqual(0.3f, FeedbackTuning.JumpLaunchDustRadius);
         }
 

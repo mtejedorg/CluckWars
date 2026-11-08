@@ -75,12 +75,12 @@ namespace CluckWars.Tests
         [Test]
         public void SkidAppearance_FollowsTheSpec()
         {
-            Assert.AreEqual(0.18f, FeedbackTuning.ShoveSkidSizeMin);
-            Assert.AreEqual(0.24f, FeedbackTuning.ShoveSkidSizeMax);
+            Assert.AreEqual(0.18f * 1.3f, FeedbackTuning.ShoveSkidSizeMin, 1e-4f, "F4: x1.3");
+            Assert.AreEqual(0.24f * 1.3f, FeedbackTuning.ShoveSkidSizeMax, 1e-4f, "F4: x1.3");
             Assert.AreEqual(0.85f, FeedbackTuning.ShoveSkidColor.r, 1e-4f);
             Assert.AreEqual(0.75f, FeedbackTuning.ShoveSkidColor.g, 1e-4f);
             Assert.AreEqual(0.55f, FeedbackTuning.ShoveSkidColor.b, 1e-4f);
-            Assert.AreEqual(0.6f, FeedbackTuning.ShoveSkidColor.a, 1e-4f);
+            Assert.AreEqual(0.45f, FeedbackTuning.ShoveSkidColor.a, 1e-4f, "F4: 0.6 to 0.45");
         }
 
         [Test]

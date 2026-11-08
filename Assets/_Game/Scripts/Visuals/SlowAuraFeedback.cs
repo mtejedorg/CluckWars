@@ -334,7 +334,7 @@ namespace CluckWars.Visuals
                 _puffBuilt = true;
                 _puff = new ChickenVFX.FxEmit
                 {
-                    SizeMin = FeedbackTuning.SlowAuraFeatherSizeMin, SizeMax = FeedbackTuning.SlowAuraFeatherSizeMax,
+                    SizeMin = FeedbackTuning.SlowAuraPuffSizeMin, SizeMax = FeedbackTuning.SlowAuraPuffSizeMax,
                     SpeedMin = 0.5f, SpeedMax = 1.0f,
                     LifeMin = FeedbackTuning.SlowAuraPuffLifeSeconds, LifeMax = FeedbackTuning.SlowAuraPuffLifeSeconds,
                     Shape = ChickenVFX.FxShape.Cone, Radius = 0.3f, ConeAngle = 80f, ConeMinAngle = 45f, Axis = Vector3.up,
