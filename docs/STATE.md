@@ -6,6 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-08 - Feedback fix batch F (`simplify-abilities`, verified no-decision fixes from the 8 Nov re-audit, E1-E4 untouched, not merged, not pushed)
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| F10 tooling | done | `6eb39482` | capture_feedback_lab.py shoots at timeScale 1 (`--slowmo` = 0.3); `tools/ui_capture/run_suite_api.py` (TestRunnerApi, result in gitignored `.cache/`, optional group regex); `run_editmode_tests.py` filter now an RQL query (broad substrings that hit parameterised fixtures still error). BL-132 closed. Suite 3147/3147 |
+
 ## 🔍 2026-11-08 - Ability feedback final re-audit (`simplify-abilities`, head `35598049`, five lenses, not merged, not pushed)
 
 - **Result:** Overall **C+ → B-** (Controls B+ → B+, Self-states D → B-, Icons C → B, Names & labels C+ → B-). Lens grades: mechanics B+, VFX B, UX B-, names B-, icons B-. All 15 defects from the 6 Nov audit delivered (Jump icon only partly), 0 regressions, 21 new findings, 4 open decisions E1-E4. Page republished to the same Artifact: https://claude.ai/artifact/TVK5XB4qwiyhfcereB4P2k (source `Captures/feedback-2026-11-07/final/site/`, gitignored).
