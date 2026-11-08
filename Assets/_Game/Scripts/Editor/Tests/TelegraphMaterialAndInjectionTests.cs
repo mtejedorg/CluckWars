@@ -74,6 +74,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void PerChickenLineComponents_ShareOneMaterial_NoPerChickenInstances()
+        {
+            // D12b: ControlStateVFX, AbilityRangeIndicator, AbilitySlotOverlay and HitFeedback each used to call BuildLineMaterial in
+            // Awake, so every chicken owned 4 identical, never-destroyed transparent materials (vfx.md 0.2: shared materials only).
+            foreach (var f in new[] { "ControlStateVFX", "AbilityRangeIndicator", "AbilitySlotOverlay", "HitFeedback" })
+            {
+                string src = Read("Assets/_Game/Scripts/Visuals/" + f + ".cs");
+                StringAssert.Contains("TelegraphShapes.SharedSolidLineMaterial(", src, f + " must take the shared line material");
+                StringAssert.DoesNotContain("= TelegraphShapes.BuildLineMaterial()", src, f + " must not build a material per chicken");
+            }
+        }
+
+        [Test]
         public void RivalIndicator_SelfInjects_WithoutGatingOnHasInstance()
         {
             string src = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");

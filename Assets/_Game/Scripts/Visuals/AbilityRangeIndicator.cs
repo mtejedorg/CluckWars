@@ -79,7 +79,7 @@ namespace CluckWars.Visuals
         {
             _abilities = GetComponent<AbilityController>();
 
-            var mat = TelegraphShapes.BuildLineMaterial();
+            var mat = TelegraphShapes.SharedSolidLineMaterial(null);   // shared across every chicken (D12b): colour is per-vertex, never mutated
             _flash      = TelegraphShapes.BuildLine(transform, "AbilityCastFlash", mat, 0.11f, loop: true);
             _flashStalk = TelegraphShapes.BuildLine(transform, "AbilityCastFlashStalk", mat, 0.05f, loop: false);
             _flash.enabled      = false;

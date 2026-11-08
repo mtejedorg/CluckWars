@@ -1016,7 +1016,7 @@ namespace CluckWars.Visuals
         private void BuildMotionLines()
         {
             int count = Mathf.Max(1, FeedbackTuning.ImpactMotionLineCount);
-            var mat = TelegraphShapes.BuildLineMaterial();
+            var mat = TelegraphShapes.SharedSolidLineMaterial(null);   // shared across every chicken (D12b): colour is per-vertex, never mutated
             _motionLines = new LineRenderer[count];
             _grabVictims = new ChickenController[count];
             for (int i = 0; i < count; i++)

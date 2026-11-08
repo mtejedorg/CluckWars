@@ -134,7 +134,7 @@ namespace CluckWars.Visuals
                 _dirs[i] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
             }
 
-            var mat = TelegraphShapes.BuildLineMaterial();
+            var mat = TelegraphShapes.SharedSolidLineMaterial(null);   // shared across every chicken (D12b): colour is per-vertex, never mutated
             _statusRing = new DrainRing(transform, "ControlStateRing", mat, trackWidth: 0.07f, arcWidth: 0.11f);
             _buffRing   = new DrainRing(transform, "AbilityBuffRing",  mat, trackWidth: 0.05f, arcWidth: 0.08f);
 

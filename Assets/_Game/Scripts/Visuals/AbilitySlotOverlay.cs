@@ -110,7 +110,7 @@ namespace CluckWars.Visuals
             // instances of the same unlit transparent material and permanently cost four
             // unbatchable SetPass calls on the local chicken. Same one-material-many-lines
             // shape AbilityRangeIndicator.Awake already uses.
-            var mat = TelegraphShapes.BuildLineMaterial();
+            var mat = TelegraphShapes.SharedSolidLineMaterial(null);   // shared across every chicken (D12b): colour is per-vertex, never mutated
 
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
             {

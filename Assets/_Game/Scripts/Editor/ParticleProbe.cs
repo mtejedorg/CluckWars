@@ -28,6 +28,9 @@ namespace CluckWars.EditorTools
         private static int _chunkMoversPeak;
         private static int _arenaExclPilesPeak;
         private static string _perChickenBreakdown = "";
+        // D12b: Game view frame stats (UnityEditor.UnityStats, the last rendered frame; Editor-only, so overlay/gizmo cost may add a little).
+        private static int _batchesMax, _setPassMax, _drawCallsMax, _statSamples;
+        private static long _batchesSum, _setPassSum, _drawCallsSum;
         private static readonly List<ParticleSystem> Scratch = new List<ParticleSystem>(16);
 
         /// <summary>Starts a fresh window named <paramref name="tag"/> (replaces any open one).</summary>
@@ -43,6 +46,8 @@ namespace CluckWars.EditorTools
             _chunkMoversPeak = 0;
             _arenaExclPilesPeak = 0;
             _perChickenBreakdown = "";
+            _batchesMax = _setPassMax = _drawCallsMax = _statSamples = 0;
+            _batchesSum = _setPassSum = _drawCallsSum = 0;
             if (!_active)
             {
                 _active = true;
@@ -60,8 +65,10 @@ namespace CluckWars.EditorTools
                 EditorApplication.update -= Sample;
             }
             return string.Format(CultureInfo.InvariantCulture,
-                "perChickenPeak={0} peakChicken={1} systemsPerChickenMax={2} sceneTotalPeak={3} samples={4} pileKernelPeak={5} stealMoversPeak={6} sceneExclPileKernelPeak={7} peakChickenSystems=[{8}]",
-                _perChickenPeak, _peakChicken, _systemsPerChickenMax, _sceneTotalPeak, _samples, _pileKernelPeak, _chunkMoversPeak, _arenaExclPilesPeak, _perChickenBreakdown);
+                "perChickenPeak={0} peakChicken={1} systemsPerChickenMax={2} sceneTotalPeak={3} samples={4} pileKernelPeak={5} stealMoversPeak={6} sceneExclPileKernelPeak={7} peakChickenSystems=[{8}] batchesMax={9} batchesAvg={10} setPassMax={11} setPassAvg={12} drawCallsMax={13} drawCallsAvg={14} statSamples={15}",
+                _perChickenPeak, _peakChicken, _systemsPerChickenMax, _sceneTotalPeak, _samples, _pileKernelPeak, _chunkMoversPeak, _arenaExclPilesPeak, _perChickenBreakdown,
+                _batchesMax, _statSamples > 0 ? _batchesSum / _statSamples : 0, _setPassMax, _statSamples > 0 ? _setPassSum / _statSamples : 0,
+                _drawCallsMax, _statSamples > 0 ? _drawCallsSum / _statSamples : 0, _statSamples);
         }
 
         /// <summary>The system names and live counts of the chicken currently held in <see cref="Scratch"/>, for the peak line.</summary>
@@ -80,6 +87,16 @@ namespace CluckWars.EditorTools
         {
             if (!Application.isPlaying) return;
             _samples++;
+
+            int b = UnityStats.batches, sp = UnityStats.setPassCalls, dc = UnityStats.drawCalls;
+            if (b > 0)
+            {
+                _statSamples++;
+                _batchesSum += b; _setPassSum += sp; _drawCallsSum += dc;
+                if (b > _batchesMax) _batchesMax = b;
+                if (sp > _setPassMax) _setPassMax = sp;
+                if (dc > _drawCallsMax) _drawCallsMax = dc;
+            }
 
             var list = ChickenController.ActiveControllers;
             for (int i = 0; i < list.Count; i++)
