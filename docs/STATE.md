@@ -6,6 +6,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-08 - Feedback decision batch G (E1–E4)
+
+`simplify-abilities`, Maestro's answers E1a-E4a (spec section 12), not merged, not pushed.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| G2 badge row owns the number (E2a) | done | `3b1eafd7` | `ChickenStatusBadges.Compose`: Stun row `STUN 1.5s` (`HudStatusStun`), Root row glyph + `STUCK 1.2s` (`HudStatusStuck`); `HitFeedback.SpawnControlText` word only, `SpawnSlowText` bare SLOW on every peer (percent branch + carried-forward remark replaced by the E2 rationale); caster hex digit unchanged; FEEDBACK.md lines 162/442/529. Tests: `SelfPopCatalogTests.E2_*` (no digit/% in any `HudPop*` word, source guard), `StatusBadgeSpriteTests.E2_*Row*`. Capture `G2/` (phone): stun_3_impact row `STUN 1.2s`, pop `STUN`; slow_3_impact pop `SLOW`. Suite 3183/3183 |
+
 ## 🛠 2026-11-08 - Feedback fix batch F (`simplify-abilities`, verified no-decision fixes from the 8 Nov re-audit, E1-E4 untouched, not merged, not pushed)
 
 | Item | Status | Commit | Notes |
