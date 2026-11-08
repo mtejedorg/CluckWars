@@ -23,6 +23,11 @@ GROUP = sys.argv[1] if len(sys.argv) > 1 else ""
 TIMEOUT_S = 1200
 
 bridge.init()
+# A failed script compile leaves the OLD assemblies loaded: the run would pass on stale code (2026-11-08).
+_chk = str(bridge.call("script-execute", {"csharpCode": "return UnityEditor.EditorUtility.scriptCompilationFailed ? \"COMPILE_FAILED\" : \"ok\";"}))
+if "COMPILE_FAILED" in _chk:
+    sys.exit("VERDICT: COMPILE FAILED - fix the errors (Editor.log 'error CS') before running the suite")
+
 if os.path.exists(OUT):
     os.remove(OUT)
 code = r'''
