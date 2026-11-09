@@ -6,6 +6,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔍 2026-11-09 - Ability feedback re-audit round 3 (`simplify-abilities`, head `c0bf57db`, five lenses, real-time capture)
+
+- **Result:** Overall **C+ → B- → B** (Controls B+ → B+ → B+, Self-states D → B- → B, Icons C → B → B, Names & labels C+ → B- → B). Lens grades: mechanics A-, VFX B+, UX B, names B, icons B. 0 regressions, 1 partial (hatch debris), 14 new findings, decisions E6–E8 open. **All five lenses: ship to the kids' playtest build**, each insisting on one small item first (pop clearance x3, glyph refit, hatch lift). Page republished to the same Artifact (version 7): https://claude.ai/artifact/TVK5XB4qwiyhfcereB4P2k (source `Captures/feedback-2026-11-09/site/`, gitignored).
+- **Evidence:** `Captures/feedback-2026-11-09/lab/` (68 frames at timeScale 1, `capture.log`, `particles.txt`), `phone/` (2400x1080), `storm/particles_storm.txt` (per-chicken 63/64, 6 systems, scene 73, draw calls 134 PC), `cmp/` three-way montages 6 → 8 → 9 Nov, `closeups_round3.png`.
+- **Verified new findings (fix batch H candidates, no decision):** entry pop overprints the top badge row when a second row is live (`FloatingTextStackClearance` 0.10 vs a ~0.30 m word pop; every lens) → 0.25 or LowerCenter anchor; hatch debris at the feet at real time (gravity baked to constant velocity; split five feathers from the cap top with lift 2.0 / gravity 0.6); four state glyphs at half their slot (`ChickenStatusBadges` scales by the 256 canvas; refit Stunned/Hidden/Speeding/Slowed PNGs to 208 px content); Steal claw / Jump bird height / WADDLE-vs-EGG glyph polish; stun stars brush the Fatty's cargo bar (orbit ignores model class scale); streak train reads as blocks (alpha-ramp the line ends); HIDDEN text contrast + glyph 0.30 → 0.36; lab artefacts: the dummy refill pops +5 over the robbed victim, `_2_cast` frames are one frame stale, no landing frame at 0.35 s; copy: GDD §7 table still Death Mark/EXEC, mark clock units, Egg Shell description wording (Spoiler passive rename deferred under D1).
+- **Decisions open (page):** E6 Slow row gets the word SLOW (rec.), E7 HUD strip Slow row on the Snared bit only (rec.), E8 Shield cast burst in cream (rec.).
+- **Downgraded:** the main session's 8 Nov claim that the hatch burst flies around and above the bird (true only at 0.3x); F9 landing shockwave unverifiable at real time until the capture gains a +0.35 s frame.
+- **Device / two-client still owed:** local victim strip for Stun/Slow, Hunt mark live, remote hidden bird, Mobile storm census.
+
 ## 🛠 2026-11-08 - Feedback decision batch G (E1–E4)
 
 `simplify-abilities`, Maestro's answers E1a-E4a (spec section 12), not merged, not pushed.
