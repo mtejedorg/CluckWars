@@ -202,6 +202,9 @@ Maestro's answers on the review page: `d1 later d2a d3a d4b d5b d6a d7b d8b`.
 | E3 one glyph per state (2026-11-08) | **a.** The nameplate snail shows only when no Slow badge row is visible for that bird, and never for pile or bump drag. | ChickenNameplate.StateIcon reads the badge stack. |
 | E4 rivals and a robbery (2026-11-08) | **a.** Rivals keep the bare -n at the robbed victim (it is the victim cargo change); ROB -n stays on the victim own screen. D7b is about self-pops only. | No change. |
 | E5 Slow row for pile drag (2026-11-08) | **a.** The Slow badge row, like the pill snail, shows only for ability slows (the replicated Snared bit); pile and bump drag draw no row on any peer. | ChickenStatusBadges.ShowSlowRow. |
+| E6 Slow row word (2026-11-09) | **a.** The Slow badge row reads the word SLOW (no number) in a darker cyan text tint, the same row shape as HIDDEN / FAST. | Supersedes the Phase 7 A12 glyph-only row; the no-number rule stays. |
+| E7 HUD strip Slow source (2026-11-09) | **a.** The local HUD strip Slow row follows the Snared bit like the world row and the pill snail; pile and bump drag keep the joystick tint alone. | TouchControlsController / HudFeedbackStyle. |
+| E8 Egg Shell cast burst (2026-11-09) | **a.** The Shield cast burst is shell cream plus two ink-rimmed shard pieces; the range ring and the hex keep the brown accent (D3a). | Burst colour only; no accent change. |
 
 ## 10. Implementation order (after sign-off)
 
