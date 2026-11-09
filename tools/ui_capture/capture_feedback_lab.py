@@ -13,7 +13,7 @@ Time scale: shots run at Time.timeScale 1 by default. --slowmo sets the per-abil
   --slowmo                      per-ability shots at timeScale 0.3 instead of 1.
 Note: Fusion tick timers ignore Time.timeScale, so --slowmo only slows the visuals; the ability timings in capture.log
 are real-time either way. Shoot at the default timeScale 1 when frame timing matters."""
-import sys, os, time, json
+import sys, os, re, time, json
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge
@@ -78,6 +78,7 @@ public class FB {
   public static string ResetDummies() { foreach (var d in Lab().Dummies) d.ResetNow("capture"); return "reset"; }
   public static string ClearCooldowns() { var l = Local(); for (int i = 0; i < 4; i++) l.Abilities.TriggerCooldown(i, 0.01f); return "cd cleared"; }
   public static string DummyStunned() { return Others().Any(c => c.IsStunned) ? "1" : "0"; }
+  public static string Frame() { return "F=" + Time.frameCount + " T=" + Time.realtimeSinceStartup.ToString("0.000", CultureInfo.InvariantCulture); }
   public static string ProbeBegin(string tag) { return CluckWars.EditorTools.ParticleProbe.Begin(tag); }
   public static string ProbeEnd(string tag) { return CluckWars.EditorTools.ParticleProbe.End(); }
   static FoodPile NearestPile() { var l = Local(); return FoodPile.ActivePiles.Where(p => p != null && p.Object != null && p.Object.IsValid).OrderBy(p => p.DistanceToSurface(l.transform.position)).FirstOrDefault(); }
@@ -115,14 +116,38 @@ def cs(method, *args):
         return bridge.text(m)[:600]
 
 
-def shot(name):
+def frame():
+    """(Time.frameCount, Time.realtimeSinceStartup) in the playing Editor, or (None, None) when the bridge answer is unreadable."""
+    m = re.search(r"F=(\d+) T=([\d.]+)", str(cs("Frame")))
+    return (int(m.group(1)), float(m.group(2))) if m else (None, None)
+
+
+def shot(name, since_release=None):
+    """Samples the state that goes into capture.log, yields one rendered frame so the Game View holds that state, then
+    screenshots. The log line carries the frame/time delta between the sample and the shot, so a frame can be checked
+    against its log entry instead of trusted."""
+    info = cs("Info")
+    f0, t0 = frame()
+    f = f0
+    deadline = time.time() + 2.0
+    while f0 is not None and f is not None and f <= f0 and time.time() < deadline:
+        time.sleep(0.01)
+        f, _ = frame()
     p = bridge.shot("_fb_" + name)
+    f2, t2 = frame()
+    if f0 is None or f2 is None:
+        delta = "sample->shot UNKNOWN (Frame unreadable)"
+    elif f2 <= f0:
+        delta = "sample->shot 0 frames: NO FRAME RENDERED (paused?), the shot may not match the log"
+    else:
+        delta = "sample->shot %d frames %.3f s" % (f2 - f0, t2 - t0)
+    rel = "" if since_release is None else " | +%.2f s after release" % (time.time() - since_release)
     if p:
         dest = os.path.join(OUT, name + ".png")
         os.replace(p, dest)
-        log("  shot", name, "|", cs("Info"))
+        log("  shot", name, "|", info, "|", delta + rel)
     else:
-        log("  SHOT FAILED", name)
+        log("  SHOT FAILED", name, "|", delta + rel)
 
 
 def probe_begin(tag):
@@ -143,6 +168,8 @@ def write_particles():
 
 
 def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts=DEFAULT_TS, hook=None):
+    """after: (delay, suffix) entries timed from the end of the _2_cast shot, or (delay, suffix, "release") timed from the
+    release itself. Shots are taken in deadline order."""
     log("==", tag, "slot", slot)
     probe_begin(tag)
     cs("TimeScale", ts)
@@ -150,12 +177,14 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts=DEFAULT_T
     time.sleep(0.7)
     shot(tag + "_1_hold")
     log(" ", cs("Release", str(slot)))
-    shot(tag + "_2_cast")
+    t_release = time.time()
+    shot(tag + "_2_cast", t_release)
     t0 = time.time()
-    for delay, suffix in after:
-        while time.time() - t0 < delay:
-            time.sleep(0.05)
-        shot(tag + "_" + suffix)
+    plan = sorted(((t_release if len(e) > 2 and e[2] == "release" else t0) + e[0], e[1]) for e in after)
+    for at, suffix in plan:
+        while time.time() < at:
+            time.sleep(0.01)
+        shot(tag + "_" + suffix, t_release)
     if hook:
         hook(tag)
     probe_end(tag)
@@ -309,7 +338,9 @@ def main():
             # edge, arc dots + landing dust at the 0.18 s end (a Fusion timer, so 0.18 s real at any timeScale).
             cs("Stick", "-1", "0")
             time.sleep(0.3)
-            ability(1, "jump", after=((0.25, "3_impact"), (0.5, "3b_air"), (0.8, "3c_landing"), (1.4, "4_after")))
+            # 3c_land: +0.35 s after the release itself, just past the 0.18 s dash end, to catch the landing ring.
+            ability(1, "jump", after=((0.25, "3_impact"), (0.35, "3c_land", "release"), (0.5, "3b_air"), (0.8, "3c_landing"),
+                                      (1.4, "4_after")))
             cs("Stick", "0", "0")
         if want("shield"):
             cs("Stick", "0", "1")

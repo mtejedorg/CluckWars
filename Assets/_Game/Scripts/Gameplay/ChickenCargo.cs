@@ -150,6 +150,7 @@ namespace CluckWars.Gameplay
         // on every peer, so no RPC and no VFX crossing the wire.
         private ChangeDetector _cargoDetector;
         private PropertyReader<float> _cargoReader;
+        private SilentCargoWrite _silentWrite;   // lab-only no-pop refill, see SetCargoWithoutPop
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
@@ -270,6 +271,8 @@ namespace CluckWars.Gameplay
 
                 if (changed != nameof(Cargo)) continue;
 
+                if (_silentWrite.ConsumeChange()) continue;
+
                 var (before, after) = _cargoReader.Read(previous, current);
                 float delta = after - before;
                 if (Mathf.Abs(delta) < FeedbackTuning.FloatingTextCargoDeltaThreshold) continue;
@@ -282,6 +285,26 @@ namespace CluckWars.Gameplay
 
                 if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);
             }
+
+            _silentWrite.EndRender(Time.frameCount);
+        }
+
+        /// <summary>
+        /// Ability Lab only: writes <see cref="Cargo"/> without the local <c>+n</c> / <c>-n</c>
+        /// pop or the cargo-loss hit beat, so the dummy refill after a steal does not read as the
+        /// victim gaining food. State authority only. The write replicates like any other; only
+        /// this peer's presentation of it is skipped, which is enough because the lab is solo
+        /// (<c>GameMode.Single</c>). Gameplay code must keep writing <see cref="Cargo"/> directly.
+        /// </summary>
+        public void SetCargoWithoutPop(float value)
+        {
+            if (!HasStateAuthority)
+            {
+                _log?.Warn(Source, $"{name}: SetCargoWithoutPop({value:0.0}) ignored - no state authority here.");
+                return;
+            }
+            Cargo = value;
+            _silentWrite.Arm(Time.frameCount);
         }
 
         /// <summary>

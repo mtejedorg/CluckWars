@@ -177,12 +177,13 @@ namespace CluckWars.AbilityLab
 
         /// <summary>
         /// Refills the dummy's cargo to <see cref="CargoStock"/>, clamped to what it can
-        /// actually hold. Runs after the cargo reset, which zeroes it.
+        /// actually hold. Runs after the cargo reset, which zeroes it. Silent: a refill is lab
+        /// housekeeping, and announcing it painted a green <c>+n</c> over a freshly robbed victim.
         /// </summary>
         private void Restock()
         {
             if (_cargo == null || !_cargo.HasStateAuthority) return;
-            _cargo.Cargo = Mathf.Clamp(CargoStock, 0f, _cargo.Capacity);
+            _cargo.SetCargoWithoutPop(Mathf.Clamp(CargoStock, 0f, _cargo.Capacity));
         }
     }
 }

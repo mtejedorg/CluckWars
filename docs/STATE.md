@@ -6,6 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-09 - Feedback fix batch H (round 3 + E6–E8)
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| H8 | Done (3202/3202) | see next row | Lab/tooling only. Dummy refill via ChickenCargo.SetCargoWithoutPop (authority-only, local one-shot SilentCargoWrite marker; no +n over the robbed victim). capture_feedback_lab.py waits one rendered frame between sample and shot and logs sample->shot frames/time and +t after release; new jump_3c_land (lands at +0.47 s real because of bridge latency; landing ring visible). Tests SilentCargoWriteTests (5). Capture H8/. |
+
 ## 🔍 2026-11-09 - Ability feedback re-audit round 3 (`simplify-abilities`, head `c0bf57db`, five lenses, real-time capture)
 
 - **Result:** Overall **C+ → B- → B** (Controls B+ → B+ → B+, Self-states D → B- → B, Icons C → B → B, Names & labels C+ → B- → B). Lens grades: mechanics A-, VFX B+, UX B, names B, icons B. 0 regressions, 1 partial (hatch debris), 14 new findings, decisions E6–E8 open. **All five lenses: ship to the kids' playtest build**, each insisting on one small item first (pop clearance x3, glyph refit, hatch lift). Page republished to the same Artifact (version 7): https://claude.ai/artifact/TVK5XB4qwiyhfcereB4P2k (source `Captures/feedback-2026-11-09/site/`, gitignored).
