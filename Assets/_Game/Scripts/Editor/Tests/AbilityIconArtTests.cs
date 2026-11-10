@@ -130,6 +130,43 @@ namespace CluckWars.Tests
             Assert.Less(bars.Count, 3, $"{path} has speed dashes behind the bird:\n" + string.Join("\n", bars));
         }
 
+        // ---- H4: Steal and Jump icon polish --------------------------------------------------------------------------------------
+
+        [Test]
+        public void StealIcon_FillsTheBox_AndItsInteriorLinesAreAtLeast11px()
+        {
+            // Three fat toes grip one oversized cob: the glyph fills the box (the claw alone spans >= 65 % of it), and the
+            // kernel and toe seams are >= 12 px at 256, so they survive an 11 px open (the old hand had 2-5 px detail that
+            // vanished on a 48 px hex).
+            string path = AbilityIconStyle.SpriteFileFor(nameof(SnatchAbilitySO));
+            var m = IconStrokeMetrics.Load(path);
+            Assert.IsNotNull(m, $"{path}: not a readable PNG");
+            var box = IconStrokeMetrics.BoundsOf(m.Opaque, m.W, m.H);
+            Assert.IsTrue(box.HasValue, $"{path}: empty");
+            int larger = Mathf.Max(box.Value.width, box.Value.height);
+            Assert.GreaterOrEqual(larger / (float)m.W, 0.65f, $"{path}: the glyph spans {larger} of {m.W} px, want >= 65 %");
+            float kept = IconStrokeMetrics.InkKeptByOpen(m, 11);
+            Assert.GreaterOrEqual(kept, 0.97f, $"{path}: an 11 px open keeps {kept:P0} of the ink; interior lines must be >= 12 px");
+        }
+
+        [Test]
+        public void JumpIcon_BirdIsAtLeast55PercentOfTheHeight_AndTheArcIsThinnerThanItsOutline()
+        {
+            // The bird outline (17 px) survives a 13 px open, the arc stroke (12 px ink) does not: so the 13 px opened ink
+            // box is the bird alone, and the arc must still reach below it (it survives the 9 px open).
+            string path = AbilityIconStyle.SpriteFileFor(nameof(ShadowstepAbilitySO));
+            var m = IconStrokeMetrics.Load(path);
+            Assert.IsNotNull(m, $"{path}: not a readable PNG");
+            var bird = IconStrokeMetrics.BoundsOf(IconStrokeMetrics.OpenedInk(m, 13), m.W, m.H);
+            var all = IconStrokeMetrics.BoundsOf(IconStrokeMetrics.OpenedInk(m, 9), m.W, m.H);
+            Assert.IsTrue(bird.HasValue && all.HasValue, $"{path}: no ink");
+            Assert.GreaterOrEqual(bird.Value.height / (float)m.H, 0.55f,
+                $"{path}: the bird is {bird.Value.height} of {m.H} px tall, want >= 55 %");
+            // (texture rows run bottom-up: the arc reaches below the bird = lower y)
+            Assert.GreaterOrEqual(bird.Value.yMin - all.Value.yMin, 20 * m.H / 256,
+                $"{path}: the arc stroke must be thinner than the bird outline (gone at a 13 px open) and reach below the bird");
+        }
+
         [Test]
         public void IconTextures_AreImportedSmall_OnEveryPlatform()
         {

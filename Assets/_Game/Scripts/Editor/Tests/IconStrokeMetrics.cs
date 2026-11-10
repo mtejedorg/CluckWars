@@ -92,6 +92,68 @@ namespace CluckWars.Tests
         }
 
         /// <summary>
+        /// The ink mask after a morphological open with a <paramref name="diameter"/> px disc (scaled like
+        /// <see cref="InkKeptByOpen"/>): only strokes at least that thick remain.
+        /// </summary>
+        public static bool[] OpenedInk(Masks m, int diameter)
+        {
+            int d = Mathf.Max(1, Mathf.RoundToInt(diameter * m.W / 256f));
+            if (d % 2 == 0) d++;
+            var disk = Disk(d);
+            int w = m.W, h = m.H;
+            var eroded = new bool[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    if (!m.Ink[y * w + x]) continue;
+                    bool fits = true;
+                    foreach (var o in disk)
+                    {
+                        int xx = x + o.x, yy = y + o.y;
+                        if (xx < 0 || yy < 0 || xx >= w || yy >= h || !m.Ink[yy * w + xx]) { fits = false; break; }
+                    }
+                    eroded[y * w + x] = fits;
+                }
+            var opened = new bool[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    if (!eroded[y * w + x]) continue;
+                    foreach (var o in disk)
+                    {
+                        int xx = x + o.x, yy = y + o.y;
+                        if (xx >= 0 && yy >= 0 && xx < w && yy < h) opened[yy * w + xx] = true;
+                    }
+                }
+            return opened;
+        }
+
+        /// <summary>Bounding box of the true pixels, or null when empty.</summary>
+        public static RectInt? BoundsOf(bool[] mask, int w, int h)
+        {
+            int x0 = int.MaxValue, y0 = int.MaxValue, x1 = -1, y1 = -1;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    if (mask[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+            if (x1 < 0) return null;
+            return new RectInt(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+        }
+
+        /// <summary>Number of separate opaque runs along one pixel row.</summary>
+        public static int OpaqueRunsInRow(Masks m, int y)
+        {
+            int runs = 0;
+            bool inRun = false;
+            for (int x = 0; x < m.W; x++)
+            {
+                bool o = m.Opaque[y * m.W + x];
+                if (o && !inRun) runs++;
+                inRun = o;
+            }
+            return runs;
+        }
+
+        /// <summary>
         /// Speed-line detector: 4-connected components of the opaque, ink and cream masks that are thin
         /// horizontal bars (height &lt;= 36 px, width &gt;= 2x height and &gt;= 12 px at 256) centred in the
         /// left half, i.e. trailing dashes behind a bird facing right. Returns one "mask w x h @ cx" per hit.

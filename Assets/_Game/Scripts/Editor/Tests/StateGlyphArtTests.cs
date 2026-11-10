@@ -117,6 +117,32 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void WaddleGlyph_IsAnEggWithTwoFeet_NotTheEggGlyph()
+        {
+            // H4: WADDLE is an egg that walks. Below the egg body the glyph has two separate feet; the EGG glyph is one
+            // unbroken shape there. They must also differ as pictures.
+            var walk = IconStrokeMetrics.Load(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.ShieldWalk));
+            var egg = IconStrokeMetrics.Load(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.ShieldEgg));
+            Assert.IsNotNull(walk, "ShieldWalk glyph unreadable");
+            Assert.IsNotNull(egg, "ShieldEgg glyph unreadable");
+            Assert.AreEqual(egg.W, walk.W);
+            Assert.AreEqual(egg.H, walk.H);
+
+            var wb = IconStrokeMetrics.BoundsOf(walk.Opaque, walk.W, walk.H).Value;
+            int feetRow = wb.yMin + Mathf.RoundToInt(wb.height * 0.15f);      // texture rows run bottom-up: 15 % above the bottom
+            Assert.AreEqual(2, IconStrokeMetrics.OpaqueRunsInRow(walk, feetRow),
+                "WADDLE: a row near the bottom must cross exactly two separate feet");
+
+            int diff = 0, union = 0;
+            for (int i = 0; i < walk.Opaque.Length; i++)
+            {
+                if (walk.Opaque[i] || egg.Opaque[i]) union++;
+                if (walk.Opaque[i] != egg.Opaque[i] || (walk.Opaque[i] && walk.Ink[i] != egg.Ink[i])) diff++;
+            }
+            Assert.GreaterOrEqual(diff / (float)union, 0.15f, "WADDLE and EGG must read as different pictures");
+        }
+
+        [Test]
         public void EveryUssClass_IsUniqueAndWellFormed()
         {
             var classes = States.Select(StateGlyphStyle.UssClassFor).ToList();
