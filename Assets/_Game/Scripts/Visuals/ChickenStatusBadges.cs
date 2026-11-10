@@ -745,7 +745,7 @@ namespace CluckWars.Visuals
                 case Badge.Slow:   return FeedbackTuning.CanonicalSlowTextColor;
                 case Badge.Waddle:
                 case Badge.Egg:    return FeedbackPalette.Current.Accent(AccentKey.EggShell);
-                case Badge.Hidden: return FeedbackPalette.Current.Accent(AccentKey.Hide);
+                case Badge.Hidden: return FeedbackTuning.CanonicalHideTextColor;
                 case Badge.Speed:  return FeedbackPalette.Current.Accent(AccentKey.Speed);
                 default:           return Color.white;
             }

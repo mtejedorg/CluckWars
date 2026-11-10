@@ -548,12 +548,12 @@ namespace CluckWars.Visuals
         public const float StatusBadgeStackBaseHeight = 2.12f;
 
         /// <summary>Gap between the nameplate pill's top and the centre of the bottom badge row (batch D0b 0.08; D0c 0.16 = half the
-        /// 0.30 glyph plus a hair, so the bottom row's glyph sits on or above the pill).</summary>
-        public const float StatusBadgeStackPillGap = 0.16f;
+        /// 0.36 glyph plus a hair, so the bottom row's glyph sits on or above the pill).</summary>
+        public const float StatusBadgeStackPillGap = 0.19f;
 
-        /// <summary>Vertical spacing between status badge rows (batch D0c: 0.15 → 0.26, so the 0.30 glyphs overlap only
-        /// through their transparent margins). See <see cref="StatusBadgeStackBaseHeight"/> for the budget this has to fit.</summary>
-        public const float StatusBadgeRowSpacing = 0.26f;
+        /// <summary>Vertical spacing between status badge rows (batch D0c: 0.15 → 0.26; H7: 0.26 → 0.38, so a row pitch is at
+        /// least the 0.36 glyph height and the rows no longer overprint). See <see cref="StatusBadgeStackBaseHeight"/> for the budget this has to fit.</summary>
+        public const float StatusBadgeRowSpacing = 0.38f;
 
         /// <summary>
         /// Maximum simultaneous status badges. Three, because stun / root / slow are
@@ -566,9 +566,9 @@ namespace CluckWars.Visuals
         public const int StatusBadgeMaxRows = 3;
 
         /// <summary>Height (world metres) of the state glyph sprite on a status badge row (feedback batch C3).
-        /// Batch D0b: 0.13 → 0.17 (measured only 10-13 px at 2400x1080); batch D0c: 0.17 → 0.30 (24-28 px). The row text
-        /// scales with it (<c>ChickenStatusBadges.CharacterSize</c>), row pitch is <see cref="StatusBadgeRowSpacing"/>.</summary>
-        public const float StatusBadgeGlyphSize = 0.30f;
+        /// Batch D0b: 0.13 → 0.17 (measured only 10-13 px at 2400x1080); batch D0c: 0.17 → 0.30 (24-28 px); H7: 0.30 → 0.36.
+        /// The row text scales with it (<c>ChickenStatusBadges.CharacterSize</c>), row pitch is <see cref="StatusBadgeRowSpacing"/>.</summary>
+        public const float StatusBadgeGlyphSize = 0.36f;
 
         /// <summary>Gap between a badge row's glyph sprite and its text.</summary>
         public const float StatusBadgeGlyphGap = 0.02f;
@@ -1222,6 +1222,10 @@ namespace CluckWars.Visuals
         /// <summary>Darker slow blue for text (the SLOW row word and the SLOW pop, E6a); rings and tints keep
         /// <see cref="CanonicalSlowColor"/>.</summary>
         public static Color CanonicalSlowTextColor => FeedbackPalette.Current.SlowTextColor;
+
+        /// <summary>Lighter Hide purple for text (the HIDDEN row word and the POOF! pop, H7); the Hide accent keeps
+        /// rings and tints.</summary>
+        public static Color CanonicalHideTextColor => FeedbackPalette.Current.HideTextColor;
 
         /// <summary>Canonical knockback shockwave colour — already consistent
         /// (white) wherever it appears; reproduced for completeness.</summary>

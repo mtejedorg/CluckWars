@@ -205,7 +205,7 @@ namespace CluckWars.Visuals
                 _lastSlotEdgeTime = Time.time;
             }
             _wasJumpSlotActive = jump;
-            if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, AccentKey.Hide, ChickenStatusBadges.Badge.Hidden);
+            if (faded && !_wasFaded)       SelfPop(UiKeys.HudPopPoof, FeedbackTuning.CanonicalHideTextColor, ChickenStatusBadges.Badge.Hidden);
             _wasSpeedActive = speed;
             _wasFaded       = faded;
 
@@ -244,6 +244,9 @@ namespace CluckWars.Visuals
 
         private void SelfPop(string key, AccentKey accent, ChickenStatusBadges.Badge entering = ChickenStatusBadges.Badge.None) =>
             FloatingCombatText.SpawnSelfPop(_controller, key, FeedbackPalette.Current.Accent(accent), entering);
+
+        private void SelfPop(string key, Color color, ChickenStatusBadges.Badge entering) =>
+            FloatingCombatText.SpawnSelfPop(_controller, key, color, entering);
 
         // ---- §5.1 status ring + depleting arc (cases 17 / 18 / 21) ------------
 

@@ -216,6 +216,17 @@ namespace CluckWars.Tests
             Assert.AreNotEqual(p.SlowColor, p.SlowTextColor);
         }
 
+        [Test]
+        public void H7_HideTextColour_IsLighterThanTheHideAccentAndShipped()
+        {
+            var p = AssetDatabase.LoadAssetAtPath<FeedbackPaletteSO>("Assets/_Game/Data/FeedbackPalette.asset");
+            Assert.NotNull(p);
+            Color.RGBToHSV(p.HideAccent, out _, out _, out float vAccent);
+            Color.RGBToHSV(p.HideTextColor, out _, out _, out float vText);
+            Assert.Greater(vText, vAccent, "the Hide text tint is lighter than the Hide accent");
+            Assert.AreNotEqual(p.HideAccent, p.HideTextColor);
+        }
+
         // ---- layout ----------------------------------------------------------------------------------------
 
         [Test]

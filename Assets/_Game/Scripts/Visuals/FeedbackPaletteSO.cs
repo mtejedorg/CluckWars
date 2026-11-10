@@ -56,6 +56,8 @@ namespace CluckWars.Visuals
         public Color JumpAccent = new Color(0.4f, 0.2f, 0.9f, 1f);
         public Color EggShellAccent = new Color(0.55f, 0.42f, 0.25f, 1f);
         public Color HideAccent = new Color(0.55f, 0.85f, 0.85f, 1f);
+        /// <summary>Lighter Hide purple for TEXT (the HIDDEN row and the POOF! pop, H7 contrast); the accent stays for rings/tints.</summary>
+        public Color HideTextColor = new Color(0.75f, 0.65f, 1.00f, 1f);
         public Color PeckAccent = new Color(0.96f, 0.8f, 0.3f, 1f);
         public Color HuntAccent = new Color(0.9f, 0.1f, 0.2f, 1f);
 

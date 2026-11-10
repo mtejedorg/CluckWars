@@ -96,9 +96,9 @@ namespace CluckWars.Tests
         [Test]
         public void GlyphIsAtLeastTheAskedPhoneSize()
         {
-            Assert.AreEqual(0.30f, FeedbackTuning.StatusBadgeGlyphSize, 1e-5f);
-            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeRowSpacing, FeedbackTuning.StatusBadgeGlyphSize * 0.85f,
-                "rows must not collide beyond the sprites' transparent margins");
+            Assert.AreEqual(0.36f, FeedbackTuning.StatusBadgeGlyphSize, 1e-5f);
+            Assert.GreaterOrEqual(FeedbackTuning.StatusBadgeRowSpacing, FeedbackTuning.StatusBadgeGlyphSize,
+                "rows must not overprint each other (H7)");
         }
 
         [Test]
