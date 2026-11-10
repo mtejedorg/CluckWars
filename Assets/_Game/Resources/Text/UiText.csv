@@ -75,7 +75,7 @@ ability.snatch.desc,Robs {n} food from every rival within {r}m.
 ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
 ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,"Waddle {walk}s - slows bounce off. Then be an egg {egg}s: no stun, slow, shove, theft or pounce. Press again to hatch."
+ability.turtlemode.desc,"Waddle for {walk}s (slows bounce off), then be an egg for {egg}s: nothing can touch you. Press again to hatch."
 perk.relentless.line,Your stuns and slows last {out}% longer.
 perk.relentless.detail,"Your stuns and slows last {out}% longer. Stuns, getting stuck and timed slows on you end {in}% sooner."
 perk.bully.line,Moves recharge {pct}% faster.

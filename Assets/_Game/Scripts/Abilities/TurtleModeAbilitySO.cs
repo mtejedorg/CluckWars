@@ -47,7 +47,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Egg Shell";
             ShortLabel = "EGG";
-            Description = "Waddle 1s - slows bounce off. Then be an egg 2s: no stun, slow, shove, theft or pounce. Press again to hatch.";
+            Description = "Waddle for 1s (slows bounce off), then be an egg for 2s: nothing can touch you. Press again to hatch.";
             Category = AbilityCategory.Defense;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 3f;
