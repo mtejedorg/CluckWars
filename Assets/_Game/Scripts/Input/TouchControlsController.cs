@@ -1233,10 +1233,10 @@ namespace CluckWars.Input
                 return;
             }
 
-            int seconds = Mathf.CeilToInt(remaining);
+            int seconds = remaining > 0f ? Mathf.CeilToInt(remaining) : 0;
             if (seconds == _appliedCdSeconds[slot]) return;
             _appliedCdSeconds[slot] = seconds;
-            refs.CdNum.text = seconds.ToString();
+            refs.CdNum.text = HudLayoutRules.TouchCooldownText(remaining);
         }
 
         /// <summary>

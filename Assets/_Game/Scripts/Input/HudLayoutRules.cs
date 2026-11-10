@@ -93,6 +93,16 @@ namespace CluckWars.Input
             int tenths = (int)System.Math.Ceiling(remainingSeconds * 10f);
             return tenths >= 10 ? "1" : "0." + tenths;
         }
+
+        /// <summary>
+        /// Touch-hex seconds readout: whole seconds rounded up, and empty (no digit) when nothing is left, so a held hex
+        /// with nobody in reach never prints a bare 0.
+        /// </summary>
+        public static string TouchCooldownText(float remainingSeconds)
+        {
+            if (remainingSeconds <= 0f) return string.Empty;
+            return UnityEngine.Mathf.CeilToInt(remainingSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
     }
 
     /// <summary>

@@ -392,6 +392,15 @@ namespace CluckWars.Tests
             Assert.AreEqual("1", HudLayoutRules.CooldownText(0.96f), "Never shows 0.10 tenths past ten.");
         }
 
+        [Test]
+        public void TouchCooldownText_NoDigitAtZero_WholeSecondsAbove()
+        {
+            Assert.AreEqual(string.Empty, HudLayoutRules.TouchCooldownText(0f));
+            Assert.AreEqual(string.Empty, HudLayoutRules.TouchCooldownText(-0.1f));
+            Assert.AreEqual("1", HudLayoutRules.TouchCooldownText(0.4f));
+            Assert.AreEqual("4", HudLayoutRules.TouchCooldownText(3.2f));
+        }
+
         // ---- First-time hint -------------------------------------------------------------------------------------
 
         [Test]
