@@ -54,7 +54,15 @@ namespace CluckWars.Visuals
         [SerializeField] private float _starSpinSpeed = 180f;
 
         private const int StarCount   = 3;
+        /// <summary>I4 kept 0.26: the phone frame shows the star under 28 px, but 0.30 breaks the H5 cargo-bar
+        /// clearance by ~8 mm (H5 gap at 0.26 is ~12 mm, so 0.28 is the most that would fit).</summary>
         public const float StarBaseScale = 0.26f;
+
+        /// <summary>Cartoon gold fill of the stun star, baked into <see cref="StarSprite"/> (the renderer tint is white).</summary>
+        public static readonly Color StarGold = new Color(1f, 0.86f, 0.25f, 1f);
+
+        /// <summary>I4: width of the ink ring around the star, in sprite texels (64 px sprite).</summary>
+        public const float StarInkRimPx = 4.5f;
         private const int StreakCount = 4;
 
         /// <summary>How fast a streak travels from the chicken's heel out to its tail, in
@@ -203,11 +211,11 @@ namespace CluckWars.Visuals
                 go.transform.SetParent(_starRoot, worldPositionStays: false);
                 go.transform.localPosition = new Vector3(
                     Mathf.Cos(ang) * FeedbackTuning.StunStarOrbitRadius, 0f, Mathf.Sin(ang) * FeedbackTuning.StunStarOrbitRadius);
-                go.transform.localScale = Vector3.one * 0.26f;
+                go.transform.localScale = Vector3.one * StarBaseScale;
 
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite       = StarSprite();
-                sr.color        = new Color(1f, 0.86f, 0.25f, 1f); // cartoon gold
+                sr.color        = Color.white; // gold fill + ink rim are baked into the sprite (I4)
                 sr.sortingOrder = FeedbackTuning.StunStarSortingOrder;
                 _stars[i] = sr;
             }
@@ -364,7 +372,7 @@ namespace CluckWars.Visuals
             if (_stars == null || (scale == _appliedScale && alpha == _appliedAlpha)) return;
             _appliedScale = scale;
             _appliedAlpha = alpha;
-            var color = new Color(1f, 0.86f, 0.25f, alpha);
+            var color = new Color(1f, 1f, 1f, alpha);   // white tint: the sprite carries the gold + ink (I4)
             for (int i = 0; i < _stars.Length; i++)
             {
                 if (_stars[i] == null) continue;
@@ -570,36 +578,63 @@ namespace CluckWars.Visuals
             return _streakSprite;
         }
 
-        /// <summary>Chunky 5-point cartoon star — the overhead stun markers.</summary>
-        private static Sprite StarSprite()
+        /// <summary>
+        /// Chunky 5-point cartoon star, the overhead stun markers (orbit and drop-off both use it).
+        /// I4: gold fill with a <see cref="StarInkRimPx"/> ink ring (palette Ink, #2A1A0C) drawn outside the
+        /// star outline and a 1 px anti-aliased outer edge, so the star reads on the yellow food pile.
+        /// The ring follows a true signed distance to the star polygon, so it is even along the rays and
+        /// rounds the tips like a sticker outline.
+        /// </summary>
+        public static Sprite StarSprite()
         {
             if (_starSprite != null) return _starSprite;
 
             const int S = 64;
             const int Points = 5;
-            const float outer = 0.46f, inner = 0.19f;
-            var px = new Color[S * S];
+            // Tip radius leaves room for the rim and the soft edge inside the 32 px half-tile.
+            const float outerPx = 25f, innerPx = outerPx * (0.19f / 0.46f);
+            var poly = new Vector2[Points * 2];
+            for (int k = 0; k < poly.Length; k++)
+            {
+                float a = Mathf.PI * 0.5f + k * Mathf.PI / Points;    // tip up
+                float r = (k & 1) == 0 ? outerPx : innerPx;
+                poly[k] = new Vector2(Mathf.Cos(a) * r, Mathf.Sin(a) * r);
+            }
 
+            Color gold = StarGold;
+            Color ink  = FeedbackTuning.InkColor; ink.a = 1f;
+            var px = new Color[S * S];
             for (int y = 0; y < S; y++)
             for (int x = 0; x < S; x++)
             {
-                float dx = (x + 0.5f) / S - 0.5f;
-                float dy = (y + 0.5f) / S - 0.5f;
-                float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                var p = new Vector2(x + 0.5f - S * 0.5f, y + 0.5f - S * 0.5f);
+                float sd = SignedDistanceToPolygon(p, poly);            // texels, negative inside
 
-                // Star radius at this angle: sweep between the outer tip and the
-                // inner notch as the angle passes through each point's wedge.
-                float ang = Mathf.Atan2(dy, dx) + Mathf.PI * 0.5f;      // tip up
-                float seg = Mathf.PI * 2f / Points;
-                float t   = Mathf.Repeat(ang, seg) / seg;               // 0..1 in wedge
-                float tri = 1f - Mathf.Abs(t * 2f - 1f);                // 0 at notch, 1 at tip
-                float r   = Mathf.Lerp(inner, outer, tri);
-
-                float a = d <= r ? 1f : 0f;
-                px[y * S + x] = new Color(1f, 1f, 1f, a);
+                float toInk = Mathf.Clamp01(sd + 0.5f);                 // 1 px AA between gold and ink
+                float alpha = Mathf.Clamp01(StarInkRimPx + 1f - sd);    // 1 px soft outer edge
+                Color c = Color.Lerp(gold, ink, toInk);
+                c.a = alpha;
+                px[y * S + x] = c;
             }
             _starSprite = MakeSprite(px, S);
             return _starSprite;
+        }
+
+        /// <summary>Signed distance from <paramref name="p"/> to a closed polygon (negative inside, even-odd rule).</summary>
+        private static float SignedDistanceToPolygon(Vector2 p, Vector2[] poly)
+        {
+            float best = float.MaxValue;
+            bool inside = false;
+            for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+            {
+                Vector2 a = poly[j], b = poly[i];
+                Vector2 ab = b - a;
+                float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+                best = Mathf.Min(best, (p - (a + ab * t)).sqrMagnitude);
+                if ((a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) * ab.x / ab.y) inside = !inside;
+            }
+            float d = Mathf.Sqrt(best);
+            return inside ? -d : d;
         }
 
         private static Sprite MakeSprite(Color[] px, int size)

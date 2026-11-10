@@ -402,6 +402,50 @@ namespace CluckWars.Tests
             Assert.AreEqual(ChickenStateOverlays.StunStarHeightFor(scale, barCentre), centre, 1e-5f, cls + ": the runtime height is the pure helper");
         }
 
+        private static float Luminance(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+
+        [Test]
+        public void I4_StunStarSprite_HasAnInkRimOnEveryRay_AGoldCentre_AndASoftOuterEdge()
+        {
+            var tex = ChickenStateOverlays.StarSprite().texture;
+            int s = tex.width;
+            float half = s * 0.5f;
+
+            Color centre = tex.GetPixel(s / 2, s / 2);
+            Assert.AreEqual(ChickenStateOverlays.StarGold.r, centre.r, 0.02f, "gold centre r");
+            Assert.AreEqual(ChickenStateOverlays.StarGold.g, centre.g, 0.02f, "gold centre g");
+            Assert.AreEqual(ChickenStateOverlays.StarGold.b, centre.b, 0.02f, "gold centre b");
+            Assert.AreEqual(1f, centre.a, 0.01f, "opaque centre");
+
+            for (int k = 0; k < 5; k++)
+            {
+                float ang = Mathf.PI * 0.5f + k * Mathf.PI * 2f / 5f;     // tip up, like the generator
+                var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                float lastOpaque = -1f;
+                for (float r = 0f; r < half; r += 0.25f)
+                {
+                    var c = tex.GetPixel(Mathf.FloorToInt(half + dir.x * r), Mathf.FloorToInt(half + dir.y * r));
+                    if (c.a >= 0.99f) lastOpaque = r;
+                }
+                Assert.Greater(lastOpaque, half * 0.5f, "ray " + k + ": the star reaches out along its ray");
+                float rr = lastOpaque - 1f;                                   // just inside the outer boundary
+                var edge = tex.GetPixel(Mathf.FloorToInt(half + dir.x * rr), Mathf.FloorToInt(half + dir.y * rr));
+                Assert.Less(Luminance(edge), 0.3f, "ray " + k + ": dark ink just inside the outer boundary, got " + edge);
+                Assert.Greater(edge.a, 0.9f, "ray " + k + ": the ink rim is opaque");
+            }
+
+            int soft = 0;
+            for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                var c = tex.GetPixel(x, y);
+                if (c.a <= 0.01f || c.a >= 0.99f) continue;
+                soft++;
+                Assert.Less(Luminance(c), 0.3f, "an intermediate-alpha pixel at " + x + "," + y + " sits on the ink outer edge, not on the gold");
+            }
+            Assert.Greater(soft, 0, "the outer edge is anti-aliased (some 0 < a < 1 pixels)");
+        }
+
         [Test]
         public void H5_StarHeightRule_IsMinOfScaledBeakAndBarMinusClearance_AndBonkFollowsTheScale()
         {
