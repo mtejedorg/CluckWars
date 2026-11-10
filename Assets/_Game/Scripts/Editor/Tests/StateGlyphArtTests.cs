@@ -143,6 +143,134 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void PeckGlyph_IsThePeckIconBird_WithTheInkRing()
+        {
+            // I10: Peck reads as ONE bird. The PECK state glyph is the Peck ability icon (head, open beak, one seed)
+            // re-stroked for the badge, so its cream silhouette must match the icon once both are normalised to the
+            // same box (redrawn glyph 0.96; the old different bird 0.51; every other glyph 0.34-0.42 -> 0.85 splits them),
+            // it must keep the seed as its own cream island the way the icon does, and its ink ring share must sit
+            // inside the range the other state glyphs show (derived from the folder, not hand-copied).
+            string glyphPath = StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.PeckChain);
+            string iconPath = AbilityIconStyle.SpriteFileFor(nameof(CluckWars.Abilities.PeckAbilitySO));
+            var glyph = IconStrokeMetrics.Load(glyphPath);
+            var icon = IconStrokeMetrics.Load(iconPath);
+            Assert.IsNotNull(glyph, glyphPath + " unreadable");
+            Assert.IsNotNull(icon, iconPath + " unreadable");
+
+            bool[] glyphCream = CreamOf(glyph), iconCream = CreamOf(icon);
+            float iou = Iou(Normalise(glyphCream, glyph.W, glyph.H), Normalise(iconCream, icon.W, icon.H));
+            Assert.GreaterOrEqual(iou, 0.85f, $"PECK glyph silhouette IoU with the Peck icon {iou:F3}: not the same bird");
+
+            var gIslands = CreamIslands(glyphCream, glyph.W, glyph.H);
+            var iIslands = CreamIslands(iconCream, icon.W, icon.H);
+            Assert.AreEqual(iIslands.Count, gIslands.Count, "PECK glyph must keep the icon's cream islands (head + seed)");
+            Assert.GreaterOrEqual(gIslands.Count, 2, "Peck art lost its seed");
+            float gSeed = gIslands[1] / (float)gIslands[0], iSeed = iIslands[1] / (float)iIslands[0];
+            Assert.That(gSeed, Is.InRange(iSeed * 0.5f, iSeed * 1.5f), $"PECK seed/head ratio {gSeed:F3} vs icon {iSeed:F3}");
+
+            // Ink ring: every opaque pixel on the outer edge is ink, and the ink share sits in the other glyphs' range.
+            int edge = 0, edgeInk = 0;
+            for (int y = 0; y < glyph.H; y++)
+                for (int x = 0; x < glyph.W; x++)
+                {
+                    int i = y * glyph.W + x;
+                    if (!glyph.Opaque[i]) continue;
+                    bool border = x == 0 || y == 0 || x == glyph.W - 1 || y == glyph.H - 1
+                        || !glyph.Opaque[i - 1] || !glyph.Opaque[i + 1] || !glyph.Opaque[i - glyph.W] || !glyph.Opaque[i + glyph.W];
+                    if (!border) continue;
+                    edge++;
+                    if (glyph.Ink[i]) edgeInk++;
+                }
+            Assert.Greater(edge, 0);
+            Assert.GreaterOrEqual(edgeInk / (float)edge, 0.95f, "PECK glyph outer edge is not an ink ring");
+
+            float min = float.MaxValue, max = float.MinValue;
+            foreach (var s in States)
+            {
+                string path = StateGlyphStyle.SpritePathFor(s);
+                if (s == StateGlyphStyle.StateGlyph.PeckChain || !path.StartsWith(StateGlyphStyle.GlyphFolder)) continue;
+                var m = IconStrokeMetrics.Load(path);
+                if (m == null) continue;
+                float share = InkShare(m);
+                min = Mathf.Min(min, share);
+                max = Mathf.Max(max, share);
+            }
+            Assert.Less(min, max, "need other state glyphs to derive the ink range");
+            float peck = InkShare(glyph);
+            Assert.That(peck, Is.InRange(min - 0.02f, max + 0.02f), $"PECK ink share {peck:F2} outside the glyph range {min:F2}-{max:F2}");
+        }
+
+        private static bool[] CreamOf(IconStrokeMetrics.Masks m)
+        {
+            var c = new bool[m.Opaque.Length];
+            for (int i = 0; i < c.Length; i++) c[i] = m.Opaque[i] && !m.Ink[i];
+            return c;
+        }
+
+        private static float InkShare(IconStrokeMetrics.Masks m)
+        {
+            int op = 0, ink = 0;
+            for (int i = 0; i < m.Opaque.Length; i++) { if (m.Opaque[i]) op++; if (m.Ink[i]) ink++; }
+            return op == 0 ? 0f : ink / (float)op;
+        }
+
+        /// <summary>Samples the mask's own bounding box onto a 64x64 grid (pixel centres), so two drawings of
+        /// the same shape at different sizes and canvases compare cell for cell.</summary>
+        private static bool[] Normalise(bool[] mask, int w, int h)
+        {
+            const int n = 64;
+            var b = IconStrokeMetrics.BoundsOf(mask, w, h).Value;
+            var g = new bool[n * n];
+            for (int j = 0; j < n; j++)
+                for (int i = 0; i < n; i++)
+                {
+                    int x = b.xMin + (int)((i + 0.5f) * b.width / n);
+                    int y = b.yMin + (int)((j + 0.5f) * b.height / n);
+                    g[j * n + i] = mask[y * w + x];
+                }
+            return g;
+        }
+
+        private static float Iou(bool[] a, bool[] b)
+        {
+            int inter = 0, union = 0;
+            for (int i = 0; i < a.Length; i++) { if (a[i] && b[i]) inter++; if (a[i] || b[i]) union++; }
+            return union == 0 ? 0f : inter / (float)union;
+        }
+
+        /// <summary>Sizes of the 8-connected cream islands, largest first.</summary>
+        private static List<int> CreamIslands(bool[] mask, int w, int h)
+        {
+            var seen = new bool[mask.Length];
+            var sizes = new List<int>();
+            var stack = new Stack<int>();
+            for (int s = 0; s < mask.Length; s++)
+            {
+                if (!mask[s] || seen[s]) continue;
+                int size = 0;
+                seen[s] = true;
+                stack.Push(s);
+                while (stack.Count > 0)
+                {
+                    int p = stack.Pop();
+                    size++;
+                    int px = p % w, py = p / w;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int nx = px + dx, ny = py + dy;
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                            int q = ny * w + nx;
+                            if (mask[q] && !seen[q]) { seen[q] = true; stack.Push(q); }
+                        }
+                }
+                sizes.Add(size);
+            }
+            sizes.Sort((a, b) => b.CompareTo(a));
+            return sizes;
+        }
+
+        [Test]
         public void EveryUssClass_IsUniqueAndWellFormed()
         {
             var classes = States.Select(StateGlyphStyle.UssClassFor).ToList();
