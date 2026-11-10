@@ -45,6 +45,7 @@ When you begin a session:
 4. Before making nontrivial changes, skim `docs/CONVENTIONS.md` — the project has a few hard-won rules (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.).
 5. After making changes, **update `docs/STATE.md`** so the next agent doesn't lose context. ROADMAP entries get ticked too when phases complete.
 6. **If you changed the design docs or any gameplay `.asset` value, update `docs/site/index.html` too.** Standing instruction from Maestro (2026-09-04): the compendium is a living document, not a snapshot. It is one self-contained HTML file with no build step. Its numbers must be read from the shipped `.asset` files and gameplay constants, **never** from GDD prose — the GDD carries known-stale figures. Republish it to the same Artifact URL (see `memory/mechanics-compendium-site.md`).
+7. **Slow batches (artist icons, lab captures, five-minute suite runs) run their specialists from the main session, one foreground agent at a time**, not through a background orchestrator: on 2026-11-10 a background `code-architect` died twice on API timeouts mid-item, taking its child with it. If an orchestrator dies, check `git status` before redoing anything.
 
 ---
 
