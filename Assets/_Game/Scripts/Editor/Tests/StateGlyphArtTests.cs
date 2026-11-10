@@ -89,6 +89,34 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EveryStateGlyph_FillsAtLeast80PercentOfItsCanvasHeight()
+        {
+            // ChickenStatusBadges scales a glyph by its canvas height, so the content must fill that height or the
+            // glyph draws small (round-3 H3: four wide glyphs sat on a 256 square at ~55 % of the slot).
+            var problems = new List<string>();
+            var files = Directory.GetFiles(StateGlyphStyle.GlyphFolder, "*.png");
+            Assert.IsNotEmpty(files);
+            foreach (var f in files)
+            {
+                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                try
+                {
+                    if (!ImageConversion.LoadImage(tex, File.ReadAllBytes(f))) { problems.Add($"{f}: not a readable PNG"); continue; }
+                    var px = tex.GetPixels32();
+                    int w = tex.width, h = tex.height, minY = h, maxY = -1;
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x++)
+                            if (px[y * w + x].a > 8) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
+                    if (maxY < 0) { problems.Add($"{f}: empty"); continue; }
+                    float ratio = (maxY - minY + 1) / (float)h;
+                    if (ratio < 0.80f) problems.Add($"{f}: content {maxY - minY + 1} of {h} px tall ({ratio:P0}), want >= 80 %");
+                }
+                finally { Object.DestroyImmediate(tex); }
+            }
+            Assert.IsEmpty(problems, string.Join(System.Environment.NewLine, problems));
+        }
+
+        [Test]
         public void EveryUssClass_IsUniqueAndWellFormed()
         {
             var classes = States.Select(StateGlyphStyle.UssClassFor).ToList();

@@ -644,11 +644,21 @@ namespace CluckWars.Visuals
             _rows[i].color = ColorFor(badge);
         }
 
+        /// <summary>World width of a row glyph: the glyph height is fixed at <c>StatusBadgeGlyphSize</c>, the width
+        /// follows the sprite aspect (the wide state glyphs are cropped to a short canvas, so they are wider than tall).</summary>
+        public static float GlyphWidthFor(Sprite sprite)
+        {
+            if (sprite == null) return 0f;
+            Vector2 size = sprite.bounds.size;
+            float aspect = size.y > 1e-4f ? size.x / size.y : 1f;
+            return FeedbackTuning.StatusBadgeGlyphSize * aspect;
+        }
+
         /// <summary>Centres the glyph + text pair on the row. The text width is the renderer's mesh bounds, which
         /// settles one frame after a text write; a row's first frame is a one-frame approximation.</summary>
         private void LayoutRow(int i)
         {
-            float glyphW = _rowHasGlyph[i] ? FeedbackTuning.StatusBadgeGlyphSize : 0f;
+            float glyphW = _rowHasGlyph[i] ? GlyphWidthFor(_glyphs[i].sprite) : 0f;
             var mr = _rowRenderers[i];
             float textW = mr != null && _rows[i].text.Length > 0 ? mr.localBounds.size.x : 0f;
             RowLayout(glyphW, FeedbackTuning.StatusBadgeGlyphGap, textW, out float gx, out float tx);

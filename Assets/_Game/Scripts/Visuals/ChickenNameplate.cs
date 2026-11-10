@@ -353,10 +353,11 @@ namespace CluckWars.Visuals
                 _slowGlyph.sortingOrder = _textRenderer.sortingOrder + 1;   // one above the text, rival or local
                 if (_slowGlyph.enabled)
                 {
-                    glyphW = size.y * SlowGlyphHeightScale;
-                    glyphGap = RivalDotGap * 0.5f;
+                    float glyphH = size.y * SlowGlyphHeightScale;
                     float sh = _slowGlyph.sprite.bounds.size.y;
-                    float sc = sh > 1e-4f ? glyphW / sh : 1f;
+                    float sc = sh > 1e-4f ? glyphH / sh : 1f;
+                    glyphW = _slowGlyph.sprite.bounds.size.x * sc;   // the slow glyph is wider than tall: width follows the sprite
+                    glyphGap = RivalDotGap * 0.5f;
                     _slowGlyph.transform.localScale = new Vector3(sc, sc, 1f);
                     _slowGlyph.transform.localPosition = new Vector3(centre.x + size.x * 0.5f + glyphGap + glyphW * 0.5f, centre.y, 0.005f);
                 }

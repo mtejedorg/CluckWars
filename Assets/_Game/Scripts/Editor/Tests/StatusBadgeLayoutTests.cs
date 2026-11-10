@@ -535,6 +535,25 @@ namespace CluckWars.Tests
             float drawn = FeedbackTuning.FloatingTextStackClearance * BillboardUp30.y;
             Assert.GreaterOrEqual(drawn, wordHalfHeightOnScreen + 0.02f, "the STUN word must not touch the STUN 1.5s row at onset (round-3 R01)");
         }
+
+        [Test]
+        public void WideGlyphSprite_RowWidthFollowsItsAspect_AndTheTextStartsAfterIt()
+        {
+            var tex = new Texture2D(256, 160);
+            var wide = Sprite.Create(tex, new Rect(0, 0, 256, 160), new Vector2(0.5f, 0.5f), 100f);
+            var square = Sprite.Create(tex, new Rect(0, 0, 160, 160), new Vector2(0.5f, 0.5f), 100f);
+            try
+            {
+                Assert.AreEqual(FeedbackTuning.StatusBadgeGlyphSize, ChickenStatusBadges.GlyphWidthFor(square), 1e-5f, "a square sprite keeps the glyph size");
+                Assert.AreEqual(FeedbackTuning.StatusBadgeGlyphSize * 1.6f, ChickenStatusBadges.GlyphWidthFor(wide), 1e-5f, "a wide sprite is as tall as the slot and wider by its aspect");
+                Assert.AreEqual(0f, ChickenStatusBadges.GlyphWidthFor(null), 1e-6f);
+
+                float w = ChickenStatusBadges.GlyphWidthFor(wide);
+                ChickenStatusBadges.RowLayout(w, FeedbackTuning.StatusBadgeGlyphGap, 0.5f, out float gx, out float tx);
+                Assert.GreaterOrEqual(tx, gx + w * 0.5f + FeedbackTuning.StatusBadgeGlyphGap - 1e-5f, "the text starts after the wide glyph and its gap");
+            }
+            finally { Object.DestroyImmediate(wide); Object.DestroyImmediate(square); Object.DestroyImmediate(tex); }
+        }
     }
 
 }
