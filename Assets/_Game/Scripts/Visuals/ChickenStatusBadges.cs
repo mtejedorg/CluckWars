@@ -464,7 +464,22 @@ namespace CluckWars.Visuals
         public static float ShellPhaseSeconds(bool egg, float runRemaining, float eggSeconds) =>
             egg ? Mathf.Max(0f, runRemaining) : Mathf.Max(0f, runRemaining - eggSeconds);
 
-        /// <summary>Centres a glyph + text pair on the row origin: x of the glyph centre and of the text's left edge.</summary>
+        /// <summary>
+        /// I12: a row laid out against the pill's left edge <paramref name="pillLeft"/> (stack-root x), so stacked rows of
+        /// different widths share one glyph column instead of a ragged centred pyramid. The glyph centres in a column
+        /// <paramref name="columnWidth"/> wide (the widest glyph shown; a square glyph: pill left + glyph half width) and the
+        /// text starts one <paramref name="gap"/> after the column. A row with no glyph sprite starts its text at the pill
+        /// edge, so a text glyph it prints (Root, the missing-sprite fallback) lands in the column.
+        /// </summary>
+        public static void PillColumnRowLayout(float pillLeft, float columnWidth, bool hasGlyph, float gap, out float glyphX, out float textX)
+        {
+            float c = Mathf.Max(0f, columnWidth);
+            glyphX = pillLeft + c * 0.5f;
+            textX  = hasGlyph && c > 0f ? pillLeft + c + gap : pillLeft;
+        }
+
+        /// <summary>Centres a glyph + text pair on the row origin: x of the glyph centre and of the text's left edge.
+        /// The layout when no fitted nameplate pill is there to align to.</summary>
         public static void RowLayout(float glyphWidth, float gap, float textWidth, out float glyphX, out float textX)
         {
             float g = Mathf.Max(0f, glyphWidth);
@@ -604,9 +619,18 @@ namespace CluckWars.Visuals
                 }
 
                 if (!rowGo.activeSelf) rowGo.SetActive(true);
-                LayoutRow(i);
             }
+
+            // I12: with a fitted pill, every row starts at its left edge so the glyphs share one column (as wide as the
+            // widest glyph shown) and the words start on one line; without one, each row centres as before.
+            bool hasPill = _nameplate != null && _nameplate.TryGetPillLeftOffset(out _pillLeft);
+            float column = 0f;
+            for (int i = 0; i < count; i++)
+                if (_rowHasGlyph[i]) column = Mathf.Max(column, GlyphWidthFor(_glyphs[i].sprite));
+            for (int i = 0; i < count; i++) LayoutRow(i, hasPill, column);
         }
+
+        private float _pillLeft;   // last pill left edge read from the nameplate, stack-root x (I12)
 
         /// <summary>A row's text is rebuilt when its badge changed or the displayed (quantised) value moved: compares ints, so
         /// the unchanged frames allocate nothing.</summary>
@@ -654,14 +678,24 @@ namespace CluckWars.Visuals
             return FeedbackTuning.StatusBadgeGlyphSize * aspect;
         }
 
-        /// <summary>Centres the glyph + text pair on the row. The text width is the renderer's mesh bounds, which
-        /// settles one frame after a text write; a row's first frame is a one-frame approximation.</summary>
-        private void LayoutRow(int i)
+        /// <summary>Places the glyph + text pair of row <paramref name="i"/>: in the glyph column over the pill's left edge
+        /// (<see cref="PillColumnRowLayout"/>) when <paramref name="hasPill"/>, else centred (<see cref="RowLayout"/>). The text
+        /// width is the renderer's mesh bounds, which settles one frame after a text write; a row's first frame is a one-frame
+        /// approximation (it only matters for the centred fallback).</summary>
+        private void LayoutRow(int i, bool hasPill, float column)
         {
             float glyphW = _rowHasGlyph[i] ? GlyphWidthFor(_glyphs[i].sprite) : 0f;
-            var mr = _rowRenderers[i];
-            float textW = mr != null && _rows[i].text.Length > 0 ? mr.localBounds.size.x : 0f;
-            RowLayout(glyphW, FeedbackTuning.StatusBadgeGlyphGap, textW, out float gx, out float tx);
+            float gx, tx;
+            if (hasPill)
+            {
+                PillColumnRowLayout(_pillLeft, column, glyphW > 0f, FeedbackTuning.StatusBadgeGlyphGap, out gx, out tx);
+            }
+            else
+            {
+                var mr = _rowRenderers[i];
+                float textW = mr != null && _rows[i].text.Length > 0 ? mr.localBounds.size.x : 0f;
+                RowLayout(glyphW, FeedbackTuning.StatusBadgeGlyphGap, textW, out gx, out tx);
+            }
             _glyphs[i].transform.localPosition = new Vector3(gx, 0f, 0f);
             _rows[i].transform.localPosition = new Vector3(tx, 0f, 0f);
         }

@@ -121,6 +121,19 @@ namespace CluckWars.Visuals
             return true;
         }
 
+        /// <summary>
+        /// The visible pill's left edge as an x offset from the label origin, in this root's local units (the label's scale
+        /// applied): the stack-root x of the edge for <see cref="ChickenStatusBadges"/>, whose stack anchors at the label
+        /// origin's x (<see cref="TryGetPillTopAnchor"/>) and billboards the same way. False until the first fit.
+        /// </summary>
+        public bool TryGetPillLeftOffset(out float x)
+        {
+            x = 0f;
+            if (_textTransform == null || _plateHalfSize == Vector2.zero) return false;
+            x = (_plateCentreLocal.x - _plateHalfSize.x) * _textTransform.localScale.x;
+            return true;
+        }
+
         /// <summary>Root-local metres the label is raised for a taller class model (<see cref="SetHeadLift"/>).</summary>
         public float HeadLift => _headLift;
 

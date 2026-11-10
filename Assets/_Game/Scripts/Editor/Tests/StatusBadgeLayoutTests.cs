@@ -689,6 +689,70 @@ namespace CluckWars.Tests
             }
             finally { Object.DestroyImmediate(wide); Object.DestroyImmediate(square); Object.DestroyImmediate(tex); }
         }
+
+        [Test]
+        public void PillColumnRowLayout_GlyphsShareOneColumnAndWordsOneLine_WhateverTheGlyphOrTextWidth()
+        {
+            const float left = -0.42f, gap = FeedbackTuning.StatusBadgeGlyphGap;
+            float column = FeedbackTuning.StatusBadgeGlyphSize * 1.6f;   // a wide glyph sets the column
+            ChickenStatusBadges.PillColumnRowLayout(left, column, true, gap, out float gx0, out float tx0);
+            ChickenStatusBadges.PillColumnRowLayout(left, column, true, gap, out float gx1, out float tx1);
+            Assert.AreEqual(gx0, gx1, 1e-6f);
+            Assert.AreEqual(left + column * 0.5f, gx0, 1e-5f, "the glyph centres in the column over the pill's left edge");
+            Assert.AreEqual(tx0, tx1, 1e-6f);
+            Assert.AreEqual(left + column + gap, tx0, 1e-5f, "the words start one gap after the column");
+
+            ChickenStatusBadges.PillColumnRowLayout(left, column, false, gap, out _, out float txText);
+            Assert.AreEqual(left, txText, 1e-5f, "a row with no sprite starts its text (and its text glyph) at the pill edge");
+            ChickenStatusBadges.PillColumnRowLayout(left, 0f, false, gap, out _, out float txNone);
+            Assert.AreEqual(left, txNone, 1e-5f, "no glyph column at all: the text starts at the pill edge");
+        }
+
+        /// <summary>I12 (feedback 2026-11-10, badges_stun_slow): a STUN 1.1s row over a SLOW row used to centre each on its
+        /// own width, a ragged pyramid. Through the runtime layout on the real prefab, the two rows now share the glyph x,
+        /// at the rival pill's left edge plus half a glyph, and the pill itself stays where the nameplate centred it.</summary>
+        [Test]
+        public void TwoRowsOfDifferentText_ShareTheGlyphX_AtThePillLeftEdge_AndThePillStaysCentred()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            var root = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            var tex = new Texture2D(160, 160);
+            var square = Sprite.Create(tex, new Rect(0, 0, 160, 160), new Vector2(0.5f, 0.5f), 100f);
+            try
+            {
+                const BindingFlags Inst = BindingFlags.Instance | BindingFlags.NonPublic;
+                var plate = root.GetComponent<ChickenNameplate>();
+                var badges = root.GetComponent<ChickenStatusBadges>();
+                typeof(ChickenNameplate).GetMethod("Awake", Inst).Invoke(plate, null);
+                typeof(ChickenStatusBadges).GetMethod("Awake", Inst).Invoke(badges, null);
+                typeof(ChickenNameplate).GetMethod("FitMarks", Inst).Invoke(plate, new object[] { false, Color.white });
+
+                var pill = root.transform.Find("Nameplate/RivalMark").GetComponent<SpriteRenderer>();
+                var label = root.transform.Find("Nameplate");
+                Vector3 pillCentre = pill.transform.localPosition;
+                Assert.IsTrue(plate.TryGetPillLeftOffset(out float left), "a fitted nameplate reports its pill edge");
+                Assert.AreEqual((pillCentre.x - pill.size.x * 0.5f) * label.localScale.x, left, 1e-5f, "the pill's real left edge, label scale applied");
+
+                var glyphs = (SpriteRenderer[])typeof(ChickenStatusBadges).GetField("_glyphs", Inst).GetValue(badges);
+                var rows = (TextMesh[])typeof(ChickenStatusBadges).GetField("_rows", Inst).GetValue(badges);
+                var hasGlyph = (bool[])typeof(ChickenStatusBadges).GetField("_rowHasGlyph", Inst).GetValue(badges);
+                typeof(ChickenStatusBadges).GetField("_pillLeft", Inst).SetValue(badges, left);
+                Assert.GreaterOrEqual(rows.Length, 2);
+
+                string[] words = { "STUN 1.1s", "SLOW" };
+                for (int i = 0; i < 2; i++) { glyphs[i].sprite = square; hasGlyph[i] = true; rows[i].text = words[i]; }
+                float column = ChickenStatusBadges.GlyphWidthFor(square);
+                var layoutRow = typeof(ChickenStatusBadges).GetMethod("LayoutRow", Inst);
+                for (int i = 0; i < 2; i++) layoutRow.Invoke(badges, new object[] { i, true, column });
+
+                float g0 = glyphs[0].transform.localPosition.x, g1 = glyphs[1].transform.localPosition.x;
+                Assert.AreEqual(g0, g1, 1e-6f, "both rows' glyphs in one column");
+                Assert.AreEqual(left + FeedbackTuning.StatusBadgeGlyphSize * 0.5f, g0, 1e-5f, "glyph x = pill left + glyph half width");
+                Assert.AreEqual(rows[0].transform.localPosition.x, rows[1].transform.localPosition.x, 1e-6f, "the words start on one line");
+                Assert.AreEqual(pillCentre, pill.transform.localPosition, "the pill keeps its own centre");
+            }
+            finally { Object.DestroyImmediate(root); Object.DestroyImmediate(square); Object.DestroyImmediate(tex); }
+        }
     }
 
 }
