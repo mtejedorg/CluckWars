@@ -133,7 +133,7 @@ namespace CluckWars.Tests
             Assert.AreEqual("POUNCE", UiText.Get(UiKeys.MarkHexKill), "spec D5b: HUNT then POUNCE");
             Assert.AreEqual("MARKED!", UiText.Get(UiKeys.MarkToast));
             Assert.AreEqual("LIVE 1s", UiText.Format(UiKeys.MarkClock, ("secs", 1)));
-            Assert.AreEqual("LIVE IN 3", UiText.Format(UiKeys.MarkClockArming, ("secs", 3)));
+            Assert.AreEqual("LIVE IN 3s", UiText.Format(UiKeys.MarkClockArming, ("secs", 3)));
             Assert.AreEqual("24 m", UiText.Format(UiKeys.MarkDistance, ("m", 24)));
             foreach (var old in new[] { "mark.hunt", "mark.stun", "mark.closein", "mark.walled", "mark.kill", "mark.victim" })
                 Assert.IsFalse(UiText.HasKey(old), old);

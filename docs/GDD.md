@@ -770,7 +770,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | Ability | Short | Cooldown | Who can pick it | Effect |
 |---|---|---|---|---|
 | **Steal** | ROB | 4 s | everyone | Robs 5 food from every rival carrier within 5.16 m (Thief x1.6); no knockback. Was Snatch: 4.3 m ahead, cooldown 3 s, with knockback, Assassin-only. |
-| **Stun** | STUN | 7 s | everyone | Stuns every rival within 5.4 m for 1.3 s. Was Wing Slam (4.5 m, 120 deg cone). Also the Spoiler's way to qualify a Death Mark kill. |
+| **Stun** | STUN | 7 s | everyone | Stuns every rival within 5.4 m for 1.3 s. Was Wing Slam (4.5 m, 120 deg cone). Also the Spoiler's way to qualify a Hunt pounce. |
 | **Shove** | PUSH | 5 s | everyone | Shoves every rival within 5.4 m away (knockback force 16.2). Was Cluck Shock (4.5 m). |
 | **Slow** | SLOW | 6 s | everyone | Aura: slows every rival within 6.48 m to 55% speed for 3 s (a Slippery bird: to 73%, and only for the first 1.8 s). Was Feather Aura (5.4 m, "every chicken"). |
 | **Speed** | FAST | 4 s | everyone | A 1.5 s sprint at 1.3x movement speed (1.5x until 2026-11-05). Was Speed Burst; no longer Speedy-only. |
@@ -778,7 +778,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | **Egg Shell** | EGG | 8 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove, theft and execution still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 8 s from the cast. Press again to end it. Was Shield (until 2026-11-07), before that Turtle Mode (Fatty-only). |
 | **Hide** | HIDE | 4.5 s | everyone | Fades you to a ghostly outline for 2 s (opacity 0.2; 4 s until 2026-11-05). Using a move breaks it. Was Invisibility (Sneaky-only). |
 | **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
-| **Death Mark** | EXEC | 4 s after a miss, 8 s after a kill | none (pre-equip) | The execute (§6.4). Marks a rival, likelier far from home; stun them within 6.2 m, then press again to take everything they carry. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
+| **Hunt** (code Death Mark) | HUNT | 4 s after a miss, 8 s after a kill | none (pre-equip) | The hunt (§6.4): mark a rival far from home, stun them within 6.2 m, press again to pounce. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
 
 **Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. **Quick Drop** (`QuickDrop.asset`, `Retired` 1, out of the registry) was retired later the same day: its 4x banking burst became Featherfoot's permanent `DepositRateMultiplier` (1.5x, tuned to 1.1x the same day) (19 retired in all, 10 active). Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 10.
 

@@ -99,7 +99,7 @@ mark.hex.kill,POUNCE
 hud.backin,BACK IN!
 mark.toast,MARKED!
 mark.clock,LIVE {secs}s
-mark.clock.arming,LIVE IN {secs}
+mark.clock.arming,LIVE IN {secs}s
 mark.distance,{m} m
 loadout.next,NEXT
 loadout.registryMissing,"No abilities in registry.
