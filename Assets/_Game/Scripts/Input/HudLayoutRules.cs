@@ -95,13 +95,14 @@ namespace CluckWars.Input
         }
 
         /// <summary>
-        /// Touch-hex seconds readout: whole seconds rounded up, and empty (no digit) when nothing is left, so a held hex
-        /// with nobody in reach never prints a bare 0.
+        /// Touch-hex seconds readout: whole seconds rounded up with an <c>s</c> suffix (<c>4s</c>), and empty (no digit)
+        /// when nothing is left, so a held hex with nobody in reach never prints a bare 0. The suffix (I11) keeps the
+        /// countdown from twinning the slot badge numeral (<c>4</c>, top-left) on the touch arc.
         /// </summary>
         public static string TouchCooldownText(float remainingSeconds)
         {
             if (remainingSeconds <= 0f) return string.Empty;
-            return UnityEngine.Mathf.CeilToInt(remainingSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return UnityEngine.Mathf.CeilToInt(remainingSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture) + "s";
         }
     }
 

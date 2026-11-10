@@ -197,12 +197,18 @@
 }
 
 /* --- Layer 9 : cooldown seconds (centered, only while cd > 0) -------------- */
+/* I11 (2026-11-10): on the touch arc the bare centred digit ("4") twinned the slot badge ("4", top-left), so a
+   child read two identical numbers. Touch now writes "4s" (HudLayoutRules.TouchCooldownText) in a 40 px band
+   pinned to the LOWER-CENTRE of the hex, under the (dimmed) icon: y 98..138 of the 150 px pointy-top hex, where
+   the hex is still >= 80 px wide, clear of the badge (top-left) and the category mark (top-right). Accent gold
+   #f5c842 (the pip colour, which is hidden while cooling) keeps it apart from the cream badge numeral. The
+   desktop / pad strip restores the centred cream digit below (.cw-hud--desktop / .cw-hud--pad overrides). */
 .cw-hex-cdnum {
     position: absolute;
-    left: 0; right: 0; top: 0; bottom: 0;
+    left: 0; right: 0; top: auto; bottom: 12px; height: 40px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 46px;
-    color: rgb(254, 245, 224);
+    font-size: 36px;
+    color: rgb(245, 200, 66);
     /* ink outline: the number sits on top of the cream icon silhouette */
     -unity-text-outline-width: 4px;
     -unity-text-outline-color: rgb(42, 26, 12);
@@ -606,6 +612,12 @@
     padding-left: 10px; padding-right: 10px;
 }
 .cw-hud--desktop .cw-hex-badge-text, .cw-hud--pad .cw-hex-badge-text { font-size: 40px; }
+/* I11: the strip has no twin-number problem (its badge is a key name) - keep the centred cream seconds there. */
+.cw-hud--desktop .cw-hex-cdnum, .cw-hud--pad .cw-hex-cdnum {
+    top: 0; bottom: 0; height: auto;
+    font-size: 46px;
+    color: rgb(254, 245, 224);
+}
 
 /* ============================================================================
    FIRST-TIME HOLD HINT  (Phase 6 chunk 6, A1)

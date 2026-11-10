@@ -397,8 +397,38 @@ namespace CluckWars.Tests
         {
             Assert.AreEqual(string.Empty, HudLayoutRules.TouchCooldownText(0f));
             Assert.AreEqual(string.Empty, HudLayoutRules.TouchCooldownText(-0.1f));
-            Assert.AreEqual("1", HudLayoutRules.TouchCooldownText(0.4f));
-            Assert.AreEqual("4", HudLayoutRules.TouchCooldownText(3.2f));
+            Assert.AreEqual("1s", HudLayoutRules.TouchCooldownText(0.4f));
+            Assert.AreEqual("4s", HudLayoutRules.TouchCooldownText(3.2f));
+        }
+
+        [Test]
+        public void TouchCooldownNumber_SitsInTheHexLowerHalf_AwayFromTheBadge_StripStaysCentred()
+        {
+            // I11: the touch countdown ("4s") must not twin the slot badge numeral (top-left), so the base
+            // .cw-hex-cdnum rule (touch arc) pins a band to the lower half of the 150 px hex, under the icon.
+            string uss = Read("Assets/UI/Styles/TouchControls.uss");
+            var rule = Regex.Match(uss, @"(?m)^\.cw-hex-cdnum\s*\{([^}]*)\}");
+            Assert.IsTrue(rule.Success, "The .cw-hex-cdnum rule is missing.");
+            string body = rule.Groups[1].Value;
+            StringAssert.Contains("top: auto", body, "The touch countdown must not be stretched from the top edge.");
+            var bottom = Regex.Match(body, @"bottom:\s*(\d+)px");
+            var height = Regex.Match(body, @"height:\s*(\d+)px");
+            Assert.IsTrue(bottom.Success && height.Success, "The touch countdown needs an explicit bottom and height.");
+            const float hexPx = 150f;
+            float topEdge = hexPx - int.Parse(bottom.Groups[1].Value) - int.Parse(height.Groups[1].Value);
+            Assert.GreaterOrEqual(topEdge, hexPx / 2f, "The touch countdown band must sit entirely in the lower half of the hex.");
+            Assert.GreaterOrEqual(int.Parse(bottom.Groups[1].Value), 8, "Keep the band off the hex's bottom point.");
+            var badgeColour = Regex.Match(uss, @"\.cw-hex-badge-text\s*\{[^}]*color:\s*(rgb\([^)]*\))");
+            var cdColour = Regex.Match(body, @"(?<![-\w])color:\s*(rgb\([^)]*\))");
+            Assert.IsTrue(badgeColour.Success && cdColour.Success);
+            Assert.AreNotEqual(badgeColour.Groups[1].Value, cdColour.Groups[1].Value,
+                "The touch countdown is tinted apart from the cream badge numeral.");
+
+            // The desktop / pad strip keeps the centred seconds (its badge is a key name, no twin number).
+            var strip = Regex.Match(uss, @"\.cw-hud--desktop \.cw-hex-cdnum,\s*\.cw-hud--pad \.cw-hex-cdnum\s*\{([^}]*)\}");
+            Assert.IsTrue(strip.Success, "The desktop / pad .cw-hex-cdnum override is missing.");
+            StringAssert.Contains("top: 0", strip.Groups[1].Value);
+            StringAssert.Contains("bottom: 0", strip.Groups[1].Value);
         }
 
         // ---- First-time hint -------------------------------------------------------------------------------------
