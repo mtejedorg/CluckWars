@@ -167,6 +167,68 @@ namespace CluckWars.Tests
                 $"{path}: the arc stroke must be thinner than the bird outline (gone at a 13 px open) and reach below the bird");
         }
 
+        // ---- I9: hex safe area (BL-136) ------------------------------------------------------------------------------------------
+
+        // Mapping (TouchControls.uss): .cw-hex is 150 px with its children centred, .cw-hex-icon is an 88 px box drawn
+        // scale-to-fit, so the 256 canvas lands 1:1 on the box at 88/256 and the box spans hex px 31..119. The slot badge
+        // (.cw-hex-badge, 54 px at top/left 14) covers hex 14..68, i.e. the box's top-left 37x37; the category mark
+        // (.cw-cat-mark, 24 px, scale 1.3, top/right 30) takes the box's top-right corner, 24x24 as briefed. At 256 those
+        // corners are 37*256/88 = 108 px and 24*256/88 = 70 px. Safe circle: r 96 at (128,140) of the 256 canvas (top-down).
+        private const float HexIconBoxPx = 88f, BadgeCornerPx = 37f, MarkCornerPx = 24f;
+
+        /// <summary>Ink share of the top-left / top-right corner squares (side in 88 px box units). Texture rows run
+        /// bottom-up, so the top corners are the last rows.</summary>
+        private static float CornerInkShare(IconStrokeMetrics.Masks m, float sideInBox, bool left)
+        {
+            int side = Mathf.RoundToInt(sideInBox * m.W / HexIconBoxPx);
+            int ink = 0;
+            for (int y = m.H - side; y < m.H; y++)
+                for (int x = left ? 0 : m.W - side; x < (left ? side : m.W); x++)
+                    if (m.Ink[y * m.W + x]) ink++;
+            return ink / (float)(side * side);
+        }
+
+        private static float OpaqueOutsideSafeCircle(IconStrokeMetrics.Masks m)
+        {
+            float k = m.W / 256f, cx = 128f * k, cy = m.H - 140f * k, r = 96f * k;   // (128,140) top-down -> bottom-up
+            int all = 0, outside = 0;
+            for (int y = 0; y < m.H; y++)
+                for (int x = 0; x < m.W; x++)
+                {
+                    if (!m.Opaque[y * m.W + x]) continue;
+                    all++;
+                    float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                    if (dx * dx + dy * dy > r * r) outside++;
+                }
+            return all == 0 ? 1f : outside / (float)all;
+        }
+
+        private static readonly string[] HexSafeAreaIcons =
+            { nameof(WingSlamAbilitySO), nameof(ShadowstepAbilitySO), nameof(MarkKillAbilitySO), nameof(SnatchAbilitySO) };
+
+        [Test]
+        public void HexSafeArea_StunJumpHuntSteal_SitInTheSafeCircle_ClearOfTheCornerOverlays()
+        {
+            // I9: these four had their key feature (star, bird, toes, cob top) under the slot badge or the category mark on
+            // the phone (20-33 % ink in the badge corner, up to 23 % in the mark corner). Re-laid: the glyph sits in the
+            // safe circle, the mark corner holds <= 5 % ink, the badge corner <= 18 %. (The brief's 5 % for the badge
+            // corner is not reachable by a glyph that fills the safe circle - that circle alone crosses ~1/4 of the corner.)
+            var problems = new List<string>();
+            foreach (var typeName in HexSafeAreaIcons)
+            {
+                string path = AbilityIconStyle.SpriteFileFor(typeName);
+                var m = IconStrokeMetrics.Load(path);
+                if (m == null) { problems.Add($"{path}: not a readable PNG"); continue; }
+                float badge = CornerInkShare(m, BadgeCornerPx, left: true);
+                float mark = CornerInkShare(m, MarkCornerPx, left: false);
+                float outside = OpaqueOutsideSafeCircle(m);
+                if (mark > 0.05f) problems.Add($"{path}: {mark:P1} ink under the category-mark corner (24x24 of 88), want <= 5 %");
+                if (badge > 0.18f) problems.Add($"{path}: {badge:P1} ink under the slot-badge corner (37x37 of 88), want <= 18 %");
+                if (outside > 0.12f) problems.Add($"{path}: {outside:P1} of the glyph outside the safe circle r96 @ (128,140), want <= 12 %");
+            }
+            Assert.IsEmpty(problems, "Hex safe area (I9 / BL-136):\n" + string.Join("\n", problems));
+        }
+
         [Test]
         public void IconTextures_AreImportedSmall_OnEveryPlatform()
         {
