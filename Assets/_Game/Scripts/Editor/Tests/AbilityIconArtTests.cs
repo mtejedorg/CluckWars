@@ -153,5 +153,67 @@ namespace CluckWars.Tests
                 $"Ability icons must import at <= {limit} px (UiSpriteImportSettings caps them at " +
                 $"{UiSpriteImportSettings.AbilityIconMaxSize}; reimport if this fails):\n" + string.Join("\n", problems));
         }
+
+        // ---- H6: the Speed streak train must read as one line --------------------------------------------------------------------
+
+        private const string SpeedLinePath = "Assets/_Game/Art/UI/Fx/Fx_SpeedLine.png";
+
+        private static Texture2D LoadSpeedLine()
+        {
+            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            Assert.IsTrue(ImageConversion.LoadImage(tex, File.ReadAllBytes(SpeedLinePath)), "Fx_SpeedLine.png must decode");
+            return tex;
+        }
+
+        /// <summary>Mean alpha of one column (the streak length runs along X: the sprite is the wide axis).</summary>
+        private static float ColumnAlpha(Texture2D t, int x)
+        {
+            float sum = 0f;
+            for (int y = 0; y < t.height; y++) sum += t.GetPixel(x, y).a;
+            return sum / t.height;
+        }
+
+        [Test]
+        public void SpeedLine_ShortEndsRampToZero_SoNeighbouringStreaksMerge()
+        {
+            var t = LoadSpeedLine();
+            try
+            {
+                Assert.Greater(t.width, t.height, "the streak length is the wide (X) axis");
+                float centre = ColumnAlpha(t, t.width / 2);
+                Assert.Greater(centre, 0.5f, "the body keeps its alpha");
+                Assert.Less(ColumnAlpha(t, 0), 0.15f * centre, "first column ramps to ~0");
+                Assert.Less(ColumnAlpha(t, t.width - 1), 0.15f * centre, "last column ramps to ~0");
+                int ramp = Mathf.RoundToInt(t.width * 0.2f);
+                // monotone rise over the first 20 % and fall over the last 20 % (the ramp, not a hard edge)
+                for (int x = 1; x < ramp; x++)
+                {
+                    Assert.GreaterOrEqual(ColumnAlpha(t, x) + 0.01f, ColumnAlpha(t, x - 1), $"alpha rises at column {x}");
+                    int m = t.width - 1 - x;
+                    Assert.GreaterOrEqual(ColumnAlpha(t, m) + 0.01f, ColumnAlpha(t, m + 1), $"alpha falls at column {m}");
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(t); }
+        }
+
+        [Test]
+        public void SpeedLine_CentreKeepsItsInkEdgeOnTheLongSides()
+        {
+            var t = LoadSpeedLine();
+            try
+            {
+                int x = t.width / 2;
+                int dark = 0;
+                for (int y = 0; y < t.height; y++)
+                {
+                    var c = t.GetPixel(x, y);
+                    if (c.a > 0.3f && c.r < 0.3f && c.g < 0.3f && c.b < 0.3f) dark++;
+                }
+                Assert.GreaterOrEqual(dark, 2, "ink (dark opaque) pixels on the long sides at the centre column");
+                Assert.Less(t.GetPixel(x, 1).r, 0.3f, "one long side is ink");
+                Assert.IsTrue(t.GetPixel(x, t.height / 2).r > 0.9f, "the cream body is between the ink edges");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(t); }
+        }
     }
 }
