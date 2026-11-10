@@ -720,8 +720,9 @@ namespace CluckWars.Visuals
                 case Badge.Root:
                     return RootGlyph + " " + WordWithCountdown(UiText.Get(UiKeys.HudStatusStuck), secs);
                 case Badge.Slow:
-                    // Icon only: slow has no deadline and a x0.45 means nothing to a kid (Phase 7 A12).
-                    return string.Empty;
+                    // E6a (2026-11-09): the no-number rule stays (slow has no deadline and a x0.45 means nothing to a
+                    // kid), but the row carries the word like HIDDEN / FAST so the word channel is uniform.
+                    return UiText.Get(UiKeys.HudStatusSlow);
                 case Badge.Waddle: return WordWithCountdown(UiText.Get(UiKeys.HudBadgeWaddle), secs);
                 case Badge.Egg:    return WordWithCountdown(UiText.Get(UiKeys.HudBadgeEgg), secs);
                 case Badge.Hidden: return UiText.Get(UiKeys.HudBadgeHidden);
@@ -734,13 +735,14 @@ namespace CluckWars.Visuals
         private static string WordWithCountdown(string word, string secs) =>
             secs.Length > 0 ? word + " " + secs : word;
 
+        /// <summary>The row TEXT colour (the glyph keeps its own art colours).</summary>
         private static Color ColorFor(Badge badge)
         {
             switch (badge)
             {
                 case Badge.Stun:   return FeedbackTuning.CanonicalStunColor;
                 case Badge.Root:   return FeedbackTuning.CanonicalRootColor;
-                case Badge.Slow:   return FeedbackTuning.CanonicalSlowColor;
+                case Badge.Slow:   return FeedbackTuning.CanonicalSlowTextColor;
                 case Badge.Waddle:
                 case Badge.Egg:    return FeedbackPalette.Current.Accent(AccentKey.EggShell);
                 case Badge.Hidden: return FeedbackPalette.Current.Accent(AccentKey.Hide);

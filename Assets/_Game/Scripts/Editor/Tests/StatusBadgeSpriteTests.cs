@@ -192,6 +192,30 @@ namespace CluckWars.Tests
             Assert.AreEqual(HudFeedbackStyle.RootGlyph + " " + stuck, Compose(ChickenStatusBadges.Badge.Root, 0));
         }
 
+        [Test]
+        public void E6a_SlowRow_IsTheWordWithNoNumber()
+        {
+            string word = UiText.Get(UiKeys.HudStatusSlow);
+            Assert.AreEqual("SLOW", word);
+            foreach (int q in new[] { 0, 1, 45 })
+            {
+                string row = Compose(ChickenStatusBadges.Badge.Slow, q);
+                Assert.AreEqual(word, row);
+                Assert.IsFalse(row.Any(char.IsDigit), "the no-number rule stays: " + row);
+            }
+        }
+
+        [Test]
+        public void E6a_SlowTextColour_IsDarkerThanTheStateColourAndShipped()
+        {
+            var p = AssetDatabase.LoadAssetAtPath<FeedbackPaletteSO>("Assets/_Game/Data/FeedbackPalette.asset");
+            Assert.NotNull(p);
+            Color.RGBToHSV(p.SlowColor, out _, out _, out float vState);
+            Color.RGBToHSV(p.SlowTextColor, out _, out _, out float vText);
+            Assert.Less(vText, vState, "the text tint is darker than the ring colour");
+            Assert.AreNotEqual(p.SlowColor, p.SlowTextColor);
+        }
+
         // ---- layout ----------------------------------------------------------------------------------------
 
         [Test]

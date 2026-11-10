@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.FeedbackPaletteSO
   StunColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   SlowColor: {r: 0.3, g: 0.75, b: 1, a: 1}
+  SlowTextColor: {r: 0.15, g: 0.55, b: 0.95, a: 1}
   KnockColor: {r: 1, g: 1, b: 1, a: 1}
   NeutralNoEffectColor: {r: 0.58, g: 0.58, b: 0.62, a: 0.85}
   InkColor: {r: 0.165, g: 0.102, b: 0.047, a: 1}

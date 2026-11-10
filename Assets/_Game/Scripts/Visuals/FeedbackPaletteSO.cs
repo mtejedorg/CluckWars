@@ -33,6 +33,8 @@ namespace CluckWars.Visuals
         [Header("State colours")]
         public Color StunColor = new Color(1.00f, 0.85f, 0.20f, 1f);
         public Color SlowColor = new Color(0.30f, 0.75f, 1.00f, 1f);
+        [Tooltip("E6a: a darker slow blue for TEXT (the SLOW row word and pop) so it reads on pale ground; the ring and state colour stay SlowColor.")]
+        public Color SlowTextColor = new Color(0.15f, 0.55f, 0.95f, 1f);
         public Color KnockColor = new Color(1f, 1f, 1f, 1f);
         [Tooltip("\"Nothing will happen to THIS target\" grey (alpha is part of the colour).")]
         public Color NeutralNoEffectColor = new Color(0.58f, 0.58f, 0.62f, 0.85f);

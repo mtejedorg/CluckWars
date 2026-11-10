@@ -1240,12 +1240,12 @@ namespace CluckWars.Visuals
         /// <summary>
         /// The bare SLOW word on every peer, with no number (spec section 12 E2, 2026-11-08, supersedes the old
         /// SLOW 45% magnitude pop). Pops are words only: the badge row and the snail glyph carry the slow state,
-        /// and the cyan colour plus the word keep the two coding channels.
+        /// and the blue colour plus the word keep the two coding channels (the darker text tint, E6a).
         /// </summary>
         private void SpawnSlowText()
         {
             FloatingCombatText.Spawn(_controller, _controller.PopAnchorEntering(ChickenStatusBadges.Badge.Slow),
-                UiText.Get(UiKeys.HudPopSlow), FeedbackTuning.CanonicalSlowColor);
+                UiText.Get(UiKeys.HudPopSlow), FeedbackTuning.CanonicalSlowTextColor);
         }
 
         private Vector3 TextAnchorPoint() => _controller.PopAnchor;

@@ -1219,6 +1219,10 @@ namespace CluckWars.Visuals
         /// see the delete/replace instruction in the report.</summary>
         public static Color CanonicalSlowColor => FeedbackPalette.Current.SlowColor;
 
+        /// <summary>Darker slow blue for text (the SLOW row word and the SLOW pop, E6a); rings and tints keep
+        /// <see cref="CanonicalSlowColor"/>.</summary>
+        public static Color CanonicalSlowTextColor => FeedbackPalette.Current.SlowTextColor;
+
         /// <summary>Canonical knockback shockwave colour — already consistent
         /// (white) wherever it appears; reproduced for completeness.</summary>
         public static Color CanonicalKnockColor => FeedbackPalette.Current.KnockColor;
