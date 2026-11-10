@@ -365,6 +365,36 @@ namespace CluckWars.Tests
             StringAssert.Contains(StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.Marked), UssRuleBody(uss, "cw-hunter-skull-glyph"));
         }
 
+        [Test]
+        public void StatusGlyphSpriteBox_IsWideEnoughForTheWideStateGlyphs_AndScalesToFit()
+        {
+            // BL-135 (feedback I15): a 28 x 28 box letterboxed the wide glyphs to 15-17 px tall in the local strip.
+            string uss = System.IO.File.ReadAllText(TouchControlsUssPath);
+            foreach (var state in new[] { StateGlyphStyle.StateGlyph.Stunned, StateGlyphStyle.StateGlyph.Hidden,
+                                          StateGlyphStyle.StateGlyph.Speeding, StateGlyphStyle.StateGlyph.Slowed })
+            {
+                string cls = StateGlyphStyle.UssClassFor(state);
+                string body = null;
+                foreach (System.Text.RegularExpressions.Match r in System.Text.RegularExpressions.Regex.Matches(uss, @"([^{}]*)\{([^}]*)\}"))
+                {
+                    bool selects = System.Text.RegularExpressions.Regex.IsMatch(r.Groups[1].Value,
+                        @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"(?![a-z-])");
+                    if (selects && r.Groups[2].Value.Contains("height:")) { body = r.Groups[2].Value; break; }
+                }
+                Assert.IsNotNull(body, $"{state}: no box rule (width/height) selects .{cls}.");
+                float w = UssPx(body, "width"), h = UssPx(body, "height");
+                Assert.GreaterOrEqual(w / h, 1.6f, $"{state}: glyph box {w}x{h} is too narrow for the wide glyphs.");
+                StringAssert.Contains("-unity-background-scale-mode: scale-to-fit", body, $"{state}: glyph box must scale-to-fit.");
+            }
+        }
+
+        private static float UssPx(string body, string prop)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(body, @"(?<![a-z-])" + prop + @":\s*([0-9.]+)px");
+            Assert.IsTrue(m.Success, $"no `{prop}: Npx` in rule.");
+            return float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private static string UssRuleBody(string uss, string cls)
         {
             var m = System.Text.RegularExpressions.Regex.Match(uss, @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"\s*\{([^}]*)\}");

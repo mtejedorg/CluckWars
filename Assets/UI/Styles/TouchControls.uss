@@ -387,12 +387,16 @@
 }
 /* Sprite glyph rows (feedback batch C3): the row's glyph element carries one of these classes (set by the
    controller from HudFeedbackStyle.GlyphClassFor) and draws the state sprite from StateGlyphStyle; the text glyph
-   above stays as the fallback for a kind with no sprite (Root). 28 px sprite centred in the same 46 px slot. */
+   above stays as the fallback for a kind with no sprite (Root). The sprite box fills the whole 46 x 28 slot
+   (BL-135, feedback I15): the four wide state glyphs (Stunned / Hidden / Speeding / Slowed) are width-limited, so a
+   28 x 28 box letterboxed them to 15-17 px tall; at 46 wide scale-to-fit lets them reach ~28 px tall like the badge
+   rows, and square glyphs stay 28 px centred. Slot width is unchanged (was 28 + 9 + 9), so the name text start does
+   not move. */
 .cw-status-glyph--stunned, .cw-status-glyph--slowed, .cw-status-glyph--knocked-back, .cw-status-glyph--shield-walk,
 .cw-status-glyph--shield-egg, .cw-status-glyph--hidden, .cw-status-glyph--speeding, .cw-status-glyph--hunting,
 .cw-status-glyph--safe, .cw-status-glyph--peck-chain, .cw-status-glyph--marked {
-    width: 28px; height: 28px;
-    margin-left: 9px; margin-right: 9px;
+    width: 46px; height: 28px;
+    margin-left: 0; margin-right: 0;
     align-self: center;
     -unity-background-scale-mode: scale-to-fit;
 }
