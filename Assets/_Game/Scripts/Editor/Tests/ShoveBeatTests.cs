@@ -66,8 +66,10 @@ namespace CluckWars.Tests
             Assert.AreEqual(0, budget);
             Assert.AreEqual(0, ShoveBeatRules.SpendSkidBudget(5, ref budget), "an empty budget emits nothing");
             Assert.LessOrEqual(FeedbackTuning.ShoveSkidMaxLive, 10, "spec: at most 10 live for this effect");
-            // 0.25 s lifetime < 0.3 s window: everything emitted in the window can be alive at once, so the cap bounds the live count.
-            Assert.AreEqual(0.25f, FeedbackTuning.ShoveSkidLifeSeconds);
+            // I8: the 0.45 s life outlasts the 0.3 s window, so every puff of one shove can be alive at once: the per-edge
+            // budget (10) is the worst-case live count of one shove, and the Dust family maxParticles hard-caps overlapping shoves.
+            Assert.AreEqual(0.45f, FeedbackTuning.ShoveSkidLifeSeconds, 1e-4f);
+            Assert.AreEqual(10, FeedbackTuning.ShoveSkidMaxLive, "I8: the live count stays at 10");
             Assert.LessOrEqual(ChickenVFX.DustMaxParticles, 12);
             Assert.GreaterOrEqual(ChickenVFX.DustMaxParticles, FeedbackTuning.ShoveSkidMaxLive, "the dust family holds the whole skid");
         }
@@ -75,8 +77,8 @@ namespace CluckWars.Tests
         [Test]
         public void SkidAppearance_FollowsTheSpec()
         {
-            Assert.AreEqual(0.18f * 1.3f, FeedbackTuning.ShoveSkidSizeMin, 1e-4f, "F4: x1.3");
-            Assert.AreEqual(0.24f * 1.3f, FeedbackTuning.ShoveSkidSizeMax, 1e-4f, "F4: x1.3");
+            Assert.AreEqual(0.35f, FeedbackTuning.ShoveSkidSizeMin, 1e-4f, "I8: x1.5 of 0.234");
+            Assert.AreEqual(0.47f, FeedbackTuning.ShoveSkidSizeMax, 1e-4f, "I8: x1.5 of 0.312");
             Assert.AreEqual(0.85f, FeedbackTuning.ShoveSkidColor.r, 1e-4f);
             Assert.AreEqual(0.75f, FeedbackTuning.ShoveSkidColor.g, 1e-4f);
             Assert.AreEqual(0.55f, FeedbackTuning.ShoveSkidColor.b, 1e-4f);

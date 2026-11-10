@@ -1669,13 +1669,14 @@ namespace CluckWars.Visuals
         /// <summary>The skid needs more than this planar speed (m/s): the knockback decays under it in about 0.17 s, and a bird merely walking does not skid.</summary>
         public const float ShoveSkidMinSpeed = 4f;
         public const float ShoveSkidPerMetre = 4f;
-        /// <summary>F4: x1.3 of the D6 0.18-0.24 so the fainter puff (alpha 0.45) keeps its footprint.</summary>
-        public const float ShoveSkidSizeMin = 0.234f;
-        public const float ShoveSkidSizeMax = 0.312f;
-        public const float ShoveSkidLifeSeconds = 0.25f;
+        /// <summary>F4: x1.3 of the D6 0.18-0.24 so the fainter puff (alpha 0.45) keeps its footprint; I8: x1.5 again (0.234-0.312 to 0.35-0.47) because the puffs did not read in the impact frame.</summary>
+        public const float ShoveSkidSizeMin = 0.35f;
+        public const float ShoveSkidSizeMax = 0.47f;
+        /// <summary>I8: 0.25 to 0.45 s so the puffs linger long enough to read.</summary>
+        public const float ShoveSkidLifeSeconds = 0.45f;
         /// <summary>Scatter radius of a puff around the feet path.</summary>
         public const float ShoveSkidScatter = 0.12f;
-        /// <summary>Most skid puffs one knockback may emit: with a 0.25 s life and a 0.3 s window this is also the most live at once.</summary>
+        /// <summary>Most skid puffs one knockback may emit. With the 0.45 s life every puff of one shove can be alive at once (10 live), and the Dust family maxParticles (12) hard-caps back-to-back shoves.</summary>
         public const int ShoveSkidMaxLive = 10;
         /// <summary>Brown-cream ground dust (vfx.md 2.3); F4 alpha 0.6 to 0.45 (the brown read as mud on the green floor).</summary>
         public static readonly Color ShoveSkidColor = new Color(0.85f, 0.75f, 0.55f, 0.45f);
