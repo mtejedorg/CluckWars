@@ -10,7 +10,8 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 | Item | Status | Commit | Notes |
 |---|---|---|---|
-| H8 | Done (3202/3202) | see next row | Lab/tooling only. Dummy refill via ChickenCargo.SetCargoWithoutPop (authority-only, local one-shot SilentCargoWrite marker; no +n over the robbed victim). capture_feedback_lab.py waits one rendered frame between sample and shot and logs sample->shot frames/time and +t after release; new jump_3c_land (lands at +0.47 s real because of bridge latency; landing ring visible). Tests SilentCargoWriteTests (5). Capture H8/. |
+| H8 | Done (3202/3202) | `cfa547e0` | Lab/tooling only. Dummy refill via ChickenCargo.SetCargoWithoutPop (authority-only, local one-shot SilentCargoWrite marker; no +n over the robbed victim). capture_feedback_lab.py waits one rendered frame between sample and shot and logs sample->shot frames/time and +t after release; new jump_3c_land (lands at +0.47 s real because of bridge latency; landing ring visible). Tests SilentCargoWriteTests (5). Capture H8/. |
+| H1 | Done (3204/3204) | `c2e88959` | Entry pops clear the rows ON SCREEN: `ChickenStatusBadges.PopClearHeight` (dot(fromPivot, billboardUp) / up.y; the pill and rows extend along the billboard while a pop offset is world-vertical, so matching world Y left a two-row entry pop ~0.29 m low), `FloatingTextStackClearance` 0.10 -> 0.20; single-row pops move up ~18 px on the phone (the brief asked to keep them, neither brief option could). `MarkerPlacement` still uses the world-Y `CurrentStackTopLocalY` (flagged). Tests: ScreenLevelHeight, clearance covers a word half-height on screen. Capture `H1/badges_stun_slow` (phone): STUN word clear above the STUN 1.5s row with the Slow row live. Finished by the main session after the sub-agent hit the weekly limit mid-edit |
 
 ## 🔍 2026-11-09 - Ability feedback re-audit round 3 (`simplify-abilities`, head `c0bf57db`, five lenses, real-time capture)
 
