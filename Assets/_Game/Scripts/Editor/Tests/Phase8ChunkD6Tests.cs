@@ -128,7 +128,7 @@ namespace CluckWars.Tests
                 root.GetComponent<ChickenNameplate>().SetHeadLift(lift);
                 root.GetComponent<ChickenWorldBars>().SetHeadLift(lift);
                 root.GetComponent<ChickenStatusBadges>().SetHeadLift(lift);
-                root.GetComponent<ChickenStateOverlays>().SetHeadLift(lift);
+                root.GetComponent<ChickenStateOverlays>().SetHeadLift(lift, Entry(ChickenClass.Speedy).ResolvedModelScale.y);
 
                 for (int i = 0; i < names.Length; i++)
                     Assert.AreEqual(before[i] + lift, Child(root, names[i]).localPosition.y, 1e-3f, names[i]);

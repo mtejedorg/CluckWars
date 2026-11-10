@@ -179,6 +179,7 @@ namespace CluckWars.Visuals
         private static Material s_sharedMaterial;
 
         private ChickenController _controller;
+        private ChickenStateOverlays _overlays;   // H5: the class scale the bonk height follows
         private ChickenCombat     _combat;
         private ChickenCargo      _cargo;
         private AbilityController _abilities;
@@ -254,6 +255,7 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             _controller = GetComponent<ChickenController>();
+            _overlays   = GetComponent<ChickenStateOverlays>();
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
@@ -668,7 +670,7 @@ namespace CluckWars.Visuals
             var e = _stunBonk;
             e.Count = StunBeatRules.BonkCount(reduced);
             e.SpeedMin = e.SpeedMax = StunBeatRules.BonkSpeed(reduced);
-            EmitDust(in e, FeedbackTuning.StunBonkHeight / Mathf.Max(1e-4f, transform.lossyScale.y));   // FxPoint is root-local: keep the bonk at world head height
+            EmitDust(in e, ChickenStateOverlays.StunBonkHeightFor(_overlays != null ? _overlays.ClassScale : 1f) / Mathf.Max(1e-4f, transform.lossyScale.y));   // FxPoint is root-local: keep the bonk at world head height, scaled with the class (H5)
         }
 
         /// <summary>

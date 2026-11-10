@@ -15,8 +15,14 @@ namespace CluckWars.Visuals
     [RequireComponent(typeof(ChickenController))]
     public sealed class ChickenWorldBars : MonoBehaviour
     {
+        /// <summary>Default root-local height of the bar stack (the cargo bar centre) above the pivot, before the class head lift.</summary>
+        public const float DefaultBarHeight = 1.16f;
+
+        /// <summary>Authored root-local height of the cargo bar centre above the pivot, before the class head lift.</summary>
+        public float BarBaseHeight => _barOffset.y;
+
         [Tooltip("Bar stack offset above the chicken's pivot (below the nameplate).")]
-        [SerializeField] private Vector3 _barOffset = new Vector3(0f, 1.16f, 0f);
+        [SerializeField] private Vector3 _barOffset = new Vector3(0f, DefaultBarHeight, 0f);
 
         [Tooltip("Bar width in world units.")]
         [Range(0.3f, 2f)]

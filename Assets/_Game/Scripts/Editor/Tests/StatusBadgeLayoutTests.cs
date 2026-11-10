@@ -277,19 +277,58 @@ namespace CluckWars.Tests
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
             float lift = prefab.GetComponent<CharacterController>().height * (entry.ResolvedModelScale.y - 1f);
 
-            float centre = ChickenStateOverlays.StarLocalY(1f, lift);
+            float centre = ChickenStateOverlays.StarLocalY(1f, lift, entry.ResolvedModelScale.y);
             float starTop = centre + ChickenStateOverlays.StarBaseScale * 0.5f;   // steady size; the 0.15 s pop overshoot (x1.25) briefly draws behind the pill (order 8 < 10)
             float pillBottom = LowestPillBottomLocal(lift);
             Assert.Less(starTop, pillBottom, cls + ": a star tops out under the pill bottom " + pillBottom);
-            Assert.Greater(centre, 0.9f + lift, cls + ": the stars still frame the head, not the belly");
+            Assert.Greater(centre, 0.85f + lift, cls + ": the stars still frame the head, not the belly");
+        }
+
+        [TestCase(ChickenClass.Warrior)]
+        [TestCase(ChickenClass.Speedy)]
+        [TestCase(ChickenClass.Fatty)]
+        [TestCase(ChickenClass.Assassin)]
+        public void H5_StunStarTopStaysUnderTheCargoBar_ForEveryClassScale(ChickenClass cls)
+        {
+            var registry = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            Assert.IsTrue(registry.TryGet(cls, out var entry), cls + " in the registry");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            float scale = entry.ResolvedModelScale.y;
+            float lift = prefab.GetComponent<CharacterController>().height * (scale - 1f);
+            var bars = prefab.GetComponent<ChickenWorldBars>();
+            var so = new SerializedObject(bars);
+            float barCentre = bars.BarBaseHeight + lift;
+            float barHalf = so.FindProperty("_hpHeight").floatValue * 0.72f * 0.5f;      // CargoHeight / 2, the trough drawn at the bar centre
+            float barBottom = barCentre - barHalf;
+
+            float centre = ChickenStateOverlays.StarLocalY(1f, lift, scale);
+            float tiltExtent = FeedbackTuning.StunStarOrbitRadius * Mathf.Sin(FeedbackTuning.StunStarTiltDegrees * Mathf.Deg2Rad);
+            float starTop = centre + ChickenStateOverlays.StarBaseScale * 0.5f + tiltExtent;
+
+            Debug.Log($"H5 geometry {cls}: scale {scale:0.00} lift {lift:0.000} starCentre {centre:0.000} starTop {starTop:0.000} barCentre {barCentre:0.000} barBottom {barBottom:0.000} gap {barBottom - starTop:0.000}");
+            Assert.Less(starTop, barBottom, cls + ": the star top stays under the cargo bar bottom");
+            Assert.LessOrEqual(centre, FeedbackTuning.StunStarBeakHeight * scale + 1e-5f, cls + ": never above the scaled beak height");
+            Assert.AreEqual(ChickenStateOverlays.StunStarHeightFor(scale, barCentre), centre, 1e-5f, cls + ": the runtime height is the pure helper");
+        }
+
+        [Test]
+        public void H5_StarHeightRule_IsMinOfScaledBeakAndBarMinusClearance_AndBonkFollowsTheScale()
+        {
+            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight * 0.5f, ChickenStateOverlays.StunStarHeightFor(0.5f, 9f), 1e-5f, "a short class: the scaled beak height");
+            Assert.AreEqual(1f - FeedbackTuning.StunStarBarClearance, ChickenStateOverlays.StunStarHeightFor(2f, 1f), 1e-5f, "a tall class: capped under the bar");
+            Assert.AreEqual(FeedbackTuning.StunBonkHeight, ChickenStateOverlays.StunBonkHeightFor(1f), 1e-5f);
+            Assert.AreEqual(FeedbackTuning.StunBonkHeight * 1.3f, ChickenStateOverlays.StunBonkHeightFor(1.3f), 1e-5f);
+            Assert.AreEqual(15f, FeedbackTuning.StunStarTiltDegrees);
         }
 
         [Test]
         public void StarHeightIsAWorldMetreConstant_DividedByTheRootScale()
         {
-            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight, ChickenStateOverlays.StarLocalY(2f, 0f) * 2f, 1e-5f);
-            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight + 0.5f, ChickenStateOverlays.StarLocalY(1f, 0.5f), 1e-5f, "head lift is root-local");
-            Assert.AreEqual(FeedbackTuning.StunStarBeakHeight, ChickenStateOverlays.StarLocalY(0f, 0f), 1e-5f, "an unauthored zero scale is one");
+            float cap = ChickenWorldBars.DefaultBarHeight - FeedbackTuning.StunStarBarClearance;
+            Assert.AreEqual(cap, ChickenStateOverlays.StarLocalY(1f, 0f), 1e-5f, "an unscaled class sits under the bar");
+            Assert.AreEqual(ChickenStateOverlays.StunStarHeightFor(1f, ChickenWorldBars.DefaultBarHeight * 2f), ChickenStateOverlays.StarLocalY(2f, 0f) * 2f, 1e-5f, "world metres, divided by the root scale (the bar is 2x higher in world metres too)");
+            Assert.AreEqual(ChickenStateOverlays.StarLocalY(1f, 0f) + 0.5f, ChickenStateOverlays.StarLocalY(1f, 0.5f, 1f + 0.5f / 1.2f), 1e-4f, "head lift is root-local (bar and stars rise together)");
+            Assert.AreEqual(cap, ChickenStateOverlays.StarLocalY(0f, 0f), 1e-5f, "an unauthored zero scale is one");
             StringAssert.Contains("lossyScale.y", System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/ChickenVFX.cs"), "the bonk height divides by the root scale too");
         }
 

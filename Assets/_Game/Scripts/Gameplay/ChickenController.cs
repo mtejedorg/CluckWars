@@ -641,7 +641,7 @@ namespace CluckWars.Gameplay
             // captures _restScale from this transform in SetModelRoot (called after we return), so it keeps it.
             var modelScale = entry.ResolvedModelScale;
             model.transform.localScale = modelScale;
-            ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f));
+            ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f), modelScale.y);
             ChickenFootprint.Apply(this, model.transform);   // foot rings clear the body (Phase 8 chunk C R3)
 
             // Caches its renderer set in Spawned, which may already have run — and could not have
@@ -660,13 +660,13 @@ namespace CluckWars.Gameplay
         /// stun stars) by <paramref name="lift"/> root-local metres, so a class model drawn taller than the
         /// collider does not swallow them. Ground overlays are untouched: they describe the hitbox.
         /// </summary>
-        private void ApplyOverlayHeadLift(float lift)
+        private void ApplyOverlayHeadLift(float lift, float classScale)
         {
             if (Mathf.Approximately(lift, 0f)) return;
             GetComponent<ChickenNameplate>()?.SetHeadLift(lift);
             GetComponent<ChickenWorldBars>()?.SetHeadLift(lift);
             GetComponent<ChickenStatusBadges>()?.SetHeadLift(lift);
-            GetComponent<ChickenStateOverlays>()?.SetHeadLift(lift);
+            GetComponent<ChickenStateOverlays>()?.SetHeadLift(lift, classScale);
         }
 
         /// <summary>

@@ -1793,6 +1793,16 @@ namespace CluckWars.Visuals
         /// starts about 1.5 m up) instead of crossing it. Sorting order 8 is the head-overlay layer (vfx.md 0.1), under the
         /// 10-12 label band.</summary>
         public const float StunStarBeakHeight = 1.20f;
+
+        /// <summary>H5: the stars' resting height is <see cref="StunStarBeakHeight"/> times the model's class scale (a taller class has
+        /// its head higher), capped so the star TOP (half a star + the tilt's vertical extent) stays under the cargo bar's bottom edge.
+        /// The cap is the bar centre minus this clearance: 0.27 m = star half-size 0.13 + tilt extent 0.088 + the bar half-height 0.04
+        /// + a hair. (The first H5 brief said 0.20; that brushes the bar by 0.07 m once the star radius and the tilt are counted.)</summary>
+        public const float StunStarBarClearance = 0.27f;
+
+        /// <summary>H5: the star orbit plane leans toward the camera by this many degrees (about the camera's right axis), so the
+        /// ring reads as a ring from the high game camera and the near stars do not hide the head.</summary>
+        public const float StunStarTiltDegrees = 15f;
         public const float StunStarOrbitRadius = 0.34f;
         public const int StunStarSortingOrder = 8;
 

@@ -106,6 +106,9 @@ namespace CluckWars.Visuals
         private Transform      _starRoot;
         private SpriteRenderer[] _stars;
         private float          _headLift;
+        private float          _classScale = 1f;   // H5: the model's class scale (Y), set with the head lift
+        private float          _barBaseY = ChickenWorldBars.DefaultBarHeight;
+        private float          _starSpin;          // accumulated orbit angle, degrees
 
         // Stun beats (D10): edge state of "is this bird stunned" (pure, see StunStarTimeline).
         private StunStarTimeline _starTimeline;
@@ -127,6 +130,7 @@ namespace CluckWars.Visuals
             _combat     = GetComponent<ChickenCombat>();
             _cargo      = GetComponent<ChickenCargo>();
 
+            _barBaseY = GetComponent<ChickenWorldBars>() is { } bars ? bars.BarBaseHeight : ChickenWorldBars.DefaultBarHeight;
             BuildStars();
             _slowBlob    = BuildFlatSprite("SlowBlob",    DiscSprite(),    SlowBlobDiameter, SlowColor, sortingOrder: 2, y: 0.03f);
             _rootBlob    = BuildFlatSprite("RootBlob",    DiscSprite(),    0.74f, RootColor,    sortingOrder: 3, y: 0.03f);
@@ -138,24 +142,51 @@ namespace CluckWars.Visuals
 
         // ── Construction ───────────────────────────────────────────────────────
 
-        /// <summary>Raises the stun stars for a class model drawn taller than the collider (Phase 8 D6).
-        /// Root-local metres; presentation only.</summary>
-        public void SetHeadLift(float lift)
+        /// <summary>Raises the stun stars for a class model drawn taller than the collider (Phase 8 D6) and tells them the model's class
+        /// scale (H5). Root-local metres; presentation only.</summary>
+        public void SetHeadLift(float lift, float classScale = 1f)
         {
             _headLift = lift;
+            _classScale = classScale > 1e-4f ? classScale : 1f;
             if (_starRoot != null) _starRoot.localPosition = new Vector3(0f, StarY(), 0f);
         }
 
-        /// <summary>Root-local Y of the star orbit centre: the beak height (a world-metre constant, so divided by the root's
-        /// lossy Y scale), plus the class head lift (root-local, as the nameplate carries it), plus the world-metre
+        /// <summary>The model's class scale (Y); one until <see cref="SetHeadLift"/> says otherwise.</summary>
+        public float ClassScale => _classScale;
+
+        /// <summary>H5: world-metre height of the star orbit centre above the pivot: the beak height scaled by the class scale, capped
+        /// <see cref="FeedbackTuning.StunStarBarClearance"/> under the cargo bar centre (<paramref name="cargoBarWorldY"/>), so a taller
+        /// class never lifts the stars into its bar. Pure.</summary>
+        public static float StunStarHeightFor(float classScale, float cargoBarWorldY) =>
+            Mathf.Min(FeedbackTuning.StunStarBeakHeight * classScale, cargoBarWorldY - FeedbackTuning.StunStarBarClearance);
+
+        /// <summary>H5: world-metre height of the victim's bonk puff: <see cref="FeedbackTuning.StunBonkHeight"/> follows the class
+        /// scale like the stars do. Pure.</summary>
+        public static float StunBonkHeightFor(float classScale) => FeedbackTuning.StunBonkHeight * classScale;
+
+        /// <summary>Root-local Y of the star orbit centre: <see cref="StunStarHeightFor"/> (world metres, so divided by the root's lossy Y
+        /// scale; the cargo bar sits at <paramref name="barBaseY"/> plus the root-local <paramref name="headLift"/>) plus the world-metre
         /// <paramref name="offsetY"/> of a drop. A root scale of zero (never authored) is treated as one.</summary>
-        public static float StarLocalY(float lossyScaleY, float headLift, float offsetY = 0f)
+        public static float StarLocalY(float lossyScaleY, float headLift, float classScale = 1f, float offsetY = 0f,
+                                       float barBaseY = ChickenWorldBars.DefaultBarHeight)
         {
-            float inv = lossyScaleY > 1e-4f ? 1f / lossyScaleY : 1f;
-            return (FeedbackTuning.StunStarBeakHeight + offsetY) * inv + headLift;
+            float scale = lossyScaleY > 1e-4f ? lossyScaleY : 1f;
+            float height = StunStarHeightFor(classScale, (barBaseY + headLift) * scale);
+            return (height + offsetY) / scale;
         }
 
-        private float StarY(float offsetY = 0f) => StarLocalY(transform.lossyScale.y, _headLift, offsetY);
+        private float StarY(float offsetY = 0f) =>
+            StarLocalY(transform.lossyScale.y, _headLift, _classScale, offsetY, _barBaseY);
+
+        /// <summary>Spin about the tilted orbit axis: the plane leans toward the camera by <see cref="FeedbackTuning.StunStarTiltDegrees"/>
+        /// (a world-space tilt about the camera's right axis, so the chicken's yaw does not turn it). No camera, no tilt.</summary>
+        private void SpinStars(float degrees)
+        {
+            _starSpin = Mathf.Repeat(_starSpin + degrees, 360f);
+            var cam = Camera.main;
+            var tilt = cam != null ? Quaternion.AngleAxis(FeedbackTuning.StunStarTiltDegrees, cam.transform.right) : Quaternion.identity;
+            _starRoot.rotation = tilt * Quaternion.Euler(0f, _starSpin, 0f);
+        }
 
         private void BuildStars()
         {
@@ -306,7 +337,7 @@ namespace CluckWars.Visuals
             if (!f.Visible) return;
 
             _starRoot.localPosition = new Vector3(0f, StarY(f.OffsetY), 0f);
-            if (f.Orbit && !PlayerPreferences.ReducedMotionEnabled) _starRoot.Rotate(Vector3.up, _starSpinSpeed * Time.deltaTime, Space.Self);
+            SpinStars(f.Orbit && !PlayerPreferences.ReducedMotionEnabled ? _starSpinSpeed * Time.deltaTime : 0f);
             ApplyStars(f.Scale, f.Alpha);
             FaceStars(!f.Orbit);
         }
