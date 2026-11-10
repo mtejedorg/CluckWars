@@ -151,6 +151,7 @@ namespace CluckWars.Gameplay
         private ChangeDetector _cargoDetector;
         private PropertyReader<float> _cargoReader;
         private SilentCargoWrite _silentWrite;   // lab-only no-pop refill, see SetCargoWithoutPop
+        private int _stealCreditFrame = -1;      // I5: frame of this thief own steal credit (local, presentation only)
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
@@ -279,6 +280,16 @@ namespace CluckWars.Gameplay
 
                 // A drain into a base is not a loss to anyone — it is the point of the game.
                 if (delta < 0f && IsDepositing) continue;
+
+                // I5: the thief own +n waits for the stolen kernels (HitFeedback releases it on their arrival);
+                // pile pickups, the victim -n and every other peer view pop at once, as before.
+                if (delta > 0f && StealGainPopHold.IsStealCredit(_stealCreditFrame, Time.frameCount) &&
+                    _hitFeedback != null && FloatingCombatText.IsSelfPopTarget(_controller))
+                {
+                    _stealCreditFrame = -1;
+                    _hitFeedback.HoldStealGainPop(delta);
+                    continue;
+                }
 
                 FloatingCombatText.SpawnCargoPop(_controller,
                     _controller.PopAnchor, delta);
@@ -633,6 +644,7 @@ namespace CluckWars.Gameplay
             }
 
             Cargo += amount;
+            _stealCreditFrame = Time.frameCount;   // I5: Render holds this gain own +n until the kernels land
             _pendingSteals.Record(victim._controller.Id, amount, Time.unscaledTime);
             victim.RPC_DrainStolen(amount, _controller.Id);
         }

@@ -1740,6 +1740,13 @@ namespace CluckWars.Visuals
         /// <summary>A kernel fades out over the last share of its flight when it vanishes (hidden thief).</summary>
         public const float StealChunkVanishFraction = 0.4f;
 
+        /// <summary>I5: the thief own +n waits for the last kernel; with no kernel flight in the air (hidden-thief reroute,
+        /// culled mover) it pops this long after the cargo write instead (one kernel flight).</summary>
+        public const float StealSelfPopFallbackSeconds = 0.35f;
+        /// <summary>I5: a held +n pops after this long even if a flight is still reported in the air, so it is never lost
+        /// (fallback + the last kernel of a robbery, 2 x stagger + flight, + a round trip).</summary>
+        public const float StealSelfPopMaxHoldSeconds = 1.2f;
+
         /// <summary>Arrival sparkles at the thief: 4 gold (2 under Reduced Motion, fading in place), 0.25 s.</summary>
         public const int StealArrivalSparkleCount = 4;
         public const int StealArrivalSparkleCountReduced = 2;

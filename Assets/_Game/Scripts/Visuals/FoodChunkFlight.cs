@@ -34,6 +34,7 @@ namespace CluckWars.Visuals
             public Vector3 Start, End, Lateral;
             public ChickenController Thief;
             public ChickenVFX ThiefVfx;
+            public HitFeedback ThiefFeedback;   // I5: the Arrives kernel only, on the ToThief route
             public float Roll;
             public float BaseScale;
             public Color Tint;
@@ -98,6 +99,7 @@ namespace CluckWars.Visuals
             Vector3 side = flat.sqrMagnitude > 1e-4f ? Vector3.Cross(Vector3.up, flat.normalized) : Vector3.right;
             var gold = FeedbackPalette.Current.YolkColor;
             var thiefVfx = route == StealBeatRules.ChunkRoute.ToThief ? thief.GetComponent<ChickenVFX>() : null;
+            var thiefFeedback = route == StealBeatRules.ChunkRoute.ToThief ? thief.GetComponent<HitFeedback>() : null;
 
             int n = FeedbackTuning.StealChunksPerVictim;
             for (int i = 0; i < n; i++)
@@ -115,6 +117,7 @@ namespace CluckWars.Visuals
                 m.ThiefVfx = thiefVfx;
                 m.Order = FeedbackTuning.StealChunkSortingOrder;
                 m.Arrives = i == n - 1;
+                m.ThiefFeedback = m.Arrives ? thiefFeedback : null;
                 m.Roll = i * 120f;
                 m.Tint = gold;
                 m.Life = StealBeatRules.ChunkLifeSeconds(reduced);
@@ -122,6 +125,7 @@ namespace CluckWars.Visuals
                 m.BaseScale = FeedbackTuning.StealChunkSize / SpriteWidth(s_cornSprite);
                 m.Renderer.sprite = s_cornSprite;
                 pool.Activate(m);
+                if (m.ThiefFeedback != null) m.ThiefFeedback.NotifyStealFlightLaunched();   // I5: the thief +n waits for this one
             }
         }
 
@@ -151,6 +155,7 @@ namespace CluckWars.Visuals
                 m.Lateral = Vector3.zero;
                 m.Thief = null;
                 m.ThiefVfx = null;
+                m.ThiefFeedback = null;
                 m.Arrives = false;
                 m.Roll = s * FeedbackTuning.StealWhiffSpreadDegrees;
                 m.Tint = FeedbackTuning.StealWhiffColor;
@@ -195,6 +200,7 @@ namespace CluckWars.Visuals
                 m.Lateral = Vector3.zero;
                 m.Thief = null;
                 m.ThiefVfx = null;
+                m.ThiefFeedback = null;
                 m.Arrives = false;
                 m.Roll = -side * FeedbackTuning.StunArcRollDegrees;
                 m.Tint = new Color(accent.r, accent.g, accent.b, 1f);
@@ -259,7 +265,12 @@ namespace CluckWars.Visuals
             if (_pool == null) BuildPool();
             for (int i = 0; i < _pool.Length; i++) _ages[i] = _pool[i].Live ? _pool[i].Age : -1f;
             int slot = StealBeatRules.PickSlot(_ages);
-            return slot < 0 ? null : _pool[slot];
+            if (slot < 0) return null;
+            var m = _pool[slot];
+            // A robbery's last kernel recycled mid-air never lands: the thief held +n falls back to its timer (I5).
+            if (m.Live && m.ThiefFeedback != null) m.ThiefFeedback.NotifyStealFlightCulled();
+            m.ThiefFeedback = null;
+            return m;
         }
 
         private void Activate(Mover m)
@@ -292,10 +303,13 @@ namespace CluckWars.Visuals
         {
             if (m.Kind == Kind.Kernel && m.Arrives && m.ThiefVfx != null && m.Thief != null && m.Route == StealBeatRules.ChunkRoute.ToThief)
                 m.ThiefVfx.EmitStealArrival();   // gates on the thief opacity and Reduced Motion itself
+            if (m.Kind == Kind.Kernel && m.Arrives && m.ThiefFeedback != null)
+                m.ThiefFeedback.NotifyStealFlightArrived();   // I5: the thief own +n pops as the corn lands
             m.Live = false;
             _live--;
             m.Thief = null;
             m.ThiefVfx = null;
+            m.ThiefFeedback = null;
             m.Root.gameObject.SetActive(false);
         }
 

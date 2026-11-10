@@ -239,11 +239,170 @@ namespace CluckWars.Tests
             Assert.Greater(start, 0);
             Assert.Greater(end, start);
             var beat = hitSrc.Substring(start, end - start);
-            StringAssert.DoesNotContain("FloatingCombatText", beat, "the steal beat adds no pop beside the cargo ROB/+n");
+            // I5: the only text in the beat is the thief own +n, held from ChickenCargo and spawned on the kernels arrival.
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(beat, @"FloatingCombatText\.").Count,
+                "the steal beat adds no pop beside the cargo ROB/+n");
+            StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", beat, "the held +n is the same cargo pop, only later");
 
             var cargoSrc = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
             Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(cargoSrc, @"FloatingCombatText\.Spawn\w*\(").Count,
                 "one pop per cargo change on any peer (SpawnCargoPop: the self word on the owner, corn text for rivals)");
+        }
+
+        // ---- I5: the thief own +n lands with the corn ----
+
+        [Test]
+        public void ThiefPop_IsHeldOnTheCargoWrite_AndSpawnsOnTheLastKernelArrival()
+        {
+            var hold = new StealGainPopHold();
+            hold.Hold(5f);                                   // the cargo write: nothing pops
+            Assert.AreEqual(0f, hold.Tick(0.016f), "no pop on the cargo write");
+            hold.FlightLaunched();                           // the victim kernels leave
+            Assert.AreEqual(0f, hold.Tick(FeedbackTuning.StealSelfPopFallbackSeconds), "a flight is in the air: the fallback waits");
+            Assert.AreEqual(0f, hold.Tick(0.05f));
+            Assert.AreEqual(5f, hold.FlightArrived(), Eps, "the +5 pops as the last kernel lands");
+            Assert.IsFalse(hold.IsHolding);
+            Assert.AreEqual(0f, hold.Tick(1f), "exactly one pop");
+        }
+
+        [Test]
+        public void ThiefPop_FlightLaunchedBeforeTheCargoChangeIsSeen_StillWaitsForIt()
+        {
+            var hold = new StealGainPopHold();
+            hold.FlightLaunched();                           // the victim Render ran first this frame
+            hold.Hold(4f);
+            Assert.AreEqual(0f, hold.Tick(FeedbackTuning.StealSelfPopFallbackSeconds + 0.01f));
+            Assert.AreEqual(4f, hold.FlightArrived(), Eps);
+        }
+
+        [Test]
+        public void ThiefPop_TwoVictims_SumIntoOnePop_OnTheLastFlight()
+        {
+            var hold = new StealGainPopHold();
+            hold.Hold(3f);
+            hold.Hold(2f);                                   // more cargo in the queue window
+            hold.FlightLaunched();
+            hold.FlightLaunched();
+            Assert.AreEqual(0f, hold.FlightArrived(), "one flight still in the air");
+            Assert.AreEqual(5f, hold.FlightArrived(), Eps, "one summed pop");
+        }
+
+        [Test]
+        public void ThiefPop_NoLiveFlight_FallsBackAt0_35s()
+        {
+            Assert.AreEqual(0.35f, FeedbackTuning.StealSelfPopFallbackSeconds, "one kernel flight");
+            Assert.AreEqual(FeedbackTuning.StealChunkFlightSeconds, FeedbackTuning.StealSelfPopFallbackSeconds, Eps);
+            var hold = new StealGainPopHold();
+            hold.Hold(5f);                                   // hidden-thief reroute: no flight comes to this thief
+            Assert.AreEqual(0f, hold.Tick(0.34f), "still held just before the fallback");
+            Assert.AreEqual(5f, hold.Tick(0.02f), Eps, "pops at 0.35 s");
+            Assert.AreEqual(0f, hold.Tick(1f));
+        }
+
+        [Test]
+        public void ThiefPop_CulledFlight_FallsBackToTheTimer_AndAStuckFlightIsCapped()
+        {
+            var hold = new StealGainPopHold();
+            hold.Hold(5f);
+            hold.FlightLaunched();
+            hold.FlightCulled();                             // the mover was recycled mid-air
+            Assert.AreEqual(0f, hold.Tick(0.2f));
+            Assert.AreEqual(5f, hold.Tick(0.2f), Eps, "culled: the 0.35 s fallback");
+
+            var stuck = new StealGainPopHold();
+            stuck.Hold(2f);
+            stuck.FlightLaunched();                          // never reported as landed
+            Assert.AreEqual(0f, stuck.Tick(FeedbackTuning.StealSelfPopMaxHoldSeconds - 0.01f));
+            Assert.AreEqual(2f, stuck.Tick(0.02f), Eps, "a held pop is never lost");
+            Assert.Greater(FeedbackTuning.StealSelfPopMaxHoldSeconds,
+                FeedbackTuning.StealSelfPopFallbackSeconds + 2 * FeedbackTuning.StealChunkStaggerSeconds + FeedbackTuning.StealChunkFlightSeconds,
+                "the cap never cuts a normal last kernel short");
+        }
+
+        [Test]
+        public void ThiefPop_OnlyTheThiefOwnStealCreditIsHeld()
+        {
+            Assert.IsTrue(StealGainPopHold.IsStealCredit(10, 10), "the Render of the credit frame");
+            Assert.IsTrue(StealGainPopHold.IsStealCredit(10, 11), "or the next one");
+            Assert.IsFalse(StealGainPopHold.IsStealCredit(10, 12), "an older credit is some other gain: it pops at once");
+            Assert.IsFalse(StealGainPopHold.IsStealCredit(-1, 10), "no credit (pile peck, Bank, a remote thief): pops at once");
+        }
+
+        [Test]
+        public void ThiefPop_KernelArrivalReleasesTheHeldPop_ThroughTheFlightPool()
+        {
+            var go = new GameObject("[FoodChunkFlightTest]");
+            var thief = new GameObject("[ThiefTest]");
+            var flight = go.AddComponent<FoodChunkFlight>();
+            var feedback = thief.AddComponent<HitFeedback>();
+            try
+            {
+                const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+                typeof(FoodChunkFlight).GetMethod("Awake", F).Invoke(flight, null);
+                var take = typeof(FoodChunkFlight).GetMethod("Take", F);
+                var activate = typeof(FoodChunkFlight).GetMethod("Activate", F);
+                var finish = typeof(FoodChunkFlight).GetMethod("Finish", F);
+                var hold = (StealGainPopHold)typeof(HitFeedback).GetField("_stealPop", F).GetValue(feedback);
+
+                object Kernel()
+                {
+                    var m = take.Invoke(flight, null);
+                    var t = m.GetType();
+                    t.GetField("Kind").SetValue(m, System.Enum.ToObject(t.GetField("Kind").FieldType, 0));   // Kernel
+                    t.GetField("Arrives").SetValue(m, true);
+                    t.GetField("Route").SetValue(m, ChunkRoute.ToThief);
+                    t.GetField("ThiefFeedback").SetValue(m, feedback);
+                    t.GetField("Life").SetValue(m, FeedbackTuning.StealChunkFlightSeconds);
+                    activate.Invoke(flight, new[] { m });
+                    feedback.NotifyStealFlightLaunched();
+                    return m;
+                }
+
+                feedback.HoldStealGainPop(5f);
+                var last = Kernel();
+                Assert.IsTrue(hold.IsHolding);
+                Assert.AreEqual(1, hold.FlightsLive);
+                finish.Invoke(flight, new[] { last });
+                Assert.IsFalse(hold.IsHolding, "the last kernel landing releases the held +n");
+                Assert.AreEqual(0, hold.FlightsLive);
+
+                // A recycled last kernel never lands: the hold falls back to its timer.
+                feedback.HoldStealGainPop(5f);
+                var culled = Kernel();
+                culled.GetType().GetField("Age").SetValue(culled, 9f);   // make it the oldest
+                for (int i = 1; i < FeedbackTuning.StealChunkPoolSize; i++) activate.Invoke(flight, new[] { take.Invoke(flight, null) });
+                take.Invoke(flight, null);                               // pool full: recycles the culled kernel
+                Assert.AreEqual(0, hold.FlightsLive, "the recycled flight is no longer counted");
+                Assert.IsTrue(hold.IsHolding, "and the pop waits for the fallback");
+            }
+            finally
+            {
+                typeof(FoodChunkFlight).GetField("s_instance", BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, null);
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(thief);
+            }
+        }
+
+        [Test]
+        public void ThiefPop_CargoRendersRouteOnlyTheOwnStealGain_TheVictimLossStaysImmediate()
+        {
+            var src = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
+            int credit = src.IndexOf("public void CreditStealAndDrain(", System.StringComparison.Ordinal);
+            Assert.Greater(credit, 0);
+            StringAssert.Contains("_stealCreditFrame = Time.frameCount;", src.Substring(credit, 900),
+                "the thief credit is stamped where it is written (local, no networked signal)");
+
+            int render = src.IndexOf("public override void Render()", System.StringComparison.Ordinal);
+            int held = src.IndexOf("_hitFeedback.HoldStealGainPop(delta)", render, System.StringComparison.Ordinal);
+            int pop = src.IndexOf("FloatingCombatText.SpawnCargoPop(", render, System.StringComparison.Ordinal);
+            int loss = src.IndexOf("_hitFeedback?.NotifyCargoLoss(", render, System.StringComparison.Ordinal);
+            Assert.Greater(held, render);
+            Assert.Less(held, pop, "the own steal gain is held before the immediate pop");
+            string gate = src.Substring(render, held - render);
+            StringAssert.Contains("delta > 0f && StealGainPopHold.IsStealCredit(_stealCreditFrame, Time.frameCount)", gate,
+                "only a gain that is this thief own credit is held: the victim -n and pile pickups pop at once");
+            StringAssert.Contains("FloatingCombatText.IsSelfPopTarget(_controller)", gate, "only the thief own screen waits");
+            Assert.Greater(loss, pop, "the victim loss beat follows the immediate pop, unchanged (E4a)");
         }
 
         [Test]

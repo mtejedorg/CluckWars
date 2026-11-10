@@ -224,6 +224,7 @@ namespace CluckWars.Visuals
         /// why that scan had to go and why both observation orders have to work.
         /// </summary>
         private HitAttribution _attribution;
+        private readonly StealGainPopHold _stealPop = new StealGainPopHold();   // I5: this thief own +n waits for its kernels
 
         // Reused across cast events so a 32 Hz stream of activations never allocates.
         private readonly System.Collections.Generic.List<ChickenController> _castTargets = new(4);
@@ -283,6 +284,7 @@ namespace CluckWars.Visuals
             // previous occupant's named attacker or its dangling pending impact and light a
             // bearing for a hit that happened to somebody else.
             _attribution = new HitAttribution(FeedbackTuning.HitAttributionWindowSeconds);
+            _stealPop.Clear();
 
             _log?.Debug(Source, $"Spawned. HasInputAuthority={HasInputAuthority}, hitStop={_enableHitStop}.");
         }
@@ -296,6 +298,7 @@ namespace CluckWars.Visuals
             }
             EndFlash();
             HitStopDriver.CancelIfRequestedBy(this);
+            _stealPop.Clear();
         }
 
         private void OnDisable()
@@ -947,6 +950,7 @@ namespace CluckWars.Visuals
             AnimateFlash();
             AnimateMotionLines();
             AnimateGrabLines();
+            SpawnStealGainPop(_stealPop.Tick(Time.deltaTime));
         }
 
         private void AnimateFlash()
@@ -1154,6 +1158,30 @@ namespace CluckWars.Visuals
         {
             if (_controller == null || _controller.IsDecoy) return;
             FoodChunkFlight.PlaySteal(_controller, thief);
+        }
+
+        // ---- I5: the thief own +n lands with the corn ----------------------------
+
+        /// <summary>
+        /// Called by <see cref="ChickenCargo"/> instead of the immediate pop for this thief own steal gain: the
+        /// <c>+n</c> is held until the last stolen kernel lands (<see cref="NotifyStealFlightArrived"/>), or
+        /// <see cref="FeedbackTuning.StealSelfPopFallbackSeconds"/> with no flight in the air. Presentation only.
+        /// </summary>
+        public void HoldStealGainPop(float delta) => _stealPop.Hold(delta);
+
+        /// <summary><see cref="FoodChunkFlight"/>: a robbery's kernels started toward this thief.</summary>
+        public void NotifyStealFlightLaunched() => _stealPop.FlightLaunched();
+
+        /// <summary><see cref="FoodChunkFlight"/>: the last kernel of a robbery landed on this thief.</summary>
+        public void NotifyStealFlightArrived() => SpawnStealGainPop(_stealPop.FlightArrived());
+
+        /// <summary><see cref="FoodChunkFlight"/>: a flight toward this thief was recycled before it landed.</summary>
+        public void NotifyStealFlightCulled() => _stealPop.FlightCulled();
+
+        private void SpawnStealGainPop(float delta)
+        {
+            if (delta <= 0f || _controller == null) return;
+            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor, delta);
         }
 
         private void AddGrabVictim(ChickenController victim)
