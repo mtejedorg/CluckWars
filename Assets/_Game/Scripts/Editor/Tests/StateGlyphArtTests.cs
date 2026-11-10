@@ -74,12 +74,12 @@ namespace CluckWars.Tests
         public void EveryStateGlyph_HasStrokesThatSurviveA9pxOpen()
         {
             // Same stroke contract as the ability icons: a 9 px open at 256 keeps >= 90 % of the ink, so the
-            // outline matches the kept set and no hairline detail disappears on a 24-40 px badge.
+            // outline matches the kept set and no hairline detail disappears on a 24-40 px badge. Every state,
+            // Marked's skull included (I14: it carries the ink ring now, though it lives outside the States folder).
             var problems = new List<string>();
             foreach (var s in States)
             {
                 string path = StateGlyphStyle.SpritePathFor(s);
-                if (!path.StartsWith(StateGlyphStyle.GlyphFolder)) continue;   // Marked reuses the shipped skull
                 var m = IconStrokeMetrics.Load(path);
                 if (m == null) { problems.Add($"{path}: not a readable PNG"); continue; }
                 float kept = IconStrokeMetrics.InkKeptByOpen(m);
@@ -169,26 +169,55 @@ namespace CluckWars.Tests
             Assert.That(gSeed, Is.InRange(iSeed * 0.5f, iSeed * 1.5f), $"PECK seed/head ratio {gSeed:F3} vs icon {iSeed:F3}");
 
             // Ink ring: every opaque pixel on the outer edge is ink, and the ink share sits in the other glyphs' range.
+            Assert.GreaterOrEqual(EdgeInkShare(glyph), 0.95f, "PECK glyph outer edge is not an ink ring");
+            var (min, max) = InkShareRangeOfFolderGlyphs(StateGlyphStyle.StateGlyph.PeckChain);
+            float peck = InkShare(glyph);
+            Assert.That(peck, Is.InRange(min - 0.02f, max + 0.02f), $"PECK ink share {peck:F2} outside the glyph range {min:F2}-{max:F2}");
+        }
+
+        [Test]
+        public void SkullGlyph_CarriesTheInkRing_WithAnInkShareInTheGlyphRange()
+        {
+            // I14: the Marked skull shipped as a flat white shape (ink share 0.00 vs 0.38-0.63 on every other state
+            // glyph), so it read as a different family on the badge. It now carries the same 17 px ink ring with its
+            // eye sockets, nose and tooth gaps as ink: the outer edge is ink and the ink share sits in the range the
+            // States-folder glyphs show (derived from the folder at test time, not hand-copied).
+            string path = StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.Marked);
+            var skull = IconStrokeMetrics.Load(path);
+            Assert.IsNotNull(skull, path + " unreadable");
+            Assert.GreaterOrEqual(EdgeInkShare(skull), 0.95f, "Marked skull outer edge is not an ink ring");
+            var (min, max) = InkShareRangeOfFolderGlyphs(StateGlyphStyle.StateGlyph.Marked);
+            float share = InkShare(skull);
+            Assert.That(share, Is.InRange(min - 0.02f, max + 0.02f), $"Marked skull ink share {share:F2} outside the glyph range {min:F2}-{max:F2}");
+        }
+
+        /// <summary>Fraction of the opaque pixels on the glyph's outer edge that are ink (1 = a full ink ring).</summary>
+        private static float EdgeInkShare(IconStrokeMetrics.Masks m)
+        {
             int edge = 0, edgeInk = 0;
-            for (int y = 0; y < glyph.H; y++)
-                for (int x = 0; x < glyph.W; x++)
+            for (int y = 0; y < m.H; y++)
+                for (int x = 0; x < m.W; x++)
                 {
-                    int i = y * glyph.W + x;
-                    if (!glyph.Opaque[i]) continue;
-                    bool border = x == 0 || y == 0 || x == glyph.W - 1 || y == glyph.H - 1
-                        || !glyph.Opaque[i - 1] || !glyph.Opaque[i + 1] || !glyph.Opaque[i - glyph.W] || !glyph.Opaque[i + glyph.W];
+                    int i = y * m.W + x;
+                    if (!m.Opaque[i]) continue;
+                    bool border = x == 0 || y == 0 || x == m.W - 1 || y == m.H - 1
+                        || !m.Opaque[i - 1] || !m.Opaque[i + 1] || !m.Opaque[i - m.W] || !m.Opaque[i + m.W];
                     if (!border) continue;
                     edge++;
-                    if (glyph.Ink[i]) edgeInk++;
+                    if (m.Ink[i]) edgeInk++;
                 }
-            Assert.Greater(edge, 0);
-            Assert.GreaterOrEqual(edgeInk / (float)edge, 0.95f, "PECK glyph outer edge is not an ink ring");
+            Assert.Greater(edge, 0, "glyph has no opaque edge");
+            return edgeInk / (float)edge;
+        }
 
+        /// <summary>Min and max ink share over the glyphs in the States folder, leaving out <paramref name="except"/>.</summary>
+        private static (float min, float max) InkShareRangeOfFolderGlyphs(StateGlyphStyle.StateGlyph except)
+        {
             float min = float.MaxValue, max = float.MinValue;
             foreach (var s in States)
             {
                 string path = StateGlyphStyle.SpritePathFor(s);
-                if (s == StateGlyphStyle.StateGlyph.PeckChain || !path.StartsWith(StateGlyphStyle.GlyphFolder)) continue;
+                if (s == except || !path.StartsWith(StateGlyphStyle.GlyphFolder)) continue;
                 var m = IconStrokeMetrics.Load(path);
                 if (m == null) continue;
                 float share = InkShare(m);
@@ -196,8 +225,7 @@ namespace CluckWars.Tests
                 max = Mathf.Max(max, share);
             }
             Assert.Less(min, max, "need other state glyphs to derive the ink range");
-            float peck = InkShare(glyph);
-            Assert.That(peck, Is.InRange(min - 0.02f, max + 0.02f), $"PECK ink share {peck:F2} outside the glyph range {min:F2}-{max:F2}");
+            return (min, max);
         }
 
         private static bool[] CreamOf(IconStrokeMetrics.Masks m)
