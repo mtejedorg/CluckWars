@@ -89,6 +89,12 @@ namespace CluckWars.Visuals
         /// sits above the nameplate pill, so it rarely overlaps one, but a neighbour's label must never draw over a badge.</summary>
         public const int SortingOrder = FeedbackTuning.StatusBadgeSortingOrder;
 
+        /// <summary>The local bird's badge order (E9c): above every rival part of the band, so its stack never prints under a neighbour's.</summary>
+        public const int LocalSortingOrder = FeedbackTuning.LocalStatusBadgeSortingOrder;
+
+        /// <summary>The order a badge stack draws at: <see cref="LocalSortingOrder"/> on the bird this peer owns, else <see cref="SortingOrder"/>.</summary>
+        public static int OrderFor(bool hasInputAuthority) => hasInputAuthority ? LocalSortingOrder : SortingOrder;
+
         /// <summary>Badge text size: 0.0338 (D0b) x 0.30/0.17 (D0c) to match the 0.30 glyph, so the row text cap height
         /// tracks the glyph; about 1.2x the nameplate's characterSize (0.05).</summary>
         private const float CharacterSize = 0.0596f;
@@ -139,6 +145,8 @@ namespace CluckWars.Visuals
         // Scratch for this frame's active set. Fixed size, never reallocated.
         private Badge[] _active;
         private float[] _value;
+
+        private int _appliedOrder = SortingOrder;
 
         private readonly bool[] _warnedMissingSprite = new bool[8];
 
@@ -337,7 +345,7 @@ namespace CluckWars.Visuals
                 {
                     mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                     mr.receiveShadows    = false;
-                    mr.sortingOrder      = SortingOrder;
+                    mr.sortingOrder      = _appliedOrder;
                 }
                 _rowRenderers[i] = mr;
 
@@ -346,7 +354,7 @@ namespace CluckWars.Visuals
                 var glyphGo = new GameObject("Glyph");
                 glyphGo.transform.SetParent(go.transform, worldPositionStays: false);
                 var sr = glyphGo.AddComponent<SpriteRenderer>();
-                sr.sortingOrder      = SortingOrder;
+                sr.sortingOrder      = _appliedOrder;
                 sr.color             = Color.white;
                 sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 sr.receiveShadows    = false;
@@ -359,6 +367,18 @@ namespace CluckWars.Visuals
             }
 
             _stackRoot.gameObject.SetActive(false);
+        }
+
+        /// <summary>Writes <paramref name="order"/> on every row and glyph renderer, only when it differs from what they carry.</summary>
+        private void ApplySortingOrder(int order)
+        {
+            if (order == _appliedOrder) return;
+            _appliedOrder = order;
+            for (int i = 0; i < _rowRenderers.Length; i++)
+            {
+                if (_rowRenderers[i] != null) _rowRenderers[i].sortingOrder = order;
+                if (_glyphs[i] != null) _glyphs[i].sortingOrder = order;
+            }
         }
 
         private void LateUpdate()
@@ -392,6 +412,7 @@ namespace CluckWars.Visuals
 
             if (!_stackRoot.gameObject.activeSelf) _stackRoot.gameObject.SetActive(true);
 
+            ApplySortingOrder(OrderFor(_controller.HasInputAuthority));   // a late authority change re-orders the rows
             UpdateEntryPunch(count);
             LayoutAndFill(count);
             BillboardToCamera();

@@ -1822,13 +1822,16 @@ namespace CluckWars.Visuals
 
         /// <summary>Label band (vfx.md 0.1, orders 10-12), bottom to top: rival pill, rival text (and dot ring), rival dot and slow
         /// glyph (and the badges: glyph + row text). The local "You" pill and text sit above every rival part (13 to 15), and
-        /// everything stays under the cargo bars (100) and the floating popups (210). Stars (8) sit below the whole band.</summary>
+        /// everything stays under the cargo bars (100) and the floating popups (210). Stars (8) sit below the whole band.
+        /// E9c: the local bird's whole label band draws above every rival part: pill 13, text 14, badge rows and glyphs 15
+        /// (<see cref="LocalStatusBadgeSortingOrder"/>), and its own pops one above a rival pop (211 vs 210).</summary>
         public const int RivalPillSortingOrder = 10;
         public const int RivalTextSortingOrder = 11;
         public const int RivalDotSortingOrder = 12;
         public const int StatusBadgeSortingOrder = 12;
         public const int LocalPillSortingOrder = 13;
         public const int LocalTextSortingOrder = 14;
+        public const int LocalStatusBadgeSortingOrder = 15;
 
         // ---- Slow aura (D8, vfx.md 2.4) --------------------------------------------------------------
 

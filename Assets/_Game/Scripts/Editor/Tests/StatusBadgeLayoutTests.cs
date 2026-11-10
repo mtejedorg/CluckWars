@@ -168,9 +168,10 @@ namespace CluckWars.Tests
                 _pool = Go.AddComponent<FloatingCombatText>();
                 typeof(FloatingCombatText).GetMethod("BuildPool", NonPublic).Invoke(_pool, null);
             }
-            public void Spawn(Vector3 pos, Transform follow) =>
+            public void Spawn(Vector3 pos, Transform follow, bool isLocal = false) =>
                 typeof(FloatingCombatText).GetMethod("SpawnInternal", NonPublic)
-                    .Invoke(_pool, new object[] { pos, "TEST", Color.white, follow, FloatingCombatText.WordCharacterSize });
+                    .Invoke(_pool, new object[] { pos, "TEST", Color.white, follow, FloatingCombatText.WordCharacterSize, isLocal });
+            public int PopOrder(int slot) => Go.transform.GetChild(slot).GetComponent<MeshRenderer>().sortingOrder;
             public void Tick() => typeof(FloatingCombatText).GetMethod("LateUpdate", NonPublic).Invoke(_pool, null);
             public Vector3 PopPosition(int slot) => Go.transform.GetChild(slot).position;
         }
@@ -484,6 +485,59 @@ namespace CluckWars.Tests
             int min = int.MaxValue;
             foreach (var r in t.GetComponentsInChildren<Renderer>(true)) min = Mathf.Min(min, r.sortingOrder);
             return min;
+        }
+
+        [Test]
+        public void LocalLabelBand_EveryLocalOrderIsAboveEveryRivalOrder()
+        {
+            int[] rival = { ChickenNameplate.RivalPillOrder, ChickenNameplate.RivalTextOrder, FeedbackTuning.RivalDotSortingOrder,
+                            ChickenStatusBadges.OrderFor(false), FloatingCombatText.PopupOrderFor(false) };
+            Assert.AreEqual(new[] { 10, 11, 12, 12, 210 }, rival, "the rival band");
+            int[] local = { ChickenNameplate.LocalPillOrder, ChickenNameplate.LocalTextOrder,
+                            ChickenStatusBadges.OrderFor(true), FloatingCombatText.PopupOrderFor(true) };
+            Assert.AreEqual(new[] { 13, 14, 15, 211 }, local, "the local band");
+            // Each local part sits above every rival part of its own band (label parts vs pops).
+            foreach (int l in new[] { local[0], local[1], local[2] })
+                foreach (int r in new[] { rival[0], rival[1], rival[2], rival[3] })
+                    Assert.Greater(l, r, "a local label part draws over every rival label part");
+            Assert.Greater(local[3], rival[4], "a local pop draws over a rival pop");
+        }
+
+        [Test]
+        public void LocalStack_RowAndGlyphRenderersCarryTheLocalOrder_RivalCarriesTwelve()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChickenPrefab);
+            var root = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            try
+            {
+                var badges = root.GetComponent<ChickenStatusBadges>();
+                typeof(ChickenStatusBadges).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(badges, null);
+                var apply = typeof(ChickenStatusBadges).GetMethod("ApplySortingOrder", BindingFlags.Instance | BindingFlags.NonPublic);
+                var stack = root.transform.Find("StatusBadges");
+
+                Assert.AreEqual(12, MinOrder(root.transform, "StatusBadges"), "built as a rival stack");
+                apply.Invoke(badges, new object[] { ChickenStatusBadges.OrderFor(true) });
+                Assert.AreEqual(15, MinOrder(root.transform, "StatusBadges"), "a late authority change re-orders every row and glyph");
+                Assert.AreEqual(15, MaxOrder(root.transform, "StatusBadges"));
+                Assert.That(stack.GetComponentsInChildren<SpriteRenderer>(true), Is.Not.Empty);
+                apply.Invoke(badges, new object[] { ChickenStatusBadges.OrderFor(false) });
+                Assert.AreEqual(12, MaxOrder(root.transform, "StatusBadges"));
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void LocalPop_DrawsOneAboveARivalPop()
+        {
+            var h = new PoolHarness();
+            try
+            {
+                h.Spawn(Vector3.zero, null, isLocal: true);
+                Assert.AreEqual(211, h.PopOrder(0));
+                h.Spawn(Vector3.zero, null, isLocal: false);
+                Assert.AreEqual(210, h.PopOrder(1));
+            }
+            finally { Object.DestroyImmediate(h.Go); }
         }
 
         [Test]

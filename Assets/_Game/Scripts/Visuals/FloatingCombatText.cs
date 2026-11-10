@@ -59,6 +59,12 @@ namespace CluckWars.Visuals
         /// disappears behind a name it is spawned on top of.</summary>
         private const int PopupSortingOrder = 210;
 
+        /// <summary>The local bird's own pops (E9c): one above a rival pop so they print on top where they overlap.</summary>
+        private const int LocalPopupSortingOrder = PopupSortingOrder + 1;
+
+        /// <summary>The order a pop draws at: <see cref="LocalPopupSortingOrder"/> for the owner's own pops, else <see cref="PopupSortingOrder"/>.</summary>
+        public static int PopupOrderFor(bool isLocal) => isLocal ? LocalPopupSortingOrder : PopupSortingOrder;
+
         private sealed class Popup
         {
             public Transform Root;
@@ -107,12 +113,12 @@ namespace CluckWars.Visuals
             SpawnSized(worldPos, text, color, follow, WordCharacterSize);
 
         /// <summary>Shared body of every spawn: <paramref name="characterSize"/> is written on each spawn, so a recycled slot never keeps the previous pop's size.</summary>
-        private static void SpawnSized(Vector3 worldPos, string text, Color color, Transform follow, float characterSize)
+        private static void SpawnSized(Vector3 worldPos, string text, Color color, Transform follow, float characterSize, bool isLocal = false)
         {
             if (string.IsNullOrEmpty(text)) return;
             var pool = EnsureInstance();
             if (pool == null) return;
-            pool.SpawnInternal(worldPos, text, color, follow, characterSize);
+            pool.SpawnInternal(worldPos, text, color, follow, characterSize, isLocal);
         }
 
         /// <summary>
@@ -208,7 +214,7 @@ namespace CluckWars.Visuals
         {
             if (!IsSelfPopTarget(controller)) return false;
             string text = args == null || args.Length == 0 ? UiText.Get(key) : UiText.Format(key, args);
-            SpawnUngated(controller.PopAnchorEntering(entering), text, color, controller.transform);
+            SpawnSized(controller.PopAnchorEntering(entering), text, color, controller.transform, WordCharacterSize, isLocal: true);
             return true;
         }
 
@@ -321,7 +327,7 @@ namespace CluckWars.Visuals
 
         // ── Spawn / recycle ────────────────────────────────────────────────────
 
-        private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow, float characterSize)
+        private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow, float characterSize, bool isLocal)
         {
             if (_pool == null) BuildPool();
 
@@ -337,6 +343,8 @@ namespace CluckWars.Visuals
             popup.Text.text          = text;
             popup.Text.color         = color;
             popup.Text.characterSize = characterSize;   // always overwritten, so a recycled slot never keeps a stale size
+            var renderer = popup.Text.GetComponent<MeshRenderer>();
+            if (renderer != null) renderer.sortingOrder = PopupOrderFor(isLocal);   // same: a recycled slot never keeps a stale order
 
             popup.Root.position = worldPos;
             if (!popup.Root.gameObject.activeSelf) popup.Root.gameObject.SetActive(true);
