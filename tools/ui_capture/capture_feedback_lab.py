@@ -6,6 +6,8 @@ Usage (Editor open, bridge up, not in Play mode): python tools/ui_capture/captur
                                 the probe samples; writes <out_dir>/particles_storm.txt (see storm()).
   --only <ability>[,<ability>]  runs only those abilities' shots plus the 00_rest frame. Names: steal, stun, shove, slow
                                 (loadout A), speed, jump, shield, hide (loadout B), peck (C), hunt (D, Assassin).
+                                shove also shoots push_over_slow_a/_b (Slow, then Shove on the slowed dummy); shield also
+                                shoots shield_6c_hatch_still (the hatch with the stick let go mid egg).
                                 Without the flag the whole run is unchanged.
 Every ability's sequence is also probed for particle counts (CluckWars.EditorTools.ParticleProbe): the peaks per ability,
 per chicken (live particles, ParticleSystem count) and for the whole scene, are written to <out_dir>/particles.txt.
@@ -76,7 +78,9 @@ public class FB {
   public static string Stick(string x, string y) { var h = TouchControlsController.Instance; var ci = CultureInfo.InvariantCulture; F("_movement").SetValue(h, new Vector2(float.Parse(x, ci), float.Parse(y, ci))); return "stick " + x + "," + y; }
   public static string RespawnAs(string cls) { Lab().RespawnPlayerAs((ChickenClass)System.Enum.Parse(typeof(ChickenClass), cls)); return "respawn " + cls; }
   public static string ResetDummies() { foreach (var d in Lab().Dummies) d.ResetNow("capture"); return "reset"; }
-  public static string ClearCooldowns() { var l = Local(); for (int i = 0; i < 4; i++) l.Abilities.TriggerCooldown(i, 0.01f); return "cd cleared"; }
+  // Only the slots that are not running: a running slot keeps its cooldown (so a storm re-press cannot restart it mid-run).
+  public static string ClearCooldowns() { var l = Local(); var kept = new List<int>(); for (int i = 0; i < 4; i++) { if (l.Abilities.IsSlotActive(i)) { kept.Add(i); continue; } l.Abilities.TriggerCooldown(i, 0.01f); }
+    return "cd cleared" + (kept.Count > 0 ? " (kept running slot " + string.Join(",", kept) + ")" : ""); }
   public static string DummyStunned() { return Others().Any(c => c.IsStunned) ? "1" : "0"; }
   public static string Frame() { return "F=" + Time.frameCount + " T=" + Time.realtimeSinceStartup.ToString("0.000", CultureInfo.InvariantCulture); }
   public static string ProbeBegin(string tag) { return CluckWars.EditorTools.ParticleProbe.Begin(tag); }
@@ -89,7 +93,8 @@ public class FB {
   public static string PeckProbeEnd() { return CluckWars.EditorTools.PeckEdgeProbe.End(); }
   public static string Info() { var l = Local(); if (l == null) return "no local"; var a = l.Abilities;
     string self = "SELF ctrl=" + l.CurrentControlState + " stunned=" + l.IsStunned + " opacity=" + l.VisualOpacity.ToString("0.00") + " stealProof=" + l.IsStealProof + " cargo=" + l.Cargo.Cargo.ToString("0.0")
-      + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0"))) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount + " castId=" + a.LastCastEventId + " castAb=" + (a.LastCastAbility != null ? a.LastCastAbility.name : "-");
+      + " active=" + string.Join("", Enumerable.Range(0,4).Select(i => a.IsSlotActive(i) ? "1" : "0")) + " cd=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.CooldownRemaining(i).ToString("0.0")))
+      + " run=" + string.Join("/", Enumerable.Range(0,4).Select(i => a.GetSlot(i) != null ? (a.ActiveRemaining01For(i) * a.GetSlot(i).ResolveActiveDuration(l)).ToString("0.00") : "-")) + " charging=" + a.ChargingSlot + " lastHits=" + a.LastCastHitCount + " castId=" + a.LastCastEventId + " castAb=" + (a.LastCastAbility != null ? a.LastCastAbility.name : "-");
     string oth = string.Join(" | ", Others().Select(c => "DUMMY ctrl=" + c.CurrentControlState + " stunned=" + c.IsStunned + " flags=" + c.ControlFlags + " cargo=" + c.Cargo.Cargo.ToString("0.0") + " dist=" + Vector3.Distance(c.transform.position, l.transform.position).ToString("0.0")));
     var pl = NearestPile(); string pileInfo = pl != null ? " || PILE amount=" + pl.Amount.ToString("0.0") + " reach=" + pl.IsWithinCollectRange(l.transform.position) : "";
     return self + " || " + oth + pileInfo + " ts=" + Time.timeScale; }
@@ -193,6 +198,65 @@ def ability(slot, tag, after=((0.5, "3_impact"), (1.5, "4_after")), ts=DEFAULT_T
     log(" ", cs("ResetDummies"))
     log(" ", cs("ClearCooldowns"))
     time.sleep(1.5)
+
+
+def wait_idle(limit=5.0):
+    """Waits until none of the local bird's slots is running (Info active=0000), so the next ClearCooldowns clears them all."""
+    t0 = time.time()
+    while time.time() - t0 < limit:
+        if "active=0000" in str(cs("Info")):
+            return
+        time.sleep(0.2)
+    log("  WARNING: a slot is still running after %.1f s, its cooldown stays" % limit)
+
+
+def press(slot, hold=0.4):
+    """Real press path: hold (instant preview), then release (cast). Returns the release time."""
+    log(" ", cs("Hold", str(slot)))
+    time.sleep(hold)
+    log(" ", cs("Release", str(slot)))
+    return time.time()
+
+
+def push_over_slow(tag="push_over_slow"):
+    """Round-4 finding 2: Slow on the dummy, 0.35 s, then Shove the same dummy; frames +0.2 s / +0.6 s after the Shove release
+    show the PUSH pop against the live SLOW row. Loadout A: slot 2 Shove (CluckShock), slot 3 Slow (FeatherAura)."""
+    log("==", tag, "slow, 0.35 s, shove")
+    cs("TimeScale", "1")
+    press(3)
+    time.sleep(0.35)
+    t_release = press(2, hold=0.25)
+    for at, suffix in ((0.2, "_a"), (0.6, "_b")):
+        while time.time() < t_release + at:
+            time.sleep(0.01)
+        shot(tag + suffix, t_release)
+    log(" ", cs("ResetDummies"))
+    wait_idle()   # the Slow aura runs 3 s: let it end so the Slow sequence after this one finds its slot cleared
+    log(" ", cs("ClearCooldowns"))
+    time.sleep(1.5)
+
+
+def shield_hatch_still(tag="shield_6c_hatch_still"):
+    """The hatch burst with the bird standing still: walk with the stick held, let go 2.0 s after the release (mid egg, 1 s
+    before the 3 s run ends), shoot the hatch at +3.25 s. Loadout B: slot 2 Egg Shell (TurtleMode)."""
+    log("==", tag, "stick released mid egg")
+    cs("TimeScale", "1")
+    wait_idle()
+    log(" ", cs("ClearCooldowns"))
+    cs("Stick", "0", "1")
+    time.sleep(0.2)
+    t_release = press(2, hold=0.7)
+    while time.time() < t_release + 2.0:
+        time.sleep(0.01)
+    log(" ", cs("Stick", "0", "0"))
+    while time.time() < t_release + 3.25:
+        time.sleep(0.01)
+    shot(tag, t_release)
+    time.sleep(1.0)
+    log(" ", cs("ResetDummies"))
+    wait_idle()
+    log(" ", cs("ClearCooldowns"))
+    time.sleep(1.0)
 
 
 def stun_end_frames(tag):
@@ -319,6 +383,7 @@ def main():
             ability(1, "stun", after=((0.4, "3_impact"), (0.9, "3b_mid")), hook=stun_end_frames)
         if want("shove"):
             ability(2, "shove", after=((0.3, "3_impact"), (0.8, "4_after"), (2.0, "5_late")))
+            push_over_slow()
         if want("slow"):
             ability(3, "slow", after=((0.6, "3_impact"), (3.0, "4_after"), (7.0, "5_late")))
         if want("stun"):
@@ -349,6 +414,7 @@ def main():
             ability(2, "shield", after=((0.45, "3_walk"), (1.05, "4_walkend"), (2.0, "5_egg"), (2.75, "5b_egg_jitter"),
                                         (3.1, "6_eggend"), (3.3, "6b_hatch"), (4.5, "7_over")))
             cs("Stick", "0", "0")
+            shield_hatch_still()
         if want("hide"):
             # The Hide is 2 s of Fusion time: enter poof at the cast, ring turning, blink in the last 0.25 s (~1.85 s), break poof + flash at ~2 s.
             ability(3, "hide", after=((0.8, "3_hidden"), (1.85, "3b_blink"), (2.2, "3c_break"), (3.5, "4_mid"), (7.5, "5_end")))
