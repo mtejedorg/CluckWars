@@ -40,7 +40,7 @@ namespace CluckWars.Visuals
     ///   to the pill (<see cref="ChickenNameplate.TryGetPillTopAnchor"/>) rather than a constant, so the taller local pill
     ///   is cleared too; <see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> is the fallback with no nameplate</item>
     ///   <item>above the shown rows — floating combat text (<see cref="FloatingCombatText"/>), spawning at
-    ///   <c>max(<see cref="FeedbackTuning.FloatingTextSpawnHeight"/>, <see cref="CurrentStackTopLocalY"/> +
+    ///   <c>max(<see cref="FeedbackTuning.FloatingTextSpawnHeight"/>, <see cref="PopClearHeight"/> +
     ///   <see cref="FeedbackTuning.FloatingTextStackClearance"/>)</c> and rising by
     ///   <see cref="FeedbackTuning.FloatingTextRiseDistance"/></item>
     /// </list>
@@ -170,7 +170,7 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// Top edge of the badge rows this bird shows right now (or is about to show this frame), in the chicken's pivot-local Y:
-        /// metres above its pivot, the same space pops spawn in (<c>pivot + Vector3.up * y</c>). Computed on demand from the live
+        /// metres above its pivot (a world Y; pops use the screen-level <see cref="PopClearHeight"/> instead). Computed on demand from the live
         /// status set (<see cref="CollectActive"/>), not from last frame's layout, so a pop spawned on the very edge that adds a
         /// row already clears it. Conversion: the stack is anchored at the pill top along the billboard axis, which tilts toward
         /// the camera, so the pivot-local Y of the bottom row is that anchor's world Y minus the pivot's world Y, and each row
@@ -178,23 +178,67 @@ namespace CluckWars.Visuals
         /// scaled in Y). With no rows (or a hidden bird or a decoy, which show none) it is the fallback base
         /// (<see cref="FeedbackTuning.StatusBadgeStackBaseHeight"/> plus the head lift).
         /// </summary>
-        public float CurrentStackTopLocalY => StackTopLocalY(Badge.None);
+        public float CurrentStackTopLocalY => StackTopLocalY();
 
         /// <summary>
-        /// <see cref="CurrentStackTopLocalY"/> counting the row <paramref name="entering"/> that is added on this frame, for a
-        /// state-entry pop spawned on the edge, before the layout (or, for a hit's control flag, the replicated state) shows it:
-        /// the pop then starts above that row instead of on it. A row already shown adds nothing (<see cref="RowsWithEntry"/>).
+        /// The pivot-local height a world-vertical pop must start at to sit level ON SCREEN with the top of the rows shown,
+        /// counting the row <paramref name="entering"/> added on this frame (a state-entry pop spawned on the edge, before the
+        /// layout shows it; a row already shown, or <see cref="Badge.None"/>, adds nothing: <see cref="RowsWithEntry"/>), for <c>ChickenController.PopAnchor</c> / <c>PopAnchorEntering</c> only (batch H1).
+        /// Differs from <see cref="CurrentStackTopLocalY"/> (a world Y, still used by <c>MarkerPlacement</c>): the pill and rows
+        /// extend along the billboard axis, which draws 1:1 on screen, while a pop offset is world-vertical and draws only
+        /// <c>up.y</c> per metre (0.866 under the 30 degree match camera), so matching world Y left a two-row entry pop ~0.29 m
+        /// low, over the top row. With no rows it is the same fallback base as <see cref="CurrentStackTopLocalY"/>.
         /// </summary>
-        public float StackTopLocalYEntering(Badge entering) => StackTopLocalY(entering);
-
-        private float StackTopLocalY(Badge entering)
+        public float PopClearHeight(Badge entering)
         {
-            float baseY = FeedbackTuning.StatusBadgeStackBaseHeight + _headLift;
-            if (_controller == null || _stackRoot == null) return baseY;
+            if (!TryStackTop(entering, out int count, out float baseY) || count == 0) return baseY;
+            Vector3 pivot = transform.position;
+            Vector3 up = BillboardUp(pivot);
+            Vector3 anchor = _nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world)
+                ? world
+                : pivot + Vector3.up * baseY;
+            return ScreenLevelHeight(anchor + up * StackTopInRoot(count) - pivot, up);
+        }
+
+        /// <summary>Smallest billboard <c>up.y</c> <see cref="ScreenLevelHeight"/> divides by: a near top-down camera would
+        /// otherwise send the height to infinity (the match camera is 30 degrees, up.y 0.866).</summary>
+        private const float MinBillboardUpY = 0.25f;
+
+        /// <summary>
+        /// Height <c>h</c> above the pivot whose world-vertical point <c>pivot + Vector3.up * h</c> projects level, on a camera whose
+        /// screen-up is <paramref name="billboardUp"/>, with the point <paramref name="fromPivot"/> (pivot-relative world offset):
+        /// <c>dot(fromPivot, up) / up.y</c>. Exact for the orthographic match camera, where billboards face its forward.
+        /// </summary>
+        public static float ScreenLevelHeight(Vector3 fromPivot, Vector3 billboardUp) =>
+            Vector3.Dot(fromPivot, billboardUp) / Mathf.Max(MinBillboardUpY, billboardUp.y);
+
+        /// <summary>The up axis the stack and pill billboard to at <paramref name="position"/> (same recipe as
+        /// <see cref="BillboardToCamera"/>), read from the camera so a stack hidden until this frame is not read stale.
+        /// World up with no camera.</summary>
+        private static Vector3 BillboardUp(Vector3 position)
+        {
+            var cam = Camera.main;
+            if (cam == null) return Vector3.up;
+            var dir = BillboardFacing.Direction(cam, position);
+            return dir.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(dir, Vector3.up) * Vector3.up : Vector3.up;
+        }
+
+        /// <summary>Rows shown with <paramref name="entering"/> and the fallback base; false (and no rows) when this bird shows
+        /// none at all (no stack, an unspawned, hidden-for-this-peer or decoy bird).</summary>
+        private bool TryStackTop(Badge entering, out int count, out float baseY)
+        {
+            baseY = FeedbackTuning.StatusBadgeStackBaseHeight + _headLift;
+            count = 0;
+            if (_controller == null || _stackRoot == null) return false;
             var obj = _controller.Object;
-            if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return baseY;
-            int count = RowsWithEntry(_active, CollectActive(), entering, _active.Length);
-            if (count == 0) return baseY;
+            if (obj == null || !obj.IsValid || _controller.IsDecoy || HiddenVisibilityRules.IsHiddenFor(_controller)) return false;
+            count = RowsWithEntry(_active, CollectActive(), entering, _active.Length);
+            return true;
+        }
+
+        private float StackTopLocalY()
+        {
+            if (!TryStackTop(Badge.None, out int count, out float baseY) || count == 0) return baseY;
             float bottomY = _nameplate != null && _nameplate.TryGetPillTopAnchor(FeedbackTuning.StatusBadgeStackPillGap, out Vector3 world)
                 ? world.y - transform.position.y
                 : baseY;

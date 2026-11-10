@@ -470,6 +470,32 @@ namespace CluckWars.Tests
             Assert.IsTrue(ChickenStatusBadges.ShowSlowRow(aura));
             Assert.IsTrue(SlowRowShown(aura), "an aura or trap slow draws the row on every peer");
         }
+
+        // ---- H1 (2026-11-10): pops clear the rows ON SCREEN, not in world Y -------------------------------
+
+        /// <summary>The match camera pitches 30 degrees: the rows extend along the billboard axis (1:1 on screen) while a pop
+        /// offset is world-vertical and draws only up.y per metre, so a pop level with a row's world Y sits below it on screen.</summary>
+        private static readonly Vector3 BillboardUp30 = new Vector3(0f, Mathf.Cos(30f * Mathf.Deg2Rad), -Mathf.Sin(30f * Mathf.Deg2Rad));
+
+        [Test]
+        public void ScreenLevelHeight_RaisesAWorldVerticalPop_ToTheBillboardTop()
+        {
+            Vector3 twoRowsUpTheBillboard = BillboardUp30 * 2.0f;
+            float h = ChickenStatusBadges.ScreenLevelHeight(twoRowsUpTheBillboard, BillboardUp30);
+            Assert.AreEqual(2.0f / BillboardUp30.y, h, 1e-4f, "dot(from, up) / up.y");
+            Assert.Greater(h, twoRowsUpTheBillboard.y, "the correction never lowers the pop below the row's world Y");
+            Assert.AreEqual(1.5f, ChickenStatusBadges.ScreenLevelHeight(Vector3.up * 1.5f, Vector3.up), 1e-5f, "a top-down-free camera changes nothing");
+        }
+
+        [Test]
+        public void StackClearance_CoversAWordPopHalfHeight_OnScreen()
+        {
+            // A 0.058 word pop reaches ~0.15 m below its MiddleCenter anchor along the billboard; the clearance is
+            // world-vertical and draws up.y (0.866 at 30 degrees) per metre, so it must cover 0.15 m plus a margin.
+            const float wordHalfHeightOnScreen = 0.15f;
+            float drawn = FeedbackTuning.FloatingTextStackClearance * BillboardUp30.y;
+            Assert.GreaterOrEqual(drawn, wordHalfHeightOnScreen + 0.02f, "the STUN word must not touch the STUN 1.5s row at onset (round-3 R01)");
+        }
     }
 
 }

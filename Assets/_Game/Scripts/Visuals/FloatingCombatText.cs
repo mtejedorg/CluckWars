@@ -206,7 +206,7 @@ namespace CluckWars.Visuals
 
         /// <summary>Pivot-local height a pop starts at: <see cref="FeedbackTuning.FloatingTextSpawnHeight"/> as the floor, or
         /// <see cref="FeedbackTuning.FloatingTextStackClearance"/> above <paramref name="stackTopLocalY"/>
-        /// (<c>ChickenStatusBadges.CurrentStackTopLocalY</c>) when the shown badge rows reach higher.</summary>
+        /// (<c>ChickenStatusBadges.PopClearHeight</c>, the screen-level top of the shown rows) when they reach higher.</summary>
         public static float PopSpawnHeight(float stackTopLocalY) =>
             Mathf.Max(FeedbackTuning.FloatingTextSpawnHeight, stackTopLocalY + FeedbackTuning.FloatingTextStackClearance);
 

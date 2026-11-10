@@ -359,8 +359,15 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float FloatingTextSpawnHeight = 2.50f;
 
-        /// <summary>Clearance, pivot-local metres, between the top of the shown badge stack and a pop's spawn point (batch D0c).</summary>
-        public const float FloatingTextStackClearance = 0.10f;
+        /// <summary>
+        /// Clearance, pivot-local vertical metres, between the screen-level top of the shown badge rows
+        /// (<c>ChickenStatusBadges.PopClearHeight</c>) and a pop's spawn point. 0.20 (batch H1, was 0.10): a word pop's glyphs
+        /// reach ~0.15 m below its MiddleCenter anchor along the billboard, and a world-vertical offset draws only
+        /// <c>up.y</c> = cos(camera pitch) = 0.866 per metre on screen, so 0.20 * 0.866 = 0.17 clears the glyph with ~2 cm to spare.
+        /// The old 0.10 was paired with a world-Y stack top that ignored that projection and let a two-row entry pop overprint
+        /// the top row (guarded by <c>StatusBadgeLayoutTests</c>).
+        /// </summary>
+        public const float FloatingTextStackClearance = 0.20f;
 
         /// <summary>
         /// Smallest cargo change, in food units, that earns a floating <c>±N 🌽</c> popup.
@@ -535,7 +542,7 @@ namespace CluckWars.Visuals
         /// 1.16 (<c>ChickenWorldBars</c>) → nameplate 1.70 (<c>ChickenNameplate</c>, a pill centred there) → badge
         /// rows (bottom row centre = pill top + <see cref="StatusBadgeStackPillGap"/>, three rows
         /// <see cref="StatusBadgeRowSpacing"/> apart) → floating combat text, at least <see cref="FloatingTextSpawnHeight"/>
-        /// and always above the rows currently shown (<c>ChickenStatusBadges.CurrentStackTopLocalY</c>; guarded by
+        /// and always above the rows currently shown (<c>ChickenStatusBadges.PopClearHeight</c>; guarded by
         /// <c>StatusBadgeLayoutTests</c>).
         /// </summary>
         public const float StatusBadgeStackBaseHeight = 2.12f;

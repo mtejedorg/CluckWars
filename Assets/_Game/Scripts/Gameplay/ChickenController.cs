@@ -1109,10 +1109,10 @@ namespace CluckWars.Gameplay
         /// <summary>Where a floating pop over this bird starts: its pivot plus the pop height, above any shown badge rows
         /// (cached sibling, no per-call lookup; the floor alone when the bird has no badge stack).</summary>
         public Vector3 PopAnchor => CluckWars.Visuals.FloatingCombatText.PopSpawnPosition(
-            transform.position, _statusBadges != null ? _statusBadges.CurrentStackTopLocalY : 0f);
+            transform.position, _statusBadges != null ? _statusBadges.PopClearHeight(CluckWars.Visuals.ChickenStatusBadges.Badge.None) : 0f);
         /// <summary><see cref="PopAnchor"/> for a state-entry pop: clear of the badge row <paramref name="entering"/> that appears this frame.</summary>
         public Vector3 PopAnchorEntering(CluckWars.Visuals.ChickenStatusBadges.Badge entering) => CluckWars.Visuals.FloatingCombatText.PopSpawnPosition(
-            transform.position, _statusBadges != null ? _statusBadges.StackTopLocalYEntering(entering) : 0f);
+            transform.position, _statusBadges != null ? _statusBadges.PopClearHeight(entering) : 0f);
         /// <summary>The CharacterController (the body's footprint, for presentation placement; may be null).</summary>
         public CharacterController Body => _characterController;
 
