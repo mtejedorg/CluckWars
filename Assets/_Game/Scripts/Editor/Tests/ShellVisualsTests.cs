@@ -665,6 +665,89 @@ namespace CluckWars.Tests
             for (int live = 0; live <= ChickenVFX.ShardMaxParticles; live++)
                 Assert.LessOrEqual(live + ChickenVFX.CastShardCount(shield, live), ChickenVFX.ShardMaxParticles, "live shards " + live);
         }
+
+        // ---- I7: the Shield cast sparkles stay under the cargo bar ---------------------
+
+        private static CluckWars.Abilities.TurtleModeAbilitySO ShippedShield() =>
+            TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All
+                .OfType<CluckWars.Abilities.TurtleModeAbilitySO>().First();
+
+        [TestCase(ChickenClass.Warrior)]
+        [TestCase(ChickenClass.Speedy)]
+        [TestCase(ChickenClass.Fatty)]
+        [TestCase(ChickenClass.Assassin)]
+        public void I7_ShieldCastSparkleApex_StaysUnderTheCargoBar_ForEveryClass(ChickenClass cls)
+        {
+            // The bar height for this class, derived from the shipped assets the way H5 does: the prefab bar offset plus the
+            // class head lift (collider height x (model scale - 1)), all root-local, the frame FxPoint emits in.
+            var classes = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            Assert.IsTrue(classes.TryGet(cls, out var entry), cls + " in the registry");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TestAssets.ChickenPrefabPath);
+            Assert.AreEqual(1f, prefab.transform.localScale.y, 1e-5f, "the root is unscaled: root-local metres are world metres");
+            float lift = prefab.GetComponent<CharacterController>().height * (entry.ResolvedModelScale.y - 1f);
+            var bars = prefab.GetComponent<ChickenWorldBars>();
+            float barBase = bars.BarBaseHeight + lift;
+            float barBottom = barBase - new SerializedObject(bars).FindProperty("_hpHeight").floatValue * 0.72f * 0.5f;
+
+            var shield = ShippedShield();
+            var burst = ChickenVFX.CastBurstFor(shield, ChickenVFX.AbilityCastBurstTemplate);
+            float emit = ChickenVFX.CastBurstHeightFor(shield);
+            float bound = emit + ChickenVFX.SparkleApexRise(burst);
+
+            // Brute force the per-particle launch rule (the one Emit uses) over the burst ranges, plus the extreme particle
+            // (start at the sphere top, straight up, fastest, longest life). The Sparkle family simulates at zero gravity with
+            // no velocity module, so a path is a straight line and its apex is the higher of its start and its end.
+            var rng = new System.Random(7);
+            float worst = float.MinValue;
+            for (int i = 0; i <= 4000; i++)
+            {
+                Vector3 offset, dir;
+                float speed, life;
+                if (i == 4000)
+                {
+                    offset = Vector3.up * burst.Radius; dir = Vector3.up; speed = burst.SpeedMax; life = burst.LifeMax;
+                }
+                else
+                {
+                    do offset = new Vector3((float)rng.NextDouble() * 2f - 1f, (float)rng.NextDouble() * 2f - 1f, (float)rng.NextDouble() * 2f - 1f);
+                    while (offset.sqrMagnitude > 1f || offset.sqrMagnitude < 1e-6f);
+                    offset *= burst.Radius;
+                    dir = offset.normalized;
+                    speed = Mathf.Lerp(burst.SpeedMin, burst.SpeedMax, (float)rng.NextDouble());
+                    life = Mathf.Lerp(burst.LifeMin, burst.LifeMax, (float)rng.NextDouble());
+                }
+                Vector3 v = ChickenVFX.LaunchVelocity(in burst, dir, speed, life, ref offset);
+                worst = Mathf.Max(worst, emit + Mathf.Max(offset.y, offset.y + v.y * life));
+            }
+
+            Debug.Log($"I7 geometry {cls}: emit {emit:0.000} bound {bound:0.000} worst {worst:0.000} barBottom {barBottom:0.000} barBase {barBase:0.000}");
+            Assert.LessOrEqual(worst, bound + 1e-5f, cls + ": the pure apex bound holds for every launched particle");
+            Assert.Less(bound, barBase, cls + ": the Shield sparkle apex stays under ChickenWorldBars.BarBaseHeight");
+            Assert.Less(bound, barBottom, cls + ": and under the cargo bar trough bottom");
+        }
+
+        [Test]
+        public void I7_OnlyTheShieldBurstIsLoweredAndCapped_CountsSizesAndSpeedsUnchanged()
+        {
+            var shield = ShippedShield();
+            var other = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All
+                .First(a => a != null && !(a is CluckWars.Abilities.TurtleModeAbilitySO));
+            var template = ChickenVFX.AbilityCastBurstTemplate;
+            var s = ChickenVFX.CastBurstFor(shield, template);
+            var o = ChickenVFX.CastBurstFor(other, template);
+
+            Assert.AreEqual(0f, o.MaxRise, other.name + ": every other cast stays uncapped");
+            Assert.AreEqual(ChickenVFX.CastBurstHeight, ChickenVFX.CastBurstHeightFor(other), other.name + ": every other cast leaves from 1.0");
+            Assert.AreEqual(ChickenVFX.CastBurstHeight - 0.15f, ChickenVFX.CastBurstHeightFor(shield), 1e-5f, "the Shield burst leaves 0.15 m lower");
+            Assert.AreEqual(16, s.Count, "the burst count is unchanged");
+            Assert.AreEqual(template.Count, s.Count);
+            Assert.AreEqual(template.SizeMax, s.SizeMax); Assert.AreEqual(template.SpeedMax, s.SpeedMax);
+            Assert.AreEqual(template.LifeMax, s.LifeMax); Assert.AreEqual(template.Radius, s.Radius);
+            Assert.GreaterOrEqual(s.MaxRise, s.Radius, "the cap never flattens the start sphere, only the upward drift");
+            // The cap is load-bearing: uncapped, the burst would climb far past the lowest bar (the bug in shield_2_cast).
+            Assert.Greater(ChickenVFX.CastBurstHeightFor(shield) + ChickenVFX.SparkleApexRise(template), ChickenWorldBars.DefaultBarHeight,
+                "uncapped, the Shield burst would reach the cargo bar");
+        }
     }
 }
 

@@ -1592,6 +1592,12 @@ namespace CluckWars.Visuals
         public const int ShellShardCount = 3;
         /// <summary>H12 (E8a): shard pieces thrown by the Shield cast burst (the Shard family max is 3, see ChickenVFX.CastShardCount).</summary>
         public const int ShellCastShardCount = 2;
+        /// <summary>I7: root-local height (m) the Shield cast sparkle burst leaves from, 0.15 m under the 1.0 of every other cast.</summary>
+        public const float ShellCastBurstHeight = 0.85f;
+        /// <summary>I7: the Shield cast sparkles rise at most this far (m) above their emit point (start offset and end of life):
+        /// 0.85 + 0.25 = 1.10 tops out under the lowest cargo bar (1.16 centre, 1.12 bottom). Equal to the burst sphere radius,
+        /// so the start sphere is untouched and only the upward drift is capped.</summary>
+        public const float ShellCastBurstMaxRise = 0.25f;
         public const int ShellFeatherCount = 10;
         public const int ShellYolkPuffs = 6;
         public const float ShellYolkAlpha = 0.7f;

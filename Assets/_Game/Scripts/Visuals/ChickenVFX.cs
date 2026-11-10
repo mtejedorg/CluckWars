@@ -62,6 +62,11 @@ namespace CluckWars.Visuals
             public bool RandomRotation;
             /// <summary>A constant upward speed (m/s) added after the shape's direction and before the baked gravity (0 = none).</summary>
             public float Lift;
+            /// <summary>
+            /// I7: when above 0, no particle starts or ends higher than this many metres above the emit point (see
+            /// <see cref="CapRise"/>); 0 = uncapped. Meant for the zero-gravity, no-drag Sparkle family.
+            /// </summary>
+            public float MaxRise;
         }
 
         private const float EarthG = 9.81f;
@@ -412,13 +417,8 @@ namespace CluckWars.Visuals
                 SpeedMin = 2.5f, SpeedMax = 4.5f, LifeMin = 0.45f, LifeMax = 0.65f,
                 Shape = FxShape.Cone, Radius = 0.10f, ConeAngle = 35f, Axis = Vector3.up, Gravity = -1.5f,
             };
-            // Colour overwritten per cast with the ability accent.
-            _abilityBurst = new FxEmit
-            {
-                Count = 16, Color = Color.white, SizeMin = 0.22f, SizeMax = 0.40f,
-                SpeedMin = 1.5f, SpeedMax = 3.5f, LifeMin = 0.30f, LifeMax = 0.55f,
-                Shape = FxShape.Sphere, Radius = 0.25f, Gravity = -0.8f,
-            };
+            // Colour (and the Shield rise cap) set per cast by CastBurstFor.
+            _abilityBurst = AbilityCastBurstTemplate;
             // H12: the Shield cast shard pieces (real shard gravity baked back to 0.3 g like the hatch); Count set per cast.
             _castShard = new FxEmit
             {
@@ -433,6 +433,34 @@ namespace CluckWars.Visuals
                 Shape = FxShape.Disc, Radius = 0.38f, Gravity = -0.25f,
             };
         }
+
+        /// <summary>The 16-particle cast burst before the per-ability colour and rise cap of <see cref="CastBurstFor"/>.</summary>
+        public static FxEmit AbilityCastBurstTemplate => new FxEmit
+        {
+            Count = 16, Color = Color.white, SizeMin = 0.22f, SizeMax = 0.40f,
+            SpeedMin = 1.5f, SpeedMax = 3.5f, LifeMin = 0.30f, LifeMax = 0.55f,
+            Shape = FxShape.Sphere, Radius = 0.25f, Gravity = -0.8f,
+        };
+
+        /// <summary>Root-local height the cast burst leaves from (every ability but the Shield).</summary>
+        public const float CastBurstHeight = 1.0f;
+
+        /// <summary>
+        /// I7: the cast burst for <paramref name="ability"/>: <paramref name="template"/> in <see cref="CastBurstColorFor"/>, and
+        /// for the Shield (<see cref="TurtleModeAbilitySO"/>) the rise capped at <see cref="FeedbackTuning.ShellCastBurstMaxRise"/>
+        /// so the cream sparkles top out under the cargo bar. Counts, sizes, speeds and lives stay as in the template.
+        /// </summary>
+        public static FxEmit CastBurstFor(AbilityBaseSO ability, in FxEmit template)
+        {
+            var b = template;
+            b.Color = CastBurstColorFor(ability);
+            if (ability is TurtleModeAbilitySO) b.MaxRise = FeedbackTuning.ShellCastBurstMaxRise;
+            return b;
+        }
+
+        /// <summary>I7: root-local emit height of the cast burst: <see cref="FeedbackTuning.ShellCastBurstHeight"/> for the Shield, else <see cref="CastBurstHeight"/>.</summary>
+        public static float CastBurstHeightFor(AbilityBaseSO ability) =>
+            ability is TurtleModeAbilitySO ? FeedbackTuning.ShellCastBurstHeight : CastBurstHeight;
 
         /// <summary>
         /// H12 (E8a): the colour of the 16-particle cast burst. The Shield cast (<see cref="TurtleModeAbilitySO"/>) is drawn in
@@ -1040,6 +1068,47 @@ namespace CluckWars.Visuals
         public int EmitRoom() =>
             Mathf.Max(0, FeedbackTuning.ParticlesPerChickenCap - FeedbackTuning.ParticleBudgetMargin - LiveParticles());
 
+        /// <summary>
+        /// The baked launch of one particle: <paramref name="dir"/> x <paramref name="speed"/>, plus <c>Lift</c>, minus the
+        /// gravity baked as an end-of-life-equivalent constant (<c>0.5 x Gravity x g x life</c>; the families simulate at zero
+        /// gravity), then <see cref="CapRise"/> on the start offset and vertical speed. Pure: the I7 test bounds the apex with it.
+        /// </summary>
+        public static Vector3 LaunchVelocity(in FxEmit e, Vector3 dir, float speed, float life, ref Vector3 offset)
+        {
+            Vector3 v = dir * speed;
+            v.y += e.Lift;
+            v.y -= 0.5f * e.Gravity * EarthG * life;
+            CapRise(ref offset.y, ref v.y, life, e.MaxRise);
+            return v;
+        }
+
+        /// <summary>
+        /// I7: with <paramref name="maxRise"/> above 0, lowers the start offset to at most <paramref name="maxRise"/> and the
+        /// vertical speed so the end-of-life height <c>offsetY + vy x life</c> is at most <paramref name="maxRise"/> too. On a
+        /// zero-gravity, no-drag family the path is a straight line, so its apex (start or end) stays at or under the cap. A
+        /// capped particle reaches the cap only as it dies (faded to alpha 0), so the cap never reads as a ceiling.
+        /// </summary>
+        public static void CapRise(ref float offsetY, ref float vy, float life, float maxRise)
+        {
+            if (maxRise <= 0f) return;
+            offsetY = Mathf.Min(offsetY, maxRise);
+            if (life > 0f) vy = Mathf.Min(vy, (maxRise - offsetY) / life);
+        }
+
+        /// <summary>
+        /// I7: an upper bound (m above the emit point) of how high a particle of <paramref name="e"/> goes on a zero-gravity,
+        /// no-drag family (the Sparkle family): the shape start offset plus the largest upward speed over the longest life,
+        /// clipped by <see cref="FxEmit.MaxRise"/>.
+        /// </summary>
+        public static float SparkleApexRise(in FxEmit e)
+        {
+            float start = e.Shape == FxShape.Sphere ? e.Radius : 0f;
+            float lift = e.Lift - 0.5f * e.Gravity * EarthG * (e.Gravity < 0f ? e.LifeMax : e.LifeMin);
+            float up = e.Shape == FxShape.Cone || e.Shape == FxShape.Sphere ? e.SpeedMax : 0f;
+            float natural = start + Mathf.Max(0f, up + lift) * e.LifeMax;
+            return e.MaxRise > 0f ? Mathf.Min(natural, e.MaxRise) : natural;
+        }
+
         private void Emit(ParticleSystem ps, in FxEmit e, Vector3 world)
         {
             if (ps == null || e.Count <= 0) return;
@@ -1084,9 +1153,7 @@ namespace CluckWars.Visuals
                         break;
                     }
                 }
-                Vector3 v = dir * Random.Range(e.SpeedMin, e.SpeedMax);
-                v.y += e.Lift;
-                v.y -= 0.5f * e.Gravity * EarthG * life;   // gravity as an end-of-life-equivalent constant lift/drop
+                Vector3 v = LaunchVelocity(in e, dir, Random.Range(e.SpeedMin, e.SpeedMax), life, ref offset);
                 _ep.position = world + offset;
                 _ep.velocity = v;
                 _ep.startLifetime = life;
@@ -1136,9 +1203,8 @@ namespace CluckWars.Visuals
             // The burst needs AccentColor, so an unresolved ability means no burst. None on a hidden bird (A1).
             if (ability != null && !hidden)
             {
-                var burst = _abilityBurst;
-                burst.Color = CastBurstColorFor(ability);
-                EmitSparkles(in burst, 1.0f);
+                var burst = CastBurstFor(ability, in _abilityBurst);
+                EmitSparkles(in burst, CastBurstHeightFor(ability));   // I7: the Shield burst leaves lower and its rise is capped under the cargo bar
 
                 // H12 (E8a): the Shield cast also throws two ink-rimmed shell pieces (the Shard family the hatch uses).
                 int shards = CastShardCount(ability, _shardPS != null ? _shardPS.particleCount : 0);
