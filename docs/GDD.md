@@ -569,7 +569,7 @@ Cargo transfers **directly** attacker←→victim — nothing ever drops on the 
 formula self-regulates: a **loaded thief cannot steal** (no free space), so theft is a
 rhythm (steal → bank → return), not a drain. Fatty's 35 cargo can only leave in ≤10–14
 bites, so he *bleeds* under pressure instead of popping, and his defensive abilities are
-what he's actually playing. A **steal-proof** bird (Shield, §7.2) refuses every
+what he's actually playing. A **steal-proof** bird (Egg Shell, §7.2) refuses every
 steal outright: the thief is not credited, so the formula never runs.
 
 ### 6.3 Control ladder
@@ -581,7 +581,7 @@ steal outright: the thief is not credited, so the formula never runs.
 | **Stunned** | ❌ | **❌** | ❌ | the Stun ability |
 
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
-the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stun; 1.3 s against Slippery too since the later 2026-11-05 rework, 0.845 s against Bulwark, 0.975 s against Relentless, 1.69 s from a Relentless caster). **Protections:** control immunity (the Shield egg stops the whole ladder; the Shield walk stops ability slows only, §7.2); **steal-proof** (Shield) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
+the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stun; 1.3 s against Slippery too since the later 2026-11-05 rework, 0.845 s against Bulwark, 0.975 s against Relentless, 1.69 s from a Relentless caster). **Protections:** control immunity (the Egg Shell egg stops the whole ladder; the Egg Shell walk stops ability slows only, §7.2); **steal-proof** (Egg Shell) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
 passives like Slippery can target one without the others. Bulwark and Relentless shorten
 only **timed** effects (stuns, getting stuck, timed slows); presence slows (zones,
 the Slow aura, pile, collision) have no duration and apply to them in full. **Slippery** (2026-11-05, later) resists
@@ -607,7 +607,7 @@ it at all, cannot hand-pick it, and cannot execute. The Assassin's stun now come
 | **Kill** | Press again in the last 1.0 s while it is stunned, within **6.2 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
 No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
-A steal-proof Shield egg (§7.2; the walk is not steal-proof) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
+A steal-proof Egg Shell egg (§7.2; the walk is not steal-proof) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
 (`ExecuteRules.CanBeExecuted`). The egg is stun-immune as well, so an egged bird cannot be stunned at all; the mark stays alive and its timer keeps running. A stun can still land on the one-second walk.
 
 On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
@@ -646,7 +646,7 @@ at most 4 kills in a 45 s round (press 4, kill 7.3, press 15.3, kill 18.6, press
 at 49.2 is past the end; it was 3 kills at 5 s / 10 s); any miss costs 8 s. **Stun** cooldown is 7 s, longer than the 4 s window: never a second stun in one hunt,
 and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 11.1 x 0.18 = 5.99 m (6.56 m at the old 12.15 speed; the reach figures below predate both changes). **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 8.39 m (9.19 m at 12.15), under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
-29-36% of marks. **D5 (changed twice on 2026-11-05):** Shield is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
+29-36% of marks. **D5 (changed twice on 2026-11-05):** Egg Shell is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
 plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
 code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
 about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
@@ -804,11 +804,11 @@ cooldowns were too long for a 45 s match).
 | Tier | Range | Shipped (cooldown read from the `.asset` files, before passives) |
 |---|---|---|
 | **Low** | 1-3 s | Jump 2 |
-| **Medium** | 4-6 s | Steal 4, Speed 4, Hide 4.5, Shove 5, Slow 6; Death Mark 4 after a miss (and 4 at GO) |
-| **High** | 7-8 s | Stun 7, Shield 8; Death Mark 8 after a kill |
+| **Medium** | 4-6 s | Steal 4, Speed 4, Hide 4.5, Shove 5, Slow 6; Hunt (code Death Mark) 4 after a miss (and 4 at GO) |
+| **High** | 7-8 s | Stun 7, Egg Shell 8; Hunt 8 after a kill |
 
 The previous bands were Quick 3-5 s, Standard 6-9 s and Heavy 10-12 s (Jump 4, Steal 5, Speed 6, Shove 7, Slow 7, Stun 8,
-Hide 8, Shield 10, Death Mark 5 / 10). The High band holds the immunity move (Shield) and the one hard stun (Stun, which
+Hide 8, Shield 10, Death Mark 5 / 10). The High band holds the immunity move (Egg Shell) and the one hard stun (Stun, which
 also qualifies a Death Mark kill). Stun stays 1.3 s. Peck (per-class, about 0.7-0.8 s) is foraging cadence
 governed by the SCT axiom, not a tiered move.
 
@@ -826,18 +826,18 @@ as cooling). Bots still cast one move at a time.
 **Same kind of effect never stacks: the strongest active value wins.** Example: Speed
 (x1.5) while Jump's dash (x3.0) runs is x3.0 for the dash, not x4.5. Each move keeps its own timer, so
 when the stronger one ends the weaker one is still in force. **Different kinds both apply**
-(Shield 0.5 speed x Speed 1.5 = 0.75, because a speed boost and a self-slow are
+(Egg Shell 0.5 speed x Speed 1.5 = 0.75, because a speed boost and a self-slow are
 different kinds).
 
 | Kind | How several are resolved | Moves |
 |---|---|---|
 | Self speed boost | highest | Speed 1.5, Jump 3.0 |
-| Self speed penalty | lowest | Shield 0.5 (the walk) |
+| Self speed penalty | lowest | Egg Shell 0.5 (the walk) |
 | Stealth opacity | lowest | Hide |
-| Movement lock | any | Shield (egg), Peck |
-| Slow immunity | later expiry | Shield (walk) |
-| Control immunity | later expiry | Shield (egg) |
-| Steal-proof | later expiry | Shield (egg only) |
+| Movement lock | any | Egg Shell (egg), Peck |
+| Slow immunity | later expiry | Egg Shell (walk) |
+| Control immunity | later expiry | Egg Shell (egg) |
+| Steal-proof | later expiry | Egg Shell (egg only) |
 | Deposit rate | multiplied | Featherfoot passive 1.1 (permanent) |
 | Wall-phasing tier | highest holder (Barge < Vault < Blink) | Jump |
 | Aura slow | lowest factor, its radius | Slow |
@@ -849,7 +849,7 @@ you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. **Pec
 is an opener for Steal / Stun, not a 2 s cast lock.
 
 **Combos that are now legal on one bird** (flagged for balance, no value changed): Speed + Slow is about 2.4x relative speed against
-chasers inside 6.48 m for 1.5 s (1.3 / 0.55); Hide + Steal (the Thief opener); Jump + Stun (the Spoiler dash, 5.99 m, then a 5.4 m stun); Shield + Speed walks at 0.65x while slow-immune. **Watch in playtest (no caps now):** Shield into its egg back to back with the Slow aura nearby (the aura no longer works on a walking or egged bird).
+chasers inside 6.48 m for 1.5 s (1.3 / 0.55); Hide + Steal (the Thief opener); Jump + Stun (the Spoiler dash, 5.99 m, then a 5.4 m stun); Egg Shell + Speed walks at 0.65x while slow-immune. **Watch in playtest (no caps now):** Egg Shell into its egg back to back with the Slow aura nearby (the aura no longer works on a walking or egged bird).
 
 ---
 

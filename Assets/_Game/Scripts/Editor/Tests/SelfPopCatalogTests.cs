@@ -48,10 +48,10 @@ namespace CluckWars.Tests
         [Test]
         public void RefusalAndControlRows_AreUnchanged()
         {
-            // D8b: IMMUNE / SAFE / STUCK! stay as shipped.
+            // D8b: IMMUNE / SAFE / STUCK stay as shipped (STUCK stays, bang dropped 10 Nov).
             Assert.AreEqual("IMMUNE", UiText.Get(UiKeys.HudPopImmune));
             Assert.AreEqual("SAFE",   UiText.Get(UiKeys.HudPopSafe));
-            Assert.AreEqual("STUCK!", UiText.Get(UiKeys.HudPopStuck));
+            Assert.AreEqual("STUCK", UiText.Get(UiKeys.HudPopStuck));
             Assert.AreEqual("STUN",   UiText.Get(UiKeys.HudPopStun));
         }
 

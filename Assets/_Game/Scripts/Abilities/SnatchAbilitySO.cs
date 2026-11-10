@@ -25,7 +25,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Steal";
             ShortLabel = "ROB";
-            Description = "Robs 5 food from every rival within 5.16m.";
+            Description = "Robs 5 food from every rival within 5.2m.";
             Category = AbilityCategory.Steal;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 0.3f;

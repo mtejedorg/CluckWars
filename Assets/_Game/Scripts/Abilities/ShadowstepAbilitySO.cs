@@ -13,13 +13,13 @@ namespace CluckWars.Abilities
     {
         public override string DescriptionKey => UiKeys.AbilityShadowstepDesc;
         public override (string name, object value)[] DescriptionArgs() =>
-            new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };
+            System.Array.Empty<(string, object)>();   // I13: the Jump line carries no numbers (a quick dash, straight over walls)
 
         public ShadowstepAbilitySO()
         {
             DisplayName = "Jump";
             ShortLabel = "JUMP";
-            Description = "Dashes forward at 3x speed for 0.18s, straight over walls.";
+            Description = "A quick dash forward, straight over walls.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
             AllowedClasses = ChickenClassFlags.Warrior | ChickenClassFlags.Fatty | ChickenClassFlags.Assassin;

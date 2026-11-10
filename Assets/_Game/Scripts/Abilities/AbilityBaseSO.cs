@@ -174,8 +174,8 @@ namespace CluckWars.Abilities
             }
         }
 
-        /// <summary>A number as it reads in a description: at most two decimals, no trailing zeros (1.5, 5.4, 2).</summary>
-        protected static string Num(float value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+        /// <summary>A number as it reads in a description: at most one decimal, no trailing zero (1.5, 5.2, 2).</summary>
+        protected static string Num(float value) => value.ToString("0.#", CultureInfo.InvariantCulture);
 
         /// <summary>A 0..1 fraction as a whole percent (0.55 becomes 55).</summary>
         protected static string Pct(float fraction) => Mathf.RoundToInt(fraction * 100f).ToString(CultureInfo.InvariantCulture);

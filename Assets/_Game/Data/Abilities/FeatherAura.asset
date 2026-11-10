@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeatherAuraAbilitySO
   DisplayName: Slow
   ShortLabel: SLOW
-  Description: Slows every rival within 6.48m to 55% speed for 3s.
+  Description: Slows every rival within 6.5m to 55% speed for 3s.
   AccentKey: 4
   CustomAccentColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
   Category: 1

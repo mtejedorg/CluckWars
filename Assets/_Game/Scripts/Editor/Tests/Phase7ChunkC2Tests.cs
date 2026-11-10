@@ -95,7 +95,7 @@ namespace CluckWars.Tests
             foreach (var a in AllAbilities())
                 Assert.IsFalse(RootWord.IsMatch(a.Description ?? ""), $"{a.name}: the asset Description still says root: {a.Description}");
 
-            Assert.AreEqual("STUCK!", UiText.Get(UiKeys.HudPopStuck));
+            Assert.AreEqual("STUCK", UiText.Get(UiKeys.HudPopStuck));
             Assert.AreEqual("STUCK", UiText.Get(UiKeys.HudStatusStuck));
             Assert.AreEqual("STUCK", HudFeedbackStyle.NameFor(HudStatusKind.Root));
             Assert.IsFalse(Regex.IsMatch(UiText.Get(UiKeys.AbilityGroundQuakeDesc), @"\bpins?\b"), "Ground Quake should say stuck, not pinned.");

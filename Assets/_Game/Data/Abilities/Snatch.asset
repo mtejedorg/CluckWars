@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SnatchAbilitySO
   DisplayName: Steal
   ShortLabel: ROB
-  Description: Robs 5 food from every rival within 5.16m.
+  Description: Robs 5 food from every rival within 5.2m.
   AccentKey: 1
   CustomAccentColor: {r: 1, g: 0.3, b: 0.1, a: 1}
   Category: 0

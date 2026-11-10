@@ -65,7 +65,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Slow";
             ShortLabel = "SLOW";
-            Description = "Slows every rival within 6.48m to 55% speed for 3s.";
+            Description = "Slows every rival within 6.5m to 55% speed for 3s.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.All;
             AreaKind = AreaEffectKind.Aura;

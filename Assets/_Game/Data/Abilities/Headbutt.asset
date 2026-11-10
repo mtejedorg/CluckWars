@@ -14,25 +14,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.HeadbuttAbilitySO
   DisplayName: Headbutt
   ShortLabel: BUTT
-  Description: Shoves rivals up to 3.6m ahead and staggers them for 0.35s.
-  Icon: 
-  AccentColor: {r: 0.75, g: 0.3, b: 0.22, a: 1}
+  Description: Shoves rivals up to 3.6m ahead and staggers them for 0.4s.
+  AccentKey: 0
+  CustomAccentColor: {r: 0.75, g: 0.3, b: 0.22, a: 1}
   Category: 1
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 1
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
   BotRole: 3
   Duration: 0.25
   Cooldown: 4
-  Retired: 1
-  SearchMask:
   CastMotion: 0
+  AreaKind: 0
+  SearchMask:
     serializedVersion: 2
     m_Bits: 256
+  Retired: 1
   Reach: 3.6
   ConeAngle: 70
   KnockbackForce: 7.5
   StaggerSeconds: 0.35
-  PeckSlotPreEquippedBy: 0
-  SignaturePreEquippedBy: 0

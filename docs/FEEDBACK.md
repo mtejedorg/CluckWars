@@ -159,8 +159,9 @@ Fired the instant the ability resolves. All peers.
   direction, so the victim reads *where it came from*.
 - **Floating combat text** at the victim, rising and fading over 0.9 s:
   - Steal: `-5 🌽` at victim (warm red), `+5 🌽` at thief (green).
-  - Control: pops are words only, `STUN`, `STUCK!`, `SLOW` (spec section 12 E2, 2026-11-08: the badge row owns the countdown, `STUN 1.5s` / `STUCK 1.2s`; one kid word, STUCK, for root / pin; all pop words live in UiText `hud.pop.*`: STUN, STUCK!, SLOW, IMMUNE, FULL!, SAFE).
-  - Blocked: `BLOCKED` / `IMMUNE` in grey.
+  - Control: pops are words only, `STUN`, `STUCK`, `SLOW` (spec section 12 E2, 2026-11-08: the badge row owns the countdown, `STUN 1.5s` / `STUCK 1.2s`; one kid word, STUCK, for root / pin; the `STUCK!` bang was dropped 2026-11-10 so every control pop reads alike).
+  - Refused: `IMMUNE` (control-immune victim) and `SAFE` (steal-proof victim), kept as shipped (spec section 12 D8b). There is no BLOCKED pop.
+  - **Shipped words (UiText.csv, 2026-11-10).** Pops `hud.pop.*`: STUN, STUCK, SLOW, PUSH, IMMUNE, SAFE, FULL! and the self-only pops WADDLE, EGG!, HATCH!, POOF!, FAST!, HOP!, HUNT!, ROB -n, +n (spec section 12 D7b: self-pops are never drawn for rivals). Rows `hud.status.*` / `hud.badge.*`: STUN, STUCK, SLOW, WADDLE, EGG, HIDDEN, FAST; the timed rows carry the countdown (STUN 1.5s, STUCK 1.2s, WADDLE / EGG n.ns), the others are the word alone. The Streak particle family (wind lines) belongs to Speed alone; no other move emits it.
 - **Directional damage indicator** for the local player — an arc at the screen
   edge pointing at the attacker, fading over 1.2 s. This is the only reliable way
   to learn who hit you from off-screen.
@@ -284,7 +285,7 @@ Today a ring colour shows *which* state, but nothing shows **how long** or
 - **Depleting arc** — the existing status ring gains a radial wipe that drains
   over the remaining duration. Time-left becomes readable without a number.
 - **Status badge stack** above the nameplate — one small icon per active status
-  with a numeric countdown (`⚡1.4s`). Stacks vertically, most severe on top.
+  with the countdown on the timed states (`STUN 1.5s`, `STUCK 1.2s`, `WADDLE 0.8s`, `EGG 1.6s`) and the word alone on the rest (`SLOW`, `FAST`, `HIDDEN`); the row owns the number and the pops are words only (spec section 12 E2a). Stacks vertically, most severe on top.
 - **Shape coding per §1.3** — stun keeps orbiting stars, root gets a static
   ground shackle glyph, slow gets trailing streaks. Distinguishable in greyscale.
 
@@ -298,7 +299,7 @@ Today a ring colour shows *which* state, but nothing shows **how long** or
 |---|---|---|---|
 | **Stunned** | all red-crossed, `CanCast` false | greyed | blocked |
 | **Rooted** | normal (casting still allowed) | greyed + shackle glyph | blocked |
-| **Slowed** | normal | cyan tint + `×0.45` label | allowed |
+| **Slowed** | normal | cyan tint (no label; the SLOW row names the state, E6a) | allowed |
 | **Free** | normal | normal | allowed |
 
 This directly encodes `ControlRules.CanMove / CanCast / CanCollect` in the UI, so
@@ -425,7 +426,7 @@ Drag/Snare split.)
 
 Since the Drag/Snare split, a pile drag is conveyed *only* by persistent state: the
 `ChickenStateOverlays` streak blob (held still for a Drag, breathing for a Snare) and the
-`TouchControlsController` joystick tint with its `×0.45` label. The floating `SLOW nn%`
+`TouchControlsController` joystick tint (no label since E2a / E6a). The floating `SLOW nn%`
 text that used to mark the *moment* it began is deliberately gone — a Drag is
 `SlowSource.Pile` or `SlowSource.Collision`, ambient friction with nobody to blame and no
 deadline, and a one-shot popup for a continuous cause is a lie about its shape.
@@ -503,12 +504,12 @@ Feather Aura, food piles, collisions. It is a `Mathf.Min` over live sources with
 time anywhere in it. Two overlapping slow sources have no single deadline, and a source
 you are still standing in has no deadline at all.
 
-So a draining bar on a slow row would be **inventing a fact**. Instead the slow row
-shows its **magnitude** — `×0.45` — which is the honest number for that state, and the
-one that actually changes the player's decision ("how much slower am I" beats "for how
-long", when the answer to the latter is "until you move"). The same choice is made
+So a draining bar on a slow row would be **inventing a fact**. The slow row therefore
+carries no number at all: it reads the word **SLOW** (spec section 12 E2a and E6a; the
+earlier `×0.45` magnitude label was dropped on 2026-11-08 because pops are words only and
+a row shows a countdown only where a deadline exists). The same choice is made
 identically in three places: `ChickenStatusBadges` (world badge), the HUD status strip,
-and the move stick's tint label. `HudFeedbackStyle.HasDrainBar` is the single predicate.
+and the move stick's tint. `HudFeedbackStyle.HasDrainBar` is the single predicate.
 
 This is a deliberate divergence from §5.1's "one small icon per active status **with a
 numeric countdown**" and is recorded here rather than silently dropped.
@@ -662,4 +663,4 @@ Countdown digit 250 px in the top third; the slam-in peaks at 1.4x (`MenuJuicePo
 was 1.7x) so it never reaches the YOU pill. Touch hold hint: one phrase per line, right margin
 130 px clear of the cancel strip ("Hold to see the reach", "Let go to use it", "Slide to the edge
 to cancel"); pad and keys keep the one-line mid-dot copy above the info strip. Pop words (STUN,
-STUCK!, SLOW, IMMUNE, FULL!, SAFE) all come from UiText.
+STUCK, SLOW, IMMUNE, FULL!, SAFE) all come from UiText.

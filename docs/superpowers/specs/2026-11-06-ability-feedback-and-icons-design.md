@@ -107,18 +107,18 @@ Numbers are from the shipped assets. "Primary" = the one cue that must survive R
 | State | Badge word · pop | Body cue (primary) | Who sees it |
 |---|---|---|---|
 | Stunned | STUN · STUN | stars (pop-in / drop-off) + yellow drain ring; red-X hexes for the victim | everyone |
-| Slowed | SLOW · SLOW | cyan ring + dragging streaks; `×0.55` | everyone |
+| Slowed | SLOW · SLOW | cyan ring + dragging streaks; `×0.55` *(as shipped: the SLOW word alone, no magnitude — §12 E2a, E6a)* | everyone |
 | Knocked back | — · PUSH | shockwave + impact lines + skid; instant, no row | everyone |
 | Waddle (shield walk) | WADDLE · WADDLE | cup around the legs + waddle + heel dust | everyone |
 | Egg | EGG · EGG! / HATCH! | closed two-half egg with player bands, wobble, cracks | everyone |
 | Hidden | HIDDEN · POOF! | dither ghost (remote); dashed cream ring + HIDDEN row (self only) | self only |
-| Zoom | ZOOM · ZOOM! | hip-height streaks + stride dust, lean | everyone (motion), self (row) |
+| Zoom *(as shipped: Speed · FAST · FAST! — §12 D1)* | ZOOM · ZOOM! | hip-height streaks + stride dust, lean | everyone (motion), self (row) |
 | Jump landing | — · (HOP! optional) | launch dust, arc dots, landing shockwave + dust | everyone |
 | Marked / Hunting | MARKED · MARKED! / HUNT · HUNT! | MarkFeedback unchanged | victim / Assassin |
 | Steal-proof | — · SAFE | the egg itself; clinks on a refused steal | the robber |
 | Peck chain | — · +1 … FULL! | hex chain ring; no body cue | self |
 
-Stacking priority (what owns the body when states overlap): Removed > Stunned (head + feet) > Egg (body; suppresses speed/slow/hide cues) > Waddle (body-adjacent) > Hidden (suppresses every ground ring) > Marked (screen) > Slowed (feet) > Zoom (motion only) > one-shots > Peck chain (HUD). Realistic worst case on one bird is stun + slow + zoom = 3 badge rows (the egg refuses both controls, the waddle refuses slows), so the badge stack stays at 3.
+Stacking priority (what owns the body when states overlap): Removed > Stunned (head + feet) > Egg (body; suppresses speed/slow/hide cues) > Waddle (body-adjacent) > Hidden (suppresses every ground ring) > Marked (screen) > Slowed (feet) > Zoom / Speed (motion only) > one-shots > Peck chain (HUD). Realistic worst case on one bird is stun + slow + zoom = 3 badge rows (the egg refuses both controls, the waddle refuses slows), so the badge stack stays at 3.
 
 Not shown at all (noise): immunity or steal-proof as badges, Zoom or Hide rings on peers, Jump in flight, pile/bump drag on rivals, a second purple ring at a slowed victim's feet.
 
@@ -205,6 +205,11 @@ Maestro's answers on the review page: `d1 later d2a d3a d4b d5b d6a d7b d8b`.
 | E6 Slow row word (2026-11-09) | **a.** The Slow badge row reads the word SLOW (no number) in a darker cyan text tint, the same row shape as HIDDEN / FAST. | Supersedes the Phase 7 A12 glyph-only row; the no-number rule stays. |
 | E7 HUD strip Slow source (2026-11-09) | **a.** The local HUD strip Slow row follows the Snared bit like the world row and the pill snail; pile and bump drag keep the joystick tint alone. | TouchControlsController / HudFeedbackStyle. |
 | E8 Egg Shell cast burst (2026-11-09) | **a.** The Shield cast burst is shell cream plus two ink-rimmed shard pieces; the range ring and the hex keep the brown accent (D3a). | Burst colour only; no accent change. |
+| E9 two stacks at contact range (2026-11-10) | **c, with a note: "always draw the player above the others".** No nudge or fade until a two-client capture shows how often stacks collide; the local bird's label band (pill, text, badge rows, own pops) draws above every rival's where they overlap. | Sorting orders only (`FeedbackTuning` local band 13-15, local pops 211); nothing moves. Batch J1. |
+| E10 one shape for FAST (2026-11-10) | **a.** `Glyph_Speeding` is redrawn as the hex bolt with two trailing dashes. | Icons/States only; the hex icon unchanged. Batch J2. |
+| E11 rival rows at the top edge (2026-11-10) | **c.** Leave it; the chevron and the pill are enough near the edge. | No change. |
+| E12 telling the egg it can hatch (2026-11-10) | **a, with a note: "also with an exact timer".** While EggSeconds runs the Egg Shell hex swaps to a cracked-egg icon and its label prints the egg's remaining seconds in tenths in the shell accent (the caster-digit path). | Walk phase unchanged; no gameplay change. Batch J3. |
+| E13 Egg Shell picker text (2026-11-10) | **b.** `Waddle for 1s (slows bounce off), then be an egg for 2s: nothing can touch you. Press again to hatch.` (101 chars; closes BL-137). | `ability.turtlemode.desc` and its fallbacks. Batch J4. |
 
 ## 10. Implementation order (after sign-off)
 

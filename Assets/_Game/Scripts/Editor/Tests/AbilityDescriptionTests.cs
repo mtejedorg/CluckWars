@@ -104,7 +104,8 @@ namespace CluckWars.Tests
                 foreach (var (name, value) in a.DescriptionArgs())
                 {
                     double shown = double.Parse(Convert.ToString(value, CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
-                    Assert.IsTrue(real.Any(r => Math.Abs(r - shown) <= 0.005 + 1e-6),
+                    // I13: descriptions print one decimal (AbilityBaseSO.Num "0.#"), so a shown number matches a field at that precision.
+                    Assert.IsTrue(real.Any(r => Math.Abs(r - shown) <= 0.05 + 1e-6),
                         $"{a.name}: argument {{{name}}} = {shown} is not any field value of the asset ({string.Join(", ", fields)}).");
                 }
             }
@@ -120,7 +121,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(5.4f, ((SneakyStealAbilitySO)Active("SneakySteal")).StealRange, 1e-4f);
             StringAssert.Contains("5.4m", Active("SneakySteal").DescriptionText);
             Assert.AreEqual(6.48f, ((FeatherAuraAbilitySO)Active("FeatherAura")).AuraRadius, 1e-4f);
-            StringAssert.Contains("6.48m", Active("FeatherAura").DescriptionText);
+            StringAssert.Contains("6.5m", Active("FeatherAura").DescriptionText);   // 6.48 shown at one decimal (I13)
             StringAssert.DoesNotContain(" 3m", Active("FeatherAura").DescriptionText);
         }
 
@@ -131,10 +132,10 @@ namespace CluckWars.Tests
             var steal = ScriptableObject.CreateInstance<SneakyStealAbilitySO>();
             try
             {
-                burst.SpeedMultiplier = 3f; burst.Duration = 0.75f;
-                steal.StealRange = 7.25f; steal.StealAmount = 9f;
-                Assert.AreEqual("A 0.75s sprint at 3x movement speed.", burst.DescriptionText);
-                Assert.AreEqual("Yanks 9 food from the nearest rival within 7.25m. Same bird: every 10s.", steal.DescriptionText);
+                burst.SpeedMultiplier = 3f; burst.Duration = 0.7f;
+                steal.StealRange = 7.2f; steal.StealAmount = 9f;
+                Assert.AreEqual("A 0.7s sprint at 3x movement speed.", burst.DescriptionText);
+                Assert.AreEqual("Yanks 9 food from the nearest rival within 7.2m. Same bird: every 10s.", steal.DescriptionText);
             }
             finally
             {

@@ -99,7 +99,7 @@ namespace CluckWars.Localization
         [UiArgs("secs")] public const string AbilityRootEggDesc = "ability.rootegg.desc";
         [UiArgs("mult", "secs")] public const string AbilityRuffleDesc = "ability.ruffle.desc";
         [UiArgs("n", "r")] public const string AbilityScrapDesc = "ability.scrap.desc";
-        [UiArgs("mult", "secs")] public const string AbilityShadowstepDesc = "ability.shadowstep.desc";
+        public const string AbilityShadowstepDesc = "ability.shadowstep.desc";
         [UiArgs("r", "secs", "pct")] public const string AbilitySmokeRoostDesc = "ability.smokeroost.desc";
         [UiArgs("n", "r")] public const string AbilitySnatchDesc = "ability.snatch.desc";
         [UiArgs("n", "r", "secs")] public const string AbilitySneakyStealDesc = "ability.sneakysteal.desc";

@@ -69,7 +69,7 @@ ability.rollpush.desc,"Rolls forward at {mult}x speed for {secs}s, shoving chick
 ability.rootegg.desc,Drops a sticky egg. The first chicken to step on it is stuck for {secs}s.
 ability.ruffle.desc,A burst of pace: {mult}x speed for {secs}s. Enough to close a gap or leave one.
 ability.scrap.desc,Grabs {n} food off the nearest rival within {r}m.
-ability.shadowstep.desc,"Dashes forward at {mult}x speed for {secs}s, straight over walls."
+ability.shadowstep.desc,"A quick dash forward, straight over walls."
 ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): you fade, rivals inside slow to {pct}% speed. Using a move breaks it."
 ability.snatch.desc,Robs {n} food from every rival within {r}m.
 ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
@@ -208,7 +208,7 @@ hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,PILES RESTOCKED!
 hud.pop.safe,SAFE
 hud.pop.stun,STUN
-hud.pop.stuck,STUCK!
+hud.pop.stuck,STUCK
 hud.pop.slow,SLOW
 hud.pop.immune,IMMUNE
 hud.pop.full,FULL!
