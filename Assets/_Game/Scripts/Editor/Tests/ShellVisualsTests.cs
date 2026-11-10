@@ -635,6 +635,36 @@ namespace CluckWars.Tests
             Assert.AreEqual(Phase.Egg, ChickenShellVisuals.PhaseOf(true, true));
             Assert.AreNotEqual(Phase.Egg, ChickenShellVisuals.PhaseOf(true, false), "the walk is not stun-proof: its overlays must stay free to draw");
         }
+
+        // ---- H12 (E8a): the Shield cast burst ------------------------------------------
+
+        [Test]
+        public void CastBurstColour_ShieldIsShellCream_EveryOtherAbilityKeepsItsAccent()
+        {
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var all = reg.All.Where(a => a != null).ToList();
+            var shield = all.OfType<CluckWars.Abilities.TurtleModeAbilitySO>().First();
+            Assert.AreEqual(FeedbackPalette.Current.CreamColor, ChickenVFX.CastBurstColorFor(shield), "the Shield cast burst is shell cream");
+            var others = all.Where(a => !(a is CluckWars.Abilities.TurtleModeAbilitySO)).Take(2).ToList();
+            Assert.AreEqual(2, others.Count, "two non-Shield shipped abilities");
+            foreach (var a in others)
+                Assert.AreEqual(a.AccentColor, ChickenVFX.CastBurstColorFor(a), a.name + " keeps its accent");
+        }
+
+        [Test]
+        public void ShieldCast_ThrowsTwoShards_NeverBeyondTheShardFamilyMax()
+        {
+            var reg = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            var all = reg.All.Where(a => a != null).ToList();
+            var shield = all.OfType<CluckWars.Abilities.TurtleModeAbilitySO>().First();
+            var other = all.First(a => !(a is CluckWars.Abilities.TurtleModeAbilitySO));
+            Assert.AreEqual(2, FeedbackTuning.ShellCastShardCount);
+            Assert.AreEqual(2, ChickenVFX.CastShardCount(shield, 0));
+            Assert.LessOrEqual(ChickenVFX.CastShardCount(shield, 0), ChickenVFX.ShardMaxParticles);
+            Assert.AreEqual(0, ChickenVFX.CastShardCount(other, 0), "only the Shield throws shards");
+            for (int live = 0; live <= ChickenVFX.ShardMaxParticles; live++)
+                Assert.LessOrEqual(live + ChickenVFX.CastShardCount(shield, live), ChickenVFX.ShardMaxParticles, "live shards " + live);
+        }
     }
 }
 

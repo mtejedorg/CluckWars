@@ -1590,6 +1590,8 @@ namespace CluckWars.Visuals
         public const float ShellCupSinkSeconds = 0.25f;
         public const float ShellFoldSeconds = 0.15f;
         public const int ShellShardCount = 3;
+        /// <summary>H12 (E8a): shard pieces thrown by the Shield cast burst (the Shard family max is 3, see ChickenVFX.CastShardCount).</summary>
+        public const int ShellCastShardCount = 2;
         public const int ShellFeatherCount = 10;
         public const int ShellYolkPuffs = 6;
         public const float ShellYolkAlpha = 0.7f;

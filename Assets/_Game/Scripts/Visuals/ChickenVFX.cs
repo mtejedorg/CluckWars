@@ -192,7 +192,7 @@ namespace CluckWars.Visuals
         private ParticleSystem.EmitParams _ep;   // cached: every emit rewrites it, nothing allocates
 
         // Effect presets built once from the serialized counts and colours.
-        private FxEmit _hitBurst, _deathFeathers, _deathDust, _depositBurst, _abilityBurst, _cargoRing;
+        private FxEmit _hitBurst, _deathFeathers, _deathDust, _depositBurst, _abilityBurst, _cargoRing, _castShard;
 
         private float _lastCargo = float.NaN;
         private bool  _wasRemoved;
@@ -417,6 +417,13 @@ namespace CluckWars.Visuals
                 SpeedMin = 1.5f, SpeedMax = 3.5f, LifeMin = 0.30f, LifeMax = 0.55f,
                 Shape = FxShape.Sphere, Radius = 0.25f, Gravity = -0.8f,
             };
+            // H12: the Shield cast shard pieces (real shard gravity baked back to 0.3 g like the hatch); Count set per cast.
+            _castShard = new FxEmit
+            {
+                Count = FeedbackTuning.ShellCastShardCount, Color = FeedbackPalette.Current.CreamColor, SizeMin = 0.14f, SizeMax = 0.20f,
+                SpeedMin = 1.5f, SpeedMax = 3.0f, LifeMin = 0.45f, LifeMax = 0.60f,
+                Shape = FxShape.Sphere, Radius = 0.25f, Gravity = FeedbackTuning.ShellBurstGravity - 1f,
+            };
             _cargoRing = new FxEmit
             {
                 Count = 1, Color = new Color(1.00f, 0.85f, 0.15f, 1f), SizeMin = 0.20f, SizeMax = 0.32f,
@@ -424,6 +431,25 @@ namespace CluckWars.Visuals
                 Shape = FxShape.Disc, Radius = 0.38f, Gravity = -0.25f,
             };
         }
+
+        /// <summary>
+        /// H12 (E8a): the colour of the 16-particle cast burst. The Shield cast (<see cref="TurtleModeAbilitySO"/>) is drawn in
+        /// shell cream from the palette (the cream the hatch shards use); every other ability keeps its accent. Pure: the range
+        /// ring and the hex read <c>AccentColor</c> directly and are untouched.
+        /// </summary>
+        public static Color CastBurstColorFor(AbilityBaseSO ability) =>
+            ability is TurtleModeAbilitySO ? FeedbackPalette.Current.CreamColor : ability.AccentColor;
+
+        /// <summary>
+        /// H12: how many shard pieces a cast throws: <see cref="FeedbackTuning.ShellCastShardCount"/> for the Shield, else 0,
+        /// clipped to the Shard family room left (<see cref="ShardMaxParticles"/> minus <paramref name="liveShards"/>). The cast
+        /// is at the start of the 3 s run and the hatch at the end so they do not normally coexist; the clip guarantees the
+        /// family max even if a hatch lands on the same frame as a cast.
+        /// </summary>
+        public static int CastShardCount(AbilityBaseSO ability, int liveShards) =>
+            ability is TurtleModeAbilitySO
+                ? Mathf.Clamp(ShardMaxParticles - liveShards, 0, FeedbackTuning.ShellCastShardCount)
+                : 0;
 
         private void LateUpdate()
         {
@@ -1109,8 +1135,17 @@ namespace CluckWars.Visuals
             if (ability != null && !hidden)
             {
                 var burst = _abilityBurst;
-                burst.Color = ability.AccentColor;
+                burst.Color = CastBurstColorFor(ability);
                 EmitSparkles(in burst, 1.0f);
+
+                // H12 (E8a): the Shield cast also throws two ink-rimmed shell pieces (the Shard family the hatch uses).
+                int shards = CastShardCount(ability, _shardPS != null ? _shardPS.particleCount : 0);
+                if (shards > 0)
+                {
+                    var piece = _castShard;
+                    piece.Count = shards;
+                    EmitShards(in piece, FxPoint(1.0f));
+                }
             }
 
             // FEEDBACK.md §3.1's "Always" caster micro-shake: fires on EVERY cast, hit or
