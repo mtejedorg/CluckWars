@@ -1501,7 +1501,7 @@ namespace CluckWars.Input
                 ? HudFeedbackStyle.CollectStatusRows(
                       chicken.IsStunned, chicken.StunRemaining,
                       chicken.Rooted,    chicken.RootRemaining,
-                      slow, _statusScratch)
+                      slow, ChickenStatusBadges.ShowSlowRow(chicken.ControlFlags), _statusScratch)
                 : 0;
 
             // Forget the cached peak of any status that is no longer running, so the next

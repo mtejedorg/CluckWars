@@ -263,13 +263,17 @@ namespace CluckWars.UI
         /// has exactly one appearance. Writes at most <paramref name="into"/>.Length rows,
         /// which the caller sizes from <c>FeedbackTuning.StatusBadgeMaxRows</c>.
         /// </summary>
+        /// <param name="snared">The replicated <c>ControlVfx.Snared</c> bit (E7a): the strip's
+        /// Slow row is ability slows only. Pile and bump drag (multiplier &lt; 1, bit clear)
+        /// keep the joystick tint alone and draw no row, matching
+        /// <c>ChickenStatusBadges.ShowSlowRow</c> on the world badges.</param>
         /// <param name="stunRemaining">Seconds left; may legitimately be 0 on the frame a
         /// stun is applied but its timer has not been read yet — the row still appears, it
         /// just renders without a number rather than with a wrong one.</param>
         public static int CollectStatusRows(
             bool stunned, float stunRemaining,
             bool rooted, float rootRemaining,
-            float slowMultiplier,
+            float slowMultiplier, bool snared,
             HudStatusRow[] into)
         {
             if (into == null || into.Length == 0) return 0;
@@ -279,7 +283,7 @@ namespace CluckWars.UI
                 into[n++] = new HudStatusRow(HudStatusKind.Stun, stunRemaining > 0f ? stunRemaining : 0f);
             if (rooted && n < into.Length)
                 into[n++] = new HudStatusRow(HudStatusKind.Root, rootRemaining > 0f ? rootRemaining : 0f);
-            if (slowMultiplier < SlowThreshold && n < into.Length)
+            if (snared && slowMultiplier < SlowThreshold && n < into.Length)
                 into[n++] = new HudStatusRow(HudStatusKind.Slow, slowMultiplier);
 
             return n;

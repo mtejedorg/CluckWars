@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using CluckWars.Gameplay;
 using CluckWars.UI;
+using CluckWars.Visuals;
 
 namespace CluckWars.Tests
 {
@@ -147,7 +148,7 @@ namespace CluckWars.Tests
         public void CollectStatusRows_Free_ProducesNoRows()
         {
             var buf = Buffer();
-            int n = HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 1f, buf);
+            int n = HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 1f, true, buf);
             Assert.AreEqual(0, n);
         }
 
@@ -158,7 +159,7 @@ namespace CluckWars.Tests
             // active one (§5.1 "one small icon per active status"), unlike the single
             // dominant CurrentControlState that drives the stick.
             var buf = Buffer();
-            int n = HudFeedbackStyle.CollectStatusRows(true, 1.5f, true, 2.0f, 0.45f, buf);
+            int n = HudFeedbackStyle.CollectStatusRows(true, 1.5f, true, 2.0f, 0.45f, true, buf);
             Assert.AreEqual(3, n);
             Assert.AreEqual(HudStatusKind.Stun, buf[0].Kind);
             Assert.AreEqual(HudStatusKind.Root, buf[1].Kind);
@@ -169,7 +170,7 @@ namespace CluckWars.Tests
         public void CollectStatusRows_CarriesSecondsForTimedStatesAndMagnitudeForSlow()
         {
             var buf = Buffer();
-            HudFeedbackStyle.CollectStatusRows(true, 1.5f, true, 2.0f, 0.45f, buf);
+            HudFeedbackStyle.CollectStatusRows(true, 1.5f, true, 2.0f, 0.45f, true, buf);
             Assert.AreEqual(1.5f, buf[0].Value, 1e-4f);
             Assert.AreEqual(2.0f, buf[1].Value, 1e-4f);
             Assert.AreEqual(0.45f, buf[2].Value, 1e-4f, "Slow carries its multiplier, not a countdown.");
@@ -179,7 +180,7 @@ namespace CluckWars.Tests
         public void CollectStatusRows_RootOnly_StillOccupiesTheFirstRow()
         {
             var buf = Buffer();
-            int n = HudFeedbackStyle.CollectStatusRows(false, 0f, true, 2.4f, 1f, buf);
+            int n = HudFeedbackStyle.CollectStatusRows(false, 0f, true, 2.4f, 1f, true, buf);
             Assert.AreEqual(1, n);
             Assert.AreEqual(HudStatusKind.Root, buf[0].Kind);
         }
@@ -188,8 +189,8 @@ namespace CluckWars.Tests
         public void CollectStatusRows_UnslowedMultiplier_ProducesNoSlowRow()
         {
             var buf = Buffer();
-            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 1f, buf));
-            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 0.995f, buf),
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 1f, true, buf));
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 0.995f, true, buf),
                 "Floating-point noise just under 1 must not raise a SLOW row.");
         }
 
@@ -200,8 +201,8 @@ namespace CluckWars.Tests
             // below 0.99, so the strip has to raise its row at exactly the same point or
             // the HUD would list a status on a stick it is painting as Free.
             var buf = Buffer();
-            Assert.AreEqual(1, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 0.98f, buf));
-            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, HudFeedbackStyle.SlowThreshold, buf));
+            Assert.AreEqual(1, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, 0.98f, true, buf));
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(false, 0f, false, 0f, HudFeedbackStyle.SlowThreshold, true, buf));
         }
 
         [Test]
@@ -210,7 +211,7 @@ namespace CluckWars.Tests
             // A stun observed on the frame its timer has not been read yet must render as
             // a bare row, never as a negative remaining time that would invert the bar.
             var buf = Buffer();
-            int n = HudFeedbackStyle.CollectStatusRows(true, -0.2f, false, 0f, 1f, buf);
+            int n = HudFeedbackStyle.CollectStatusRows(true, -0.2f, false, 0f, 1f, true, buf);
             Assert.AreEqual(1, n);
             Assert.AreEqual(0f, buf[0].Value, 1e-4f);
         }
@@ -221,12 +222,36 @@ namespace CluckWars.Tests
             // The controller sizes its buffer from FeedbackTuning.StatusBadgeMaxRows; if
             // that were ever lowered, collecting must truncate rather than throw.
             var small = new HudStatusRow[1];
-            int n = HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, small);
+            int n = HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, true, small);
             Assert.AreEqual(1, n);
             Assert.AreEqual(HudStatusKind.Stun, small[0].Kind);
 
-            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, null));
-            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, new HudStatusRow[0]));
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, true, null));
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(true, 1f, true, 1f, 0.5f, true, new HudStatusRow[0]));
+        }
+
+        // ---- E7a (2026-11-10): the strip's Slow row is ability slows only ------------------------
+
+        [Test]
+        public void PileDrag_TintsTheStick_ButDrawsNoStripRow()
+        {
+            var buf = new HudStatusRow[4];
+            var flags = ControlVfx.Slowed; // pile / bump drag: Slowed bit, Snared clear
+            Assert.IsNotNull(HudFeedbackStyle.JoystickClass(ControlState.Slowed), "the stick keeps its slow tint");
+            Assert.AreEqual(0, HudFeedbackStyle.CollectStatusRows(
+                false, 0f, false, 0f, 0.6f, ChickenStatusBadges.ShowSlowRow(flags), buf));
+        }
+
+        [Test]
+        public void AuraSlow_TintsTheStick_AndDrawsTheStripRow()
+        {
+            var buf = new HudStatusRow[4];
+            var flags = ControlVfx.Slowed | ControlVfx.Snared;
+            Assert.IsNotNull(HudFeedbackStyle.JoystickClass(ControlState.Slowed));
+            int n = HudFeedbackStyle.CollectStatusRows(
+                false, 0f, false, 0f, 0.6f, ChickenStatusBadges.ShowSlowRow(flags), buf);
+            Assert.AreEqual(1, n);
+            Assert.AreEqual(HudStatusKind.Slow, buf[0].Kind);
         }
 
         // ---- Bars, glyphs, names --------------------------------------------------
