@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔍 2026-11-10 - Re-audit round 4 STARTED, cut off by the usage limit (resume here)
+
+- **Done:** fresh capture with the same script at timeScale 1: `Captures/feedback-2026-11-10/lab/` (68 frames incl. `jump_3c_land`), `phone/` (2400x1080: stun, shield, slow, hide, badges), `storm/particles_storm.txt` (per-chicken 63/64, 6 systems, scene 80, drawCallsAvg 85); three-way montages 8 → 9 → 10 Nov in `cmp/` (67) and `cmp/phone/` (33); `closeups_round4.png`. Lens brief `brief_reaudit4.md`, page builder `make_round4.py` (reads `round4.json`, not yet written) and `closeups_round4.py` are in the session scratchpad `C:\Users\MARCO\AppData\Local\Temp\claude\48da6996b1f009fc\523a44c2-5194-46f2-b4c2-d3cc8e68ea62\scratchpad`.
+- **Main-session spot checks (10 Nov frames):** phone `badges_stun_slow` STUN pop / STUN 1.5s row / SLOW row separate; `steal_3b_flight` no +5 over the robbed dummy (H8); `jump_3c_land` HOP! + landing ring visible; the hatch frame still shows the debris at the feet because the lab walks the bird (known limit; the lift was verified stationary in H2). Lab per-ability draw-call maxima are all lower than on 9 Nov.
+- **Open question:** `storm/particles_storm.txt` drawCallsMax 470 / batchesMax 420 / setPassMax 300 against averages 85 / 74 / 52 (9 Nov max 134). Looks like a one-sample spike at the run start (the preceding `open_scene.py` threw InvalidOperationException because the Editor was still in Play); a confirmation re-run into `storm2/` was started and killed by the limit. Re-run `--storm` into `storm2/` from a clean Bootstrap scene before any lens may call it a regression.
+- **Not done:** the five lenses (mechanics-designer A-, ux-designer B, vfx-artist B+, narrative-designer B, artist-2d B on 9 Nov) were launched on the brief and stopped before reporting; nothing verified or graded; page not built. Resume: relaunch the five lenses on the brief, verify, write `round4.json`, `make_round4.py` → `build_site.py` → republish https://claude.ai/artifact/TVK5XB4qwiyhfcereB4P2k.
+
 ## 🛠 2026-11-09 - Feedback fix batch H (round 3 + E6–E8)
 
 | Item | Status | Commit | Notes |
