@@ -1601,6 +1601,20 @@ namespace CluckWars.Visuals
         public const float ShellBurstLift = 0.8f;
         /// <summary>F2: the hatch debris falls at this fraction of g (a slow, floaty drop), so it clears the shell before it lands.</summary>
         public const float ShellBurstGravity = 0.3f;
+        /// <summary>H2: of the <see cref="ShellFeatherCount"/> hatch feathers this many leave from the cap top (seam + <see cref="ShellCapFeatherOffset"/>), the rest from the seam disc.</summary>
+        public const int ShellCapFeatherCount = ShellFeatherCount / 2;
+        /// <summary>H2: the cap-top feathers start this far above the seam (m), about the top of the open cap.</summary>
+        public const float ShellCapFeatherOffset = 0.4f;
+        /// <summary>
+        /// H2: how far above the head (m) the cap-top feathers peak. The launch lift is solved per class by
+        /// <c>ChickenShellVisuals.CapFeatherLift</c> (head = <see cref="ShellModelHeight"/> x class scale, the hatched bird at full height).
+        /// Measured in the lab (Warrior, scale 1, head 1.6 m, seam 0.73 m): the solved lift 11.9 peaked 0.54 m above the head
+        /// (cap-half max 2.14 m above the feet at about 0.5 s; level with the head at 0.07 s, +0.4 m at 0.25 s). The Feather family's
+        /// drag clamp (<c>ChickenVFX.FeatherSpeedLimit</c>) leaves a rise of about <c>0.6 * life + 0.07 * (vy - 0.6)</c>.
+        /// </summary>
+        public const float ShellCapFeatherClearance = 0.5f;
+        /// <summary>H2: the cap-top feathers' gravity (fraction of g), baked into the launch like every Feather-family burst.</summary>
+        public const float ShellCapBurstGravity = 0.6f;
 
         // ---- Speed body cue (D4, vfx.md 2.5) --------------------------------------------------------
 

@@ -69,6 +69,31 @@ namespace CluckWars.Visuals
         /// <summary>The seated egg's world height for a class (m).</summary>
         public static float EggWorldHeight(float classScale) => FeedbackTuning.ShellEggBaseHeight * EggScale(classScale);
 
+        /// <summary>H2: where the cap-top feathers start: the seam point lifted by <see cref="FeedbackTuning.ShellCapFeatherOffset"/>.</summary>
+        public static Vector3 CapFeatherOrigin(Vector3 seamPoint) => seamPoint + Vector3.up * FeedbackTuning.ShellCapFeatherOffset;
+
+        /// <summary>
+        /// H2: the baked lift (m/s) that makes the cap-top feathers peak <see cref="FeedbackTuning.ShellCapFeatherClearance"/> above the
+        /// hatched bird's head: head = <see cref="FeedbackTuning.ShellModelHeight"/> x class scale, apex = seam + offset + rise, and the rise is
+        /// <see cref="ChickenVFX.FeatherRise"/> inverted at the shortest life (the conservative end).
+        /// </summary>
+        public static float CapFeatherLift(float seamHeight, float classScale)
+        {
+            const float life = HatchFeatherLifeMin;
+            float rise = FeedbackTuning.ShellModelHeight * classScale + FeedbackTuning.ShellCapFeatherClearance
+                       - seamHeight - FeedbackTuning.ShellCapFeatherOffset;
+            float vy = rise <= ChickenVFX.FeatherSpeedLimit * life
+                ? rise / life
+                : ChickenVFX.FeatherSpeedLimit + (rise - ChickenVFX.FeatherSpeedLimit * life) / ChickenVFX.FeatherDragSettleSeconds;
+            return vy + 0.5f * FeedbackTuning.ShellCapBurstGravity * 9.81f * life;
+        }
+
+        private const float HatchFeatherLifeMin = 0.45f, HatchFeatherLifeMax = 0.55f;   // both feather halves
+
+        /// <summary>H2: the cap-top feathers' height above the feet (m) at the end of their shortest life, from the same drag-aware rise the runtime flies.</summary>
+        public static float CapFeatherApexHeight(float seamHeight, in ChickenVFX.FxEmit capFeather) =>
+            seamHeight + FeedbackTuning.ShellCapFeatherOffset + ChickenVFX.FeatherRise(in capFeather, capFeather.LifeMin);
+
         /// <summary>F2: the hatch debris disc radius in metres, scaled per class exactly like the egg.</summary>
         public static float BurstRadius(float classScale) => FeedbackTuning.ShellBurstRadius * EggScale(classScale);
 
@@ -190,7 +215,7 @@ namespace CluckWars.Visuals
 
         private struct FxEmitSet
         {
-            public ChickenVFX.FxEmit Heel, Puff, Shard, Feather, Yolk;
+            public ChickenVFX.FxEmit Heel, Puff, Shard, Feather, CapFeather, Yolk;
         }
 
         [Inject]
@@ -307,10 +332,15 @@ namespace CluckWars.Visuals
             };
             _fx.Feather = new ChickenVFX.FxEmit
             {
-                Count = FeedbackTuning.ShellFeatherCount, Color = Color.white, SizeMin = 0.30f, SizeMax = 0.50f, SpeedMin = 2.0f, SpeedMax = 4.5f,
-                LifeMin = 0.45f, LifeMax = 0.55f, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellBurstRadius,
+                Count = FeedbackTuning.ShellFeatherCount - FeedbackTuning.ShellCapFeatherCount, Color = Color.white, SizeMin = 0.30f, SizeMax = 0.50f, SpeedMin = 2.0f, SpeedMax = 4.5f,
+                LifeMin = HatchFeatherLifeMin, LifeMax = HatchFeatherLifeMax, Shape = ChickenVFX.FxShape.Disc, Radius = FeedbackTuning.ShellBurstRadius,
                 Lift = FeedbackTuning.ShellBurstLift, Gravity = FeedbackTuning.ShellBurstGravity, RandomRotation = true,
             };
+            // H2: the other half leaves from the cap top and climbs past the head (see FeedbackTuning.ShellCapBurstLift for the arithmetic).
+            _fx.CapFeather = _fx.Feather;
+            _fx.CapFeather.Count = FeedbackTuning.ShellCapFeatherCount;
+            // (the lift is solved per class at emit time: CapFeatherLift)
+            _fx.CapFeather.Gravity = FeedbackTuning.ShellCapBurstGravity;
             var yolk = FeedbackPalette.Current.YolkColor; yolk.a = FeedbackTuning.ShellYolkAlpha;
             _fx.Yolk = new ChickenVFX.FxEmit
             {
@@ -827,6 +857,13 @@ namespace CluckWars.Visuals
             feathers.Color = tint;
             if (_reduced) feathers.Count = Mathf.Max(1, feathers.Count / 2);
             _vfx.EmitFeathersAt(in feathers, seamPoint);
+
+            var capFeathers = _fx.CapFeather;
+            capFeathers.Radius = radius;
+            capFeathers.Lift = CapFeatherLift(seam, Mathf.Abs(transform.localScale.x));
+            capFeathers.Color = tint;
+            if (_reduced) capFeathers.Count = Mathf.Max(1, capFeathers.Count / 2);
+            _vfx.EmitFeathersAt(in capFeathers, CapFeatherOrigin(seamPoint));
 
             var yolk = _fx.Yolk;
             yolk.Radius = radius;

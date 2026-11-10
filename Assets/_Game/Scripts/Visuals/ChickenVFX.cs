@@ -66,6 +66,28 @@ namespace CluckWars.Visuals
 
         private const float EarthG = 9.81f;
 
+        /// <summary>The Feather family's air drag: speed above <see cref="FeatherSpeedLimit"/> m/s is damped by <see cref="FeatherDampen"/> every frame.</summary>
+        public const float FeatherSpeedLimit = 0.6f;
+        public const float FeatherDampen = 0.35f;
+        /// <summary>
+        /// Seconds of travel the drag "pays back" per m/s of speed above <see cref="FeatherSpeedLimit"/> (fitted on a 60 fps
+        /// <c>ParticleSystem.Simulate</c> of this family, 0.0692; the same fit at 30 and 120 fps is within 5%).
+        /// </summary>
+        public const float FeatherDragSettleSeconds = 0.07f;
+
+        /// <summary>
+        /// Vertical travel (m) of a Feather-family particle of <paramref name="e"/> over <paramref name="life"/> seconds, for a Disc
+        /// or Ring shape (no vertical shape direction). The baked launch is <c>vy = Lift - 0.5 * Gravity * g * life</c>, but the
+        /// family's drag clamps the speed to <see cref="FeatherSpeedLimit"/>, so the rise is
+        /// <c>limit * life + settle * (vy - limit)</c> when <c>vy</c> exceeds the limit (the launch only buys the settle term).
+        /// </summary>
+        public static float FeatherRise(in FxEmit e, float life)
+        {
+            float vy = e.Lift - 0.5f * e.Gravity * EarthG * life;
+            if (vy <= FeatherSpeedLimit) return vy * life;
+            return FeatherSpeedLimit * life + FeatherDragSettleSeconds * (vy - FeatherSpeedLimit);
+        }
+
         // ---- Tunables (Inspector-tweakable) -----------------------------------
 
         [Header("Hit sparks")]
@@ -259,8 +281,8 @@ namespace CluckWars.Visuals
             // Air drag so feathers slow to a drift instead of flying off like sparks.
             var vel = _featherPS.limitVelocityOverLifetime;
             vel.enabled = true;
-            vel.dampen  = 0.35f;
-            vel.limit   = new ParticleSystem.MinMaxCurve(0.6f);
+            vel.dampen  = FeatherDampen;
+            vel.limit   = new ParticleSystem.MinMaxCurve(FeatherSpeedLimit);
 
             FoodChunkFlight.RegisterSprites(_cornSprite, _whiffSprite);
             BuildPresets();

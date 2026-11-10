@@ -549,6 +549,42 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void TheHatchFeathers_SplitSeamAndCapTop_AndTheCapHalfClearsTheHeadForEveryClass()
+        {
+            // H2: half the hatch feathers leave from the cap top and must rise clear above the head on every class.
+            var shell = Wake();
+            typeof(ChickenShellVisuals).GetMethod("BuildPresets", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(shell, null);
+            object fx = typeof(ChickenShellVisuals).GetField("_fx", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(shell);
+            var seamHalf = (ChickenVFX.FxEmit)fx.GetType().GetField("Feather").GetValue(fx);
+            var capHalf = (ChickenVFX.FxEmit)fx.GetType().GetField("CapFeather").GetValue(fx);
+            float seamUnits = (float)typeof(ChickenShellVisuals).GetField("_seamY", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(shell);
+
+            Assert.AreEqual(FeedbackTuning.ShellFeatherCount, seamHalf.Count + capHalf.Count, "the two halves sum to ShellFeatherCount");
+            Assert.AreEqual(FeedbackTuning.ShellCapFeatherCount, capHalf.Count);
+            Assert.Greater(capHalf.Count, 0);
+            Assert.Greater(seamHalf.Count, 0);
+
+            var seamPoint = new Vector3(1f, 0.73f, -2f);
+            var origin = ChickenShellVisuals.CapFeatherOrigin(seamPoint);
+            Assert.AreEqual(seamPoint.y + 0.4f, origin.y, 1e-5f, "the cap-top feathers start 0.4 m above the seam");
+            Assert.AreEqual(seamPoint.x, origin.x, 1e-6f);
+            Assert.AreEqual(seamPoint.z, origin.z, 1e-6f);
+
+            var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            foreach (var cls in AllClasses())
+            {
+                var (c, modelTop) = ShippedClass(reg, cls);
+                float headTop = modelTop * c.Scale;   // the hatched bird stands at full height (the egg tuck is over)
+                float seam = seamUnits * ChickenShellVisuals.EggWorldHeight(c.Scale);
+                var cap = capHalf;
+                cap.Lift = ChickenShellVisuals.CapFeatherLift(seam, c.Scale);
+                float apex = ChickenShellVisuals.CapFeatherApexHeight(seam, in cap);
+                Assert.GreaterOrEqual(apex, headTop + 0.4f, c.DisplayName + ": the cap-top feathers must peak well above the head (apex " + apex.ToString("F2") + " m, head " + headTop.ToString("F2") + " m)");
+                Assert.LessOrEqual(apex, headTop + 0.6f, c.DisplayName + ": and not fly off (apex " + apex.ToString("F2") + " m, head " + headTop.ToString("F2") + " m)");
+            }
+        }
+
+        [Test]
         public void ShadowsAreOnlyOnThePcTier()
         {
             var pc = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>("Assets/Settings/PC_RPAsset.asset");
