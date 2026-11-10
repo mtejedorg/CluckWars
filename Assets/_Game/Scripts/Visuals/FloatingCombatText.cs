@@ -138,10 +138,18 @@ namespace CluckWars.Visuals
         /// <paramref name="text"/> unless <paramref name="at"/> is a faded remote bird (<see cref="IsSuppressedAt"/>). Returns whether it
         /// was spawned. The raw <see cref="SpawnUngated"/> is for the pop helpers below, which gate themselves.
         /// </summary>
-        public static bool Spawn(ChickenController at, Vector3 worldPos, string text, Color color)
+        public static bool Spawn(ChickenController at, Vector3 worldPos, string text, Color color) =>
+            Spawn(at, worldPos, text, color, null);
+
+        /// <summary>
+        /// As <see cref="Spawn(ChickenController,Vector3,string,Color)"/>, but a non-null <paramref name="follow"/> makes the pop
+        /// ride on that transform (see <see cref="SpawnUngated(Vector3,string,Color,Transform)"/>). Only PUSH passes one (I6): the
+        /// shoved bird slides away from the impact point; every other victim pop stays world-fixed.
+        /// </summary>
+        public static bool Spawn(ChickenController at, Vector3 worldPos, string text, Color color, Transform follow)
         {
             if (IsSuppressedAt(at)) return false;
-            SpawnUngated(worldPos, text, color);
+            SpawnUngated(worldPos, text, color, follow);
             return true;
         }
 

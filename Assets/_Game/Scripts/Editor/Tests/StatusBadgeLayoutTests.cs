@@ -238,6 +238,97 @@ namespace CluckWars.Tests
 
         }
 
+        // ---- I6: PUSH rides on the shoved bird; STUN / SLOW / STUCK stay world-fixed ---------------------
+
+        private static string HitFeedbackBody(string signature, int length)
+        {
+            string src = System.IO.File.ReadAllText("Assets/_Game/Scripts/Visuals/HitFeedback.cs");
+            int start = src.IndexOf(signature, System.StringComparison.Ordinal);
+            Assert.Greater(start, 0, signature + " found");
+            return src.Substring(start, System.Math.Min(length, src.Length - start));
+        }
+
+        [Test]
+        public void I6_ThePushPopIsGivenTheVictimAsItsFollowTarget_AndTheControlPopsAreNot()
+        {
+            string knock = HitFeedbackBody("private void ObserveKnockback()", 1800);
+            StringAssert.Contains("UiKeys.HudPopPush", knock);
+            StringAssert.Contains("_controller.transform);", knock, "PUSH passes the victim transform to the gated spawn");
+
+            string control = HitFeedbackBody("private void SpawnControlText", 400);
+            StringAssert.DoesNotContain("transform", control, "STUN / STUCK stay world-fixed");
+            string slow = HitFeedbackBody("private void SpawnSlowText", 400);
+            StringAssert.DoesNotContain("transform", slow, "SLOW stays world-fixed");
+        }
+
+        [Test]
+        public void I6_ShovePop_MovesByTheVictimsHorizontalDeltaBetweenTwoLateUpdates()
+        {
+            var victim = new GameObject("ShovedBird");
+            var h = new PoolHarness();
+            try
+            {
+                victim.transform.position = new Vector3(3f, 0f, -1f);
+                h.Spawn(FloatingCombatText.PopSpawnPosition(victim.transform.position, 0.4f), victim.transform);
+                h.Tick();
+                Vector3 before = h.PopPosition(0);
+
+                Vector3 slide = new Vector3(1.4f, 0f, 1f);                       // the ~1.7 m shove slide
+                victim.transform.position += slide;
+                h.Tick();
+                Vector3 after = h.PopPosition(0);
+
+                Assert.AreEqual(slide.x, after.x - before.x, 1e-4f, "PUSH rides on the sliding bird (x)");
+                Assert.AreEqual(slide.z, after.z - before.z, 1e-4f, "PUSH rides on the sliding bird (z)");
+                Assert.GreaterOrEqual(after.y, before.y, "the rise still runs on top of the follow");
+            }
+            finally { if (victim != null) Object.DestroyImmediate(victim); Object.DestroyImmediate(h.Go); }
+        }
+
+        [Test]
+        public void I6_StunPop_StaysWorldFixedWhileTheVictimMoves()
+        {
+            var victim = new GameObject("StunnedBird");
+            var h = new PoolHarness();
+            try
+            {
+                victim.transform.position = new Vector3(3f, 0f, -1f);
+                h.Spawn(FloatingCombatText.PopSpawnPosition(victim.transform.position, 0.4f), null);   // the control-pop path: no follow
+                h.Tick();
+                Vector3 before = h.PopPosition(0);
+
+                victim.transform.position += new Vector3(1.4f, 0f, 1f);
+                h.Tick();
+                Vector3 after = h.PopPosition(0);
+
+                Assert.AreEqual(before.x, after.x, 1e-4f, "STUN does not track (x)");
+                Assert.AreEqual(before.z, after.z, 1e-4f, "STUN does not track (z)");
+            }
+            finally { Object.DestroyImmediate(victim); Object.DestroyImmediate(h.Go); }
+        }
+
+        [Test]
+        public void I6_ShovePop_FreezesWithoutErrorWhenTheVictimIsDestroyed()
+        {
+            var victim = new GameObject("ShovedBird");
+            var h = new PoolHarness();
+            try
+            {
+                h.Spawn(FloatingCombatText.PopSpawnPosition(victim.transform.position, 0f), victim.transform);
+                victim.transform.position += new Vector3(1.2f, 0f, 0f);
+                h.Tick();
+                Vector3 last = h.PopPosition(0);
+
+                Object.DestroyImmediate(victim);
+                victim = null;
+                Assert.DoesNotThrow(h.Tick);
+                Vector3 frozen = h.PopPosition(0);
+                Assert.AreEqual(last.x, frozen.x, 1e-4f, "no snap back to the impact point (x)");
+                Assert.AreEqual(last.z, frozen.z, 1e-4f, "no snap back to the impact point (z)");
+            }
+            finally { if (victim != null) Object.DestroyImmediate(victim); Object.DestroyImmediate(h.Go); }
+        }
+
         // ---- F3: stars under the pill, the sorting band, the countdown refresh -----------------------
 
         private static float LowestPillBottomLocal(float headLift)

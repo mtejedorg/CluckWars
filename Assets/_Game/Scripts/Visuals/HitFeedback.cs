@@ -379,9 +379,11 @@ namespace CluckWars.Visuals
             TriggerVictimHit();
 
             // PUSH over the victim on every peer (no text on a decoy). Spec section 5. D9: like every pop AT a bird it is
-            // dropped on a faded remote bird (the controller overload of the gated spawn holds the rule).
+            // dropped on a faded remote bird (the controller overload of the gated spawn holds the rule). I6: PUSH rides on the
+            // victim, which slides away from the impact point; STUN / SLOW / STUCK stay world-fixed.
             if (!_controller.IsDecoy)
-                FloatingCombatText.Spawn(_controller, TextAnchorPoint(), UiText.Get(UiKeys.HudPopPush), FeedbackPalette.Current.Accent(AccentKey.Shove));
+                FloatingCombatText.Spawn(_controller, TextAnchorPoint(), UiText.Get(UiKeys.HudPopPush), FeedbackPalette.Current.Accent(AccentKey.Shove),
+                    _controller.transform);
         }
 
         /// <summary>
