@@ -229,6 +229,64 @@ namespace CluckWars.Tests
             Assert.IsEmpty(problems, "Hex safe area (I9 / BL-136):\n" + string.Join("\n", problems));
         }
 
+        // ---- J3a: the egg-phase hex icon (cracked egg) -------------------------------------------------------------------------
+
+        /// <summary>Extra hex icons that live beside the ability icons but are not an AbilityIconStyle entry (the Egg Shell
+        /// hex swaps to this one for the egg phase). A subfolder, so the non-recursive orphan scan never sees it.</summary>
+        private static readonly string[] PhaseIconPaths =
+            { AbilityIconStyle.IconFolder.TrimEnd('/') + "/Phases/Icon_TurtleModeAbilitySO_egg.png" };
+
+        [Test]
+        public void PhaseIcons_ExistAndAreNotOrphans_OfTheAbilityIconFolder()
+        {
+            foreach (var path in PhaseIconPaths)
+                Assert.IsTrue(File.Exists(path), $"{path}: missing");
+            // The orphan scan is Directory.GetFiles(IconFolder, "Icon_*.png") (top level only), so the Phases subfolder must
+            // not leak a file into it.
+            var top = Directory.GetFiles(AbilityIconStyle.IconFolder, "Icon_*.png").Select(Path.GetFileName);
+            CollectionAssert.DoesNotContain(top.ToList(), "Icon_TurtleModeAbilitySO_egg.png");
+        }
+
+        [Test]
+        public void PhaseIcons_AreImportedAsCapped256UiSprites()
+        {
+            var problems = new List<string>();
+            foreach (var path in PhaseIconPaths)
+            {
+                if (AssetImporter.GetAtPath(path) is not TextureImporter ti) { problems.Add($"{path}: no TextureImporter"); continue; }
+                if (ti.textureType != TextureImporterType.Sprite) problems.Add($"{path}: not a Sprite");
+                if (ti.mipmapEnabled) problems.Add($"{path}: mipmaps on");
+                if (ti.maxTextureSize > UiSpriteImportSettings.AbilityIconMaxSize) problems.Add($"{path}: maxTextureSize {ti.maxTextureSize}");
+                foreach (var platform in new[] { "Standalone", "Android", "iPhone" })
+                {
+                    var ps = ti.GetPlatformTextureSettings(platform);
+                    if (ps.overridden && ps.maxTextureSize > UiSpriteImportSettings.AbilityIconMaxSize)
+                        problems.Add($"{path}: {platform} override maxTextureSize {ps.maxTextureSize}");
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        [Test]
+        public void PhaseIcons_HaveStrokesThatSurviveA9pxOpen_AndSitInTheHexSafeArea()
+        {
+            var problems = new List<string>();
+            foreach (var path in PhaseIconPaths)
+            {
+                var m = IconStrokeMetrics.Load(path);
+                if (m == null) { problems.Add($"{path}: not a readable PNG"); continue; }
+                float kept = IconStrokeMetrics.InkKeptByOpen(m);
+                if (kept < 0.90f) problems.Add($"{path}: a 9 px open keeps {kept:P0} of the ink");
+                float badge = CornerInkShare(m, BadgeCornerPx, left: true);
+                float mark = CornerInkShare(m, MarkCornerPx, left: false);
+                float outside = OpaqueOutsideSafeCircle(m);
+                if (mark > 0.05f) problems.Add($"{path}: {mark:P1} ink under the category-mark corner, want <= 5 %");
+                if (badge > 0.18f) problems.Add($"{path}: {badge:P1} ink under the slot-badge corner, want <= 18 %");
+                if (outside > 0.12f) problems.Add($"{path}: {outside:P1} of the glyph outside the safe circle, want <= 12 %");
+            }
+            Assert.IsEmpty(problems, "Phase icon art:\n" + string.Join("\n", problems));
+        }
+
         [Test]
         public void IconTextures_AreImportedSmall_OnEveryPlatform()
         {
