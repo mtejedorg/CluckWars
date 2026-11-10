@@ -192,6 +192,13 @@ namespace CluckWars.Input
         private readonly bool[] _stunDigitShown     = new bool[SlotCount];
         private readonly int[]  _appliedStunTenths  = new int[SlotCount];
 
+        // J3 egg-phase hex (EggPhaseHexRules): per slot, the egg's remaining tenths this frame (0 = not in the egg phase), whether
+        // the cracked-egg icon class and the digit are currently applied, and the last tenth written.
+        private readonly int[]  _eggTenths         = new int[SlotCount];
+        private readonly bool[] _eggIconShown      = new bool[SlotCount];
+        private readonly bool[] _eggDigitShown     = new bool[SlotCount];
+        private readonly int[]  _appliedEggTenths  = new int[SlotCount];
+
         // Death Mark hexes (MarkFeedback.Current): KILL on the Death Mark hex exactly while a press would kill; Ambush lit while
         // the target stands in its shape. Found by the equipped ability's type, never by slot number.
         private readonly bool[]  _markKill = new bool[SlotCount];
@@ -1083,6 +1090,7 @@ namespace CluckWars.Input
                 : 0f;
             if (refs.Drain != null)
                 refs.Drain.style.height = new Length(active01 * 100f, LengthUnit.Percent);
+            RefreshEggPhase(slot, abilities, equipped);
 
             // Phase 6 (A1): while the ability runs, a duration ring around the hex rim drains with it.
             bool ringOn = active01 > 0f;
@@ -1211,6 +1219,7 @@ namespace CluckWars.Input
             // running: he just cast) on the touch arc and the desktop / pad strip alike. The cooldown clip and the
             // duration ring are separate layers and keep drawing. A "you are stunned" cross keeps the centre.
             if (RefreshCasterStunDigit(slot, equipped, mark)) return;
+            if (RefreshEggDigit(slot, equipped, mark)) return;
 
             // With drawn marks, the label is the seconds readout and nothing else; with
             // the glyph fallback it also carries ⃠ / ✕ (text written in ApplyRefusalState).
@@ -1237,6 +1246,63 @@ namespace CluckWars.Input
             if (seconds == _appliedCdSeconds[slot]) return;
             _appliedCdSeconds[slot] = seconds;
             refs.CdNum.text = HudLayoutRules.TouchCooldownText(remaining);
+        }
+
+        /// <summary>
+        /// J3: reads the Egg Shell slot's phase off the replicated run (the badge row's read: remaining run = active fraction x
+        /// the resolved duration, egg when it is within <c>EggSeconds</c>) and swaps the hex icon to the cracked egg only when
+        /// the phase moves. A hatch press (slot goes inactive) restores the whole egg on the next frame.
+        /// </summary>
+        private void RefreshEggPhase(int slot, AbilityController abilities, AbilityBaseSO equipped)
+        {
+            int tenths = 0;
+            bool egg = false;
+            if (abilities != null && equipped is TurtleModeAbilitySO turtle)
+            {
+                bool active = abilities.IsSlotActive(slot);
+                float run = active ? abilities.ActiveRemaining01For(slot) * turtle.ResolveActiveDuration(_localChicken) : 0f;
+                egg = EggPhaseHexRules.Resolve(active, run, turtle.EggSeconds, out tenths);
+            }
+            _eggTenths[slot] = tenths;
+            if (egg == _eggIconShown[slot]) return;
+            _eggIconShown[slot] = egg;
+            _slots[slot].Icon?.EnableInClassList(EggPhaseHexRules.EggIconClass, egg);
+        }
+
+        /// <summary>
+        /// J3: while the egg phase runs, the layer-9 label owns the egg's remaining seconds ("1.4s") in the Egg Shell asset's
+        /// accent, reformatting only when the shown tenth moves. Returns true while it owns the label; on hand-back it restores
+        /// the stylesheet colour and forces the cooldown readout to repaint (same contract as <see cref="RefreshCasterStunDigit"/>).
+        /// </summary>
+        private bool RefreshEggDigit(int slot, AbilityBaseSO shield, HexCenterMark mark)
+        {
+            var label = _slots[slot].CdNum;
+            bool show = _eggTenths[slot] > 0 && shield != null && mark != HexCenterMark.StunnedCross;
+
+            if (!show)
+            {
+                if (!_eggDigitShown[slot]) return false;
+                _eggDigitShown[slot] = false;
+                label.style.color = new StyleColor(StyleKeyword.Null);
+                _appliedCdSeconds[slot] = int.MinValue;
+                _appliedCdText[slot] = null;
+                return false;
+            }
+
+            if (!_eggDigitShown[slot])
+            {
+                _eggDigitShown[slot] = true;
+                _appliedEggTenths[slot] = int.MinValue;
+                // The digit wears the Egg Shell asset's own accent (text colour only; the hex TINT stays the category palette, PlayerPaletteTests).
+                label.style.color = shield.AccentColor;
+                label.style.display = DisplayStyle.Flex;
+            }
+            if (_eggTenths[slot] != _appliedEggTenths[slot])
+            {
+                _appliedEggTenths[slot] = _eggTenths[slot];
+                label.text = EggPhaseHexRules.Format(_eggTenths[slot]);
+            }
+            return true;
         }
 
         /// <summary>
@@ -1710,6 +1776,9 @@ namespace CluckWars.Input
         private void ApplyEquipped(int slot, AbilityBaseSO equipped)
         {
             var refs = _slots[slot];
+            // J3: a re-equipped hex starts from its whole icon; RefreshEggPhase re-applies the egg class if the new slot needs it.
+            _eggIconShown[slot] = false;
+            refs.Icon?.RemoveFromClassList(EggPhaseHexRules.EggIconClass);
             CategoryMark.Apply(refs.Mark, equipped != null ? equipped.Category : (AbilityCategory?)null);
 
             // Icon sprite via USS class (swap the previously applied one). Every mapped

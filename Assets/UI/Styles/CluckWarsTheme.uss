@@ -1816,6 +1816,7 @@
 .cw-hex-icon--root         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RootEggAbilitySO.png"); }
 .cw-hex-icon--shell        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EggShellAbilitySO.png"); }
 .cw-hex-icon--turtle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_TurtleModeAbilitySO.png"); }
+.cw-hex-icon--turtle-egg   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Phases/Icon_TurtleModeAbilitySO_egg.png"); }
 .cw-hex-icon--spine        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpineCoatAbilitySO.png"); }
 .cw-hex-icon--burst        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpeedBurstAbilitySO.png"); }
 .cw-hex-icon--invis        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_InvisibilityAbilitySO.png"); }

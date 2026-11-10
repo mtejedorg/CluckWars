@@ -248,6 +248,25 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void EggPhaseIconClass_IsInBothStylesheets_AndPaintsThePhaseSprite_AfterTheWholeEggRule()
+        {
+            string sprite = PhaseIconPaths[0];
+            foreach (var uss in new[] { "Assets/UI/Styles/CluckWarsTheme.uss", "Assets/UI/Styles/TouchControls.uss" })
+            {
+                string text = File.ReadAllText(uss);
+                var m = Regex.Match(text, @"\." + Regex.Escape(CluckWars.Input.EggPhaseHexRules.EggIconClass) +
+                                          @"\s*\{[^}]*url\(""project://database/([^""]+)""\)");
+                Assert.IsTrue(m.Success, $"{uss}: no .{CluckWars.Input.EggPhaseHexRules.EggIconClass} rule with a project:// url");
+                Assert.AreEqual(sprite, m.Groups[1].Value, $"{uss}: egg rule points at the wrong file");
+                Assert.IsTrue(File.Exists(m.Groups[1].Value), $"{uss}: {m.Groups[1].Value} is not on disk");
+                // Both classes sit on the icon at once, so the egg rule must come later to win.
+                string whole = AbilityIconStyle.Entries["TurtleModeAbilitySO"];
+                Assert.Greater(m.Index, text.IndexOf("." + whole + " ", System.StringComparison.Ordinal),
+                    $"{uss}: the egg rule must follow the .{whole} rule");
+            }
+        }
+
+        [Test]
         public void PhaseIcons_AreImportedAsCapped256UiSprites()
         {
             var problems = new List<string>();
