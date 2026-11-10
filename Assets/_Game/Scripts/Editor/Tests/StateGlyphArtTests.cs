@@ -191,6 +191,63 @@ namespace CluckWars.Tests
             Assert.That(share, Is.InRange(min - 0.02f, max + 0.02f), $"Marked skull ink share {share:F2} outside the glyph range {min:F2}-{max:F2}");
         }
 
+        [Test]
+        public void SpeedingGlyph_IsTheHexBolt_WithTwoSeparateDashes()
+        {
+            // J2 (E10a): FAST used to be three dashes plus a chevron (four cream pieces) while the Speed Burst hex
+            // shows a lightning bolt. The glyph is now that bolt with two short trailing dashes: after the ink ring
+            // is masked off (cream pixels only) it must be exactly three islands (bolt + two dashes), the biggest
+            // island must match the hex icon's bolt silhouette once both are normalised to the same box, and the
+            // outer edge must stay an ink ring.
+            string glyphPath = StateGlyphStyle.SpritePathFor(StateGlyphStyle.StateGlyph.Speeding);
+            string iconPath = AbilityIconStyle.SpriteFileFor(nameof(CluckWars.Abilities.SpeedBurstAbilitySO));
+            var glyph = IconStrokeMetrics.Load(glyphPath);
+            var icon = IconStrokeMetrics.Load(iconPath);
+            Assert.IsNotNull(glyph, glyphPath + " unreadable");
+            Assert.IsNotNull(icon, iconPath + " unreadable");
+
+            var islands = CreamIslands(CreamOf(glyph), glyph.W, glyph.H);
+            Assert.AreEqual(3, islands.Count, "Speeding glyph must be one bolt plus two dash blobs, cream islands: " + string.Join(",", islands));
+            Assert.Greater(islands[0], islands[1] * 4, "the bolt must dwarf the dashes");
+
+            bool[] boltOnly = LargestCreamIsland(CreamOf(glyph), glyph.W, glyph.H);
+            var iconCream = CreamOf(icon);
+            float iou = Iou(Normalise(boltOnly, glyph.W, glyph.H), Normalise(iconCream, icon.W, icon.H));
+            Assert.GreaterOrEqual(iou, 0.85f, $"Speeding bolt IoU with the Speed Burst hex bolt {iou:F3}: not the same shape");
+
+            Assert.GreaterOrEqual(EdgeInkShare(glyph), 0.95f, "Speeding glyph outer edge is not an ink ring");
+        }
+
+        private static bool[] LargestCreamIsland(bool[] mask, int w, int h)
+        {
+            var seen = new bool[mask.Length];
+            List<int> best = null;
+            var stack = new Stack<int>();
+            for (int s = 0; s < mask.Length; s++)
+            {
+                if (!mask[s] || seen[s]) continue;
+                var cur = new List<int>();
+                seen[s] = true; stack.Push(s);
+                while (stack.Count > 0)
+                {
+                    int p = stack.Pop(); cur.Add(p);
+                    int px = p % w, py = p / w;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int nx = px + dx, ny = py + dy;
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                            int q = ny * w + nx;
+                            if (mask[q] && !seen[q]) { seen[q] = true; stack.Push(q); }
+                        }
+                }
+                if (best == null || cur.Count > best.Count) best = cur;
+            }
+            var res = new bool[mask.Length];
+            if (best != null) foreach (var i in best) res[i] = true;
+            return res;
+        }
+
         /// <summary>Fraction of the opaque pixels on the glyph's outer edge that are ink (1 = a full ink ring).</summary>
         private static float EdgeInkShare(IconStrokeMetrics.Masks m)
         {
