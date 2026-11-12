@@ -276,7 +276,7 @@ namespace CluckWars.UI
                 SetShown(_hunterSkull, false);
                 return;
             }
-            var indicator = hunter.Indicator;
+            var indicator = hunter.Indicator();
             if (indicator == null && !_missingIndicatorReported)
             {
                 _missingIndicatorReported = true;
@@ -295,7 +295,7 @@ namespace CluckWars.UI
             float half = _hunterSkull.resolvedStyle.width > 0f ? _hunterSkull.resolvedStyle.width * 0.5f : 22f;
             var at = new Vector2(vp.x * panel.x, (1f - vp.y) * panel.y);
             // Off the "You" plate: slid along the arrow, toward its tip (outward), until clear.
-            var you = LocalChicken() != null ? LocalChicken().Nameplate : null;
+            var you = LocalChicken() != null ? LocalChicken().Nameplate() : null;
             if (you != null && you.TryGetPlateViewport(cam, out Rect yvp))
                 at = MarkerPlacement.SlideOff(at, half, MarkerPlacement.ToPanel(yvp, panel), new Vector2(outward.x, -outward.y));
             _hunterSkull.style.translate = new Translate(at.x - half, at.y - half);

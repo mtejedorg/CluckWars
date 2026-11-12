@@ -133,6 +133,10 @@ namespace CluckWars.Installers
             // Cross-scene mutable state for menu → match handoff.
             Container.Bind<ISessionSelectionService>().To<SessionSelectionService>().AsSingle();
 
+            // The presentation half of composing a chicken (tint, model root, head lift, foot rings, cached plate /
+            // indicator / badges). Gameplay sees only the interface; stateless, so one instance for every chicken.
+            Container.Bind<IChickenModelPresenter>().FromInstance(new ChickenModelPresenter()).AsSingle();
+
             // Static data assets — bound by instance so the same SO ships to every consumer.
             if (_chickenClassRegistry != null)
             {

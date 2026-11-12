@@ -300,7 +300,8 @@ namespace CluckWars.Tests
             string src = Read("Assets/_Game/Scripts/UI/MarkerPlacement.cs");
             StringAssert.Contains("bool onScreen = vp3.z > 0f && feet.x >= 0f && feet.x <= 1f && feet.y >= 0f && feet.y <= 1f;", src);
             StringAssert.Contains("if (TryPlaceAround(scene, aboveCentre, out at, out var slot))", src);
-            StringAssert.Contains("target.Nameplate", src, "cached accessors, no per-frame GetComponent");
+            StringAssert.Contains("target.Nameplate()", src, "cached accessors, no per-frame GetComponent");
+            StringAssert.Contains("target.StatusBadges()", src, "cached accessors, no per-frame GetComponent");
             StringAssert.DoesNotContain("GetComponent<", src);
         }
 

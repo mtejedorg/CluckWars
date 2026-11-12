@@ -383,7 +383,7 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor, delta);
+            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor(), delta);
             if (delta < 0f) NotifyCargoLoss(-delta);
         }
 
@@ -696,7 +696,7 @@ namespace CluckWars.Visuals
                         // A pure-control ability bounced off control immunity: IMMUNE. Anything else
                         // that is nullified was a steal refused by the steal-proof state: SAFE.
                         FloatingCombatText.Spawn(
-                            victim, victim.PopAnchor,
+                            victim, victim.PopAnchor(),
                             ability.TargetEffectIsPurelyControl ? UiText.Get(UiKeys.HudPopImmune) : UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                         continue;
@@ -707,7 +707,7 @@ namespace CluckWars.Visuals
                     if (ability.TargetEffectIncludesSteal && victim.IsStealProof)
                     {
                         FloatingCombatText.Spawn(
-                            victim, victim.PopAnchor,
+                            victim, victim.PopAnchor(),
                             UiText.Get(UiKeys.HudPopSafe),
                             FeedbackTuning.NeutralNoEffectColor);
                     }
@@ -799,7 +799,7 @@ namespace CluckWars.Visuals
                 if (!ability.WouldAffect(_controller, candidate)) continue;
 
                 FloatingCombatText.Spawn(
-                    candidate, candidate.PopAnchor,
+                    candidate, candidate.PopAnchor(),
                     UiText.Get(UiKeys.HudPopImmune),
                     FeedbackTuning.NeutralNoEffectColor);
             }
@@ -1274,7 +1274,7 @@ namespace CluckWars.Visuals
         private void SpawnStealGainPop(float delta)
         {
             if (delta <= 0f || _controller == null) return;
-            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor, delta);
+            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor(), delta);
         }
 
         private void AddGrabVictim(ChickenController victim)
@@ -1371,7 +1371,7 @@ namespace CluckWars.Visuals
                 UiText.Get(UiKeys.HudPopSlow), FeedbackTuning.CanonicalSlowTextColor);
         }
 
-        private Vector3 TextAnchorPoint() => _controller.PopAnchor;
+        private Vector3 TextAnchorPoint() => _controller.PopAnchor();
 
         // ---- Execute / removal (§3.4) -----------------------------------------
 

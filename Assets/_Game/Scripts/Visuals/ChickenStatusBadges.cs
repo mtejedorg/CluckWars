@@ -192,7 +192,7 @@ namespace CluckWars.Visuals
         /// <summary>
         /// The pivot-local height a world-vertical pop must start at to sit level ON SCREEN with the top of the rows shown,
         /// counting the row <paramref name="entering"/> added on this frame (a state-entry pop spawned on the edge, before the
-        /// layout shows it; a row already shown, or <see cref="Badge.None"/>, adds nothing: <see cref="RowsWithEntry"/>), for <c>ChickenController.PopAnchor</c> / <c>PopAnchorEntering</c> only (batch H1).
+        /// layout shows it; a row already shown, or <see cref="Badge.None"/>, adds nothing: <see cref="RowsWithEntry"/>), for <c>ChickenPresentationAccess.PopAnchor</c> / <c>PopAnchorEntering</c> only (batch H1).
         /// Differs from <see cref="CurrentStackTopLocalY"/> (a world Y, still used by <c>MarkerPlacement</c>): the pill and rows
         /// extend along the billboard axis, which draws 1:1 on screen, while a pop offset is world-vertical and draws only
         /// <c>up.y</c> per metre (0.866 under the 30 degree match camera), so matching world Y left a two-row entry pop ~0.29 m

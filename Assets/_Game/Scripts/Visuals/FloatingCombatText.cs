@@ -206,7 +206,7 @@ namespace CluckWars.Visuals
         /// <summary>
         /// <see cref="SpawnSelfPop(ChickenController,string,Color,(string name, object value)[])"/> for a state-entry pop: the
         /// spawn height clears the badge row <paramref name="entering"/> that appears on this same frame
-        /// (<see cref="ChickenController.PopAnchorEntering"/>). The pop follows the bird (see <see cref="SpawnUngated(Vector3,string,Color,Transform)"/>).
+        /// (<see cref="ChickenPresentationAccess.PopAnchorEntering"/>). The pop follows the bird (see <see cref="SpawnUngated(Vector3,string,Color,Transform)"/>).
         /// </summary>
         public static bool SpawnSelfPop(ChickenController controller, string key, Color color,
                                         ChickenStatusBadges.Badge entering,

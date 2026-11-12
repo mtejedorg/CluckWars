@@ -99,16 +99,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheGameplayFiles_ThatStillImportVisuals_AreTheKnownOne()
+        public void NoGameplayFile_ImportsVisualsOrUi()
         {
-            // What is left is not a one-shot effect: the chicken's composition root.
-            // Batch 4 of the audit owns it. A new import here is a new dependency from gameplay on presentation.
-            var expected = new[]
-            {
-                $"{ScriptsRoot}/Gameplay/ChickenController.cs",   // composition: model attach, head lift, pop anchor, indicator accessors
-            };
-            var actual = GameplayFiles().Where(p => Code(p).Contains("CluckWars.Visuals")).OrderBy(p => p).ToArray();
-            CollectionAssert.AreEqual(expected.OrderBy(p => p).ToArray(), actual);
+            // Batch 4 of the audit removed the last four (tuning constants, the ability accent, the player colours, the
+            // chicken's composition root). Gameplay and Abilities compile without presentation: an import here is a new
+            // dependency from gameplay on presentation, and it will not compile once the layers are separate assemblies.
+            var offenders = GameplayFiles()
+                .Where(p => Regex.IsMatch(Code(p), @"\bCluckWars\.(Visuals|UI)\b"))
+                .OrderBy(p => p).ToArray();
+            Assert.IsEmpty(offenders, "Gameplay / Abilities files that reference CluckWars.Visuals or CluckWars.UI:\n" + string.Join("\n", offenders));
+            Assert.Greater(GameplayFiles().Count(), 50, "the guard is scanning the wrong folders");
         }
 
         [Test]

@@ -138,7 +138,7 @@ namespace CluckWars.Visuals
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if (ShowsHuntPop(o) && _localHunter != null)
-                FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor,
+                FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor(),
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
         }
 
@@ -230,7 +230,7 @@ namespace CluckWars.Visuals
             var cam = MatchCamera.Instance != null ? MatchCamera.Instance.Camera : null;
             input.InnerRadius = FloorRivalArrows.RingRadiusFor(cam);
             input.HunterInvisible = Mathf.Clamp01(hunter.VisualOpacity) < RivalIndicator.VisibleOpacityThreshold;
-            var indicator = hunter.Indicator;
+            var indicator = hunter.Indicator();
             if (indicator == null) ReportOnce(ref _missingIndicatorReported, $"{hunter.name} has no RivalIndicator: the victim's " +
                 "hunter badge treats it as never off screen (prefab wiring).");
             input.HunterHiddenFromView = indicator != null && indicator.HiddenFromClearViewport;

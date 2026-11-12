@@ -2,7 +2,6 @@ using CluckWars.Abilities;
 using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Networking;
-using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -223,6 +222,7 @@ namespace CluckWars.Gameplay
             s_localDirty = true;
             s_localScanFrame = -1;
             s_localScratch.Clear();
+            s_presenterMissingReported = false;
         }
 
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
@@ -606,11 +606,13 @@ namespace CluckWars.Gameplay
         [Networked] public float VerticalVelocity { get; set; }
 
         [Inject]
-        public void Construct(ChickenClassRegistrySO registry, AbilityRegistrySO abilityRegistry, ILogService log)
+        public void Construct(ChickenClassRegistrySO registry, AbilityRegistrySO abilityRegistry, ILogService log,
+            [InjectOptional] IChickenModelPresenter presenter = null)
         {
             _registry = registry;
             _abilityRegistry = abilityRegistry;
             _log = log;
+            _presenter = presenter;   // optional: a game with no presenter still plays (BindPresentation reports it)
         }
 
         public override void Spawned()
@@ -631,9 +633,7 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _assassin = GetComponent<AssassinExecute>();
-            _indicator = GetComponent<CluckWars.Visuals.RivalIndicator>();
-            _nameplate = GetComponent<CluckWars.Visuals.ChickenNameplate>();
-            _statusBadges = GetComponent<CluckWars.Visuals.ChickenStatusBadges>();
+            BindPresentation();   // presentation caches its indicator / nameplate / badge stack here
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
             _inContact = false;   // pooled: no contact carried over from a previous life
@@ -654,34 +654,14 @@ namespace CluckWars.Gameplay
             if (HasStateAuthority && VisualOpacity <= 0f) VisualOpacity = 1f;
 
             transform.localScale = Vector3.one * _activeStats.Scale;
-            ChickenGround.Refresh(this); // ground overlays hang off an anchor that depends on the scale
+            _presenter?.OnScaleApplied(this); // ground overlays hang off an anchor that depends on the scale
             SeatOnGroundAtSpawn();       // scale is known now: stand on the grass before the countdown (CW-021)
             _log?.Debug(Source, $"Applied scale {_activeStats.Scale} for class {Class}.");
 
             if (_registry != null && _registry.TryGet(Class, out var entry))
             {
                 var modelRoot = AttachClassModel(entry);
-
-                var visuals = GetComponent<ChickenVisuals>();
-                if (visuals != null)
-                {
-                    // Order matters: point the tint at the model before colouring it. The model
-                    // did not exist when ChickenVisuals.Awake built its renderer list.
-                    visuals.SetModelRoot(modelRoot);
-                    visuals.ApplyTint(entry.TintColor, entry.TintStrength);
-                    ClassBodyTint = Color.Lerp(Color.white, entry.TintColor, entry.TintStrength);   // presentation only: the colour the body wears (death feathers read it)
-                    _log?.Debug(Source, $"Applied tint {entry.TintColor} at strength {entry.TintStrength:0.##} for class {Class}.");
-                }
-
-                // Hand the same model root to the animator helper, and tell it whether the
-                // skeletal path came up. Without the model root it has nothing to offset;
-                // without the skeletal flag it cannot know which of its two paths to run.
-                var animator = GetComponent<ChickenAnimator>();
-                if (animator != null)
-                {
-                    animator.SetModelRoot(modelRoot);
-                    animator.SetSkeletalActive(_skeletalAnimationActive);
-                }
+                ApplyClassLook(modelRoot, entry.TintColor, entry.TintStrength);
             }
             else
             {
@@ -690,6 +670,41 @@ namespace CluckWars.Gameplay
                                     "model and no class tint — populate ChickenClassRegistry.asset.");
             }
             PresentationReady = true;
+        }
+
+        /// <summary>
+        /// Caches this chicken's presentation siblings through the presenter (see <see cref="Presentation"/>). With no
+        /// presenter bound the chicken still plays: it has no tint, no animation model root, no head-overlay lift, and
+        /// presentation readers get null. That is a wiring fault (<c>ProjectInstaller</c> binds the presenter), so it
+        /// is an Error, once for all chickens rather than once per spawn.
+        /// </summary>
+        private void BindPresentation()
+        {
+            if (_presenter != null)
+            {
+                Presentation = _presenter.Bind(this);
+                return;
+            }
+
+            Presentation = null;
+            if (s_presenterMissingReported || _log == null) return;
+            s_presenterMissingReported = true;
+            _log.Error(Source, $"{name}: no {nameof(IChickenModelPresenter)} is bound (ProjectInstaller binds ChickenModelPresenter). " +
+                               "Chickens spawn with no class tint, no animated model root, no head-overlay lift and unfitted ground rings, " +
+                               "and their nameplate / rival indicator / badge stack are not cached (markers and pops fall back). " +
+                               "Gameplay carries on. Reported once.");
+        }
+
+        /// <summary>
+        /// Hands the freshly attached model to presentation: the tint target then the tint, then the animation
+        /// helper's model root and whether the skeletal path came up (the order is the presenter's contract). The body
+        /// colour is recorded only when the chicken really has a tint component, as before.
+        /// </summary>
+        private void ApplyClassLook(Transform modelRoot, Color tint, float strength)
+        {
+            if (_presenter == null || !_presenter.ApplyClassLook(this, modelRoot, tint, strength, _skeletalAnimationActive)) return;
+            ClassBodyTint = Color.Lerp(Color.white, tint, strength);   // presentation only: the colour the body wears (death feathers read it)
+            _log?.Debug(Source, $"Applied tint {tint} at strength {strength:0.##} for class {Class}.");
         }
 
         /// <summary>
@@ -731,12 +746,12 @@ namespace CluckWars.Gameplay
             model.transform.localRotation = Quaternion.identity;
 
             // Visual-only class scale (Phase 8 D6). The model origin is at the feet, so scaling the model root
-            // keeps the feet planted; the root, CharacterController and stats are not touched. ChickenAnimator
+            // keeps the feet planted; the root, CharacterController and stats are not touched. The animation helper
             // captures _restScale from this transform in SetModelRoot (called after we return), so it keeps it.
             var modelScale = entry.ResolvedModelScale;
             model.transform.localScale = modelScale;
             ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f), modelScale.y);
-            ChickenFootprint.Apply(this, model.transform);   // foot rings clear the body (Phase 8 chunk C R3)
+            _presenter?.FitFootprint(this, model.transform);   // foot rings clear the body (Phase 8 chunk C R3)
 
             // Presentation that cached a renderer set (HitFeedback) refreshes it now: its Spawned may already
             // have run, and could not have included the model in any case, since the model only exists now.
@@ -759,10 +774,7 @@ namespace CluckWars.Gameplay
         private void ApplyOverlayHeadLift(float lift, float classScale)
         {
             if (Mathf.Approximately(lift, 0f)) return;
-            GetComponent<ChickenNameplate>()?.SetHeadLift(lift);
-            GetComponent<ChickenWorldBars>()?.SetHeadLift(lift);
-            GetComponent<ChickenStatusBadges>()?.SetHeadLift(lift);
-            GetComponent<ChickenStateOverlays>()?.SetHeadLift(lift, classScale);
+            _presenter?.ApplyHeadLift(this, lift, classScale);
         }
 
         /// <summary>
@@ -1200,21 +1212,16 @@ namespace CluckWars.Gameplay
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
         public AssassinExecute Execute => _assassin;
 
-        private CluckWars.Visuals.RivalIndicator _indicator;
-        private CluckWars.Visuals.ChickenNameplate _nameplate;
-        /// <summary>This chicken's rival indicator and nameplate (cached at spawn, presentation readers only; may be null).</summary>
-        public CluckWars.Visuals.RivalIndicator Indicator => _indicator;
-        public CluckWars.Visuals.ChickenNameplate Nameplate => _nameplate;
-        private CluckWars.Visuals.ChickenStatusBadges _statusBadges;
-        /// <summary>This bird's badge stack (cached at spawn; may be null).</summary>
-        public CluckWars.Visuals.ChickenStatusBadges StatusBadges => _statusBadges;
-        /// <summary>Where a floating pop over this bird starts: its pivot plus the pop height, above any shown badge rows
-        /// (cached sibling, no per-call lookup; the floor alone when the bird has no badge stack).</summary>
-        public Vector3 PopAnchor => CluckWars.Visuals.FloatingCombatText.PopSpawnPosition(
-            transform.position, _statusBadges != null ? _statusBadges.PopClearHeight(CluckWars.Visuals.ChickenStatusBadges.Badge.None) : 0f);
-        /// <summary><see cref="PopAnchor"/> for a state-entry pop: clear of the badge row <paramref name="entering"/> that appears this frame.</summary>
-        public Vector3 PopAnchorEntering(CluckWars.Visuals.ChickenStatusBadges.Badge entering) => CluckWars.Visuals.FloatingCombatText.PopSpawnPosition(
-            transform.position, _statusBadges != null ? _statusBadges.PopClearHeight(entering) : 0f);
+        private IChickenModelPresenter _presenter;
+        private static bool s_presenterMissingReported;
+
+        /// <summary>
+        /// What presentation cached for this chicken at spawn (its rival indicator, nameplate and badge stack), or null
+        /// before <c>Spawned</c> / with no presenter bound. Opaque to gameplay: presentation reads it through the
+        /// extension methods in <c>ChickenPresentationAccess</c> (<c>chicken.Nameplate()</c>, <c>chicken.Indicator()</c>,
+        /// <c>chicken.StatusBadges()</c>, <c>chicken.PopAnchor()</c>, <c>chicken.PopAnchorEntering(badge)</c>).
+        /// </summary>
+        public IChickenPresentation Presentation { get; private set; }
         /// <summary>The CharacterController (the body's footprint, for presentation placement; may be null).</summary>
         public CharacterController Body => _characterController;
 
@@ -1285,7 +1292,7 @@ namespace CluckWars.Gameplay
         /// <c>FeedbackTuning.HitAttributionWindowSeconds</c> — the knockback edge that
         /// <c>HitFeedback.ObserveKnockback</c> sees a frame or two later then claims it. That
         /// jitter between the two halves of one hit is precisely what the window exists for;
-        /// see <see cref="Visuals.HitAttribution"/>. Do not add a push here.
+        /// see <c>HitAttribution</c> (Visuals). Do not add a push here.
         /// </remarks>
         public void ApplyKnockback(Vector3 impulse, ImpulseOrigin origin = ImpulseOrigin.Hit)
         {

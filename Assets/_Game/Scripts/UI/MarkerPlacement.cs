@@ -28,7 +28,7 @@ namespace CluckWars.UI
             var feet = new Vector2(vp3.x, vp3.y);
 
             Rect you = default;
-            var localPlate = local != null && local != target ? local.Nameplate : null;
+            var localPlate = local != null && local != target ? local.Nameplate() : null;
             bool hasYou = localPlate != null && localPlate.TryGetPlateViewport(cam, out Rect youVp) && Assign(out you, ToPanel(youVp, panel));
 
             // On screen (the feet in frame, in front of the camera): never an edge pin. Above the plate, else below the feet,
@@ -37,11 +37,11 @@ namespace CluckWars.UI
             if (onScreen)
             {
                 var scene = BuildScene(cam, panel, target, local, info, hasYou, you);
-                var plate = target.Nameplate;
+                var plate = target.Nameplate();
                 float lift = plate != null ? plate.HeadLift : 0f;
                 // The floor, raised to the top of whatever badge rows the target shows right now (read from the cached sibling).
                 float clear = FeedbackTuning.MarkMarkerClearHeight + lift;
-                var badges = target.StatusBadges;
+                var badges = target.StatusBadges();
                 if (badges != null) clear = Mathf.Max(clear, badges.CurrentStackTopLocalY);
                 Vector3 head = cam.WorldToViewportPoint(pos + Vector3.up * clear);
                 float anchorY = head.y;
@@ -71,7 +71,7 @@ namespace CluckWars.UI
             at = new Vector2(clamped.x * panel.x, (1f - clamped.y) * panel.y);
             // Pinned: no rising (it is at an edge), so it slides off any plate sideways (the target's, just below the band).
             if (hasYou) at = AvoidPlate(at, you, 0f);
-            var tp = target.Nameplate;
+            var tp = target.Nameplate();
             if (tp != null && tp.TryGetPlateViewport(cam, out Rect tvp)) at = AvoidPlate(at, ToPanel(tvp, panel), 0f);
             // The clamp's edge band is a viewport fraction of the chevron's; the marker and its distance label are wider: keep
             // the whole of them on the panel.
@@ -185,7 +185,7 @@ namespace CluckWars.UI
             Bounds b = cc != null && cc.enabled ? cc.bounds : new Bounds(target.transform.position + Vector3.up * 0.5f, Vector3.one);
             s.Body = ScreenEdgeProjection.TryProjectBounds(cam, b, out Rect bvp) ? ToPanel(bvp, panel) : new Rect(-1e5f, -1e5f, 0f, 0f);
 
-            var plate = target.Nameplate;
+            var plate = target.Nameplate();
             s.HasPlate = plate != null && plate.TryGetPlateViewport(cam, out Rect tvp) && Assign(out s.TargetPlate, ToPanel(tvp, panel));
 
             var all = ChickenController.ActiveControllers;
@@ -193,7 +193,7 @@ namespace CluckWars.UI
             {
                 var c = all[i];
                 if (c == null || c == target || c == local || c.IsDecoy) continue;
-                var p = c.Nameplate;
+                var p = c.Nameplate();
                 if (p != null && p.isActiveAndEnabled && p.TryGetPlateViewport(cam, out Rect vp)) OthersScratch.Add(ToPanel(vp, panel));
             }
 
