@@ -38,7 +38,7 @@ namespace CluckWars.Tests
 
         /// <summary>
         /// The palette's four colours, as any copy would spell them: the hex value (C#, USS, UXML) or the
-        /// float triple the old per-file arrays used. Anything outside PlayerPalette.cs that spells one is
+        /// float triple the old per-file arrays used. Anything outside PlayerColors.cs that spells one is
         /// a second copy that can drift (round-2 finding 1 found six).
         /// </summary>
         [Test]
@@ -55,7 +55,7 @@ namespace CluckWars.Tests
             }
             patterns.Add(new Regex(@"--cw-player-\d"));
 
-            string self = Path.Combine("Assets", "_Game", "Scripts", "UI", "PlayerPalette.cs");
+            string self = Path.Combine("Assets", "_Game", "Scripts", "Gameplay", "PlayerColors.cs");   // the one definition (A2)
             var offenders = new List<string>();
             foreach (var file in Directory.EnumerateFiles(Path.Combine(ProjectRoot, "Assets"), "*.*", SearchOption.AllDirectories))
             {
@@ -78,9 +78,41 @@ namespace CluckWars.Tests
                      {
                          "Assets/_Game/Scripts/UI/MenuUiController.cs", "Assets/_Game/Scripts/UI/MatchOverlaysController.cs",
                          "Assets/_Game/Scripts/UI/MatchHudController.cs", "Assets/_Game/Scripts/Visuals/ChickenNameplate.cs",
-                         "Assets/_Game/Scripts/Visuals/ChickenWorldBars.cs", "Assets/_Game/Scripts/Gameplay/PlayerBase.cs",
+                         "Assets/_Game/Scripts/Visuals/ChickenWorldBars.cs",
                      })
                 StringAssert.Contains("PlayerPalette.ForCorner(", Read(rel), rel);
+            // The base is gameplay: it reads the definition itself, not the UI forwarder (A2, batch 4).
+            StringAssert.Contains("PlayerColors.ForCorner(CornerIndex)", Read("Assets/_Game/Scripts/Gameplay/PlayerBase.cs"));
+        }
+
+        /// <summary>
+        /// A2 (batch 4): the values moved to <see cref="PlayerColors"/> (gameplay) and <see cref="PlayerPalette"/>
+        /// forwards them. Each must still be, bit for bit, what <c>UiGfx.Hex32</c> made of the old literal. The
+        /// literals are spelled as byte pairs here so this file is not itself "a second copy" for the scan above.
+        /// </summary>
+        [Test]
+        public void TheForwardedColours_AreByteIdenticalToTheOldLiterals()
+        {
+            var old = new (string name, Color now, Color forwarded, string hex)[]
+            {
+                ("P1", PlayerColors.P1, PlayerPalette.P1, "3f" + "e8" + "e8"),
+                ("P2", PlayerColors.P2, PlayerPalette.P2, "09" + "94" + "e8"),
+                ("P3", PlayerColors.P3, PlayerPalette.P3, "f7" + "36" + "7b"),
+                ("P4", PlayerColors.P4, PlayerPalette.P4, "17" + "78" + "5a"),
+                ("Neutral", PlayerColors.Neutral, PlayerPalette.Neutral, "a3" + "96" + "7f"),
+            };
+            foreach (var (name, now, forwarded, hex) in old)
+            {
+                Color was = UiGfx.Hex32(hex);   // exactly how PlayerPalette built it before the move
+                Assert.IsTrue(was.r == now.r && was.g == now.g && was.b == now.b && was.a == now.a, $"{name}: {now} is not the old {was}");
+                Assert.IsTrue(forwarded.r == now.r && forwarded.g == now.g && forwarded.b == now.b && forwarded.a == now.a, $"{name}: the forwarder differs");
+                Assert.AreEqual((Color32)was, (Color32)now, name);
+            }
+            Assert.AreEqual(PlayerColors.Count, PlayerPalette.Count);
+            for (int corner = -2; corner < 9; corner++)
+                Assert.IsTrue(PlayerColors.ForCorner(corner) == PlayerPalette.ForCorner(corner), $"corner {corner}");
+            Assert.IsTrue(PlayerColors.ForCorner(5) == PlayerColors.P2, "corners wrap");
+            Assert.IsTrue(PlayerColors.ForCorner(-1) == PlayerColors.Neutral);
         }
 
         // ---- Corners known in the menu ---------------------------------------------------------------

@@ -305,7 +305,7 @@ namespace CluckWars.Gameplay
         private void ApplyOwnerTint()
         {
             var color = IsClaimed
-                ? CluckWars.UI.PlayerPalette.ForCorner(CornerIndex)
+                ? PlayerColors.ForCorner(CornerIndex)
                 : UnownedColor;
 
             _log?.Debug(Source, $"{name}: ApplyOwnerTint - {_identityRenderers.Length} identity + {_flagRenderers.Length} flag + " +
