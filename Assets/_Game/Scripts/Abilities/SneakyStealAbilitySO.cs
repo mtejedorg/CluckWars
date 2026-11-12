@@ -67,7 +67,7 @@ namespace CluckWars.Abilities
             var target = _scratch[0].Cargo;
             if (target == null) return;
 
-            // Optimistic credit: take the smaller of (StealAmount, victim's cargo, our free space).
+            // Ask for the smaller of (StealAmount, victim's cargo, our free space); the victim reports what it really gave.
             float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Stealable, spaceLeft);
             if (take <= 0f) return;
 

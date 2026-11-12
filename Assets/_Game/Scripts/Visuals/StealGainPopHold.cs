@@ -1,9 +1,11 @@
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// I5: when the thief's own <c>+n</c> pop is shown. The cargo write lands at the cast, about 0.35 s before the
-    /// stolen kernels (<see cref="FoodChunkFlight"/>) reach the thief, so the pop is held and spawned as the last
-    /// kernel arrives. Pure and presentation-only: the cargo value itself changes at the cast exactly as before.
+    /// I5: when the thief's own <c>+n</c> pop is shown. The cargo write lands when the victim's report arrives
+    /// (<c>ChickenCargo.RPC_SettleSteal</c>: at the cast on the victim's own peer, one round trip later otherwise),
+    /// usually before the stolen kernels (<see cref="FoodChunkFlight"/>, about 0.35 s) reach the thief, so the pop is
+    /// held and spawned as the last kernel arrives; a credit that lands after them pops on the fallback timer.
+    /// Pure and presentation-only: it never changes when the cargo value itself is written.
     /// </summary>
     /// <remarks>
     /// One instance per thief (owned by its <see cref="HitFeedback"/>). Every steal gain seen while a hold is open

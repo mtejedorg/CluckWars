@@ -245,7 +245,7 @@ they go green when the class-registry tints are authored.
 
 - movement, knockback, root/slow application, and the whole control-state stack;
 - damage RPCs, kill credit, Spine Coat reflect, death drop;
-- cargo collection, the deposit rate, the optimistic-credit duplication window,
+- cargo collection, the deposit rate, the request / report round trip of a peck, steal or deposit,
   and the two-chickens-deposit-at-once race;
 - match flow ticks — state machine, timer, win check, restart, comeback events;
 - the permanent pile's regen tick and the NavMesh re-carve when a footprint steps;
