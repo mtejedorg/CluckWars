@@ -140,6 +140,68 @@ namespace CluckWars.Gameplay
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
+        // ---- The local chicken (A10) ----
+        private static ChickenController s_local;
+        private static bool s_localDirty = true;
+        private static int s_localScanFrame = -1;
+        private static readonly System.Collections.Generic.List<LocalChickenCandidate> s_localScratch =
+            new System.Collections.Generic.List<LocalChickenCandidate>(8);
+
+        /// <summary>
+        /// The chicken this peer drives, or null before it spawns: live object, input authority, not a decoy
+        /// (<see cref="LocalChickenRules"/>). The one accessor for it; do not scan the scene for
+        /// <c>HasInputAuthority</c>, a Doppelganger decoy shares its caster's.
+        /// </summary>
+        /// <remarks>
+        /// Cached. Re-resolved from <see cref="ActiveControllers"/> (never a scene scan, no allocation) when a chicken
+        /// spawned or despawned, when the cached one stops qualifying, and at most once a frame while there is none
+        /// (a decoy is flagged by its own component, which may run after this one's <see cref="Spawned"/>).
+        /// </remarks>
+        public static ChickenController Local
+        {
+            get
+            {
+                if (s_local != null && LocalChickenRules.IsEligible(Describe(s_local))) return s_local;
+
+                int frame = Time.frameCount;
+                if (!s_localDirty && frame == s_localScanFrame) return null;
+                s_localDirty = false;
+                s_localScanFrame = frame;
+
+                s_localScratch.Clear();
+                for (int i = 0; i < ActiveControllers.Count; i++) s_localScratch.Add(Describe(ActiveControllers[i]));
+                int at = LocalChickenRules.Pick(s_localScratch);
+                s_local = at >= 0 ? ActiveControllers[at] : null;
+                return s_local;
+            }
+        }
+
+        /// <summary><see cref="Local"/> when a human drives it (never a bot): the chicken local device input belongs to.</summary>
+        public static ChickenController LocalDriven
+        {
+            get
+            {
+                var local = Local;
+                return local != null && !local.IsBot ? local : null;
+            }
+        }
+
+        private static LocalChickenCandidate Describe(ChickenController c)
+        {
+            bool valid = c != null && c.Object != null && c.Object.IsValid;
+            return new LocalChickenCandidate(valid, valid && c.HasInputAuthority, valid && c.IsDecoy, valid && c.IsBot);
+        }
+
+        /// <summary>Enter Play Mode without a domain reload must not inherit the previous session's chickens.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetLocalStatics()
+        {
+            s_local = null;
+            s_localDirty = true;
+            s_localScanFrame = -1;
+            s_localScratch.Clear();
+        }
+
         [Tooltip("Fallback used only if the class registry is missing or has no entry for this chicken's class.")]
         [SerializeField] private ChickenStatsSO _fallbackStats;
 
@@ -531,6 +593,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveControllers.Add(this);
+            s_localDirty = true;
             LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
             _recentPositions.Clear();      // pooled: a previous life's positions never vouch
             if (_log == null)
@@ -825,6 +888,8 @@ namespace CluckWars.Gameplay
         {
             _traversal?.Abort();
             ActiveControllers.Remove(this);
+            if (s_local == this) s_local = null;
+            s_localDirty = true;
         }
 
         public override void FixedUpdateNetwork()

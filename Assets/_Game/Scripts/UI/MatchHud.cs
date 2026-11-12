@@ -122,15 +122,11 @@ namespace CluckWars.UI
             {
                 _localController = null;
                 _localCombat     = null;
-                var all = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-                for (int i = 0; i < all.Length; i++)
+                var local = ChickenController.Local;
+                if (local != null)
                 {
-                    var c = all[i];
-                    if (c.Object == null || !c.Object.IsValid) continue;
-                    if (!c.HasInputAuthority) continue;
-                    _localController = c;
-                    _localCombat     = c.Combat;
-                    break;
+                    _localController = local;
+                    _localCombat     = local.Combat;
                 }
             }
 

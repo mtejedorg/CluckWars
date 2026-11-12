@@ -737,15 +737,6 @@ namespace CluckWars.Diagnostics
             }
         }
 
-        private static ChickenController LocalChicken()
-        {
-            var all = ChickenController.ActiveControllers;
-            for (int i = 0; i < all.Count; i++)
-            {
-                var c = all[i];
-                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsBot && !c.IsDecoy) return c;
-            }
-            return null;
-        }
+        private static ChickenController LocalChicken() => ChickenController.LocalDriven;
     }
 }

@@ -1633,14 +1633,8 @@ namespace CluckWars.UI
 
         private int LocalCorner()
         {
-            var controllers = ChickenController.ActiveControllers;
-            for (int i = 0; i < controllers.Count; i++)
-            {
-                var c = controllers[i];
-                if (c == null || c.Object == null || !c.Object.IsValid) continue;
-                if (c.HasInputAuthority) return c.HomeCornerIndex;
-            }
-            return -1;
+            var local = ChickenController.Local;
+            return local != null ? local.HomeCornerIndex : -1;
         }
 
         private static string KeyOf(ChickenClass cls) => cls.ToString().ToLowerInvariant();

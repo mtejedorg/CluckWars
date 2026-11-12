@@ -151,18 +151,12 @@ namespace CluckWars.Diagnostics
         /// <summary>Running ability slots on the chicken this peer drives (0 with no local chicken).</summary>
         private static int LocalActiveAbilityCount()
         {
-            var all = ChickenController.ActiveControllers;
-            for (int i = 0; i < all.Count; i++)
-            {
-                var c = all[i];
-                if (c == null || c.Object == null || !c.Object.IsValid || !c.HasInputAuthority || c.IsBot || c.IsDecoy) continue;
-                var a = c.Abilities;
-                if (a == null) return 0;
-                int n = 0;
-                for (int s = 0; s < AbilityController.SlotCount; s++) if (a.IsSlotActive(s)) n++;
-                return n;
-            }
-            return 0;
+            var local = ChickenController.LocalDriven;
+            var a = local != null ? local.Abilities : null;
+            if (a == null) return 0;
+            int n = 0;
+            for (int s = 0; s < AbilityController.SlotCount; s++) if (a.IsSlotActive(s)) n++;
+            return n;
         }
     }
 }

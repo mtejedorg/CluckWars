@@ -1822,15 +1822,6 @@ namespace CluckWars.Input
             _ => null,
         };
 
-        private static ChickenController FindLocalChicken()
-        {
-            var all = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < all.Length; i++)
-            {
-                var c = all[i];
-                if (c.Object != null && c.Object.IsValid && c.HasInputAuthority) return c;
-            }
-            return null;
-        }
+        private static ChickenController FindLocalChicken() => ChickenController.Local;
     }
 }

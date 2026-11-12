@@ -222,16 +222,7 @@ namespace CluckWars.Networking
         }
 
         /// <summary>The chicken this client drives (input authority, not a bot), or null before it spawns.</summary>
-        private static ChickenController FindLocalChicken()
-        {
-            var all = ChickenController.ActiveControllers;
-            for (int i = 0; i < all.Count; i++)
-            {
-                var c = all[i];
-                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsBot) return c;
-            }
-            return null;
-        }
+        private static ChickenController FindLocalChicken() => ChickenController.LocalDriven;
 
         // ---------- Test-session network diagnostics (item 8) ----------
         // Breadcrumbs (always): join / leave / master change / shutdown, each with the cover and match state at that moment.

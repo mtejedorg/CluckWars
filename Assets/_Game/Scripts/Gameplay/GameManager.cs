@@ -415,13 +415,7 @@ namespace CluckWars.Gameplay
 
         private static bool LocalChickenIsUp()
         {
-            var chickens = ChickenController.ActiveControllers;
-            for (int i = 0; i < chickens.Count; i++)
-            {
-                var c = chickens[i];
-                if (c != null && c.Object != null && c.Object.IsValid && c.HasInputAuthority && !c.IsDecoy) return true;
-            }
-            return false;
+            return ChickenController.Local != null;
         }
 
         /// <summary>Starting -> Active, on the state authority, once <see cref="IntroArmGate"/> opened.</summary>

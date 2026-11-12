@@ -337,17 +337,7 @@ namespace CluckWars.UI
             // --- Local chicken ---
             sb.AppendLine();
             sb.AppendLine("[Local Chicken]");
-            ChickenController localCtrl = null;
-            var ctrls = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < ctrls.Length; i++)
-            {
-                var c = ctrls[i];
-                if (c.Object != null && c.Object.IsValid && c.HasInputAuthority)
-                {
-                    localCtrl = c;
-                    break;
-                }
-            }
+            ChickenController localCtrl = ChickenController.Local;
             if (localCtrl == null)
             {
                 sb.AppendLine("(not spawned)");
@@ -436,18 +426,7 @@ namespace CluckWars.UI
             sb.AppendLine();
             sb.AppendLine("[Local Abilities]");
 
-            ChickenController localCtrl = null;
-            var ctrls = FindObjectsByType<ChickenController>(
-                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < ctrls.Length; i++)
-            {
-                var c = ctrls[i];
-                if (c.Object != null && c.Object.IsValid && c.HasInputAuthority)
-                {
-                    localCtrl = c;
-                    break;
-                }
-            }
+            ChickenController localCtrl = ChickenController.Local;
 
             if (localCtrl == null || localCtrl.Abilities == null)
             {

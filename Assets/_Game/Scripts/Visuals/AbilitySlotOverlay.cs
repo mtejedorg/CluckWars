@@ -183,7 +183,8 @@ namespace CluckWars.Visuals
             var obj = _abilities.Object;
             if (obj == null || !obj.IsValid) return false;
 
-            return _controller.HasInputAuthority;
+            // The shared rule, not HasInputAuthority alone: a decoy shares its caster's input authority (A10).
+            return ChickenController.Local == _controller;
         }
 
         private void ClearHot()

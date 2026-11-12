@@ -373,22 +373,9 @@ namespace CluckWars.Visuals
             return _localChicken != null ? _localChicken.transform.position : _focusPoint;
         }
 
-        private static ChickenController FindLocalChicken()
-        {
-            var all = FindObjectsByType<ChickenController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < all.Length; i++)
-            {
-                var c = all[i];
-                if (c == null || c.Object == null || !c.Object.IsValid) continue;
-                // !IsDecoy as well: a Doppelganger decoy shares its caster's InputAuthority,
-                // so it is an equally valid answer here — and FindObjectsByType is unordered,
-                // so it can win. Once latched, the rescan above only re-runs when the
-                // reference goes null, which meant the camera followed the decoy for its
-                // whole lifetime instead of the player.
-                if (c.HasInputAuthority && !c.IsDecoy) return c;
-            }
-            return null;
-        }
+        // The shared rule (input authority AND not a decoy: a Doppelganger shares its caster's InputAuthority, and
+        // once latched the camera followed the decoy for its whole lifetime).
+        private static ChickenController FindLocalChicken() => ChickenController.Local;
 
         private void ApplyCamera()
         {
