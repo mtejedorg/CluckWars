@@ -207,8 +207,9 @@ namespace CluckWars.Tests
             int c = vfxSrc.IndexOf("private void EmitShoveRing", System.StringComparison.Ordinal);
             Assert.Greater(b, 0); Assert.Greater(c, b);
             string body = vfxSrc.Substring(b, c - b);
-            StringAssert.Contains("KnockbackEventId", body, "the victim beats key on the replicated knockback edge");
-            StringAssert.DoesNotContain("SelfImpulseEventId", body, "a dodge is not a shove");
+            StringAssert.Contains("_knockPending", body, "the victim beats key on the replicated knockback edge");
+            StringAssert.Contains("_events.Knockback += OnKnockback", vfxSrc, "which is ChickenLocalEvents.Knockback (KnockbackEventId)");
+            StringAssert.DoesNotContain(".SelfImpulse +=", vfxSrc, "a dodge is not a shove");
             StringAssert.Contains("IsFadedOpacity", body, "the opacity gate");
             StringAssert.DoesNotContain("Rpc", body);
         }

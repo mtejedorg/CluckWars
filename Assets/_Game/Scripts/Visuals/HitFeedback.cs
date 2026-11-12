@@ -200,12 +200,12 @@ namespace CluckWars.Visuals
 
         // ---- Replicated one-shot baselines ------------------------------------
 
-        private bool _knockInitialized;
-        private byte _lastKnockEventId;
-
-        private bool _castInitialized;
-        private byte _lastCastEventId;
-        private AbilityBaseSO _lastChargingAbility;
+        // The one-shot cursors live in ChickenLocalEvents. Its events are latched here and consumed in Render, the
+        // point these beats have always run at.
+        private ChickenLocalEvents _events;
+        private bool _knockPending;
+        private bool _castPending;
+        private CastEvent _cast;
 
         private bool _controlInitialized;
         private bool _wasStunned;
@@ -276,8 +276,8 @@ namespace CluckWars.Visuals
 
             // Seed every baseline from current state so a late joiner inheriting a non-zero
             // event id or an already-stunned chicken never plays a hit that already happened.
-            _knockInitialized   = false;
-            _castInitialized    = false;
+            _knockPending       = false;
+            _castPending        = false;
             _controlInitialized = false;
 
             // Fusion pools NetworkObjects, so a recycled chicken would otherwise inherit the
@@ -301,10 +301,62 @@ namespace CluckWars.Visuals
             _stealPop.Clear();
         }
 
+        private void OnEnable()
+        {
+            if (_controller == null || _events != null) return;
+            _events = _controller.LocalEvents;
+            _events.Knockback += OnKnockback;
+            _events.Cast      += OnCast;
+            _events.Stolen    += OnStolen;
+        }
+
         private void OnDisable()
         {
+            if (_events != null)
+            {
+                _events.Knockback -= OnKnockback;
+                _events.Cast      -= OnCast;
+                _events.Stolen    -= OnStolen;
+                _events = null;
+            }
+            _knockPending = false;
+            _castPending  = false;
+
             EndFlash();
             HitStopDriver.CancelIfRequestedBy(this);
+        }
+
+        private void OnKnockback() => _knockPending = true;
+
+        private void OnCast(CastEvent e)
+        {
+            _cast = e;
+            _castPending = true;
+        }
+
+        /// <summary>
+        /// The victim half of a robbery, off the replicated <c>ChickenCargo.StealEventId</c> edge: the attacker
+        /// attribution that gives the cargo-loss hit a direction, and the flying kernels. Local, on every peer.
+        /// </summary>
+        /// <remarks>
+        /// <b>Independent of the cargo delta, and it must stay so.</b> The <c>-n</c> (<c>ChickenCargo.Render</c>) and
+        /// this edge can arrive in either order inside one frame, and both orders work: cargo first plays a
+        /// directionless impact which the attribution then retro-claims; the edge first arms the window and the
+        /// impact claims it on arrival. That is what <see cref="HitAttribution"/>'s window exists for.
+        /// <para>
+        /// <b>A thief that does not resolve is a legitimate no-op and stays silent</b> (CONVENTIONS.md, the
+        /// silent-failure sorting rule): on a remote peer the thief's proxy may not be spawned yet or may already be
+        /// gone. The victim still gets the flash, the shake and the <c>-n</c>; only the direction is withheld.
+        /// </para>
+        /// </remarks>
+        private void OnStolen(StealEvent e)
+        {
+            if (_controller == null || _controller.IsDecoy || Runner == null) return;
+            if (!Runner.TryFindBehaviour(e.Thief, out ChickenController thief)) return;
+            if (thief == null || thief.Object == null || !thief.Object.IsValid) return;
+
+            NotifyAttacker(thief.transform.position);
+            PlayStealChunks(thief);   // D7: the kernels fly victim -> thief (local, every peer)
         }
 
         private void OnDestroy()
@@ -344,6 +396,10 @@ namespace CluckWars.Visuals
             var obj = Object;
             if (obj == null || !obj.IsValid) return;
 
+            // Sibling Render order is not guaranteed: observing here makes this frame's edges arrive before the
+            // latches below are read, whichever of ChickenController.Render and this one runs first.
+            _events?.Observe();
+
             ObserveKnockback();
             ObserveControlStates();
 
@@ -369,15 +425,8 @@ namespace CluckWars.Visuals
         /// </summary>
         private void ObserveKnockback()
         {
-            byte id = _controller.KnockbackEventId;
-            if (!_knockInitialized)
-            {
-                _knockInitialized = true;
-                _lastKnockEventId = id;
-                return;
-            }
-            if (id == _lastKnockEventId) return;
-            _lastKnockEventId = id;
+            if (!_knockPending) return;
+            _knockPending = false;
 
             TriggerVictimHit();
 
@@ -475,26 +524,12 @@ namespace CluckWars.Visuals
         {
             if (_abilities == null) return;
 
-            // TryActivate clears ChargingSlot in the same tick it fires, and a very short
-            // ability's active flag may already have cleared by the time this observes the
-            // event — so remember what was last aimed, same as AbilityRangeIndicator.
-            if (_abilities.ChargingSlot != 0)
-            {
-                var charging = _abilities.ChargingAbility;
-                if (charging != null) _lastChargingAbility = charging;
-            }
+            if (!_castPending) return;
+            _castPending = false;
 
-            byte id = _abilities.LastCastEventId;
-            if (!_castInitialized)
-            {
-                _castInitialized = true;
-                _lastCastEventId = id;
-                return;
-            }
-            if (id == _lastCastEventId) return;
-            _lastCastEventId = id;
-
-            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
+            // The ability that cast, else the one last seen charging (TryActivate clears ChargingSlot in the tick it
+            // fires, and a very short ability may already be over: ChickenLocalEvents remembers what was aimed).
+            var ability = _cast.AimedAbility;
             if (ability == null) return;
 
             // Stun (D10): the swing arcs read from across the arena, hit or whiff, and only for the Wing Slam itself.
@@ -507,7 +542,7 @@ namespace CluckWars.Visuals
             // both exemptions — see AbilityBaseSO.ReportsCastHits.
             if (!ability.ReportsCastHits) return;
 
-            int hitCount = _abilities.LastCastHitCount;
+            int hitCount = _cast.HitCount;
             if (hitCount > 0)
             {
                 ConfirmHits(ability, hitCount);
@@ -746,7 +781,7 @@ namespace CluckWars.Visuals
         /// the validated thief into replicated state inside the drain and observes the resulting
         /// edge in its own <c>Render</c>, so the attribution reaches
         /// <see cref="NotifyAttacker"/> on <i>every</i> peer — see
-        /// <c>ChickenCargo.NameTheThief</c>. The peer-count argument that rules this method out
+        /// <see cref="OnStolen"/>. The peer-count argument that rules this method out
         /// as a push point is exactly what forced that shape, so do not "simplify" the two back
         /// together: an amount and an attacker are different facts, learned different ways.
         /// </summary>
@@ -881,7 +916,7 @@ namespace CluckWars.Visuals
         /// the three places that hold real evidence: <see cref="ConfirmHits"/> (a landed direct
         /// cast, pushing the caster's position), <see cref="AbilityZone"/> (a placed trap
         /// catching someone, pushing the <i>zone's</i> position), and
-        /// <c>ChickenCargo.NameTheThief</c> (a drain that landed, pushing the position of the
+        /// <see cref="OnStolen"/> (a drain that landed, pushing the position of the
         /// thief its RPC already validated). All three derive from already-replicated state, so
         /// every peer reaches the same conclusion independently — the same no-RPC pattern as
         /// <see cref="NotifyCargoLoss"/> and <see cref="NotifyZoneTriggered"/>.
@@ -1152,8 +1187,8 @@ namespace CluckWars.Visuals
             FoodChunkFlight.PlayStunArcs(_controller, FeedbackPalette.Current.Accent(AccentKey.Stun));
         }
 
-        /// <summary>The victim half of a robbery, off the replicated <c>StealEventId</c> edge (called from <see cref="ChickenCargo"/>
-        /// with the resolved thief): the flying kernels. Local, on every peer; one robbery is one flight.</summary>
+        /// <summary>The victim half of a robbery, off the replicated <c>StealEventId</c> edge (<see cref="OnStolen"/>, with the
+        /// resolved thief): the flying kernels. Local, on every peer; one robbery is one flight.</summary>
         public void PlayStealChunks(ChickenController thief)
         {
             if (_controller == null || _controller.IsDecoy) return;

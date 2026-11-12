@@ -140,6 +140,15 @@ namespace CluckWars.Gameplay
 
         public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
 
+        private ChickenLocalEvents _localEvents;
+
+        /// <summary>
+        /// This chicken's replicated one-shot moments (cast, knockback, jump, steal...) as plain local C# events, on
+        /// every peer. The one observer of those counters: presentation subscribes here and keeps no cursor of its
+        /// own (CONVENTIONS.md, "Replicated moments").
+        /// </summary>
+        public ChickenLocalEvents LocalEvents => _localEvents ??= new ChickenLocalEvents(this);
+
         // ---- The local chicken (A10) ----
         private static ChickenController s_local;
         private static bool s_localDirty = true;
@@ -594,6 +603,7 @@ namespace CluckWars.Gameplay
         {
             ActiveControllers.Add(this);
             s_localDirty = true;
+            LocalEvents.Reset();           // pooled or respawned: every one-shot baseline is taken again
             LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
             _recentPositions.Clear();      // pooled: a previous life's positions never vouch
             if (_log == null)
@@ -890,7 +900,11 @@ namespace CluckWars.Gameplay
             ActiveControllers.Remove(this);
             if (s_local == this) s_local = null;
             s_localDirty = true;
+            _localEvents?.Reset();
         }
+
+        /// <summary>Every peer, once a frame: turns this chicken's replicated one-shot counters into local events.</summary>
+        public override void Render() => LocalEvents.Observe();
 
         public override void FixedUpdateNetwork()
         {

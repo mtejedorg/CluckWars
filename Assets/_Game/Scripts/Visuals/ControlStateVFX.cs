@@ -97,11 +97,10 @@ namespace CluckWars.Visuals
 
         private float _knockTimer = -1f;
         private const float KnockDuration = 0.3f;
-        private byte  _lastKnockEventId;
-        private bool  _knockInitialized;
-
-        private byte  _lastJumpEventId;
-        private bool  _jumpInitialized;
+        // The one-shot cursors live in ChickenLocalEvents; its events are latched here and consumed in LateUpdate.
+        private ChickenLocalEvents _events;
+        private bool  _knockPending;
+        private bool  _jumpPending;
         private float _jumpImpactDelay;  // counts down; <= 0 = nothing pending
 
         private float _windupTimer;
@@ -145,6 +144,29 @@ namespace CluckWars.Visuals
 
             _windupGlow = BuildWindupGlow();
         }
+
+        private void OnEnable()
+        {
+            if (_controller == null || _events != null) return;
+            _events = _controller.LocalEvents;
+            _events.Knockback += OnKnockback;
+            _events.Jump      += OnJump;
+        }
+
+        private void OnDisable()
+        {
+            if (_events != null)
+            {
+                _events.Knockback -= OnKnockback;
+                _events.Jump      -= OnJump;
+                _events = null;
+            }
+            _knockPending = false;
+            _jumpPending  = false;
+        }
+
+        private void OnKnockback() => _knockPending = true;
+        private void OnJump()      => _jumpPending = true;
 
         private void LateUpdate()
         {
@@ -442,6 +464,7 @@ namespace CluckWars.Visuals
         /// </remarks>
         private void UpdateImpactShockwave()
         {
+            _events?.Observe();   // this frame's edges, before the two latches are read
             ObserveKnockbackEdge();
             ObserveJumpLandingEdge();
 
@@ -491,16 +514,9 @@ namespace CluckWars.Visuals
         /// </remarks>
         private void ObserveKnockbackEdge()
         {
-            byte id = _controller.KnockbackEventId;
-            if (!_knockInitialized)
-            {
-                _knockInitialized = true;
-                _lastKnockEventId = id;
-                return;
-            }
-            if (id == _lastKnockEventId) return;
+            if (!_knockPending) return;
+            _knockPending = false;
 
-            _lastKnockEventId = id;
             _knockTimer = 0f;
         }
 
@@ -530,16 +546,9 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             if (obj == null || !obj.IsValid) return;
 
-            byte id = _controller.JumpEventId;
-            if (!_jumpInitialized)
-            {
-                _jumpInitialized = true;
-                _lastJumpEventId = id;
-                return;
-            }
-            if (id == _lastJumpEventId) return;
+            if (!_jumpPending) return;
+            _jumpPending = false;
 
-            _lastJumpEventId = id;
             // HOP! is a word, not motion, so it is not gated by Reduced Motion (owner's screen only).
             if (!JumpBeatRules.EventPathDeduped(Time.time, _lastSlotHopTime)) SelfPop(UiKeys.HudPopHop, AccentKey.Jump);
             bool hidden = IsFadedOpacity(_controller.VisualOpacity);

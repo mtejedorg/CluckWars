@@ -146,7 +146,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("CasterStunCountdownRules.TryGetSeconds(", src);
             StringAssert.Contains("CasterStunCountdownRules.Format(", src);
             StringAssert.Contains("ChickenController.ActiveControllers", src);
-            StringAssert.Contains("LastCastAbility as WingSlamAbilitySO", src);
+            StringAssert.Contains("_stunCast.Ability as WingSlamAbilitySO", src);   // the cast event of the local bird (ChickenLocalEvents)
             StringAssert.Contains("AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken)", src);   // never the bare base stun
             StringAssert.Contains("FeedbackTuning.CanonicalStunColor", src);
 

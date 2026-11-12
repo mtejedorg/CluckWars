@@ -548,7 +548,7 @@ namespace CluckWars.Tests
             string src = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/RivalIndicator.cs"));
             StringAssert.Contains("if (!chevron) _wasUnderHud = false;", src, "never a ring with neither nameplate nor arrow");
             string touch = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Input/TouchControlsController.cs"));
-            StringAssert.Contains("private void OnDisable() => StatusRowCount = 0;", touch);
+            StringAssert.IsMatch(@"private void OnDisable\(\)\s*\{\s*StatusRowCount = 0;", touch);
             StringAssert.Contains("if (!_bound) { StatusRowCount = 0; return; }", touch);
             string zones = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/HudControlZones.cs"));
             StringAssert.Contains("touch != null && touch.isActiveAndEnabled ? touch.StatusRowCount : 0", zones);

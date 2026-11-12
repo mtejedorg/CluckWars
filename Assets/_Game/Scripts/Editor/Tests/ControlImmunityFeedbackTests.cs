@@ -426,8 +426,10 @@ namespace CluckWars.Tests
             foreach (var path in new[] { HitFeedbackPath, ControlVfxPath })
             {
                 string src = StripComments(Read(path));
-                StringAssert.Contains("KnockbackEventId", src,
-                    $"{Path.GetFileName(path)} must still observe real knockbacks.");
+                StringAssert.Contains(".Knockback += OnKnockback", src,
+                    $"{Path.GetFileName(path)} must still observe real knockbacks (ChickenLocalEvents.Knockback).");
+                StringAssert.DoesNotContain(".SelfImpulse +=", src,
+                    $"{Path.GetFileName(path)} must not subscribe to the self-applied impulse.");
                 StringAssert.DoesNotContain("SelfImpulseEventId", src,
                     $"{Path.GetFileName(path)} drives the vocabulary of BEING HIT — flash, recoil, " +
                     "victim-tier shake, ground shockwave. A self-applied dodge must not reach it.");

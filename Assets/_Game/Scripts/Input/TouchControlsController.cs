@@ -178,10 +178,12 @@ namespace CluckWars.Input
         private readonly float[] _appliedScale = new float[SlotCount];   // the inline scale last written (rest scale x held scale)
         private readonly string[] _appliedCdText = new string[SlotCount]; // desktop cooldown readout cache (tenths under 1 s)
 
-        // A4 caster-side stun countdown (CasterStunCountdownRules): the last cast observed off the replicated
-        // LastCastEventId one-shot (baseline-seeded per local chicken), and the per-frame verdict the Stun hex reads.
+        // A4 caster-side stun countdown (CasterStunCountdownRules): the last cast of the local chicken (its
+        // ChickenLocalEvents.Cast, subscribed per local chicken), and the per-frame verdict the Stun hex reads.
         private ChickenController _stunCastFor;
-        private byte  _stunCastSeenId;
+        private ChickenLocalEvents _stunCastEvents;   // _stunCastFor's events while subscribed
+        private bool  _stunCastPending;
+        private CastEvent _stunCast;
         private bool  _stunCastIsWingSlam;
         private int   _stunCastHits;
         private float _stunCastAt;
@@ -374,7 +376,11 @@ namespace CluckWars.Input
         private void OnEnable() => TryBind();
 
         // A controller that stops ticking must not leave a stale strip info zone behind (HudControlZones, WP7 W6).
-        private void OnDisable() => StatusRowCount = 0;
+        private void OnDisable()
+        {
+            StatusRowCount = 0;
+            BindStunCastEvents(null);   // the paired unsubscribe; the next Update re-binds
+        }
 
         private void OnDestroy()
         {
@@ -955,6 +961,23 @@ namespace CluckWars.Input
             strip.EnableInClassList("cw-edge-glow--armed", armed);
         }
 
+        /// <summary>Subscribes the caster stun countdown to <paramref name="chicken"/>'s cast event (null: unsubscribes).
+        /// A cast that happened before the bind is never delivered, which is the baseline.</summary>
+        private void BindStunCastEvents(ChickenController chicken)
+        {
+            if (_stunCastEvents != null) _stunCastEvents.Cast -= OnLocalCast;
+            _stunCastFor = chicken;
+            _stunCastEvents = chicken != null ? chicken.LocalEvents : null;
+            _stunCastPending = false;
+            if (_stunCastEvents != null) _stunCastEvents.Cast += OnLocalCast;
+        }
+
+        private void OnLocalCast(CastEvent e)
+        {
+            _stunCast = e;
+            _stunCastPending = true;
+        }
+
         /// <summary>Which hexes carry the Death Mark states this frame, by the equipped ability's type.</summary>
         private void UpdateMarkHexes(AbilityController abilities)
         {
@@ -972,30 +995,32 @@ namespace CluckWars.Input
         /// <summary>
         /// A4: watches the local bird's casts and decides, once a frame, whether the Stun hex shows the victims'
         /// remaining stun (<see cref="CasterStunCountdownRules"/>; its remarks hold the "his victims" approximation).
-        /// Reads replicated state only (<c>LastCastEventId</c>, <c>LastCastAbility</c>, <c>LastCastHitCount</c>, the
+        /// Reads replicated state only (the local bird's cast event from <c>ChickenLocalEvents</c>, the
         /// rivals' <c>StunRemaining</c>); no allocation once the rival buffer fits.
         /// </summary>
         private void UpdateCasterStunCountdown(AbilityController abilities)
         {
             _casterStunShow = false;
-            if (abilities == null || _localChicken == null) { _stunCastFor = null; return; }
+            if (abilities == null || _localChicken == null) { BindStunCastEvents(null); return; }
 
-            byte id = abilities.LastCastEventId;
             if (_stunCastFor != _localChicken)
             {
                 // Baseline: a cast that happened before this HUD bound to the bird is not "his last stun" to count.
-                _stunCastFor = _localChicken;
-                _stunCastSeenId = id;
+                BindStunCastEvents(_localChicken);
                 _stunCastIsWingSlam = false;
             }
-            else if (id != _stunCastSeenId)
+            else
             {
-                _stunCastSeenId = id;
-                var stun = abilities.LastCastAbility as WingSlamAbilitySO;
-                _stunCastIsWingSlam = stun != null;
-                _stunCastHits = abilities.LastCastHitCount;
-                _stunCastAt = Time.unscaledTime;   // Fusion timers ignore timeScale, so unscaled time tracks StunRemaining
-                _stunCastSeconds = stun != null ? AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken) : 0f;
+                _stunCastEvents.Observe();   // this frame's edge, before the latch is read
+                if (_stunCastPending)
+                {
+                    _stunCastPending = false;
+                    var stun = _stunCast.Ability as WingSlamAbilitySO;
+                    _stunCastIsWingSlam = stun != null;
+                    _stunCastHits = _stunCast.HitCount;
+                    _stunCastAt = Time.unscaledTime;   // Fusion timers ignore timeScale, so unscaled time tracks StunRemaining
+                    _stunCastSeconds = stun != null ? AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken) : 0f;
+                }
             }
             if (!_stunCastIsWingSlam) return;
 

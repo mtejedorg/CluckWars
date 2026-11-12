@@ -65,8 +65,9 @@ namespace CluckWars.AbilityLab
         private readonly float[] _pressUnscaledTime = new float[AbilityController.SlotCount];
         private readonly bool[] _heldLastFrame = new bool[AbilityController.SlotCount];
         private AbilityController _trackedAbilities;
-        private byte _lastSeenCastEventId;
-        private bool _haveCastBaseline;
+        private ChickenLocalEvents _trackedEvents;   // _trackedAbilities' chicken, while subscribed
+        private bool _castPending;
+        private CastEvent _cast;
         private float _lastCastLatencyMs = -1f;
         private int _lastCastSlot = AbilityController.InvalidSlot;
         private int _lastCastHits = -1;
@@ -163,6 +164,25 @@ namespace CluckWars.AbilityLab
         /// how long the press took to become a cast, and how long the cast's active window
         /// actually lasted.
         /// </summary>
+        private void BindCastEvents(ChickenController chicken)
+        {
+            if (_trackedEvents != null) _trackedEvents.Cast -= OnCast;
+            _trackedEvents = chicken != null ? chicken.LocalEvents : null;
+            _castPending = false;
+            if (_trackedEvents != null) _trackedEvents.Cast += OnCast;
+        }
+
+        private void OnCast(CastEvent e)
+        {
+            _cast = e;
+            _castPending = true;
+        }
+
+        private void OnDisable()
+        {
+            BindCastEvents(null);   // the paired unsubscribe; TrackCastInstrumentation re-binds
+        }
+
         private void TrackCastInstrumentation()
         {
             var abilities = PlayerAbilities;
@@ -174,7 +194,7 @@ namespace CluckWars.AbilityLab
             if (!ReferenceEquals(abilities, _trackedAbilities))
             {
                 _trackedAbilities = abilities;
-                _haveCastBaseline = false;
+                BindCastEvents(abilities.GetComponent<ChickenController>());
                 _lastCastLatencyMs = -1f;
                 _lastActiveWindowSeconds = -1f;
                 _lastCastSlot = AbilityController.InvalidSlot;
@@ -182,19 +202,15 @@ namespace CluckWars.AbilityLab
                 for (int i = 0; i < AbilityController.SlotCount; i++) { _wasActive[i] = false; _activeWindowStart[i] = -1f; }
             }
 
-            // LastCastEventId is a wrapping one-shot signal, so the first read after spawn
-            // establishes a baseline instead of counting as a cast.
-            byte eventId = abilities.LastCastEventId;
-            if (!_haveCastBaseline)
+            // The cast one-shot comes from the chicken's ChickenLocalEvents (its first observation only seeds, so a
+            // respawn never counts as a cast). Observed here so the latency is stamped this frame.
+            if (_trackedEvents == null) BindCastEvents(abilities.GetComponent<ChickenController>());
+            _trackedEvents?.Observe();
+            if (_castPending)
             {
-                _lastSeenCastEventId = eventId;
-                _haveCastBaseline = true;
-            }
-            else if (eventId != _lastSeenCastEventId)
-            {
-                _lastSeenCastEventId = eventId;
-                _lastCastSlot = abilities.LastCastSlot;
-                _lastCastHits = abilities.LastCastHitCount;
+                _castPending = false;
+                _lastCastSlot = _cast.Slot;
+                _lastCastHits = _cast.HitCount;
 
                 if (_lastCastSlot >= 0 && _lastCastSlot < AbilityController.SlotCount &&
                     _pressUnscaledTime[_lastCastSlot] > 0f)

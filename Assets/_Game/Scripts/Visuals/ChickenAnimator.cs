@@ -213,8 +213,9 @@ namespace CluckWars.Visuals
         private float   _travelElapsed = -1f;  // < 0 = no travel in flight
         private float   _travelArcScale;       // 0..1, squared distance ratio; 0 = no visible arc
 
-        private byte _lastJumpEventId;
-        private bool _jumpEventSeeded;
+        // The jump one-shot comes from ChickenLocalEvents; latched here and consumed in LateUpdate.
+        private ChickenLocalEvents _events;
+        private bool _jumpPending;
 
         /// <summary>
         /// True when the Animator is genuinely able to accept parameter writes. Unity logs a
@@ -263,12 +264,12 @@ namespace CluckWars.Visuals
 
             // Drop any travel in flight and re-seed the trackers against the new model. A
             // carried-over anchor would be measured from a model that no longer exists, and a
-            // carried-over event id would swallow the first real jump of the new life.
+            // jump latched for the previous model is not this one's to play.
             _travelAnchor             = Vector3.zero;
             _travelElapsed            = -1f;
             _travelArcScale           = 0f;
             _modelWorldPositionSeeded = false;
-            _jumpEventSeeded          = false;
+            _jumpPending              = false;
         }
 
         /// <summary>
@@ -354,6 +355,25 @@ namespace CluckWars.Visuals
         /// <summary>True once the skeletal rig is driving the model (the legacy procedural fallback squashes on its own hit timer).</summary>
         public bool IsSkeletal => _skeletalActive;
 
+        private void OnEnable()
+        {
+            if (_controller == null || _events != null) return;
+            _events = _controller.LocalEvents;
+            _events.Jump += OnJump;
+        }
+
+        private void OnDisable()
+        {
+            if (_events != null)
+            {
+                _events.Jump -= OnJump;
+                _events = null;
+            }
+            _jumpPending = false;
+        }
+
+        private void OnJump() => _jumpPending = true;
+
         private void LateUpdate()
         {
             // A null model root means the class had no ModelPrefab. ChickenController.AttachClassModel
@@ -420,15 +440,9 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             if (obj == null || !obj.IsValid) return;
 
-            byte id = _controller.JumpEventId;
-            if (!_jumpEventSeeded)
-            {
-                _jumpEventSeeded = true;
-                _lastJumpEventId = id;
-                return;
-            }
-            if (id == _lastJumpEventId) return;
-            _lastJumpEventId = id;
+            _events?.Observe();   // this frame's edge, before the latch is read
+            if (!_jumpPending) return;
+            _jumpPending = false;
 
             // Nothing to measure against on the very first frame after a (re)bind.
             if (!_modelWorldPositionSeeded) return;

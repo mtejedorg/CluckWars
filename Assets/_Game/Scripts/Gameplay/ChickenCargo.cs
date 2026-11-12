@@ -54,7 +54,7 @@ namespace CluckWars.Gameplay
         /// <see cref="RPC_DrainStolen"/> already knows the thief — it validates the id — but it
         /// executes on the victim's StateAuthority alone, so pushing the attribution from inside
         /// it would light the bearing on exactly one peer. Writing the answer into replicated
-        /// state instead lets every peer observe the same edge in <see cref="Render"/> and reach
+        /// state instead lets every peer observe the same edge (<see cref="ChickenLocalEvents.Stolen"/>) and reach
         /// the same conclusion locally, which is the project's rule for animation and VFX: no
         /// RPC, no second channel.
         /// <para>
@@ -159,7 +159,7 @@ namespace CluckWars.Gameplay
         // Lives here rather than in a separate component precisely because Fusion's
         // ChangeDetector/PropertyReader pair only resolves for the behaviour that DECLARES
         // the [Networked] property — a detector rooted on a sibling would read nothing for
-        // Cargo, or for the StealEventId edge that rides the same detector. Strictly
+        // Cargo. (The StealEventId edge is a one-shot counter: ChickenLocalEvents polls it.) Strictly
         // observation: nothing in Render() writes networked state, and the whole block runs
         // on every peer, so no RPC and no VFX crossing the wire.
         private ChangeDetector _cargoDetector;
@@ -240,15 +240,11 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Local-only, on every peer. Two things come off one change detector:
-        /// <list type="bullet">
-        ///   <item>the replicated <see cref="Cargo"/> value turned into the §3.2
-        ///   <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, with a *loss* fed into
-        ///   <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as much
-        ///   as a knockback is — someone just took your food);</item>
-        ///   <item>the <see cref="StealEventId"/> edge turned into the attacker attribution
-        ///   that gives that hit a <i>direction</i> — see <see cref="NameTheThief"/>.</item>
-        /// </list>
+        /// Local-only, on every peer: the replicated <see cref="Cargo"/> value turned into the §3.2
+        /// <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, with a *loss* fed into
+        /// <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as much
+        /// as a knockback is — someone just took your food). The <see cref="StealEventId"/> edge that gives that
+        /// hit a <i>direction</i> is observed by <see cref="ChickenLocalEvents"/> (its <c>Stolen</c> event).
         /// </summary>
         /// <remarks>
         /// The delta is read out of the change detector's previous/current buffers rather
@@ -269,23 +265,12 @@ namespace CluckWars.Gameplay
             if (_cargoDetector == null) return;
             if (_controller != null && _controller.IsDecoy) return;
 
+            // The robbery edge (StealEventId) is ChickenLocalEvents' to observe, like every one-shot counter. Observed
+            // here too so it lands in the same Render as the cargo delta below, whichever sibling renders first.
+            _controller?.LocalEvents.Observe();
+
             foreach (var changed in _cargoDetector.DetectChanges(this, out var previous, out var current))
             {
-                // Two independent branches over one detector, and they must STAY independent.
-                // Fusion can report Cargo and StealEventId in either order inside a single
-                // batch, and both orders already work:
-                //   * Cargo first  — NotifyCargoLoss plays a directionless impact, which the
-                //                    attribution below then retro-claims.
-                //   * Event first  — the window is armed, and the impact claims it on arrival.
-                // That is precisely what HitAttribution's window exists for, so do not add an
-                // ordering dependency between the two (no hoisting one out of the loop, no
-                // deferring one until the other has run).
-                if (changed == nameof(StealEventId))
-                {
-                    NameTheThief();
-                    continue;
-                }
-
                 if (changed != nameof(Cargo)) continue;
 
                 if (_silentWrite.ConsumeChange()) continue;
@@ -332,71 +317,6 @@ namespace CluckWars.Gameplay
             }
             Cargo = value;
             _silentWrite.Arm(Time.frameCount);
-        }
-
-        /// <summary>
-        /// The third attacker-attribution push point, and the one that closes the Spine Coat
-        /// gap: a successful drain named a thief, so the victim's impact beat can finally say
-        /// which direction it came from. A plain local call on every peer — same no-RPC shape
-        /// as <see cref="HitFeedback.NotifyCargoLoss"/> and
-        /// <see cref="HitFeedback.NotifyZoneTriggered"/>.
-        /// </summary>
-        /// <remarks>
-        /// <b>Baseline seeding is the ChangeDetector's, and adding a polling-style one on top
-        /// would be a bug.</b> Fusion pools <c>NetworkObject</c>s, so a recycled chicken can
-        /// inherit a non-zero <see cref="StealEventId"/>, and a late joiner starts from whatever
-        /// the id happens to be — neither may play a beat for somebody else's theft. The
-        /// detector already answers that: <c>GetChangeDetector</c> snapshots current state when
-        /// <see cref="Spawned"/> builds it, so an inherited value <i>is</i> the baseline and no
-        /// change is reported for it. That is the same guarantee the <c>Cargo</c> branch above
-        /// has always relied on — a recycled chicken does not pop a <c>+30 🌽</c>.
-        /// <c>ControlStateVFX.ObserveKnockbackEdge</c> and <c>AbilityRangeIndicator.ObserveCast</c>
-        /// need an explicit <c>_initialized</c> flag only because they <i>poll</i> a sibling's
-        /// property and have no baseline of their own. Bolting one on here would be worse than
-        /// redundant: the first observation a detector ever reports is by definition a real
-        /// change, so an "ignore the first" flag would swallow the first genuine steal of every
-        /// match.
-        /// <para>
-        /// <b>No <c>onBeforeSpawned</c> reset either, deliberately.</b> The two existing
-        /// one-shots on this pattern — <c>ChickenController.KnockbackEventId</c> and
-        /// <c>JumpEventId</c> — are never reset by any spawner, for the reason above: the value
-        /// does not matter, only the change does. A reset would also have to be stamped by both
-        /// of <c>MatchBootstrapper</c>'s chicken-spawn call sites, coupling match bootstrap to a
-        /// presentation detail it has no business knowing. And a <i>mid-match</i> reset would be
-        /// actively harmful: writing 0 over a non-zero id is itself an edge, which every peer
-        /// would observe as a steal that never happened. Not resetting is the safer of the two
-        /// options, not merely the cheaper one — which is why <see cref="RPC_ResetForNewMatch"/>
-        /// leaves both properties alone.
-        /// </para>
-        /// <para>
-        /// <b>A thief that does not resolve is a legitimate no-op and stays silent</b>
-        /// (CONVENTIONS.md, "Error surfacing — the silent-failure sorting rule"). On a remote
-        /// peer the thief's proxy may not be spawned yet, or may already have despawned, and
-        /// both are reachable in a correctly built game rather than symptoms of a wiring fault.
-        /// The consequence is proportionate too — the victim still gets the flash, the squash,
-        /// the shake and the <c>-4 🌽</c>; only the direction is withheld, which is exactly what
-        /// <see cref="HitFeedback.NotifyAttacker"/> is designed to do when nobody can be named.
-        /// Logging here would put a line on a per-steal path for a non-event.
-        /// </para>
-        /// <para>
-        /// Decoys need no handling on either side. The victim's is covered twice over —
-        /// <see cref="Render"/> returns early on <c>IsDecoy</c> and <c>NotifyAttacker</c> guards
-        /// it again — and the thief's cannot arise, because <see cref="TryResolveThief"/> rejects
-        /// a decoy thief before anything is ever written to <see cref="LastThiefId"/>. A guard
-        /// here would be unreachable code claiming to defend something.
-        /// </para>
-        /// </remarks>
-        private void NameTheThief()
-        {
-            if (_hitFeedback == null || Runner == null) return;
-
-            // Same mechanism TryResolveThief and RPC_TransferAllToBountyBag use, resolving to
-            // the ChickenController because that is what carries the position.
-            if (!Runner.TryFindBehaviour(LastThiefId, out ChickenController thief)) return;
-            if (thief == null || thief.Object == null || !thief.Object.IsValid) return;
-
-            _hitFeedback.NotifyAttacker(thief.transform.position);
-            _hitFeedback.PlayStealChunks(thief);   // D7: the kernels fly victim -> thief (local, every peer)
         }
 
         /// <summary>The specialization's name for the steal log ("Assassin_Thief"), or "-" with none.</summary>
@@ -817,7 +737,7 @@ namespace CluckWars.Gameplay
             float actual = fromCargo + fromBag;
 
             // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
-            // NameTheThief for the observation half. Written only HERE, after the drain has
+            // HitFeedback.OnStolen for the observation half. Written only HERE, after the drain has
             // actually landed: a rejected steal and a steal against an empty load both return
             // above without touching these, because neither is an impact and neither may name
             // anybody. Both properties go out in this one tick, so every peer sees the id and

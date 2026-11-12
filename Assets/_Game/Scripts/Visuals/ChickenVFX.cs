@@ -223,8 +223,6 @@ namespace CluckWars.Visuals
         private FxEmit  _jumpLaunchDust, _jumpLaunchFeather, _jumpLandDust;
 
         // ── Shove beats (D6): victim skid + squash off KnockbackEventId, caster ring off the cast edge ──
-        private bool    _shoveInitialized;
-        private byte    _lastKnockId;
         private Vector3 _shovePrevPos;
         private float   _shoveEdgeTime = -1f;     // Time.unscaledTime of the last knockback edge; < 0 = none
         private float   _squashStart = -1f;       // Time.unscaledTime the squash began; < 0 = none
@@ -241,19 +239,13 @@ namespace CluckWars.Visuals
         private FxEmit _hidePoofDust, _hidePoofFeather;
         private AbilityRangeIndicator _castFlash;
 
-        // ── Replicated one-shot cast baseline (see ObserveCastEvent) ────────────
-        // HitFeedback and AbilityRangeIndicator reset their equivalent "_castInitialized"
-        // flags in Spawned() because they are NetworkBehaviours and Spawned() is the
-        // documented point at which [Networked] properties become safe to read. ChickenVFX
-        // is a plain MonoBehaviour with no Spawned hook, and Fusion instantiates a fresh
-        // GameObject per chicken spawn (no INetworkObjectProvider/pool is registered
-        // anywhere in this project), so Awake runs exactly once per spawn: the field's
-        // default (false) already IS that seed; there is nothing to reset it from. The
-        // first LateUpdate call after Awake is what actually captures the baseline id (see
-        // ObserveCastEvent), by which point AbilityController.Spawned() has already run.
-        private bool  _castInitialized;
-        private byte  _lastCastEventId;
-        private AbilityBaseSO _lastChargingAbility;
+        // ── Replicated one-shots (see ObserveCastEvent, ObserveShoveVictim) ─────
+        // The one-shot cursors live in ChickenLocalEvents. Its events are latched here and consumed in LateUpdate,
+        // at the point each beat has always run at.
+        private ChickenLocalEvents _events;
+        private bool _castPending;
+        private CastEvent _cast;
+        private bool _knockPending;
 
         // ---- Unity lifecycle --------------------------------------------------
 
@@ -501,6 +493,10 @@ namespace CluckWars.Visuals
 
             _wasRemoved = isRemoved;
 
+            // This frame's one-shot edges, before the beats below read their latches (same frame, same point as when
+            // each of them polled its own cursor).
+            _events?.Observe();
+
             ObserveSpeedBody(hidden, isRemoved);
             ObserveJumpBeats(hidden);
             ObserveShoveVictim(hidden);
@@ -628,21 +624,14 @@ namespace CluckWars.Visuals
             var obj = _controller.Object;
             if (obj == null || !obj.IsValid) return;
 
-            byte id = _controller.KnockbackEventId;
-            if (!_shoveInitialized)
-            {
-                _shoveInitialized = true;
-                _lastKnockId = id;
-                return;
-            }
-
             float now = Time.unscaledTime;
             bool reduced = PlayerPreferences.ReducedMotionEnabled;
             bool quiet = hidden || ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity) || (_combat != null && _combat.IsRemoved);
 
-            if (id != _lastKnockId)
+            // The replicated knockback edge (ChickenLocalEvents.Knockback; a self-applied dodge raises SelfImpulse instead).
+            if (_knockPending)
             {
-                _lastKnockId = id;
+                _knockPending = false;
                 _shoveEdgeTime = now;
                 _skidBudget = FeedbackTuning.ShoveSkidMaxLive;
                 _skidAccum = 0f;
@@ -729,10 +718,35 @@ namespace CluckWars.Visuals
 
         // ---- Speed body cue (D4, vfx.md 2.5) ---------------------------------------
 
+        private void OnEnable()
+        {
+            if (_controller == null || _events != null) return;
+            _events = _controller.LocalEvents;
+            _events.Cast      += OnCast;
+            _events.Knockback += OnKnockback;
+        }
+
         private void OnDisable()
         {
+            if (_events != null)
+            {
+                _events.Cast      -= OnCast;
+                _events.Knockback -= OnKnockback;
+                _events = null;
+            }
+            _castPending  = false;
+            _knockPending = false;
+
             if (_animator != null) { _animator.ExtraPitchDegrees = 0f; _animator.ExtraScale = Vector3.one; }
         }
+
+        private void OnCast(CastEvent e)
+        {
+            _cast = e;
+            _castPending = true;
+        }
+
+        private void OnKnockback() => _knockPending = true;
 
         /// <summary>
         /// The Speed body cue, observed from replicated state (the slot active mask) and the bird's own planar motion: a
@@ -1172,28 +1186,11 @@ namespace CluckWars.Visuals
         /// </summary>
         private void ObserveCastEvent(bool hidden)
         {
-            // TryActivate clears ChargingSlot in the same tick it fires, and a very short
-            // ability's active flag may already have cleared by the time this observes the
-            // event — so remember what was last aimed, same as HitFeedback/AbilityRangeIndicator.
-            if (_abilities.ChargingSlot != 0)
-            {
-                var charging = _abilities.ChargingAbility;
-                if (charging != null) _lastChargingAbility = charging;
-            }
+            if (!_castPending) return;
+            _castPending = false;
 
-            byte id = _abilities.LastCastEventId;
-            if (!_castInitialized)
-            {
-                // Seed from whatever id is already replicated so a late-joining peer never
-                // plays a burst/shake for a cast that happened before it connected.
-                _castInitialized = true;
-                _lastCastEventId = id;
-                return;
-            }
-            if (id == _lastCastEventId) return;
-            _lastCastEventId = id;
-
-            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
+            // The ability that cast, else the one last seen charging (ChickenLocalEvents remembers what was aimed).
+            var ability = _cast.AimedAbility;
 
             // Shove (D6): the shock ring goes out BEFORE the burst, so when the sparkle family is full it is the burst that
             // loses its last sparkles (a sphere of 16), never the ring that carries the "burst out from me" read.

@@ -35,7 +35,7 @@ namespace CluckWars.Visuals
     /// carrying both Cluck Shock and Sneaky Steal used to get ONE brightened ring (widest-range
     /// tie-break); now both shapes brighten independently when a rival enters each.
     ///
-    /// Purely local VFX driven by polling replicated state (<c>LastCastEventId</c>,
+    /// Purely local VFX driven by replicated state (the cast event of <c>ChickenLocalEvents</c>,
     /// <c>LastCastHitCount</c>, <c>ChargingSlot</c>) in <c>LateUpdate</c> — no RPCs,
     /// consistent with <see cref="ChickenVFX"/>. Shape geometry is shared with the telegraph
     /// via <see cref="TelegraphShapes"/> so the preview a player aimed with and the flash they
@@ -67,17 +67,16 @@ namespace CluckWars.Visuals
         private AbilityAimShape _flashShape = AbilityAimShape.None;
         private float _flashRadius, _flashOffset, _flashConeAngle = 360f;
 
-        // Replicated one-shot observation (same pattern as ControlStateVFX.ObserveKnockbackEdge).
-        private byte _lastCastEventId;
-        private bool _castInitialized;
-
-        // Last ability seen charging, as a fallback for reading the fired ability off a
-        // very short activation window — see ObserveCast.
-        private AbilityBaseSO _lastChargingAbility;
+        // The cast one-shot comes from ChickenLocalEvents; latched here and consumed in LateUpdate.
+        private ChickenController _controller;
+        private ChickenLocalEvents _events;
+        private bool _castPending;
+        private CastEvent _cast;
 
         private void Awake()
         {
             _abilities = GetComponent<AbilityController>();
+            _controller = GetComponent<ChickenController>();
 
             var mat = TelegraphShapes.SharedSolidLineMaterial(null);   // shared across every chicken (D12b): colour is per-vertex, never mutated
             _flash      = TelegraphShapes.BuildLine(transform, "AbilityCastFlash", mat, 0.11f, loop: true);
@@ -92,11 +91,31 @@ namespace CluckWars.Visuals
             AnimateFlash();
         }
 
+        private void OnEnable()
+        {
+            if (_controller == null || _events != null) return;
+            _events = _controller.LocalEvents;
+            _events.Cast += OnCast;
+        }
+
+        private void OnCast(CastEvent e)
+        {
+            _cast = e;
+            _castPending = true;
+        }
+
         /// <summary>The flash lives on children of this chicken, so it dies with it — but a
         /// component disabled without being destroyed would strand a half-expanded ring on
         /// screen forever. Same precedent as <c>RivalIndicator.OnDisable</c>.</summary>
         private void OnDisable()
         {
+            if (_events != null)
+            {
+                _events.Cast -= OnCast;
+                _events = null;
+            }
+            _castPending = false;
+
             _flashTimer = -1f;
             if (_flash != null && _flash.enabled) _flash.enabled = false;
             if (_flashStalk != null && _flashStalk.enabled) _flashStalk.enabled = false;
@@ -116,7 +135,7 @@ namespace CluckWars.Visuals
         // ---- Cast flash (all peers) -------------------------------------------
 
         /// <summary>
-        /// Fires the flash off the replicated <c>LastCastEventId</c> one-shot rather than an
+        /// Fires the flash off the replicated cast one-shot (<c>ChickenLocalEvents.Cast</c>) rather than an
         /// active-slot transition. The old edge-detect missed two real cases: an
         /// ability whose active window closed inside a single frame, and two back-to-back
         /// casts of the <i>same</i> slot (the slot never returned to Invalid in between, so
@@ -128,26 +147,12 @@ namespace CluckWars.Visuals
         {
             if (!NetworkReady) return;
 
-            // Remember what was last being aimed: TryActivate clears ChargingSlot in the same
-            // tick it fires, so by the time this observes the event the charge is gone, and
-            // the slot's active flag may also already have cleared for a very short-duration ability.
-            if (_abilities.ChargingSlot != 0)
-            {
-                var charging = _abilities.ChargingAbility;
-                if (charging != null) _lastChargingAbility = charging;
-            }
+            _events?.Observe();   // this frame's edge, before the latch is read
+            if (!_castPending) return;
+            _castPending = false;
 
-            byte id = _abilities.LastCastEventId;
-            if (!_castInitialized)
-            {
-                _castInitialized = true;
-                _lastCastEventId = id;
-                return;
-            }
-            if (id == _lastCastEventId) return;
-            _lastCastEventId = id;
-
-            var ability = _abilities.LastCastAbility ?? _lastChargingAbility;
+            // The ability that cast, else the one last seen charging (ChickenLocalEvents remembers what was aimed).
+            var ability = _cast.AimedAbility;
             if (ability == null) return;
 
             TelegraphShapes.Resolve(ability, out _flashShape, out _flashRadius,
@@ -180,7 +185,7 @@ namespace CluckWars.Visuals
             // keep their accent ring. Every exemption lives in one place,
             // AbilityBaseSO.ZeroHitsIsAWhiff, which is ReportsCastHits narrowed by
             // RequiresEnemyInRange.
-            bool whiff = ability.ZeroHitsIsAWhiff && _abilities.LastCastHitCount == 0;
+            bool whiff = ability.ZeroHitsIsAWhiff && _cast.HitCount == 0;
 
             _flashColor      = whiff ? Desaturate(ability.AccentColor, FeedbackTuning.WhiffRingSaturationMultiplier)
                                      : ability.AccentColor;
