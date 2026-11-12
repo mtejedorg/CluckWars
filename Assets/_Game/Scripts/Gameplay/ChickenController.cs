@@ -726,7 +726,9 @@ namespace CluckWars.Gameplay
 
             // Presentation that cached a renderer set (HitFeedback) refreshes it now: its Spawned may already
             // have run, and could not have included the model in any case, since the model only exists now.
-            LocalEvents.RaiseClassModelAttached();
+            if (!LocalEvents.RaiseClassModelAttached())
+                LocalRaise.WarnNobodyListens(_log, nameof(ChickenLocalEvents.ClassModelAttached), this, IsDecoy,
+                    "the hit flash and the fades do not reach the class model's renderers");
 
             _skeletalAnimationActive = BindSkeletalAnimation(entry);
 

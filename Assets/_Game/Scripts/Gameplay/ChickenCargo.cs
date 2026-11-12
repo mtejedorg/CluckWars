@@ -282,7 +282,9 @@ namespace CluckWars.Gameplay
                 // draws them from this local event. A gain uses up the pending steal credit whether or not it is held.
                 int stealCreditFrame = _stealCreditFrame;
                 if (delta > 0f) _stealCreditFrame = -1;
-                _controller?.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame);
+                if (_controller != null && !_controller.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame))
+                    LocalRaise.WarnNobodyListens(_log, nameof(ChickenLocalEvents.CargoChanged), this, _controller.IsDecoy,
+                        "the cargo +n / -n pop, the held steal credit and the cargo-loss hit beat are not drawn");
             }
 
             _silentWrite.EndRender(Time.frameCount);

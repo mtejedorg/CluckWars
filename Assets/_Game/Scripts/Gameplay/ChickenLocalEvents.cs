@@ -175,8 +175,8 @@ namespace CluckWars.Gameplay
         public bool RaiseAbilityCue(AbilityCue cue) =>
             LocalRaise.Invoke(_abilityCueListeners, nameof(AbilityCueRaised), Log, _controller, cue);
 
-        /// <summary>From <c>ChickenCargo.Render</c>, every peer.</summary>
-        public void RaiseCargoChanged(float delta, int stealCreditFrame) =>
+        /// <summary>From <c>ChickenCargo.Render</c>, every peer. False when nothing listens (a prefab fault the caller reports).</summary>
+        public bool RaiseCargoChanged(float delta, int stealCreditFrame) =>
             LocalRaise.Invoke(_cargoChangedListeners, nameof(CargoChanged), Log, _controller, new CargoChangeEvent(delta, stealCreditFrame));
 
         /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens.</summary>
@@ -186,8 +186,8 @@ namespace CluckWars.Gameplay
         /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens (a prefab fault the caller reports).</summary>
         public bool RaiseZoneTriggered() => LocalRaise.Invoke(_zoneTriggeredListeners, nameof(ZoneTriggered), Log, _controller);
 
-        /// <summary>From <c>ChickenController.Spawned</c>, once the class model is attached.</summary>
-        public void RaiseClassModelAttached() => LocalRaise.Invoke(_classModelAttachedListeners, nameof(ClassModelAttached), Log, _controller);
+        /// <summary>From <c>ChickenController.Spawned</c>, once the class model is attached. False when nothing listens.</summary>
+        public bool RaiseClassModelAttached() => LocalRaise.Invoke(_classModelAttachedListeners, nameof(ClassModelAttached), Log, _controller);
 
         /// <param name="controller">The chicken observed; null only in tests, which feed snapshots.</param>
         public ChickenLocalEvents(ChickenController controller = null) { _controller = controller; }

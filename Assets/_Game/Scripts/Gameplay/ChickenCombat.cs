@@ -66,6 +66,10 @@ namespace CluckWars.Gameplay
             _audioReg = audioReg;
         }
 
+        /// <summary>S-4: a removal or a return nobody presents is a prefab fault (HitFeedback / ChickenAnimator missing).</summary>
+        private void WarnNobodyListens(string eventName, string lost) =>
+            LocalRaise.WarnNobodyListens(_log, eventName, this, _controller != null && _controller.IsDecoy, lost);
+
         public override void Spawned()
         {
             ActiveCombats.Add(this);
@@ -127,11 +131,13 @@ namespace CluckWars.Gameplay
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
                             // The stunned pose, the death shake, the feathers and the hit-stop all hang off this
                             // event (ChickenAnimator, HitFeedback): presentation observes, gameplay does not call it.
+                            if (OnDeath == null) WarnNobodyListens(nameof(OnDeath), "the removed pose, the death shake, the feathers and the hit-stop are not played");
                             OnDeath?.Invoke();
                         }
                         else
                         {
                             _log?.Info(Source, "Removal ended; respawned.");
+                            if (OnRespawn == null) WarnNobodyListens(nameof(OnRespawn), "the pose back up and the BACK IN cue are not played");
                             OnRespawn?.Invoke();   // the pose back up and the local "BACK IN" cue are the listeners'
                         }
                         break;

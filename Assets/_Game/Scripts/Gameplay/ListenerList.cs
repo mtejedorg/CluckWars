@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CluckWars.Diagnostics;
 using CluckWars.Logging;
 using UnityEngine;
@@ -82,6 +83,29 @@ namespace CluckWars.Gameplay
                 catch (Exception e) { Report(eventName, items[i], e, log, owner); }
             }
             return items.Length > 0;
+        }
+
+        private static readonly HashSet<int> ReportedSilent = new HashSet<int>();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => ReportedSilent.Clear();
+
+        /// <summary>Tests only: forget which silent events were already reported.</summary>
+        public static void ForgetSilentReports() => ReportedSilent.Clear();
+
+        /// <summary>
+        /// A raise found nobody listening (S-4). On a chicken built from the prefab that is a wiring fault, never a
+        /// game state: the presentation component that draws the moment is missing. Warns once per event and chicken
+        /// kind (chicken / decoy), naming what the player loses.
+        /// </summary>
+        public static void WarnNobodyListens(ILogService log, string eventName, UnityEngine.Object owner, bool isDecoy, string lost)
+        {
+            int key = unchecked(eventName.GetHashCode() * 397 ^ (isDecoy ? 1 : 0));
+            if (!ReportedSilent.Add(key)) return;
+            string ownerName = owner != null ? owner.name : "(no chicken)";
+            (log ?? FallbackLog).Warn(Source,
+                $"Nothing listens for {eventName} on '{ownerName}' ({(isDecoy ? "decoy" : "chicken")}): {lost}. " +
+                "A presentation component is missing or disabled on the prefab (HitFeedback / ChickenAnimator). Reported once per chicken kind.");
         }
 
         private static void Report(string eventName, Delegate listener, Exception exception, ILogService log, UnityEngine.Object owner)

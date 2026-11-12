@@ -1106,7 +1106,9 @@ namespace CluckWars.Gameplay
         {
             while (_cues.TryTake(out var cue))
             {
-                if (_controller != null) _controller.LocalEvents.RaiseAbilityCue(cue);
+                if (_controller != null && !_controller.LocalEvents.RaiseAbilityCue(cue))
+                    LocalRaise.WarnNobodyListens(_log, nameof(ChickenLocalEvents.AbilityCueRaised), this, _controller.IsDecoy,
+                        "the cancel, fizzle, cargo-full and expire sounds are not played");
             }
         }
 

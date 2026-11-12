@@ -399,7 +399,7 @@ namespace CluckWars.Tests
 
             // Gameplay raises the change with the credit frame; the hold / pop / loss decision is HitFeedback's.
             int render = src.IndexOf("public override void Render()", System.StringComparison.Ordinal);
-            int raise = src.IndexOf("_controller?.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame)", render, System.StringComparison.Ordinal);
+            int raise = src.IndexOf("_controller.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame)", render, System.StringComparison.Ordinal);
             Assert.Greater(raise, render, "ChickenCargo.Render hands the delta and the steal credit frame to its listeners");
 
             string handler = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Visuals/HitFeedback.cs", "private void OnCargoChanged(CargoChangeEvent e)");
