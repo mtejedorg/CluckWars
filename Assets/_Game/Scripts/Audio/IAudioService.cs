@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace CluckWars.Audio
@@ -12,7 +13,14 @@ namespace CluckWars.Audio
         /// <summary>One-shot 2D sound. A <paramref name="pitch"/> other than 1 or a positive
         /// <paramref name="delaySeconds"/> plays on a pooled voice, so it never bends (or is cut by)
         /// the other sounds already playing.</summary>
-        void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f);
+        /// <remarks>A null <paramref name="clip"/> plays nothing and is reported once per call site (the two caller
+        /// parameters are filled in by the compiler; do not pass them).</remarks>
+        void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f,
+                     [CallerFilePath] string callerFile = "", [CallerLineNumber] int callerLine = 0);
+
+        /// <summary>One-shot 2D sound by typed id, resolved through the audio registry. <see cref="SfxId.None"/> is a
+        /// silent no-op; an id with no clip plays nothing and is reported once per id.</summary>
+        void PlaySFX(SfxId id, float volume = 1f);
 
         /// <summary>Starts the (single) music track, replacing whatever played. A positive
         /// <paramref name="fadeInSeconds"/> ramps it up from silence.</summary>

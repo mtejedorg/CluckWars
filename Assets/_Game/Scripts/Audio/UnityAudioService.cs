@@ -11,8 +11,8 @@ namespace CluckWars.Audio
     /// so audio survives scene loads.
     /// </summary>
     /// <remarks>
-    /// SFX calls accept a null <see cref="AudioClip"/> as a silent no-op so
-    /// consumers don't have to null-check before every cue. Master volume is
+    /// SFX calls accept a null <see cref="AudioClip"/> (nothing plays, consumers don't have to null-check
+    /// before every cue) and report it once per call site through <see cref="MissingSfxReporter"/>. Master volume is
     /// applied multiplicatively on top of each call's per-sound volume, including
     /// during music fades (a fade is a 0..1 multiplier, not a volume write).
     /// Fades advance in a tiny MonoBehaviour on the host, which stays disabled while idle.
@@ -44,8 +44,17 @@ namespace CluckWars.Audio
         private float _xfade, _xfadeRate;
         private bool _crossfading;
 
-        public UnityAudioService(Transform parent)
+        private const string Source = "Audio";
+        private readonly Logging.ILogService _log;
+        private readonly AudioRegistrySO _registry;
+        private readonly MissingSfxReporter _missing = new MissingSfxReporter();
+
+        /// <param name="log">Where a sound that cannot play is reported (once per call site / id). Null: not reported.</param>
+        /// <param name="registry">Resolves <see cref="SfxId"/>s. Null: every id is reported as unresolvable.</param>
+        public UnityAudioService(Transform parent, Logging.ILogService log = null, AudioRegistrySO registry = null)
         {
+            _log = log;
+            _registry = registry;
             var host = new GameObject("AudioServiceHost");
             if (parent != null) host.transform.SetParent(parent, worldPositionStays: false);
 
@@ -72,9 +81,30 @@ namespace CluckWars.Audio
             return s;
         }
 
-        public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f)
+        public void PlaySFX(SfxId id, float volume = 1f)
         {
-            if (clip == null || _sfxSource == null) return;
+            if (id == SfxId.None) return;
+            var clip = _registry != null ? _registry.Resolve(id) : null;
+            if (clip == null)
+            {
+                string line = _missing.MissingId(id, _registry != null);
+                if (line != null) _log?.Warn(Source, line);
+                return;
+            }
+            PlaySFX(clip, volume);
+        }
+
+        public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f,
+                            string callerFile = "", int callerLine = 0)
+        {
+            if (clip == null)
+            {
+                // A08: was a silent return. Still plays nothing; says so once per call site.
+                string line = _missing.NullClip(callerFile, callerLine);
+                if (line != null) _log?.Warn(Source, line);
+                return;
+            }
+            if (_sfxSource == null) return;
             float v = Mathf.Clamp01(volume) * _masterVolume * _sfxVolume;
             if (Mathf.Approximately(pitch, 1f) && delaySeconds <= 0f)
             {

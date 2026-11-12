@@ -71,6 +71,14 @@ namespace CluckWars.Audio
                  "when the comeback event fires (GameManager, MatchAudioCueTracker.Cue.Intensify).")]
         public AudioClip MatchMusicIntense;
 
+        /// <summary>The clip for a typed sound id, or null when the slot is empty (or the id is <see cref="SfxId.None"/>).</summary>
+        public AudioClip Resolve(SfxId id) => id switch
+        {
+            SfxId.AbilityActivate => AbilityActivate,
+            SfxId.Deposit => Deposit,
+            _ => null,
+        };
+
         /// <summary>
         /// Null-safe one-shot: plays <paramref name="clip"/> through <paramref name="audio"/> and returns true, or returns
         /// false without throwing when either is null (an unfilled registry slot is a legal silent no-op). Callers that must

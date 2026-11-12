@@ -82,7 +82,8 @@ namespace CluckWars.Installers
             // AudioSources survive scene loads. NullAudioService can still be bound
             // here in headless / test builds.
             Container.Bind<IAudioService>()
-                .FromMethod(_ => new UnityAudioService(transform))
+                .FromMethod(ctx => new UnityAudioService(transform,
+                    ctx.Container.Resolve<ILogService>(), ctx.Container.Resolve<AudioRegistrySO>()))
                 .AsSingle();
 
             // Input: keyboard/mouse + on-screen touch HUD + gamepad compose into one provider so the
@@ -145,7 +146,7 @@ namespace CluckWars.Installers
 
             // AudioRegistry: bind whatever asset is supplied, or a runtime-empty
             // instance so consumers don't have to null-check the binding. Empty
-            // clip fields are already a silent no-op in UnityAudioService.
+            // clip fields play nothing in UnityAudioService (reported once per call site, A08).
             var audioRegistry = _audioRegistry != null
                 ? _audioRegistry
                 : ScriptableObject.CreateInstance<AudioRegistrySO>();

@@ -5,7 +5,9 @@ namespace CluckWars.Audio
     /// <summary>No-op audio service. Used during Phase 1 / tests / headless runs.</summary>
     public sealed class NullAudioService : IAudioService
     {
-        public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f) { }
+        public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f,
+                            string callerFile = "", int callerLine = 0) { }
+        public void PlaySFX(SfxId id, float volume = 1f) { }
         public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
         public void FadeOutMusic(float seconds) { }
         public void SetMusicLevel(float level01, float seconds) { }
