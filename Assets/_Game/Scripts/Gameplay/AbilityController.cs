@@ -854,19 +854,37 @@ namespace CluckWars.Gameplay
         /// Every peer but the state authority: turns <see cref="LoadoutCodes"/> back into the slot and passive assets,
         /// for the entries whose code changed since the last call.
         /// </summary>
+        /// <remarks>
+        /// The codes are the owning peer's claim, so each resolved asset is judged before it is used
+        /// (<see cref="LoadoutClaimRules"/>): the passive against the chicken's class, then each slot against the
+        /// class pool and, in fixed-kit mode, the passive's kit. A refused entry is never applied: the passive falls
+        /// back to the class default, a slot to the kit's ability (or stays as it was). This is more than drawing the
+        /// right ring: the master reads every chicken's passive for the match-end bonus.
+        /// </remarks>
         private void ApplyReplicatedLoadout()
         {
-            AbilityRegistrySO registry = null;
-            for (int i = 0; i <= SlotCount; i++)
+            bool changed = false;
+            for (int i = 0; i <= SlotCount; i++) changed |= LoadoutCodes[i] != _appliedCodes[i];
+            if (!changed) return;
+
+            var registry = ResolveRegistry();
+            var cls = _controller != null ? _controller.Class : default;
+            var config = ProjectContext.Instance.Container.TryResolve<MatchConfigSO>();
+            var mode = config != null ? config.LoadoutMode : LoadoutMode.Free;   // as MatchBootstrapper.ActiveLoadoutMode
+            AbilityBaseSO plainPeck = null;
+            if (registry != null && registry.All != null)
+                foreach (var a in registry.All) if (a is PeckAbilitySO) { plainPeck = a; break; }
+
+            // The passive first: the slots are judged against it.
+            for (int n = 0; n <= SlotCount; n++)
             {
+                int i = n == 0 ? PassiveCodeIndex : n - 1;
                 byte code = LoadoutCodes[i];
-                if (code == _appliedCodes[i]) continue;
                 _appliedCodes[i] = code;
 
                 // "None" keeps what this peer already holds: the authority had nothing it could replicate there.
                 if (code == AbilityRegistrySO.NoAbilityCode) continue;
 
-                if (registry == null) registry = ResolveRegistry();
                 var ability = registry != null ? registry.FromCode(code) : null;
                 var passive = ability as PassiveAbilitySO;
                 bool wrongKind = ability != null && (i == PassiveCodeIndex) != (passive != null);
@@ -880,15 +898,48 @@ namespace CluckWars.Gameplay
                     continue;
                 }
 
+                if (i == PassiveCodeIndex)
+                {
+                    if (!LoadoutClaimRules.IsLegalPassive(passive, cls))
+                    {
+                        var fallback = registry.GetDefaultPassiveForClass(cls);
+                        WarnRefusedLoadout(i, ability, cls, mode, fallback);
+                        passive = fallback;
+                    }
+                    if (passive != null) _passive = passive;
+                    continue;
+                }
+
+                if (!LoadoutClaimRules.IsLegalSlot(ability, i, cls, _passive, mode, registry.All, plainPeck))
+                {
+                    var fallback = LoadoutClaimRules.SafeSlot(i, _passive, mode);
+                    WarnRefusedLoadout(i, ability, cls, mode, fallback);
+                    if (fallback == null) continue;
+                    ability = fallback;
+                }
+
                 switch (i)
                 {
                     case 0: _slot0 = ability; break;
                     case 1: _slot1 = ability; break;
                     case 2: _slot2 = ability; break;
-                    case 3: _slot3 = ability; break;
-                    default: _passive = passive; break;
+                    default: _slot3 = ability; break;
                 }
             }
+        }
+
+        // One refusal line per owning peer per 2 s, shared by every chicken (as the control-claim rejections).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter LoadoutRejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        private void WarnRefusedLoadout(int index, AbilityBaseSO claimed, ChickenClass cls, LoadoutMode mode, AbilityBaseSO fallback)
+        {
+            var owner = Object.StateAuthority;
+            if (!LoadoutRejectionLimiter.Allow(owner.RawEncoded, Time.realtimeSinceStartup, out int held)) return;
+            _log?.Warn(Source, $"{name}: rejected replicated loadout from {owner} - '{claimed.name}' is not legal in " +
+                $"{LoadoutEntryName(index)} for a {cls} (mode {mode}); this peer uses " +
+                $"{(fallback != null ? $"'{fallback.name}'" : "what it already had")} instead." +
+                (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
         }
 
         private static string LoadoutEntryName(int index) => index == PassiveCodeIndex ? "the passive" : $"slot {index}";
