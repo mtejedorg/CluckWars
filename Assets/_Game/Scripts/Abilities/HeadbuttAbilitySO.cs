@@ -79,7 +79,8 @@ namespace CluckWars.Abilities
                 dir.y = 0f;
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
 
-                victim.RPC_ApplyKnockback(dir.normalized * KnockbackForce);
+                // Both halves name the caster and are judged alike on the victim's side: across a base wall neither lands.
+                victim.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackForce, caster.Id);
                 victim.RPC_ApplyStun(stagger, caster.Id);
             }
         }

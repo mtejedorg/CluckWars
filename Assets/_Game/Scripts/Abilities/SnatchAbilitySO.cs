@@ -94,7 +94,8 @@ namespace CluckWars.Abilities
                     var dir = (targetCtrl.transform.position - thief.transform.position);
                     dir.y = 0f;
                     if (dir.sqrMagnitude < 0.001f) dir = thief.transform.forward;
-                    targetCtrl.RPC_ApplyKnockback(dir.normalized * KnockbackStrength);
+                    // Names the thief, so a base wall refuses the shove exactly where it refuses the steal.
+                    targetCtrl.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackStrength, thief.Id);
                 }
             }
         }

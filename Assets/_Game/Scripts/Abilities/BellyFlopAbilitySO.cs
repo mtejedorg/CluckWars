@@ -96,7 +96,7 @@ namespace CluckWars.Abilities
                 var dir = victim.transform.position - landing;
                 dir.y = 0f;
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
-                victim.RPC_ApplyKnockback(dir.normalized * KnockbackForce);
+                victim.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackForce, caster.Id);   // judged as the stun above is
             }
         }
 

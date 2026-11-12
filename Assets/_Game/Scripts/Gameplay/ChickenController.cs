@@ -161,6 +161,7 @@ namespace CluckWars.Gameplay
         private ControlClaimRules.Ceiling _stunCeiling = ControlClaimRules.Ceiling.Unknown;
         private ControlClaimRules.Ceiling _rootCeiling = ControlClaimRules.Ceiling.Unknown;
         private ControlClaimRules.Ceiling _slowCeiling = ControlClaimRules.Ceiling.Unknown;
+        private ControlClaimRules.Ceiling _knockbackCeiling = ControlClaimRules.Ceiling.Unknown;
 
         // Collision-slow contact with hysteresis (A11): authority-local, never networked.
         private bool _inContact;
@@ -1422,6 +1423,25 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// A knockback that rides another effect of the same cast: a stun (Headbutt, Belly Flop) or a steal (Snatch,
+        /// the Spine Coat contact). It names the casting chicken and is judged as that effect is (the sender owns the
+        /// caster, the caster is in reach, no base wall in between), so the pair lands or is refused together.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="RPC_ApplyKnockback"/> took no caster, so the shove of a Headbutt landed across a base wall its
+        /// stun was refused at. Same physics and same one-shot as the unvalidated RPC; a shove-only ability (Shove,
+        /// Roll &amp; Push) has no second half to agree with and still uses that one.
+        /// </remarks>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ApplyKnockbackFrom(Vector3 impulse, NetworkBehaviourId caster, RpcInfo info = default)
+        {
+            if (!AcceptControlClaim(nameof(RPC_ApplyKnockbackFrom), ControlKind.None, 0f, 1f, caster, info, knockback: true)) return;
+
+            ApplyKnockback(impulse);
+            _log?.Debug(Source, $"RPC_ApplyKnockbackFrom: impulse={impulse:F2}.");
+        }
+
+        /// <summary>
         /// Applies a displacement impulse this chicken is inflicting on <b>itself</b> — a
         /// dodge, not a shove. Physically identical to <see cref="RPC_ApplyKnockback"/> in
         /// every respect; the difference is that peers observe it on
@@ -1537,11 +1557,13 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Judges a control claim and logs a refusal. True only for an accepted claim.
         /// </summary>
+        /// <param name="knockback">A knockback riding another effect (<see cref="RPC_ApplyKnockbackFrom"/>): no duration,
+        /// judged on its source alone against the knockback bound.</param>
         private bool AcceptControlClaim(string rpc, ControlKind kind, float seconds, float factor,
-            NetworkBehaviourId casterId, in RpcInfo info)
+            NetworkBehaviourId casterId, in RpcInfo info, bool knockback = false)
         {
-            var ceiling = CeilingFor(kind);
-            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster);
+            var ceiling = knockback ? _knockbackCeiling : CeilingFor(kind);
+            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster, sourceOnly: knockback);
             if (verdict == ControlClaimRules.Verdict.Accepted)
             {
                 if (!CrossedBaseWall(kind, caster)) return true;
@@ -1552,10 +1574,12 @@ namespace CluckWars.Gameplay
             }
 
             if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
-                _log?.Warn(Source, $"{name}: rejected {rpc}(seconds={seconds:0.00}" +
-                    (kind == ControlKind.Slow ? $", factor={factor:0.00}" : string.Empty) +
-                    $", caster={(caster != null ? caster.name : casterId.ToString())}) from {info.Source} ({verdict}) - " +
-                    ControlClaimRules.Describe(verdict, kind, ceiling) +
+                _log?.Warn(Source, $"{name}: rejected {rpc}(" + (knockback ? string.Empty : $"seconds={seconds:0.00}, ") +
+                    (kind == ControlKind.Slow ? $"factor={factor:0.00}, " : string.Empty) +
+                    $"caster={(caster != null ? caster.name : casterId.ToString())}) from {info.Source} ({verdict}) - " +
+                    (knockback && verdict == ControlClaimRules.Verdict.OutOfRange
+                        ? $"the caster is further than any ability in the pool reaches ({ceiling.MaxReach:0.00} m + slack)."
+                        : ControlClaimRules.Describe(verdict, kind, ceiling)) +
                     (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
             return false;
         }
@@ -1582,7 +1606,8 @@ namespace CluckWars.Gameplay
 
         /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
         private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
-            NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster)
+            NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster,
+            bool sourceOnly = false)
         {
             caster = null;
             var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
@@ -1615,6 +1640,7 @@ namespace CluckWars.Gameplay
                 claim.InsideCastersRootZone = _lastRootScan.Vouched;
             }
 
+            if (sourceOnly) return ControlClaimRules.EvaluateSource(claim, ceiling);
             return ControlClaimRules.Evaluate(claim, ceiling);
         }
 
@@ -1648,6 +1674,8 @@ namespace CluckWars.Gameplay
             _stunCeiling = ResolveCeiling(pool, ControlKind.Stun);
             _rootCeiling = ResolveCeiling(pool, ControlKind.Root);
             _slowCeiling = ResolveCeiling(pool, ControlKind.Slow);
+            // No Error of its own: an unbound registry was reported three times just above.
+            _knockbackCeiling = ControlClaimRules.KnockbackCeiling(pool);
         }
 
         private ControlClaimRules.Ceiling ResolveCeiling(AbilityBaseSO[] pool, ControlKind kind)
@@ -1842,7 +1870,7 @@ namespace CluckWars.Gameplay
                         var dir = (other.transform.position - transform.position);
                         dir.y = 0f;
                         if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
-                        other.RPC_ApplyKnockback(dir.normalized * StealBackKnockback);
+                        other.RPC_ApplyKnockbackFrom(dir.normalized * StealBackKnockback, Id);
                     }
                 }
             }

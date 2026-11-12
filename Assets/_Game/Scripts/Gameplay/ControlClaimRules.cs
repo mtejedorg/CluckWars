@@ -148,6 +148,20 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// The bound for a knockback that rides another effect (<see cref="EvaluateSource"/>): the furthest ANY ability in
+        /// <paramref name="pool"/> reaches, since no ability declares that it shoves and the paired effect can be a stun
+        /// or a steal. Never tighter than the stun or steal bound, so an honest pair is never split by range; it carries
+        /// no duration. <see cref="Ceiling.Unknown"/> for a null pool (sender check only).
+        /// </summary>
+        public static Ceiling KnockbackCeiling(IEnumerable<AbilityBaseSO> pool)
+        {
+            if (pool == null) return Ceiling.Unknown;
+            float maxReach = 0f;
+            foreach (var ability in pool) maxReach = Mathf.Max(maxReach, Reach(ability));
+            return new Ceiling(true, 0f, 1f, maxReach);
+        }
+
+        /// <summary>
         /// The largest <see cref="PassiveAbilitySO.OutgoingControlMultiplier"/> any passive in <paramref name="pool"/>
         /// declares (Relentless 1.3), never below 1. Stuns and slows are sent already lengthened by the CASTER's passive
         /// (<c>AbilityBaseSO.ResolveOutgoingControlSeconds</c>) and the victim's peer does not know a remote caster's
@@ -432,6 +446,18 @@ namespace CluckWars.Gameplay
         {
             if (!IsPlausibleSeconds(c.Seconds, ceiling)) return Verdict.ImplausibleDuration;
             if (c.Kind == ControlKind.Slow && !IsPlausibleSlowFactor(c.SlowFactor, ceiling)) return Verdict.ImplausibleFactor;
+            return EvaluateSource(c, ceiling);
+        }
+
+        /// <summary>
+        /// The "who sent it, and from where" half of <see cref="Evaluate"/>, with no magnitude check: the whole
+        /// judgement of a knockback that rides another effect of the same cast
+        /// (<c>ChickenController.RPC_ApplyKnockbackFrom</c>), which carries no duration to bound. Given the same facts it
+        /// answers exactly as <see cref="Evaluate"/> does for a claim of plausible magnitude, so the knockback and the
+        /// effect it rides are accepted or refused together.
+        /// </summary>
+        public static Verdict EvaluateSource(in Claim c, in Ceiling ceiling)
+        {
             if (!c.CasterResolved) return Verdict.CasterUnresolved;
             if (c.CasterIsVictim) return Verdict.SelfApplied;
             if (c.CasterIsDecoy) return Verdict.DecoyCaster;
