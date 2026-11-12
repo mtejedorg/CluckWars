@@ -170,13 +170,4 @@ namespace CluckWars.Diagnostics
             _                         => kind.ToString().ToLowerInvariant(),
         };
     }
-
-    /// <summary>Keeps a probe alive across scene loads (Zenject parents it under the ProjectContext; this is the fallback).</summary>
-    internal static class DiagnosticsObjects
-    {
-        public static void KeepAcrossScenes(GameObject go)
-        {
-            if (go != null && go.transform.parent == null) UnityEngine.Object.DontDestroyOnLoad(go);
-        }
-    }
 }
