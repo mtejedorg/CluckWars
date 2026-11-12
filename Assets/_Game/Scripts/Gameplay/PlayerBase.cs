@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -213,7 +214,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveBases.Add(this);
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             // A base not spawned through MapGenerator (scene-baked, Ability Lab) stamps its own spot for the other peers.
             if (HasStateAuthority && !HasSpawnPosition)

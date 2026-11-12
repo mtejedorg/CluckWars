@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Settings;
 using UnityEngine;
@@ -171,7 +172,7 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             Instance = this;
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
             _camera = GetComponent<Camera>();
             // See-through fence near the local bird (Phase 6 chunk 7f). Added here rather than on the
             // scene object so every scene with a match camera gets it without a scene edit.

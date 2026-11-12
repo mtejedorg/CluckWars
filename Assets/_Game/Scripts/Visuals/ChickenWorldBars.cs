@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Localization;
 using CluckWars.Settings;
 using CluckWars.UI;
@@ -70,6 +71,11 @@ namespace CluckWars.Visuals
         public const float RingAlpha = 0.75f;
 
         private float CargoHeight => _hpHeight * 0.72f;
+
+        private ILogService _log;
+
+        [Inject]
+        public void Construct(ILogService log) => _log = log;
 
         private void Awake()
         {
@@ -168,9 +174,13 @@ namespace CluckWars.Visuals
             _ring.color        = Color.white;
             _ring.sortingOrder = 1;
             SetRingRadius(_ringRadius);
-            if (_ringGhost == null && ProjectContext.HasInstance)
-                ProjectContext.Instance.Container.TryResolve<ILogService>()?.Error("ChickenWorldBars",
+            if (_ringGhost == null)
+            {
+                // Wiring bug, reported on the error path only (the chicken is spawned outside the container).
+                SelfInject.Ensure(this, _log != null);
+                _log?.Error("ChickenWorldBars",
                     "_ringGhostMaterial is not assigned on " + name + ": the identity ring's arc under a food pile is not drawn (Phase 8 D8)");
+            }
         }
 
         /// <summary>Re-sizes the identity ring to clear the class model's body (Phase 8 chunk C R3). Presentation only;

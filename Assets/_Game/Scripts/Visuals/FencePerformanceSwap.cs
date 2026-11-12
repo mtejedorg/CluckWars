@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Logging;
 using CluckWars.Settings;
@@ -80,8 +81,8 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             // Plain MonoBehaviour added at runtime: Zenject never injects it, so self-inject (CONVENTIONS
-            // "Self-injection"). Never gate on ProjectContext.HasInstance.
-            if (_meshes == null) ProjectContext.Instance.Container.Inject(this);
+            // "Self-injection").
+            SelfInject.Ensure(this, _log != null);
         }
 
         private void Update() => Sync(batch: true);

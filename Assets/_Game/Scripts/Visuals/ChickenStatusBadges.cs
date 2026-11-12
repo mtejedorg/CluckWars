@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.UI;
@@ -758,7 +759,7 @@ namespace CluckWars.Visuals
             if (_warnedMissingSprite[k]) return;
             _warnedMissingSprite[k] = true;
 
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
             _log?.Warn(Source, $"No state glyph sprite wired for the {badge} badge on {name}; drawing the text fallback. " +
                                "Re-wire the _glyph* fields on Chicken.prefab.");
         }

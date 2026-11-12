@@ -1,5 +1,6 @@
 using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using UnityEngine;
 using Zenject;
@@ -188,8 +189,8 @@ namespace CluckWars.Visuals
 
         private void Awake()
         {
-            // Self-injection per CONVENTIONS (created with AddComponent, so nothing injected it). Never gate on HasInstance.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            // Self-injection per CONVENTIONS (created with AddComponent, so nothing injected it).
+            SelfInject.Ensure(this, _log != null);
 
             var mat = TelegraphShapes.SharedUnlitSpriteMaterial(_log);   // shared URP unlit material, never destroyed here
             if (mat == null) ReportMissingMaterial();

@@ -1,6 +1,7 @@
 using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Services;
@@ -258,7 +259,7 @@ namespace CluckWars.Visuals
 
         public override void Spawned()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             // Cached: GetComponentsInChildren allocates. The set only changes once, when
             // ChickenController attaches the per-class model — which calls RefreshBodyRenderers

@@ -1,4 +1,5 @@
 using CluckWars.Abilities;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
@@ -606,10 +607,7 @@ namespace CluckWars.Gameplay
             LocalEvents.Reset();           // pooled or respawned: every one-shot baseline is taken again
             LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
             _recentPositions.Clear();      // pooled: a previous life's positions never vouch
-            if (_log == null)
-            {
-                ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
 
             _log?.Debug(Source, $"Spawned. Class={Class}, HasStateAuthority={HasStateAuthority}, registryBound={_registry != null}.");
 

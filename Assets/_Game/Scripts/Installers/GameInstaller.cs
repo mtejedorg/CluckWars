@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Networking;
 using CluckWars.Visuals;
 using Zenject;
@@ -17,6 +18,10 @@ namespace CluckWars.Installers
 
         public override void InstallBindings()
         {
+            // First: components that Zenject does not build (network objects, runtime AddComponent) self-inject from
+            // this scene's container, and some do so in Awake, before Zenject's own scene registry is filled.
+            SelfInject.RegisterSceneContainer(this, Container);
+
             // MatchConfigSO is deliberately NOT bound here. It moved to ProjectInstaller
             // so the Bootstrap menu lobby can advertise the same rules the match enforces
             // from the one asset reference. This container inherits it.

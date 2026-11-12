@@ -27,36 +27,30 @@ a hard-won bug. Don't rediscover them.
 - `ProjectInstaller` (project-scope) — app-wide services, registries, log. Survives scene loads.
 - `GameInstaller` (scene-scope, Game.unity) — match-scoped state (`MatchConfigSO`, `INetworkService`).
 
-### Self-injection (NetworkBehaviours + Bootstrap scene)
+### Self-injection: one helper (A11 / A06, 2026-11-12)
+
+Zenject injects what it builds: scene objects present at load, and anything an installer binds. Fusion-spawned network objects and components added at runtime with `AddComponent` are built outside any container, so they inject themselves, with **one line and nothing else**:
 
 ```csharp
 [Inject]
 public void Construct(ILogService log) => _log = log;
 
-public override void Spawned()      // or Awake() in Bootstrap
+public override void Spawned()      // or Awake() for a plain MonoBehaviour
 {
-    if (_log == null)               // Construct hasn't fired? self-inject.
-    {
-        ProjectContext.Instance.Container.Inject(this);
-    }
+    SelfInject.Ensure(this, _log != null);
     // ... rest of init
 }
 ```
 
-**Don't gate on `ProjectContext.HasInstance`** — it returns false until something accesses `.Instance`. Reading `.Instance` directly triggers the lazy load. This was a real bug (`3bc2e13`).
+`SelfInject` (`Scripts/Injection/SelfInject.cs`) does nothing when the second argument is true (Zenject already injected the object). Otherwise it injects from the scene container of the object's own scene, else from any live scene container (a network object can live outside the scene that holds the `SceneContext`), else from the project container. A scene container inherits every project binding, so a `Construct()` may take project-scoped and scene-scoped types (`INetworkService`, `IArenaReadiness`) alike and there is no call-site choice to get wrong: the old "project only" copy threw on the first scene-scoped parameter and crashed every chicken spawn (`14fbf8f`).
 
-**If `Construct()` takes a scene-scoped type** (anything bound in `GameInstaller`, e.g. `MatchConfigSO`, `INetworkService`), plain `ProjectContext.Instance.Container.Inject(this)` will throw an unresolved-dependency exception — `ProjectContext` only knows about `ProjectInstaller` bindings. Self-inject from the `SceneContext` first, falling back to `ProjectContext` only if none exists:
-
-```csharp
-if (_log == null)
-{
-    var sceneCtx = FindFirstObjectByType<SceneContext>();
-    if (sceneCtx != null) sceneCtx.Container.Inject(this);
-    else ProjectContext.Instance.Container.Inject(this);
-}
-```
-
-This matters most for runtime-spawned `NetworkBehaviour`s (chickens, piles, etc.) — the self-inject path fires on every spawn, so a mismatch here crashes the game on the very first spawn, not just in some edge case. Before adding a new `[Inject]` parameter to any `Construct()`, check which installer binds that type and update the self-inject call site to match. Real bug: `ChickenCargo` gained a `MatchConfigSO` dependency (timed deposit rate) but kept the `ProjectContext`-only self-inject, so every chicken spawn threw (`14fbf8f`).
+- **Never write `<context>.Container.Inject(this)`, `FindFirstObjectByType<SceneContext>()` or `ProjectContext.Instance.Container.TryResolve<T>()` in runtime code.** A dependency is a `Construct()` parameter. A guard test fails on any of these outside `SelfInject`, the installers and the two renderer features (assets with no injection point, which borrow the project logger for one error line).
+- **Pass the null check of a dependency every `Construct()` sets**, normally `_log != null`.
+- **Call it first, at the point the component first needs a dependency** (`Spawned`, `Awake`; a presentation component that only logs on a wiring error may call it on that error path).
+- **It never throws.** A missing context or an unresolvable parameter is reported once per component type (`ILogService.Error`, source `SelfInject`, with Zenject's exception) and `Ensure` returns false. Read that line first when a spawned object misbehaves.
+- **A new scene installer registers its container as the first line of `InstallBindings`** (`SelfInject.RegisterSceneContainer(this, Container)`, as `GameInstaller` does). Zenject's own `SceneContextRegistry` is filled at the scene kernel's `Start`, after the `Awake` calls that self-inject.
+- **No guard on objects the container builds.** `FromNewComponentOnNewGameObject` keeps the new object inactive until it is injected, so `Construct` runs before `Awake` (the diagnostics probes, `ArenaReadinessDriver`, `FusionNetworkService`).
+- `ProjectContext.HasInstance` is false until something reads `.Instance` (real bug `3bc2e13`). `SelfInject` reads `.Instance`; nothing else should need either.
 
 ### Bind by instance
 

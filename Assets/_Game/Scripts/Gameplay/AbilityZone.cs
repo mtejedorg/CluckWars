@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Logging;
@@ -410,7 +411,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             ActiveZones.Add(this);
             LocalJoinClock.Note(Runner);   // a zone in a joiner's first snapshot can be the first thing it sees

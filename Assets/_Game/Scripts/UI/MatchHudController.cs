@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Input;
@@ -89,12 +90,7 @@ namespace CluckWars.UI
             // The round orientation lock (C4) lives exactly as long as the match HUD; added here so no scene edit is needed.
             if (GetComponent<OrientationPolicy>() == null) gameObject.AddComponent<OrientationPolicy>();
 
-            if (_log == null)
-            {
-                var sceneCtx = FindFirstObjectByType<SceneContext>();
-                if (sceneCtx != null) sceneCtx.Container.Inject(this);
-                else                  ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
         }
 
         private void OnDestroy()

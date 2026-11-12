@@ -1,6 +1,7 @@
 using CluckWars.Abilities;
 using CluckWars.Audio;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Services;
 using CluckWars.Settings;
@@ -546,7 +547,7 @@ namespace CluckWars.Visuals
         private void PlayEdgeSfx(bool open)
         {
             // Self-injection on first use (Fusion spawns the chicken outside the container), as Warn does below.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
             if (ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity) || HiddenVisibilityRules.IsHiddenFor(_controller))
                 return;
             if (_audio == null || _sfx == null)
@@ -875,7 +876,7 @@ namespace CluckWars.Visuals
         {
             if (_warned) return;
             _warned = true;
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
             _log?.Warn(Source, message);
         }
     }

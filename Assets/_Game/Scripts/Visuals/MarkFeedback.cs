@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Audio;
@@ -107,7 +108,7 @@ namespace CluckWars.Visuals
 
         private void Awake()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
             SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
 

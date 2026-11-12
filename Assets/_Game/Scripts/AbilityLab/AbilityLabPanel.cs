@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
@@ -95,7 +96,7 @@ namespace CluckWars.AbilityLab
 
         private void Awake()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             _lab = FindFirstObjectByType<AbilityLabBootstrapper>();
             _hud = FindFirstObjectByType<AbilityLabHud>();

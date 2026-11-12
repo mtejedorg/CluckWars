@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Networking;
@@ -87,7 +88,7 @@ namespace CluckWars.UI
 
         private void Awake()
         {
-            if (_network == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             EnsureEventSystem();
             BuildCanvas();

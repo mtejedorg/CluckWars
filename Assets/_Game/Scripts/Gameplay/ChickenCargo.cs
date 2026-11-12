@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Visuals;
 using Fusion;
@@ -215,14 +216,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveCargos.Add(this);
-            if (_log == null)
-            {
-                var sceneCtx = FindFirstObjectByType<SceneContext>();
-                if (sceneCtx != null)
-                    sceneCtx.Container.Inject(this);
-                else
-                    ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();

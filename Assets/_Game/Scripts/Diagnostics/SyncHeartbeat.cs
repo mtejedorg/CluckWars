@@ -100,7 +100,6 @@ namespace CluckWars.Diagnostics
 
         private void Start()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
             DiagnosticsObjects.KeepAcrossScenes(gameObject);
             if (!HeavyProbes.Enabled)
                 _log?.Info(Source, "Heavy probes off in the Editor (no auto-test config): no Sync lines, no automatic Visual scans " +

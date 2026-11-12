@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Input;
 using CluckWars.Logging;
 using UnityEngine;
@@ -490,8 +491,8 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             // Plain MonoBehaviour spawned inside a Fusion prefab: Zenject never injects it, so
-            // self-inject (CONVENTIONS "Self-injection"). Never gate on ProjectContext.HasInstance.
-            if (_input == null) ProjectContext.Instance.Container.Inject(this);
+            // self-inject (CONVENTIONS "Self-injection").
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _abilities  = GetComponent<AbilityController>();

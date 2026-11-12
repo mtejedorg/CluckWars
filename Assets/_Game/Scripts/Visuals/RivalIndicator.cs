@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
@@ -177,8 +178,8 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            // Self-injection per CONVENTIONS. Never gate on ProjectContext.HasInstance: it is false until .Instance is first read.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            // Self-injection per CONVENTIONS.
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _body = GetComponent<CharacterController>();

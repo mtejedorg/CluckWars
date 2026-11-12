@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -229,8 +230,7 @@ namespace CluckWars.UI
 
         private void Awake()
         {
-            if (_selection == null)
-                ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             UiText.SetLogger(_log);
             if (_input == null)

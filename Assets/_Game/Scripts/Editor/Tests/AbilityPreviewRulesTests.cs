@@ -176,7 +176,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("_input.GetAbilityHeld(i)", src);
             StringAssert.Contains("AbilityPreviewRules.SelectLocalPreviewSlot", src);
             StringAssert.Contains("_abilities.ChargingSlot", src, "the networked charge stays as the fallback");
-            StringAssert.Contains("ProjectContext.Instance.Container.Inject(this)", src, "self-injection per CONVENTIONS");
+            StringAssert.Contains("SelfInject.Ensure(this, _log != null);", src, "self-injection per CONVENTIONS");
         }
 
         // ---- Range guides ------------------------------------------------------

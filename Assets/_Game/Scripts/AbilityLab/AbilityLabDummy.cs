@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using UnityEngine;
 using Zenject;
@@ -94,7 +95,7 @@ namespace CluckWars.AbilityLab
 
         private void Awake()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
         }
 
         /// <summary>

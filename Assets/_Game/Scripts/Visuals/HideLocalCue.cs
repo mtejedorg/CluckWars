@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Settings;
 using UnityEngine;
@@ -93,7 +94,7 @@ namespace CluckWars.Visuals
             if (!_wiringChecked)
             {
                 _wiringChecked = true;
-                if (_log == null) ProjectContext.Instance.Container.Inject(this);
+                SelfInject.Ensure(this, _log != null);
             }
 
             bool faded = ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity);

@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -62,10 +63,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveStats.Add(this);
-            if (_log == null)
-            {
-                ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)

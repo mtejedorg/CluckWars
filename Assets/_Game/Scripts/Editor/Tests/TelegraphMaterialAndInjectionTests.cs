@@ -90,8 +90,8 @@ namespace CluckWars.Tests
         public void RivalIndicator_SelfInjects_WithoutGatingOnHasInstance()
         {
             string src = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
-            StringAssert.Contains("if (_log == null) ProjectContext.Instance.Container.Inject(this);", src);
-            StringAssert.DoesNotContain("ProjectContext.HasInstance", src.Replace("Never gate on ProjectContext.HasInstance", ""));
+            StringAssert.Contains("SelfInject.Ensure(this, _log != null);", src);
+            StringAssert.DoesNotContain("ProjectContext.HasInstance", src);
         }
     }
 }

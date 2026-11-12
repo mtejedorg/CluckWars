@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
@@ -154,10 +155,7 @@ namespace CluckWars.Visuals
             // FoodPileVisuals lives on a procedurally-spawned NetworkObject (MapGenerator
             // spawns the pile at runtime), so Zenject's scene-time injection doesn't fire.
             // Self-inject the color scheme — same pattern as the NetworkBehaviours.
-            if (_colors == null)
-            {
-                ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _colors != null);
         }
 
         private Color FullColor => _fullColorOverride.a > 0f

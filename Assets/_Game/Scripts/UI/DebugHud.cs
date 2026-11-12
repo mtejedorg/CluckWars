@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Text;
 using CluckWars.Abilities;
 using CluckWars.Diagnostics;
@@ -59,13 +60,7 @@ namespace CluckWars.UI
 
         private void Awake()
         {
-            if (_network == null)
-            {
-                // INetworkService is scene-scoped (GameInstaller): SceneContext first (CONVENTIONS "Self-injection").
-                var sceneCtx = FindFirstObjectByType<SceneContext>();
-                if (sceneCtx != null) sceneCtx.Container.Inject(this);
-                else ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _network != null);
             // Only GUI.Box / Label / Button are used: skipping IMGUI's layout pass keeps the hidden overlay's per-frame
             // cost down now that a dev-tools build also puts it into every Game scene (perf numbers stay representative).
             useGUILayout = false;

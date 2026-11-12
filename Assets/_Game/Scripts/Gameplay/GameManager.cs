@@ -1,4 +1,5 @@
 using CluckWars.Audio;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -157,18 +158,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            if (_log == null)
-            {
-                // Inject from the SceneContext child container when there is one, so both
-                // scene-level bindings (INetworkService) and project-level ones
-                // (MatchConfigSO, ILogService) resolve. ProjectContext alone is the
-                // fallback for the no-SceneContext case.
-                var sceneCtx = FindFirstObjectByType<SceneContext>();
-                if (sceneCtx != null)
-                    sceneCtx.Container.Inject(this);
-                else
-                    ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
 
             Instance = this;
 

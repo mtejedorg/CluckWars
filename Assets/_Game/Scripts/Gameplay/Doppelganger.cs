@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -50,7 +51,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();

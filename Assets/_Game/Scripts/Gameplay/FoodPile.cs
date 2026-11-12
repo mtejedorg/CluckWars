@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
@@ -276,7 +277,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActivePiles.Add(this);
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             // Every peer applies the stamped yaw (and, off the authority, the stamped position) itself — the root has no
             // NetworkTransform, and the collider, carve and visuals all hang off this one transform.

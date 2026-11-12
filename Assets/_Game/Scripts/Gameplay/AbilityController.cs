@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Audio;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
@@ -122,6 +123,7 @@ namespace CluckWars.Gameplay
         // The codes this peer's plain slot fields currently reflect (what it last published or applied).
         private readonly byte[] _appliedCodes = new byte[SlotCount + 1];
         private AbilityRegistrySO _registry;
+        private MatchConfigSO _matchConfig;
 
         public PassiveAbilitySO Passive => _passive;
         public AbilityBaseSO Slot0 => _slot0;
@@ -256,17 +258,20 @@ namespace CluckWars.Gameplay
         private readonly bool[] _holdSuppressed = new bool[SlotCount];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry,
+            AbilityRegistrySO registry, MatchConfigSO matchConfig)
         {
             _log = log;
             _audio = audio;
             _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
+            _registry = registry;
+            _matchConfig = matchConfig;
         }
 
         public override void Spawned()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
@@ -867,8 +872,7 @@ namespace CluckWars.Gameplay
 
             var registry = ResolveRegistry();
             var cls = _controller != null ? _controller.Class : default;
-            var config = ProjectContext.Instance.Container.TryResolve<MatchConfigSO>();
-            var mode = config != null ? config.LoadoutMode : LoadoutMode.Free;   // as MatchBootstrapper.ActiveLoadoutMode
+            var mode = _matchConfig != null ? _matchConfig.LoadoutMode : LoadoutMode.Free;   // as MatchBootstrapper.ActiveLoadoutMode
             AbilityBaseSO plainPeck = null;
             if (registry != null && registry.All != null)
                 foreach (var a in registry.All) if (a is PeckAbilitySO) { plainPeck = a; break; }
@@ -942,12 +946,8 @@ namespace CluckWars.Gameplay
 
         private static string LoadoutEntryName(int index) => index == PassiveCodeIndex ? "the passive" : $"slot {index}";
 
-        /// <summary>The project-wide registry (bound in <c>ProjectInstaller</c>); null only when it is not bound at all.</summary>
-        private AbilityRegistrySO ResolveRegistry()
-        {
-            if (_registry == null) _registry = ProjectContext.Instance.Container.TryResolve<AbilityRegistrySO>();
-            return _registry;
-        }
+        /// <summary>The project-wide registry (bound in <c>ProjectInstaller</c>, injected); null only before injection.</summary>
+        private AbilityRegistrySO ResolveRegistry() => _registry;
 
         public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1,
             AbilityBaseSO slot2 = null, AbilityBaseSO slot3 = null)

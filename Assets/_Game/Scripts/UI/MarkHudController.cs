@@ -1,4 +1,5 @@
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Localization;
 using CluckWars.Logging;
 using CluckWars.Settings;
@@ -55,7 +56,7 @@ namespace CluckWars.UI
 
         private void Awake()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
         }
 
         private void OnEnable() => TryBind();

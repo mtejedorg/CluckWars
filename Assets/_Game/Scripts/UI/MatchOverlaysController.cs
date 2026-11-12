@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System;
 using System.Collections.Generic;
 using CluckWars.Abilities;
@@ -210,15 +211,7 @@ namespace CluckWars.UI
         // ---- Unity lifecycle ---------------------------------------------------
         private void Awake()
         {
-            if (_network == null)
-            {
-                // INetworkService is bound in GameInstaller (scene scope), so inject
-                // from the SceneContext first and fall back to ProjectContext
-                // (CONVENTIONS IP-fix1).
-                var sceneCtx = FindFirstObjectByType<SceneContext>();
-                if (sceneCtx != null) sceneCtx.Container.Inject(this);
-                else                  ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _network != null);
 
             if (_network != null) _network.OnShutdown += HandleShutdown;
             if (_input == null)

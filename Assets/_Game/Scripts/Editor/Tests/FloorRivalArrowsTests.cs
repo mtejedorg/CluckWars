@@ -523,7 +523,7 @@ namespace CluckWars.Tests
             StringAssert.DoesNotContain("Time.unscaledTime", src);
             StringAssert.DoesNotContain("Time.deltaTime", src);
 
-            StringAssert.Contains("if (_log == null) ProjectContext.Instance.Container.Inject(this);", src);
+            StringAssert.Contains("SelfInject.Ensure(this, _log != null);", src);
         }
 
         [Test]

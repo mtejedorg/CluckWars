@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using CluckWars.Logging;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -29,9 +30,7 @@ namespace CluckWars.Bootstrap
         private void Awake()
         {
             // Self-inject so we work whether or not the host scene has a SceneContext.
-            // Accessing .Instance triggers the lazy load if no other component has yet.
-            if (_log == null)
-                ProjectContext.Instance.Container.Inject(this);
+            SelfInject.Ensure(this, _log != null);
         }
 
         [Inject]

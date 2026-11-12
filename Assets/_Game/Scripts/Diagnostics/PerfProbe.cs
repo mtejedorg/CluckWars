@@ -46,8 +46,7 @@ namespace CluckWars.Diagnostics
 
         private void Start()
         {
-            // Zenject injects this component straight after AddComponent (ProjectInstaller); self-inject only if it did not.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            // Built by the container (ProjectInstaller.InstallDiagnostics): Zenject injects it before Awake, so no self-injection.
             DiagnosticsObjects.KeepAcrossScenes(gameObject);
             _gcPrevFrame = _gcAtSummaryStart = GC.CollectionCount(0);
             _monoPrevFrame = Profiler.GetMonoUsedSizeLong();

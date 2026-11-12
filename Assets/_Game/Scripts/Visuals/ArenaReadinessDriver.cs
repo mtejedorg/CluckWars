@@ -64,9 +64,8 @@ namespace CluckWars.Visuals
 
         private void Awake()
         {
-            // Zenject builds this component with AddComponent, so Awake runs before the [Inject] call: self-inject
-            // (ILogService is project-scoped; CONVENTIONS "Self-injection"). Never gate on ProjectContext.HasInstance.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            // Built by the container (GameInstaller, FromNewComponentOnNewGameObject): Zenject keeps the new object
+            // inactive until it has injected it, so Construct has run before this Awake and no self-injection is needed.
             _warmup = new ArenaWarmupSequence(ShaderCompileProbe.Create());
             _warmup.StepChanged += OnStepChanged;
             _tracker.GateCompleted += (gate, t) => _log?.Info(Source, $"Gate {gate} done at {t:0.00} s.");

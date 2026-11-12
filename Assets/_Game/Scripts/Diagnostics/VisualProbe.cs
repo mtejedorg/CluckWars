@@ -69,7 +69,6 @@ namespace CluckWars.Diagnostics
 
         private void Start()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
             DiagnosticsObjects.KeepAcrossScenes(gameObject);
             RevealState.ArenaRevealed += OnRevealed;
         }

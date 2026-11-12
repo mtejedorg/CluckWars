@@ -1,5 +1,6 @@
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
+using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Settings;
 using UnityEngine;
@@ -222,7 +223,7 @@ namespace CluckWars.Visuals
             if (!_wiringChecked)
             {
                 _wiringChecked = true;
-                if (_log == null) ProjectContext.Instance.Container.Inject(this);
+                SelfInject.Ensure(this, _log != null);
                 if (_auraEdgeSprite == null || _dashedRingTexture == null || s_dashedMaterial == null || (_vfx != null && _vfx.ParticleMaterial == null))
                     _log?.Error("SlowAuraFeedback", "Slow aura art is not wired on Chicken.prefab (Fx_AuraEdge sprite, Fx_DashedRing texture, shared particle material): the aura will draw incomplete.");
             }

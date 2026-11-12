@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System;
 using CluckWars.Audio;
 using CluckWars.Logging;
@@ -68,10 +69,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             ActiveCombats.Add(this);
-            if (_log == null)
-            {
-                ProjectContext.Instance.Container.Inject(this);
-            }
+            SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
             _execute = GetComponent<AssassinExecute>();

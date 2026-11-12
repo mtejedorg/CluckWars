@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
@@ -266,7 +267,7 @@ namespace CluckWars.Visuals
                 if (!_missingGhostReported)
                 {
                     _missingGhostReported = true;
-                    if (_log == null) ProjectContext.Instance.Container.Inject(this);
+                    SelfInject.Ensure(this, _log != null);
                     _log?.Error(Source, $"{name}: no ghost material assigned; Invisibility / Smoke Roost / stun " +
                                         "cannot fade the body. Wire Chicken_Ghost.mat on ChickenVisuals.");
                 }

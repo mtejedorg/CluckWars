@@ -1,3 +1,4 @@
+using CluckWars.Injection;
 using System.Text;
 using CluckWars.Logging;
 using UnityEngine;
@@ -55,8 +56,8 @@ namespace CluckWars.Visuals
         private void Awake()
         {
             // Plain MonoBehaviour added at runtime: Zenject never injects it, so self-inject (CONVENTIONS
-            // "Self-injection"). Never gate on ProjectContext.HasInstance.
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
+            // "Self-injection").
+            SelfInject.Ensure(this, _log != null);
         }
 
         private void LateUpdate() => Sync(RenderTierPolicy.MobileBakedHazeFor(GraphicsSettings.currentRenderPipeline));

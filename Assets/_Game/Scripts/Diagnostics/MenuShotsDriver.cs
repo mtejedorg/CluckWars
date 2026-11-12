@@ -78,7 +78,6 @@ namespace CluckWars.Diagnostics
 
         private void Start()
         {
-            if (_log == null) ProjectContext.Instance.Container.Inject(this);
             DiagnosticsObjects.KeepAcrossScenes(gameObject);
             if (!UiProbeArgs.MenuShotsRequested) { enabled = false; return; }
             _done = false;   // a static survives an Editor Play session without a domain reload
