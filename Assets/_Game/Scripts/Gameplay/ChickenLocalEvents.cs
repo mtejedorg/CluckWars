@@ -7,32 +7,36 @@ using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
-    /// <summary>A cast, as every peer sees it. Ids and numbers only: text and clips are the listener's to resolve.</summary>
+    /// <summary>A cast, as every peer sees it. Ids and numbers only: text, clips and the ability asset itself are
+    /// the listener's to resolve.</summary>
     public readonly struct CastEvent
     {
         /// <summary>The slot that cast (<c>AbilityController.LastCastSlot</c>).</summary>
         public readonly int Slot;
-        /// <summary>The ability in that slot, or null when this peer has not resolved the caster's loadout yet.</summary>
-        public readonly AbilityBaseSO Ability;
-        /// <summary><see cref="Ability"/>, else the last ability this peer saw the caster charge (the cast clears the
-        /// charge in the tick it fires, and a very short ability may already be over). Null when neither is known.</summary>
-        public readonly AbilityBaseSO AimedAbility;
+        /// <summary>The registry code (<c>AbilityRegistrySO.CodeOf</c>) of the ability in that slot;
+        /// <c>AbilityRegistrySO.NoAbilityCode</c> when this peer has not resolved the caster's loadout yet.</summary>
+        public readonly byte AbilityCode;
+        /// <summary><see cref="AbilityCode"/>, else the code of the last ability this peer saw the caster charge (the
+        /// cast clears the charge in the tick it fires, and a very short ability may already be over).
+        /// <c>NoAbilityCode</c> when neither is known. A listener that needs the asset resolves it through the
+        /// registry: <see cref="ChickenLocalEvents.AbilityOf"/>.</summary>
+        public readonly byte AimedAbilityCode;
         /// <summary>Targets the cast hit (<c>AbilityController.LastCastHitCount</c>); 0 is a whiff only where the
         /// ability reports hits at all (<c>AbilityBaseSO.ReportsCastHits</c>).</summary>
         public readonly byte HitCount;
-        /// <summary>The body action of <see cref="AimedAbility"/>; <see cref="CastArchetype.None"/> when unknown.</summary>
+        /// <summary>The body action of the aimed ability; <see cref="CastArchetype.None"/> when unknown.</summary>
         public readonly CastArchetype Archetype;
         /// <summary>The cast was the Peck, which has its own animation beat instead of an archetype.</summary>
         public readonly bool IsPeck;
 
-        public CastEvent(int slot, AbilityBaseSO ability, AbilityBaseSO aimedAbility, byte hitCount)
+        public CastEvent(int slot, byte abilityCode, byte aimedAbilityCode, byte hitCount, CastArchetype archetype, bool isPeck)
         {
             Slot = slot;
-            Ability = ability;
-            AimedAbility = aimedAbility;
+            AbilityCode = abilityCode;
+            AimedAbilityCode = aimedAbilityCode;
             HitCount = hitCount;
-            Archetype = aimedAbility != null ? aimedAbility.CastMotion : CastArchetype.None;
-            IsPeck = aimedAbility is PeckAbilitySO;
+            Archetype = archetype;
+            IsPeck = isPeck;
         }
     }
 
@@ -137,6 +141,15 @@ namespace CluckWars.Gameplay
         private readonly ListenerList<Action> _zoneTriggeredListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _classModelAttachedListeners = new ListenerList<Action>();
         private readonly ListenerList<Action<AbilityCue>> _abilityCueListeners = new ListenerList<Action<AbilityCue>>();
+
+        /// <summary>The ability registry every peer ships (the chicken sets it once injected): what turns the
+        /// ability of a cast into the code its event carries, and a code back into the asset for a listener.</summary>
+        public AbilityRegistrySO Registry { get; set; }
+
+        /// <summary>The asset a <see cref="CastEvent"/> code names; null for "no ability", an unknown code or no registry.</summary>
+        public AbilityBaseSO AbilityOf(byte code) => Registry != null ? Registry.FromCode(code) : null;
+
+        private byte CodeOf(AbilityBaseSO ability) => Registry != null ? Registry.CodeOf(ability) : AbilityRegistrySO.NoAbilityCode;
 
         /// <summary>Where a throwing listener is reported. The chicken sets it once it has its logger; until then
         /// (and in tests that set none) the report still goes out, through a plain <see cref="UnityLogService"/>
@@ -247,8 +260,14 @@ namespace CluckWars.Gameplay
                 {
                     if (s.ChargingAbility != null) _lastCharging = s.ChargingAbility;
                     if (_cast.Observe(s.CastEventId))
+                    {
+                        // The payload is ids only (S-5): the assets are read here, on the gameplay side, for their code,
+                        // archetype and peck flag, and never travel with the event.
+                        var aimed = s.CastAbility != null ? s.CastAbility : _lastCharging;
                         LocalRaise.Invoke(_castListeners, nameof(Cast), Log, _controller,
-                            new CastEvent(s.CastSlot, s.CastAbility, s.CastAbility != null ? s.CastAbility : _lastCharging, s.CastHitCount));
+                            new CastEvent(s.CastSlot, CodeOf(s.CastAbility), CodeOf(aimed), s.CastHitCount,
+                                aimed != null ? aimed.CastMotion : CastArchetype.None, aimed is PeckAbilitySO));
+                    }
                 }
 
                 if (_knockback.Observe(s.KnockbackEventId)) LocalRaise.Invoke(_knockbackListeners, nameof(Knockback), Log, _controller);

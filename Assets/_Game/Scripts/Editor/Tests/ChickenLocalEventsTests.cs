@@ -34,6 +34,15 @@ namespace CluckWars.Tests
             return a;
         }
 
+        /// <summary>An observer whose registry holds exactly <paramref name="abilities"/> (codes 1, 2, ... in that order).</summary>
+        private ChickenLocalEvents EventsWith(params AbilityBaseSO[] abilities)
+        {
+            var registry = ScriptableObject.CreateInstance<AbilityRegistrySO>();
+            registry.All = abilities;
+            _made.Add(registry);
+            return new ChickenLocalEvents { Registry = registry };
+        }
+
         // ---- EventEdge: the cursor rules ---------------------------------------------------------------------------
 
         [Test]
@@ -173,7 +182,7 @@ namespace CluckWars.Tests
         public void TheCastEvent_CarriesIdsAndNumbers_ReadForThatCast()
         {
             var stun = Ability<WingSlamAbilitySO>(CastArchetype.Slam);
-            var events = new ChickenLocalEvents();
+            var events = EventsWith(Ability<CluckShockAbilitySO>(), stun);   // stun is the registry's second entry: code 2
             var seen = new Counts(events);
             events.Observe(Snapshot());
 
@@ -185,8 +194,9 @@ namespace CluckWars.Tests
 
             Assert.AreEqual(1, seen.Cast);
             Assert.AreEqual(2, seen.LastCast.Slot);
-            Assert.AreSame(stun, seen.LastCast.Ability);
-            Assert.AreSame(stun, seen.LastCast.AimedAbility);
+            Assert.AreEqual(2, seen.LastCast.AbilityCode, "the event carries the registry code, not the asset (S-5)");
+            Assert.AreEqual(2, seen.LastCast.AimedAbilityCode);
+            Assert.AreSame(stun, events.AbilityOf(seen.LastCast.AimedAbilityCode), "a listener resolves the asset through the registry");
             Assert.AreEqual(3, seen.LastCast.HitCount);
             Assert.AreEqual(CastArchetype.Slam, seen.LastCast.Archetype);
             Assert.IsFalse(seen.LastCast.IsPeck);
@@ -210,7 +220,7 @@ namespace CluckWars.Tests
             // TryActivate clears the charge in the tick it fires; a peer that has not resolved the slot still knows
             // what it saw being aimed.
             var aimed = Ability<CluckShockAbilitySO>(CastArchetype.Flare);
-            var events = new ChickenLocalEvents();
+            var events = EventsWith(aimed);
             var seen = new Counts(events);
 
             var charging = Snapshot();
@@ -218,8 +228,8 @@ namespace CluckWars.Tests
             events.Observe(in charging);
 
             events.Observe(Snapshot(cast: 1));   // no CastAbility, charge already cleared
-            Assert.IsNull(seen.LastCast.Ability);
-            Assert.AreSame(aimed, seen.LastCast.AimedAbility);
+            Assert.AreEqual(AbilityRegistrySO.NoAbilityCode, seen.LastCast.AbilityCode);
+            Assert.AreSame(aimed, events.AbilityOf(seen.LastCast.AimedAbilityCode));
             Assert.AreEqual(CastArchetype.Flare, seen.LastCast.Archetype);
         }
 
@@ -231,8 +241,36 @@ namespace CluckWars.Tests
             events.Observe(Snapshot());
             events.Observe(Snapshot(cast: 1));
             Assert.AreEqual(1, seen.Cast);
-            Assert.IsNull(seen.LastCast.AimedAbility);
+            Assert.AreEqual(AbilityRegistrySO.NoAbilityCode, seen.LastCast.AimedAbilityCode);
+            Assert.IsNull(events.AbilityOf(seen.LastCast.AimedAbilityCode));
             Assert.AreEqual(CastArchetype.None, seen.LastCast.Archetype);
+        }
+
+        [Test]
+        public void TheCastEvent_HoldsNoAssetReference_OnlyIdsEnumsAndNumbers()
+        {
+            // S-5, Maestro's rule: ids only. Checked on the type itself, so a field added later cannot bring one back.
+            foreach (var field in typeof(CastEvent).GetFields(
+                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+            {
+                Assert.IsTrue(field.FieldType.IsPrimitive || field.FieldType.IsEnum,
+                    $"CastEvent.{field.Name} is a {field.FieldType.Name}: a cast event carries ids, enums and numbers only");
+            }
+        }
+
+        [Test]
+        public void AnAbilityOutsideTheRegistry_HasNoCode_ButItsArchetypeStillTravels()
+        {
+            // Every shipped ability is in the registry (AbilitySystemTests pins it); an asset that is not has no id to
+            // carry, so a listener that needs the asset gets none, while the animation beat is unaffected.
+            var events = EventsWith(Ability<CluckShockAbilitySO>());
+            var seen = new Counts(events);
+            events.Observe(Snapshot());
+            var s = Snapshot(cast: 1);
+            s.CastAbility = Ability<WingSlamAbilitySO>(CastArchetype.Slam);
+            events.Observe(in s);
+            Assert.AreEqual(AbilityRegistrySO.NoAbilityCode, seen.LastCast.AimedAbilityCode);
+            Assert.AreEqual(CastArchetype.Slam, seen.LastCast.Archetype);
         }
 
         [Test]
@@ -254,7 +292,7 @@ namespace CluckWars.Tests
         public void Reset_ReSeedsEveryCounter_AndForgetsTheChargedAbility()
         {
             var aimed = Ability<CluckShockAbilitySO>();
-            var events = new ChickenLocalEvents();
+            var events = EventsWith(aimed);
             var seen = new Counts(events);
             var charging = Snapshot(cast: 4, knock: 4, self: 4, jump: 4, steal: 4);
             charging.ChargingAbility = aimed;
@@ -266,7 +304,7 @@ namespace CluckWars.Tests
 
             events.Observe(Snapshot(cast: 10, knock: 9, self: 9, jump: 9, steal: 9));
             Assert.AreEqual(1, seen.Cast);
-            Assert.IsNull(seen.LastCast.AimedAbility, "the previous life's charge is not this cast's ability");
+            Assert.AreEqual(AbilityRegistrySO.NoAbilityCode, seen.LastCast.AimedAbilityCode, "the previous life's charge is not this cast's ability");
         }
 
         [Test]

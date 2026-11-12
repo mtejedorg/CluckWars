@@ -152,7 +152,7 @@ namespace CluckWars.Visuals
             _castPending = false;
 
             // The ability that cast, else the one last seen charging (ChickenLocalEvents remembers what was aimed).
-            var ability = _cast.AimedAbility;
+            var ability = _events != null ? _events.AbilityOf(_cast.AimedAbilityCode) : null;
             if (ability == null) return;
 
             TelegraphShapes.Resolve(ability, out _flashShape, out _flashRadius,

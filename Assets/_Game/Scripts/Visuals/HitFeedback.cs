@@ -603,7 +603,7 @@ namespace CluckWars.Visuals
 
             // The ability that cast, else the one last seen charging (TryActivate clears ChargingSlot in the tick it
             // fires, and a very short ability may already be over: ChickenLocalEvents remembers what was aimed).
-            var ability = _cast.AimedAbility;
+            var ability = _events != null ? _events.AbilityOf(_cast.AimedAbilityCode) : null;
             if (ability == null) return;
 
             // Stun (D10): the swing arcs read from across the arena, hit or whiff, and only for the Wing Slam itself.

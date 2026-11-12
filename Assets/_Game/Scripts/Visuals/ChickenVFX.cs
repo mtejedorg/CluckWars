@@ -1190,7 +1190,7 @@ namespace CluckWars.Visuals
             _castPending = false;
 
             // The ability that cast, else the one last seen charging (ChickenLocalEvents remembers what was aimed).
-            var ability = _cast.AimedAbility;
+            var ability = _events != null ? _events.AbilityOf(_cast.AimedAbilityCode) : null;
 
             // Shove (D6): the shock ring goes out BEFORE the burst, so when the sparkle family is full it is the burst that
             // loses its last sparkles (a sphere of 16), never the ring that carries the "burst out from me" read.

@@ -609,6 +609,7 @@ namespace CluckWars.Gameplay
             _recentPositions.Clear();      // pooled: a previous life's positions never vouch
             SelfInject.Ensure(this, _log != null);
             LocalEvents.Log = _log;        // a listener that throws is reported through this chicken's logger
+            LocalEvents.Registry = _abilityRegistry;   // cast events carry registry codes, not assets
 
             _log?.Debug(Source, $"Spawned. Class={Class}, HasStateAuthority={HasStateAuthority}, registryBound={_registry != null}.");
 

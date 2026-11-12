@@ -1016,7 +1016,7 @@ namespace CluckWars.Input
                 if (_stunCastPending)
                 {
                     _stunCastPending = false;
-                    var stun = _stunCast.Ability as WingSlamAbilitySO;
+                    var stun = _stunCastEvents.AbilityOf(_stunCast.AbilityCode) as WingSlamAbilitySO;
                     _stunCastIsWingSlam = stun != null;
                     _stunCastHits = _stunCast.HitCount;
                     _stunCastAt = Time.unscaledTime;   // Fusion timers ignore timeScale, so unscaled time tracks StunRemaining
