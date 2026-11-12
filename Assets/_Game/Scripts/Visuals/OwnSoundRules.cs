@@ -7,8 +7,8 @@ namespace CluckWars.Visuals
     /// <remarks>
     /// <b>Heard only on the peer of the human who drives that chicken.</b> Not for a bot, not for a rival, not for a
     /// Doppelganger decoy (which shares its caster's input authority). These are 2D confirmation sounds for the
-    /// player's own action, the same audience as the hit-confirm / whiff one-shots (E1) and
-    /// <c>AbilityController.PlayLocalSfx</c>.
+    /// player's own action: the cast and deposit sounds, the hit-confirm / whiff one-shots (E1) and the
+    /// <c>AbilityCue</c> sounds (cancel, fizzle, cargo full, expire).
     /// <para>
     /// Before A04 both were played by gameplay on whichever peer held the chicken's state authority. For a human's
     /// own chicken that is the same peer, so nothing changes for it. For bots it was the master client (and the

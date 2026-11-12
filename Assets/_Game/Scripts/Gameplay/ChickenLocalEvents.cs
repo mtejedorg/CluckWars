@@ -136,6 +136,7 @@ namespace CluckWars.Gameplay
         private readonly ListenerList<Action<Vector3>> _attackerNamedListeners = new ListenerList<Action<Vector3>>();
         private readonly ListenerList<Action> _zoneTriggeredListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _classModelAttachedListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action<AbilityCue>> _abilityCueListeners = new ListenerList<Action<AbilityCue>>();
 
         /// <summary>Where a throwing listener is reported. The chicken sets it once it has its logger; until then
         /// (and in tests that set none) the report still goes out, through a plain <see cref="UnityLogService"/>
@@ -165,6 +166,14 @@ namespace CluckWars.Gameplay
         public event Action ZoneTriggered { add => _zoneTriggeredListeners.Add(value); remove => _zoneTriggeredListeners.Remove(value); }
         /// <summary>The per-class model was parented under this chicken (its renderers exist from now on).</summary>
         public event Action ClassModelAttached { add => _classModelAttachedListeners.Add(value); remove => _classModelAttachedListeners.Remove(value); }
+
+        /// <summary>This chicken's own-player ability cue (cancel, fizzle, cargo full, expire): raised on the peer
+        /// that simulates the chicken, never replicated. The listener decides who hears it (<c>OwnSoundRules</c>).</summary>
+        public event Action<AbilityCue> AbilityCueRaised { add => _abilityCueListeners.Add(value); remove => _abilityCueListeners.Remove(value); }
+
+        /// <summary>From <c>AbilityController.Render</c>, on the peer whose tick noticed the cue. False when nothing listens.</summary>
+        public bool RaiseAbilityCue(AbilityCue cue) =>
+            LocalRaise.Invoke(_abilityCueListeners, nameof(AbilityCueRaised), Log, _controller, cue);
 
         /// <summary>From <c>ChickenCargo.Render</c>, every peer.</summary>
         public void RaiseCargoChanged(float delta, int stealCreditFrame) =>

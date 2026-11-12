@@ -162,7 +162,6 @@ namespace CluckWars.Visuals
         private ILogService       _log;
         private IHapticsService   _haptics;   // local phone buzz (Phase 6 chunk 6): the victim's own peer only
         private IAudioService     _audio;     // E1: hit-confirm / whiff one-shots, the caster's own peer only
-        private AudioRegistrySO   _sfx;
         private bool              _missingAudioReported;
 
         // ---- Body flash -------------------------------------------------------
@@ -232,12 +231,11 @@ namespace CluckWars.Visuals
 
         [Inject]
         public void Construct(ILogService log, [InjectOptional] IHapticsService haptics,
-                              [InjectOptional] IAudioService audio, [InjectOptional] AudioRegistrySO sfx)
+                              [InjectOptional] IAudioService audio)
         {
             _log = log;
             _haptics = haptics;
             _audio = audio;
-            _sfx = sfx;
         }
 
         // ---- Lifecycle --------------------------------------------------------
@@ -316,6 +314,7 @@ namespace CluckWars.Visuals
             _events.AttackerNamed      += NotifyAttacker;
             _events.ZoneTriggered      += NotifyZoneTriggered;
             _events.ClassModelAttached += RefreshBodyRenderers;
+            _events.AbilityCueRaised   += OnAbilityCue;
         }
 
         private void OnDisable()
@@ -330,6 +329,7 @@ namespace CluckWars.Visuals
                 _events.AttackerNamed      -= NotifyAttacker;
                 _events.ZoneTriggered      -= NotifyZoneTriggered;
                 _events.ClassModelAttached -= RefreshBodyRenderers;
+                _events.AbilityCueRaised   -= OnAbilityCue;
                 _events = null;
             }
             _knockPending = false;
@@ -349,6 +349,18 @@ namespace CluckWars.Visuals
         }
 
         private void OnDeposited() => PlayOwnSfx(SfxId.Deposit);
+
+        /// <summary>The own-player ability cues (S-2): what each one sounds like. Gameplay only names the moment.</summary>
+        private void OnAbilityCue(AbilityCue cue)
+        {
+            switch (cue)
+            {
+                case AbilityCue.Cancelled: PlayOwnSfx(SfxId.AbilityCancel, FeedbackTuning.CancelSfxVolume); break;
+                case AbilityCue.Fizzled:   PlayOwnSfx(SfxId.AbilityFizzle, FeedbackTuning.FizzleSfxVolume); break;
+                case AbilityCue.CargoFull: PlayOwnSfx(SfxId.CargoFull); break;
+                case AbilityCue.Expired:   PlayOwnSfx(SfxId.AbilityExpire); break;
+            }
+        }
 
         /// <summary>
         /// The carried food changed by a meaningful amount (<c>ChickenCargo.Render</c>, every peer): the floating
@@ -376,11 +388,11 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// A04: this chicken's own cast / deposit sound, by id, for the audience <see cref="OwnSoundRules"/> names
+        /// This chicken's own sounds (cast, deposit, hit-confirm, whiff, cancel, fizzle, cargo full, expire), by id, for the audience <see cref="OwnSoundRules"/> names
         /// (the human who drives it, on that human's peer; never a bot, a rival or a decoy). Local, off the
         /// replicated event, never RPC'd. A missing service is reported once; a missing clip by the audio service.
         /// </summary>
-        private void PlayOwnSfx(SfxId id)
+        private void PlayOwnSfx(SfxId id, float volume = 1f)
         {
             if (_controller == null) return;
             if (!OwnSoundRules.IsAudible(_controller.HasInputAuthority, _controller.IsBot, _controller.IsDecoy)) return;
@@ -389,11 +401,11 @@ namespace CluckWars.Visuals
                 if (!_missingAudioReported)
                 {
                     _missingAudioReported = true;
-                    _log?.Warn(Source, "No IAudioService injected: this chicken's cast, deposit, hit-confirm and whiff sounds are silent.");
+                    _log?.Warn(Source, "No IAudioService injected: this chicken's own sounds (cast, deposit, hit-confirm, whiff, cancel, fizzle, cargo full, expire) are silent.");
                 }
                 return;
             }
-            _audio.PlaySFX(id);
+            _audio.PlaySFX(id, volume);
         }
 
         /// <summary>
@@ -608,35 +620,16 @@ namespace CluckWars.Visuals
             if (hitCount > 0)
             {
                 ConfirmHits(ability, hitCount);
-                PlayCasterSfx(_sfx != null ? _sfx.HitConfirm : null, 1f);
+                PlayOwnSfx(SfxId.HitConfirm);
             }
             else
             {
                 if (ability is SnatchAbilitySO) PlayStealWhiff();
                 MarkImmuneTargets(ability);
-                PlayCasterSfx(_sfx != null ? _sfx.CastWhiff : null, FeedbackTuning.WhiffSfxVolumeMultiplier);
+                PlayOwnSfx(SfxId.CastWhiff, FeedbackTuning.WhiffSfxVolumeMultiplier);
             }
         }
 
-        /// <summary>
-        /// E1: the hit-confirm / whiff one-shot, heard only by the human who cast (the same peer that feels the caster
-        /// micro-punch; bots excluded like <c>AbilityController.PlayLocalSfx</c>). Local, observed off the replicated
-        /// cast event, never RPC'd. A null clip is a silent no-op; a missing service is reported once.
-        /// </summary>
-        private void PlayCasterSfx(AudioClip clip, float volume)
-        {
-            if (!_controller.HasInputAuthority || _controller.IsBot) return;
-            if (_audio == null || _sfx == null)
-            {
-                if (!_missingAudioReported)
-                {
-                    _missingAudioReported = true;
-                    _log?.Warn(Source, "No IAudioService / AudioRegistrySO injected: hit-confirm and whiff sounds are silent.");
-                }
-                return;
-            }
-            AudioRegistrySO.TryPlay(_audio, clip, volume);
-        }
 
         /// <summary>
         /// §3.2 hit-confirm: a white spark on every chicken this cast landed on, plus the

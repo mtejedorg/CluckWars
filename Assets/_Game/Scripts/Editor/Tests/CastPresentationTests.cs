@@ -194,9 +194,9 @@ namespace CluckWars.Tests
             string feedback = Code("Visuals/HitFeedback.cs");
             StringAssert.Contains("PlayOwnSfx(SfxId.AbilityActivate)", feedback);
             StringAssert.Contains("PlayOwnSfx(SfxId.Deposit)", feedback);
-            string play = AssassinExecuteCreditTests.MethodBody($"{ScriptsRoot}/Visuals/HitFeedback.cs", "private void PlayOwnSfx(SfxId id)");
+            string play = AssassinExecuteCreditTests.MethodBody($"{ScriptsRoot}/Visuals/HitFeedback.cs", "private void PlayOwnSfx(SfxId id");
             int gate = play.IndexOf("OwnSoundRules.IsAudible(_controller.HasInputAuthority, _controller.IsBot, _controller.IsDecoy)", System.StringComparison.Ordinal);
-            int sound = play.IndexOf("_audio.PlaySFX(id)", System.StringComparison.Ordinal);
+            int sound = play.IndexOf("_audio.PlaySFX(id, volume)", System.StringComparison.Ordinal);
             Assert.Greater(gate, 0, "the audience gate is gone");
             Assert.Greater(sound, gate, "the gate comes before the sound");
         }

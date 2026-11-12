@@ -76,6 +76,12 @@ namespace CluckWars.Audio
         {
             SfxId.AbilityActivate => AbilityActivate,
             SfxId.Deposit => Deposit,
+            SfxId.AbilityCancel => AbilityCancel,
+            SfxId.AbilityFizzle => AbilityFizzle,
+            SfxId.CargoFull => CargoFull,
+            SfxId.AbilityExpire => AbilityExpire,
+            SfxId.HitConfirm => HitConfirm,
+            SfxId.CastWhiff => CastWhiff,
             _ => null,
         };
 

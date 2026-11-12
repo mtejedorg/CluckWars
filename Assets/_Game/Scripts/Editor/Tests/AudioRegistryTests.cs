@@ -134,8 +134,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(typeof(bool), denied.ReturnType);
 
             string hit = Src("Assets/_Game/Scripts/Visuals/HitFeedback.cs");
-            StringAssert.Contains("PlayCasterSfx(_sfx != null ? _sfx.HitConfirm : null, 1f)", hit);
-            StringAssert.Contains("PlayCasterSfx(_sfx != null ? _sfx.CastWhiff : null, FeedbackTuning.WhiffSfxVolumeMultiplier)", hit);
+            StringAssert.Contains("PlayOwnSfx(SfxId.HitConfirm)", hit);
+            StringAssert.Contains("PlayOwnSfx(SfxId.CastWhiff, FeedbackTuning.WhiffSfxVolumeMultiplier)", hit);
             StringAssert.Contains("AudioRegistrySO.TryPlay(_audio, _sfx.DeniedClick)", Src("Assets/_Game/Scripts/Input/TouchControlsController.cs"));
         }
     }

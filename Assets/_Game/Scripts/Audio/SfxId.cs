@@ -11,5 +11,17 @@ namespace CluckWars.Audio
         None = 0,
         AbilityActivate = 1,
         Deposit = 2,
+        /// <summary>The player cancelled an aim on purpose.</summary>
+        AbilityCancel = 3,
+        /// <summary>A release with nobody in range.</summary>
+        AbilityFizzle = 4,
+        /// <summary>The peck chain stopped on a full cargo.</summary>
+        CargoFull = 5,
+        /// <summary>A timed ability ran out on its own.</summary>
+        AbilityExpire = 6,
+        /// <summary>The caster's own cast hit somebody.</summary>
+        HitConfirm = 7,
+        /// <summary>The caster's own cast hit nobody.</summary>
+        CastWhiff = 8,
     }
 }

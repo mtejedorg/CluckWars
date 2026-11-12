@@ -90,23 +90,52 @@ namespace CluckWars.Tests
         [Test]
         public void EverySoundId_ResolvesToItsOwnRegistrySlot()
         {
-            var a = AudioClip.Create("a", 64, 1, 8000, false);
-            var d = AudioClip.Create("d", 64, 1, 8000, false);
+            // One distinct clip in every AudioClip slot of the registry: each id must then resolve to the slot of its
+            // own name, and no two ids to the same slot.
+            var clips = new List<AudioClip>();
             try
             {
-                _registry.AbilityActivate = a;
-                _registry.Deposit = d;
-                Assert.AreSame(a, _registry.Resolve(SfxId.AbilityActivate));
-                Assert.AreSame(d, _registry.Resolve(SfxId.Deposit));
+                foreach (var field in typeof(AudioRegistrySO).GetFields())
+                {
+                    if (field.FieldType != typeof(AudioClip)) continue;
+                    var clip = AudioClip.Create(field.Name, 64, 1, 8000, false);
+                    clips.Add(clip);
+                    field.SetValue(_registry, clip);
+                }
+
                 Assert.IsNull(_registry.Resolve(SfxId.None));
+                var seen = new HashSet<AudioClip>();
                 foreach (SfxId id in Enum.GetValues(typeof(SfxId)))
-                    if (id != SfxId.None) Assert.IsNotNull(_registry.Resolve(id), $"SfxId.{id} has no registry slot in Resolve");
+                {
+                    if (id == SfxId.None) continue;
+                    var clip = _registry.Resolve(id);
+                    Assert.IsNotNull(clip, $"SfxId.{id} has no registry slot in Resolve");
+                    Assert.AreEqual(id.ToString(), clip.name, $"SfxId.{id} resolves to the wrong registry slot");
+                    Assert.IsTrue(seen.Add(clip), $"SfxId.{id} shares a slot with another id");
+                }
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(a);
-                UnityEngine.Object.DestroyImmediate(d);
+                foreach (var clip in clips) UnityEngine.Object.DestroyImmediate(clip);
             }
+        }
+
+        [Test]
+        public void EverySoundId_WithNoClip_IsReportedOnce_ByName()
+        {
+            // S-3: the own-player sounds (cancel, fizzle, cargo full, expire, hit-confirm, whiff) used to pass a clip
+            // through null guards that hid an empty slot. By id, the audio service reports each one, once.
+            int expected = 0;
+            foreach (SfxId id in Enum.GetValues(typeof(SfxId)))
+            {
+                if (id == SfxId.None) continue;
+                _audio.PlaySFX(id);
+                _audio.PlaySFX(id, 0.5f);
+                expected++;
+                Assert.AreEqual(expected, _log.Warnings.Count, $"SfxId.{id}: one report, not one per call");
+                StringAssert.Contains($"PlaySFX({id})", _log.Warnings[expected - 1]);
+            }
+            Assert.GreaterOrEqual(expected, 8);
         }
 
         [Test]

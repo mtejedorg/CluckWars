@@ -1,5 +1,4 @@
 using CluckWars.Abilities;
-using CluckWars.Audio;
 using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Networking;
@@ -186,8 +185,7 @@ namespace CluckWars.Gameplay
         private AbilityContext _ctx;
         private ChickenCombat _combat;
         private ILogService _log;
-        private IAudioService _audio;
-        private AudioRegistrySO _audioReg;
+        private AbilityCueLatch _cues;
         private PrefabRegistrySO _prefabRegistry;
         private bool _initialized;
 
@@ -258,12 +256,10 @@ namespace CluckWars.Gameplay
         private readonly bool[] _holdSuppressed = new bool[SlotCount];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry,
+        public void Construct(ILogService log, PrefabRegistrySO prefabRegistry,
             AbilityRegistrySO registry, MatchConfigSO matchConfig)
         {
             _log = log;
-            _audio = audio;
-            _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
             _registry = registry;
             _matchConfig = matchConfig;
@@ -272,6 +268,7 @@ namespace CluckWars.Gameplay
         public override void Spawned()
         {
             SelfInject.Ensure(this, _log != null);
+            _cues.Clear();   // pooled: a previous life's cue is not this one's
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
@@ -325,13 +322,16 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            _cues.Clear();
             if (_combat != null) _combat.OnDeathAuthority -= HandleOwnerDeath;
         }
 
-        /// <summary>Every peer but the state authority: picks up a live loadout swap (five byte compares when nothing changed).</summary>
+        /// <summary>Every peer but the state authority: picks up a live loadout swap (five byte compares when nothing
+        /// changed). The state authority: raises the cues its tick latched this frame.</summary>
         public override void Render()
         {
             if (_initialized && !HasStateAuthority) ApplyReplicatedLoadout();
+            if (_cues.Any) RaisePendingCues();
         }
 
         public override void FixedUpdateNetwork()
@@ -448,7 +448,7 @@ namespace CluckWars.Gameplay
                     {
                         // A deliberate cancel (Esc / right mouse / touch edge band), not a stun tearing the aim down.
                         _holdSuppressed[liveSlot] = true;
-                        PlayLocalSfx(_audioReg != null ? _audioReg.AbilityCancel : null, FeedbackTuning.CancelSfxVolume);
+                        _cues.Queue(AbilityCue.Cancelled);
                     }
                     break;
                 case ChargeAction.RefuseAttempt:
@@ -619,7 +619,7 @@ namespace CluckWars.Gameplay
                     PeckChainActive = false;
                     // Nothing else plays CargoFull in gameplay (ChickenVFX only draws particles), so no double-play.
                     if (stop == PeckChainStop.CargoFull)
-                        PlayLocalSfx(_audioReg != null ? _audioReg.CargoFull : null, 1f);
+                        _cues.Queue(AbilityCue.CargoFull);
                     _log?.Debug(Source, $"Peck chain ended: {stop}.");
                     break;
                 case PeckChainAction.Fire:
@@ -1097,12 +1097,17 @@ namespace CluckWars.Gameplay
             return GetCooldown(slot).ExpiredOrNotRunning(Runner);
         }
 
-        /// <summary>Local-only sound: only the chicken a human is driving plays it (never bots or remote peers).</summary>
-        private void PlayLocalSfx(AudioClip clip, float volume)
+        /// <summary>
+        /// The tick's own-player cues (cancel, fizzle, cargo full, expire), raised here as local events: the tick only
+        /// latches them (<see cref="AbilityCueLatch"/>), presentation plays them, for the audience
+        /// <c>OwnSoundRules</c> names. Nothing is played from <c>FixedUpdateNetwork</c>.
+        /// </summary>
+        private void RaisePendingCues()
         {
-            if (clip == null || !Object.HasInputAuthority) return;
-            if (_controller != null && _controller.IsBot) return;
-            _audio?.PlaySFX(clip, volume);
+            while (_cues.TryTake(out var cue))
+            {
+                if (_controller != null) _controller.LocalEvents.RaiseAbilityCue(cue);
+            }
         }
 
         /// <summary>Clears an in-progress hold-to-aim gesture — committed charge AND pending
@@ -1148,7 +1153,7 @@ namespace CluckWars.Gameplay
                     _fizzlePending = true;
                     _fizzleSlot = slot;
                     _rearmRemaining[slot] = AbilityFizzleRules.Begin();
-                    PlayLocalSfx(_audioReg != null ? _audioReg.AbilityFizzle : null, FeedbackTuning.FizzleSfxVolume);
+                    _cues.Queue(AbilityCue.Fizzled);
                     return false;
                 }
                 _deniedPressPending = true;
@@ -1325,7 +1330,7 @@ namespace CluckWars.Gameplay
             AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal);
             if (ability != null)
             {
-                if (natural) PlayLocalSfx(_audioReg != null ? _audioReg.AbilityExpire : null, 1f);
+                if (natural) _cues.Queue(AbilityCue.Expired);
                 _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
             }
             ActiveMask = AbilityRunRules.End(ActiveMask, slot);

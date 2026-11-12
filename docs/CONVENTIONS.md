@@ -129,7 +129,9 @@ private void LateUpdate()
 }
 ```
 
-**Who hears a sound is a rule, written down.** A chicken's own cast and deposit sounds follow `OwnSoundRules`: only the human who drives that chicken hears them (never a bot's, a rival's or a decoy's). A sound played from gameplay plays on whichever peer holds state authority, which for bots is the master: that is the bug this rule replaced.
+**Who hears a sound is a rule, written down.** A chicken's own sounds (cast, deposit, hit-confirm, whiff, cancel, fizzle, cargo full, expire) follow `OwnSoundRules`: only the human who drives that chicken hears them (never a bot's, a rival's or a decoy's). A sound played from gameplay plays on whichever peer holds state authority, which for bots is the master: that is the bug this rule replaced.
+
+**A moment only the chicken's own player is told about needs no replication, and still is not played from the tick.** Cancel, fizzle, cargo-full and expire happen in the tick of the chicken's state authority, which for a human's chicken is that human's peer. The tick latches an `AbilityCue` (`AbilityCueLatch`, a local field), `AbilityController.Render` raises it the same frame through `ChickenLocalEvents.RaiseAbilityCue`, and `HitFeedback` plays it by `SfxId`. Every own sound goes through `IAudioService.PlaySFX(SfxId)`, so an empty registry slot is reported once per id; do not pass clips through null guards or `AudioRegistrySO.TryPlay` unless silence is the designed behaviour of an optional slot (and say so there).
 
 ### ChangeDetector for continuous state
 
