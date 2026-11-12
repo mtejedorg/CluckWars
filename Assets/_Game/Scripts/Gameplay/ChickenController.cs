@@ -1726,9 +1726,20 @@ namespace CluckWars.Gameplay
         /// (<c>EndAllForReset</c> below) and on the round reset signal (B10).
         /// Called by <see cref="GameManager"/> on match restart.
         /// </summary>
+        /// <remarks>
+        /// Sender-restricted like <see cref="RPC_TeleportTo"/>: it ends every running ability and clears both comeback
+        /// flags, so any peer could otherwise strip a rival's surge or cancel its Shield. Its two callers are the
+        /// match authority's round reset and the Ability Lab's dummy reset, which is a local invoke (solo).
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ResetControlStates()
+        public void RPC_ResetControlStates(RpcInfo info = default)
         {
+            if (!IsFromMatchAuthority(info, out string rejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_ResetControlStates from {info.Source} — {rejection}");
+                return;
+            }
+
             // Drop a live Death Mark first, without its fail cooldown: left in place, it would expire into the new round
             // and re-arm its cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();

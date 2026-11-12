@@ -71,7 +71,7 @@ namespace CluckWars.Tests
             // ResetForNewRound() that RPC_ResetControlStates calls BEFORE EndAllForReset (the reset needs a live runner,
             // so the wiring is pinned from source, like the CW-224 test above).
             var ctrl = File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs").Replace("\r\n", "\n");
-            int start = ctrl.IndexOf("public void RPC_ResetControlStates()");
+            int start = ctrl.IndexOf("public void RPC_ResetControlStates(");
             Assert.GreaterOrEqual(start, 0, "RPC_ResetControlStates was renamed - update this test");
             var body = ctrl.Substring(start, ctrl.IndexOf("\n        }", start) - start);
             int endAll = body.IndexOf("_abilities?.EndAllForReset();");

@@ -63,6 +63,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void TheReset_ThatClearsTheFlags_IsSenderCheckedToo()
+        {
+            // R-7: source guard (the branch needs a live runner). An unvalidated reset let any peer strip a rival's surge.
+            var rpc = typeof(ChickenController).GetMethod(nameof(ChickenController.RPC_ResetControlStates), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsTrue(System.Array.Exists(rpc.GetParameters(), p => p.ParameterType == typeof(Fusion.RpcInfo)));
+            string body = AssassinExecuteCreditTests.MethodBody($"{ScriptsRoot}/Gameplay/{OwnerFile}", "public void RPC_ResetControlStates(");
+            int gate = body.IndexOf("IsFromMatchAuthority(info", System.StringComparison.Ordinal);
+            Assert.Greater(gate, 0, "the match-authority gate is gone");
+            Assert.Greater(body.IndexOf("UnderdogSurgeActive  = false", System.StringComparison.Ordinal), gate);
+            Assert.Greater(body.IndexOf("EndAllForReset()", System.StringComparison.Ordinal), gate, "nothing is reset before the gate");
+        }
+
+        [Test]
         public void Grant_IsSenderChecked_AndGameManagerUsesIt()
         {
             var rpc = typeof(ChickenController).GetMethod(nameof(ChickenController.RPC_GrantComeback), BindingFlags.Public | BindingFlags.Instance);
