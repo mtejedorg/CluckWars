@@ -157,26 +157,14 @@ namespace CluckWars.UI
         /// (Phase 4, re-audit item 10): the chickens' gameplay tint stays in ChickenClassRegistrySO.
         /// Warrior is a deeper crimson and Speedy a sunnier orange than the registry tints, whose
         /// lightened tile fills were near-identical (dE00 6.9 -> 23.9 here; every pair >= 14.6, ink
-        /// on every fill >= 6.9:1).
+        /// on every fill >= 6.9:1). Fatty and Assassin equal the registry.
         /// </summary>
-        private sealed class ClassMeta
+        private static readonly Dictionary<ChickenClass, Color> ClassTints = new()
         {
-            // PassiveName/PassiveDesc were removed on 2026-08-23. They still carried the
-            // damage-era passives deleted in 62219fc ("MIGHTY: +25% outgoing ability damage",
-            // "COMBO: equips 3 abilities instead of 2") and were rendering on the lobby card.
-            // Beyond being stale, a per-CLASS passive name is now structurally wrong: the
-            // passive comes from the chosen specialization, so any single hardcoded name is
-            // right for at most one of a class's two builds. Role is stable across both.
-            public Color Tint;
-            public int[] Stats; // cargo, rate, speed (1..5) — HP/Resist removed in v0.4 (no health)
-        }
-
-        private static readonly Dictionary<ChickenClass, ClassMeta> Meta = new()
-        {
-            [ChickenClass.Warrior]  = new ClassMeta { Tint = UiGfx.Hex32("B02A3A"), Stats = new[]{3,3,3} },
-            [ChickenClass.Speedy]   = new ClassMeta { Tint = UiGfx.Hex32("F08A2C"), Stats = new[]{2,3,5} },
-            [ChickenClass.Fatty]    = new ClassMeta { Tint = UiGfx.Hex32("F5D75A"), Stats = new[]{5,5,2} },
-            [ChickenClass.Assassin] = new ClassMeta { Tint = UiGfx.Hex32("7B68EE"), Stats = new[]{2,2,4} },
+            [ChickenClass.Warrior]  = UiGfx.Hex32("B02A3A"),
+            [ChickenClass.Speedy]   = UiGfx.Hex32("F08A2C"),
+            [ChickenClass.Fatty]    = UiGfx.Hex32("F5D75A"),
+            [ChickenClass.Assassin] = UiGfx.Hex32("7B68EE"),
         };
 
         // Class names, roles and callouts are player-facing copy and live in the wording
@@ -1382,7 +1370,7 @@ namespace CluckWars.UI
         /// <summary>Active-ability slots to fill — four for every class.</summary>
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
-        private static Color TintOf(ChickenClass cls) => Meta[cls].Tint;
+        private static Color TintOf(ChickenClass cls) => ClassTints[cls];
 
         private void RefreshClassSelect()
         {
