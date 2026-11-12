@@ -20,6 +20,8 @@ namespace CluckWars.Installers
     /// </summary>
     public sealed class ProjectInstaller : MonoInstaller<ProjectInstaller>
     {
+        private const string Source = "ProjectInstaller";
+
         [Header("Logging")]
         [Tooltip("Minimum level emitted by ILogService. Default Verbose during dev; raise for builds.")]
         [SerializeField] private LogLevel _logMinLevel = LogLevel.Verbose;
@@ -60,11 +62,10 @@ namespace CluckWars.Installers
 
         public override void InstallBindings()
         {
-            // Logger bound first so other bindings can complain through it during install if they need to.
-            Container.Bind<ILogService>()
-                .To<UnityLogService>()
-                .AsSingle()
-                .WithArguments(_logMinLevel);
+            // Logger built and bound first, so this installer reports its own missing slots through it (DI-6:
+            // no Debug.Log outside the logging service).
+            ILogService log = new UnityLogService(_logMinLevel);
+            Container.Bind<ILogService>().FromInstance(log).AsSingle();
 
             // Session stamp (test-session instrumentation, always on): one "Session sha=.. device=.." line at boot and a
             // "SessionChange" line when the quality tier / Performance Mode changes. Ties every log file to a build + device.
@@ -139,8 +140,8 @@ namespace CluckWars.Installers
             }
             else
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] ChickenClassRegistry not assigned. " +
+                log.Warn(Source,
+                    "ChickenClassRegistry not assigned. " +
                     "Class-aware spawning will fall back to the prefab's serialized stats.");
             }
 
@@ -157,8 +158,8 @@ namespace CluckWars.Installers
             Container.Bind<AudioRegistrySO>().FromInstance(audioRegistry).AsSingle();
             if (_audioRegistry == null)
             {
-                Debug.Log(
-                    "[ProjectInstaller] AudioRegistry asset not assigned — using " +
+                log.Info(Source,
+                    "AudioRegistry asset not assigned — using " +
                     "fully procedural SFX bank.");
             }
 
@@ -177,8 +178,8 @@ namespace CluckWars.Installers
             Container.Bind<PrefabRegistrySO>().FromInstance(prefabRegistry).AsSingle();
             if (_prefabRegistry == null)
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] PrefabRegistry not assigned. " +
+                log.Warn(Source,
+                    "PrefabRegistry not assigned. " +
                     "Each consumer will fall back to its legacy SerializeField slot.");
             }
 
@@ -198,8 +199,8 @@ namespace CluckWars.Installers
             Container.Bind<AbilityRegistrySO>().FromInstance(abilityRegistry).AsSingle();
             if (_abilityRegistry == null)
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] AbilityRegistry not assigned. " +
+                log.Warn(Source,
+                    "AbilityRegistry not assigned. " +
                     "Character-select ability picker will show no abilities. " +
                     "Create an AbilityRegistry asset and assign it here.");
             }
@@ -220,14 +221,14 @@ namespace CluckWars.Installers
             FeedbackPalette.Current = _feedbackPalette;
             if (_feedbackPalette == null)
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] FeedbackPalette not assigned — state colours and ability accents use " +
+                log.Warn(Source,
+                    "FeedbackPalette not assigned — state colours and ability accents use " +
                     "FeedbackPaletteSO's built-in defaults, NOT FeedbackPalette.asset. Assign it here.");
             }
             if (_matchConfig == null)
             {
-                Debug.LogWarning(
-                    "[ProjectInstaller] MatchConfig not assigned — falling back to the SO's " +
+                log.Warn(Source,
+                    "MatchConfig not assigned — falling back to the SO's " +
                     "built-in defaults. Match duration, food target and MaxPlayers are NOT " +
                     "coming from MatchConfig.asset. Assign it here.");
             }

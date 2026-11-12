@@ -229,9 +229,10 @@ namespace CluckWars.Gameplay
             {
                 if (_entries[i].Class == _entries[j].Class)
                 {
-                    Debug.LogWarning(
-                        $"[ChickenClassRegistry] Duplicate entry for {_entries[i].Class} at indices {i} and {j}.",
-                        this);
+                    // Editor-time authoring check: no container exists here, so the log service is built directly
+                    // (same as the other editor tools), never looked up.
+                    new CluckWars.Logging.UnityLogService().Warn("ChickenClassRegistry",
+                        $"Duplicate entry for {_entries[i].Class} at indices {i} and {j} in '{name}'.");
                 }
             }
         }
