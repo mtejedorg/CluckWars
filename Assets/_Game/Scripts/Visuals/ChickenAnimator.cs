@@ -360,6 +360,7 @@ namespace CluckWars.Visuals
             if (_controller == null || _events != null) return;
             _events = _controller.LocalEvents;
             _events.Jump += OnJump;
+            _events.Cast += OnCast;
         }
 
         private void OnDisable()
@@ -367,12 +368,44 @@ namespace CluckWars.Visuals
             if (_events != null)
             {
                 _events.Jump -= OnJump;
+                _events.Cast -= OnCast;
                 _events = null;
             }
             _jumpPending = false;
         }
 
         private void OnJump() => _jumpPending = true;
+
+        /// <summary>
+        /// Cast and peck beats this peer has played for this chicken. Local, never networked: a diagnostic that
+        /// should agree across peers for the same chicken (a rival that never animates reads 0 here).
+        /// </summary>
+        public int CastBeatsPlayed { get; private set; }
+
+        /// <summary>
+        /// A04: the cast / peck animation, played on EVERY peer from the replicated cast event
+        /// (<see cref="ChickenLocalEvents.Cast"/>). It used to be triggered from
+        /// <c>AbilityController.TryActivate</c>, which runs on the state authority alone, so a rival's cast and
+        /// peck never animated on anyone else's screen.
+        /// </summary>
+        /// <remarks>
+        /// Peck keeps its own beat; everything else plays the archetype its asset declares. A cast this peer cannot
+        /// resolve to an ability (the caster's loadout has not replicated yet) and an ability that declares
+        /// <see cref="Abilities.CastArchetype.None"/> play nothing; the second is a wiring fault that
+        /// <c>AbilityController</c> reports on its own authority.
+        /// </remarks>
+        private void OnCast(CastEvent e)
+        {
+            if (e.IsPeck)
+            {
+                CastBeatsPlayed++;
+                TriggerPeck();
+                return;
+            }
+            if (e.Archetype == Abilities.CastArchetype.None) return;
+            CastBeatsPlayed++;
+            TriggerAbilityCast(e.Archetype);
+        }
 
         private void LateUpdate()
         {

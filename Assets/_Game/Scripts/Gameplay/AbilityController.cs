@@ -183,7 +183,6 @@ namespace CluckWars.Gameplay
         private ChickenController _controller;
         private AbilityContext _ctx;
         private ChickenCombat _combat;
-        private ChickenAnimator _animator;
         private ILogService _log;
         private IAudioService _audio;
         private AudioRegistrySO _audioReg;
@@ -271,7 +270,6 @@ namespace CluckWars.Gameplay
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
-            _animator = GetComponent<ChickenAnimator>();
             _ctx = new AbilityContext(_controller);
             // Ability SOs are assets, so Zenject cannot inject them and this project rules
             // out a service locator — the context is how they reach the logger. Assigned
@@ -1258,11 +1256,12 @@ namespace CluckWars.Gameplay
             // Everything else declares one of the eight archetypes on its asset, which selects the
             // matching animator state; the casting class's own clip is bound to that state by the
             // AnimatorOverrideController built at spawn.
-            if (ability is Abilities.PeckAbilitySO)
-            {
-                _animator?.TriggerPeck();
-            }
-            else
+            //
+            // Neither is played from here (A04). This runs on the state authority alone, so rivals never saw a cast
+            // or a peck, and the master heard every bot's cast sound. The animation and the sound are presentation:
+            // every peer plays them from the cast event bumped below (ChickenLocalEvents.Cast, observed by
+            // ChickenAnimator and HitFeedback).
+            if (!(ability is Abilities.PeckAbilitySO))
             {
                 if (ability.CastMotion == Abilities.CastArchetype.None)
                 {
@@ -1275,9 +1274,7 @@ namespace CluckWars.Gameplay
                         "which marks an ability that is never cast. No cast animation will play. " +
                         "Give it an archetype, or keep it off the activation path.");
                 }
-                _animator?.TriggerAbilityCast(ability.CastMotion);
             }
-            _audio?.PlaySFX(_audioReg != null ? _audioReg.AbilityActivate : null);
             LastCastEventId++; // wraps at 255 by design (byte overflow) — a one-shot signal, not a counter
             _log?.Info(Source, $"Activated slot {slot} ({ability.DisplayName}) for {activeSeconds:0.00}s, " +
                 $"CD {ResolveCooldownFor(ability):0.00}s, hits={hitCount}.");

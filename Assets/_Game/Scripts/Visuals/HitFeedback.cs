@@ -308,6 +308,7 @@ namespace CluckWars.Visuals
             _events.Knockback += OnKnockback;
             _events.Cast      += OnCast;
             _events.Stolen    += OnStolen;
+            _events.Deposited += OnDeposited;
         }
 
         private void OnDisable()
@@ -317,6 +318,7 @@ namespace CluckWars.Visuals
                 _events.Knockback -= OnKnockback;
                 _events.Cast      -= OnCast;
                 _events.Stolen    -= OnStolen;
+                _events.Deposited -= OnDeposited;
                 _events = null;
             }
             _knockPending = false;
@@ -332,6 +334,30 @@ namespace CluckWars.Visuals
         {
             _cast = e;
             _castPending = true;
+            PlayOwnSfx(SfxId.AbilityActivate);
+        }
+
+        private void OnDeposited() => PlayOwnSfx(SfxId.Deposit);
+
+        /// <summary>
+        /// A04: this chicken's own cast / deposit sound, by id, for the audience <see cref="OwnSoundRules"/> names
+        /// (the human who drives it, on that human's peer; never a bot, a rival or a decoy). Local, off the
+        /// replicated event, never RPC'd. A missing service is reported once; a missing clip by the audio service.
+        /// </summary>
+        private void PlayOwnSfx(SfxId id)
+        {
+            if (_controller == null) return;
+            if (!OwnSoundRules.IsAudible(_controller.HasInputAuthority, _controller.IsBot, _controller.IsDecoy)) return;
+            if (_audio == null)
+            {
+                if (!_missingAudioReported)
+                {
+                    _missingAudioReported = true;
+                    _log?.Warn(Source, "No IAudioService injected: this chicken's cast, deposit, hit-confirm and whiff sounds are silent.");
+                }
+                return;
+            }
+            _audio.PlaySFX(id);
         }
 
         /// <summary>

@@ -454,8 +454,8 @@ namespace CluckWars.Tests
             Assert.Less(settle.IndexOf("SpeaksFor(playerBase, info)", System.StringComparison.Ordinal),
                         settle.IndexOf("_requests.SettleDeposit(baseId, requestId", System.StringComparison.Ordinal));
             StringAssert.Contains("RecordDeposit(settled.Banked)", settle);
-            StringAssert.Contains("_audioReg.Deposit", settle, "the deposit sound plays on 'banked'");
-            StringAssert.DoesNotContain("_audioReg.Deposit", Body(CargoPath, "private void TryDepositAtNearbyBase()"));
+            StringAssert.Contains("DepositEventId++", settle, "the deposit moment (and so its sound) is raised on 'banked'");
+            StringAssert.DoesNotContain("DepositEventId++", Body(CargoPath, "private void TryDepositAtNearbyBase()"));
 
             Assert.IsNull(typeof(ChickenMatchStats).GetMethod("RPC_AddDeposit"),
                 "the unvalidated deposit-stat RPC is back: any peer could inflate anyone's deposits again.");

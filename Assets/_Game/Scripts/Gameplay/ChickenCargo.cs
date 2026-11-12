@@ -72,6 +72,14 @@ namespace CluckWars.Gameplay
         [Networked] public byte StealEventId { get; private set; }
 
         /// <summary>
+        /// Bumped on this chicken's state authority when its whole load is in the base (the last flush came back
+        /// "banked" with nothing left to carry). A one-shot like <see cref="StealEventId"/>: every peer observes the
+        /// edge (<see cref="ChickenLocalEvents.Deposited"/>) and decides locally who hears the deposit sound. Before
+        /// A04 the sound was played here, on whichever peer held state authority, so the master heard every bot's.
+        /// </summary>
+        [Networked] public byte DepositEventId { get; private set; }
+
+        /// <summary>
         /// Cargo the chicken can hold, after its class specialization has had a say.
         /// Hoarder raises it to a full win's worth.
         /// </summary>
@@ -166,8 +174,6 @@ namespace CluckWars.Gameplay
         private PropertyReader<float> _cargoReader;
         private SilentCargoWrite _silentWrite;   // lab-only no-pop refill, see SetCargoWithoutPop
         private int _stealCreditFrame = -1;      // I5: frame of this thief own steal credit (local, presentation only)
-        private IAudioService _audio;
-        private AudioRegistrySO _audioReg;
         private PrefabRegistrySO _prefabRegistry;
         private MatchConfigSO _matchConfig;
         private AbilityRegistrySO _abilityRegistry;
@@ -200,11 +206,9 @@ namespace CluckWars.Gameplay
         private static readonly Collider[] _overlapHits = new Collider[32];
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO audioReg, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig, AbilityRegistrySO abilityRegistry)
+        public void Construct(ILogService log, PrefabRegistrySO prefabRegistry, MatchConfigSO matchConfig, AbilityRegistrySO abilityRegistry)
         {
             _log = log;
-            _audio = audio;
-            _audioReg = audioReg;
             _prefabRegistry = prefabRegistry;
             _matchConfig = matchConfig;
             _abilityRegistry = abilityRegistry;
@@ -824,7 +828,8 @@ namespace CluckWars.Gameplay
         /// <remarks>
         /// The cargo was debited when the flush was built, so a refusal used to destroy the food (the host seeing the
         /// chicken a step outside the radius was enough). A bounce returns it to the cargo, or to the bounty bag for
-        /// whatever no longer fits. The deposit stat is counted here, on "banked" only, and so is the deposit sound.
+        /// whatever no longer fits. The deposit stat is counted here, on "banked" only, and so is the deposit moment
+        /// (<see cref="DepositEventId"/>, which presentation turns into the deposit sound).
         /// Honoured only from the base's own authority; with that verified, an answer whose flush is no longer on
         /// record is still honoured, up to one flush.
         /// </remarks>
@@ -852,7 +857,7 @@ namespace CluckWars.Gameplay
                 // The whole load is in the base: nothing left to carry, nothing still unanswered.
                 if (Cargo <= 0f && BountyBag <= 0f && _pendingBaseFood <= 0f && _requests.DepositsInFlight(now) <= 0f)
                 {
-                    _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
+                    DepositEventId++;   // wraps at 255 by design: a one-shot signal, the sound is the listeners' (A04)
                     _log?.Debug(Source, $"Deposit complete at {playerBase.name}.");
                 }
                 return;

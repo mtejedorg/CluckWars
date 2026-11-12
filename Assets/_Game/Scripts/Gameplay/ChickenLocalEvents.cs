@@ -60,6 +60,7 @@ namespace CluckWars.Gameplay
         public bool HasCargo;
         public byte StealEventId;
         public NetworkBehaviourId Thief;
+        public byte DepositEventId;
     }
 
     /// <summary>
@@ -95,7 +96,7 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private bool _siblingsResolved;
 
-        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal;
+        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit;
         private AbilityBaseSO _lastCharging;
         private bool _raising;
 
@@ -109,6 +110,8 @@ namespace CluckWars.Gameplay
         public event Action Jump;
         /// <summary><c>ChickenCargo.StealEventId</c> moved: this chicken was robbed.</summary>
         public event Action<StealEvent> Stolen;
+        /// <summary><c>ChickenCargo.DepositEventId</c> moved: this chicken finished banking its whole load.</summary>
+        public event Action Deposited;
 
         /// <param name="controller">The chicken observed; null only in tests, which feed snapshots.</param>
         public ChickenLocalEvents(ChickenController controller = null) { _controller = controller; }
@@ -151,6 +154,7 @@ namespace CluckWars.Gameplay
                 s.HasCargo = true;
                 s.StealEventId = _cargo.StealEventId;
                 if (_steal.WouldFire(s.StealEventId)) s.Thief = _cargo.LastThiefId;
+                s.DepositEventId = _cargo.DepositEventId;
             }
             Observe(in s);
         }
@@ -174,7 +178,11 @@ namespace CluckWars.Gameplay
                 if (_selfImpulse.Observe(s.SelfImpulseEventId)) SelfImpulse?.Invoke();
                 if (_jump.Observe(s.JumpEventId)) Jump?.Invoke();
 
-                if (s.HasCargo && _steal.Observe(s.StealEventId)) Stolen?.Invoke(new StealEvent(s.Thief));
+                if (s.HasCargo)
+                {
+                    if (_steal.Observe(s.StealEventId)) Stolen?.Invoke(new StealEvent(s.Thief));
+                    if (_deposit.Observe(s.DepositEventId)) Deposited?.Invoke();
+                }
             }
             finally
             {
@@ -191,6 +199,7 @@ namespace CluckWars.Gameplay
             _selfImpulse.Reset();
             _jump.Reset();
             _steal.Reset();
+            _deposit.Reset();
             _lastCharging = null;
             _siblingsResolved = false;
             _abilities = null;
