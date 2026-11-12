@@ -154,11 +154,11 @@ namespace CluckWars.UI
             { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
 
         /// <summary>
-        /// UI class colours: tile fills, the hero wash and the PICK YOUR BIRD backdrop. UI only
-        /// (Phase 4, re-audit item 10): the chickens' gameplay tint stays in ChickenClassRegistrySO.
-        /// Warrior is a deeper crimson and Speedy a sunnier orange than the registry tints, whose
-        /// lightened tile fills were near-identical (dE00 6.9 -> 23.9 here; every pair >= 14.6, ink
-        /// on every fill >= 6.9:1). Fatty and Assassin equal the registry.
+        /// UI class colours: tile fills, the hero wash and the PICK YOUR BIRD backdrop. NOT the match tints, on
+        /// purpose (Phase 4 re-audit item 10; audit 2026-11-12 A05 closed as not a defect): with the registry's
+        /// Warrior C04030 and Speedy E85A2A the two lightened tiles are near-identical (dE00 6.9). These give
+        /// 23.9, every pair >= 14.6 and ink on every fill >= 6.9:1 (MenuClassTintTests). Fatty and Assassin
+        /// equal the registry.
         /// </summary>
         private static readonly Dictionary<ChickenClass, Color> ClassTints = new()
         {
@@ -1245,8 +1245,8 @@ namespace CluckWars.UI
                 }
                 _classTiles[cls] = tile;
                 tile.Q<VisualElement>(ChipNames[i] + "Art")?.AddToClassList("cw-chicken--" + KeyOf(cls));
-                // Class colour as the full tile fill, lightened so ink text keeps >= 7:1.
-                tile.style.backgroundColor = Lighten(TintOf(cls), 0.5f);
+                // Class colour as the full tile fill, lightened so ink text keeps >= 6.9:1 (pinned by MenuClassTintTests).
+                tile.style.backgroundColor = ClassTileFill(cls);
                 tile.RegisterCallback<ClickEvent>(_ => OnClassTileTapped(cls));
             }
 
@@ -1371,6 +1371,12 @@ namespace CluckWars.UI
         private int ActiveSlotsForClass => AbilityController.SlotCount;
 
         private static Color TintOf(ChickenClass cls) => ClassTints[cls];
+
+        /// <summary>The fill of a class tile on PICK YOUR BIRD: the UI class tint, half way to white.</summary>
+        public static Color ClassTileFill(ChickenClass cls) => Lighten(TintOf(cls), 0.5f);
+
+        /// <summary>The ink the tile's text is drawn in.</summary>
+        public static Color ClassTileInk => Ink;
 
         private void RefreshClassSelect()
         {

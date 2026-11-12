@@ -126,24 +126,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ClassRegistry_TintAlpha_IsReachableBy_MenuUiControllerTintOf()
+        public void ClassRegistry_TintAlpha_IsNotZero()
         {
-            // MenuUiController.TintOf gates on `e.TintColor.a > 0f` before using the
-            // registry tint, falling back to its own hard-coded palette otherwise.
-            // Entry.TintColor is declared [ColorUsage(showAlpha: false)], so the alpha
-            // channel cannot be authored in the Inspector at all — if it is 0 in the
-            // asset the gate can never open, the registry branch is dead code, and the
-            // menu tint permanently disagrees with the in-world tint.
+            // Entry.TintColor is declared [ColorUsage(showAlpha: false)], so the alpha channel cannot be
+            // authored in the Inspector at all: an entry saved with alpha 0 is an invisible tint wherever a
+            // consumer uses the colour as it is. (The menu no longer reads this tint: MenuUiController keeps
+            // its own UI class colours on purpose, see MenuClassTintTests.)
             var reg = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
 
             foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
             {
                 Assert.IsTrue(reg.TryGet(cls, out var entry), $"No entry for {cls}.");
                 Assert.Greater(entry.TintColor.a, 0f,
-                    $"{cls}'s TintColor alpha is {entry.TintColor.a}. MenuUiController.TintOf requires " +
-                    "alpha > 0 to use the registry tint, but [ColorUsage(showAlpha: false)] hides the " +
-                    "alpha slider — so the menu silently uses a different colour than the arena does. " +
-                    "Fix by either authoring alpha 1 or dropping the `.a > 0f` gate in MenuUiController.");
+                    $"{cls}'s TintColor alpha is {entry.TintColor.a}, and [ColorUsage(showAlpha: false)] hides the " +
+                    "alpha slider. Author alpha 1 in ChickenClassRegistry.asset (text edit).");
             }
         }
 
