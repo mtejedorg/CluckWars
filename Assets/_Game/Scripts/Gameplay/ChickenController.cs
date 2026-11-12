@@ -1387,7 +1387,7 @@ namespace CluckWars.Gameplay
         /// for it to escalate to. What the check stops is a <em>remote</em> peer reaching into a
         /// chicken it does not own, and <c>IsInvokeLocal</c> is false for everything off the wire.
         /// </remarks>
-        private bool IsFromMatchAuthority(in RpcInfo info, out string rejection)
+        internal static bool IsFromMatchAuthority(in RpcInfo info, out string rejection)
         {
             rejection = null;
             if (info.IsInvokeLocal) return true;

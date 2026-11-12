@@ -667,6 +667,8 @@ namespace CluckWars.Gameplay
         // One "settled without an open request" line per owner per 2 s (a stall produces a burst of them).
         private static readonly CluckWars.Diagnostics.PerKeyRateLimiter LateSettleLimiter =
             new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter ResetRejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
 
         private void WarnLateSettle(string rpc, in RpcInfo info, string owner, ushort requestId, float credited)
         {
@@ -1301,9 +1303,22 @@ namespace CluckWars.Gameplay
         /// Reset cargo state for a new round. Called by <c>GameManager.ResetWorldForNewRound</c>
         /// from the master client; routes to each chicken's StateAuthority.
         /// </summary>
+        /// <remarks>
+        /// Sender-restricted like <c>ChickenController.RPC_ResetControlStates</c> (A19): it zeroes the hold and the
+        /// bounty bag, so any peer could otherwise empty a rival. Its two callers are the match authority's round
+        /// reset and the Ability Lab's dummy reset, which is a local invoke (solo).
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ResetForNewMatch()
+        public void RPC_ResetForNewMatch(RpcInfo info = default)
         {
+            if (!ChickenController.IsFromMatchAuthority(info, out string rejection))
+            {
+                if (ResetRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_ResetForNewMatch from {info.Source} — {rejection}" +
+                        (held > 0 ? $" (+{held} more held back)" : string.Empty));
+                return;
+            }
+
             // Drop any pending drains/deposits because a new round starts
             _pendingBaseFood = 0f;
             _activeBaseTarget = null;

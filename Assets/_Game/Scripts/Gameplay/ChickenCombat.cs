@@ -407,9 +407,22 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <remarks>
+        /// Sender-restricted like <c>ChickenController.RPC_ResetControlStates</c> (A19): it revives a removed chicken
+        /// and clears its stun, so any peer could otherwise undo an execute. Its two callers are the match authority's
+        /// round reset and the Ability Lab's dummy reset, which is a local invoke (solo).
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ResetForNewMatch()
+        public void RPC_ResetForNewMatch(RpcInfo info = default)
         {
+            if (!ChickenController.IsFromMatchAuthority(info, out string rejection))
+            {
+                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_ResetForNewMatch from {info.Source} — {rejection}" +
+                        (held > 0 ? $" (+{held} more held back)" : string.Empty));
+                return;
+            }
+
             IsRemoved = false;
             StunTimer = default;
             _respawnTeleportQueued = false;   // the round reset's own teleport takes it home
