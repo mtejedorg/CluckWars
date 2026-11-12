@@ -6,6 +6,22 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-12 - Architecture audit fix batch 1 (networking: A01, A09, A03, A02; `simplify-abilities`)
+
+Code-reading findings, none reproduced live. Validated in batch mode only (`unity test --mode EditMode`, Editor closed); **no two-client check has been run yet**. No `.asset`, prefab or scene was touched. All five commits are protocol changes (new / changed RPC signatures, 5 more networked bytes on `AbilityController`): every peer must run the same build.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| A01 comeback flags | Done (3280/3280) | `9460e6b4` | `UnderdogSurgeActive` / `LeaderBountyActive` are private-set; `ChickenController.RPC_GrantComeback(ComebackGrant)` (state authority, match authority only via `IsFromMatchAuthority`); pure `ComebackRules`; guard test fails if another file assigns either flag. |
+| A09 paired knockback | Done (3289/3289) | `9619a5a5` | `RPC_ApplyKnockbackFrom(impulse, caster)` judged by `AcceptControlClaim` (`ControlClaimRules.EvaluateSource` + the same base-wall answer; reach bound `KnockbackCeiling` = longest reach in the pool). Used by Headbutt, Belly Flop, Snatch and the Spine Coat contact. Shove (CluckShock) and Roll & Push stay on the unvalidated `RPC_ApplyKnockback` (shove-only, nothing to pair with). Of the four converted callers none is in the live roster with a knockback (Headbutt / Belly Flop / Spine Coat are retired, Snatch ships `KnockbackStrength: 0`). |
+| A03 loadout replication | Done (3298/3298) | `7a12b7ef` | `AbilityController.LoadoutCodes` (5 bytes: 4 slots + passive, `AbilityRegistrySO.CodeOf` = position in `All` + 1, 0 = none / keep prefab default). Authority publishes in `SetSlots` and `Spawned`; proxies resolve in `Spawned` (before the passive activates) and `Render`. `InvariantProbe` reads the real slot on every peer. |
+| A03 validation | Done (3332/3332, run together with A02) | `c12f9359` | `LoadoutClaimRules`: a proxy applies a replicated passive only if legal for the chicken's class, a slot only if it is the kit's (Fixed) or class-pool / pre-equip legal (Free); refused -> class-default passive / kit slot, rate-limited Warn. Matters for the score: `GameManager.AwardMatchEndBonuses` reads every chicken's passive on the master. |
+| A02 food transfers (D3a) | Done (3332/3332) | `6b5b4b18` | `FoodTransferRules`: receiver asks + records, owner debits and reports the real amount, only the report credits. Peck `RequestPeck` -> `FoodPile.RPC_Drain(amount, cargo)` -> `RPC_SettlePeck`; steal `RequestSteal` (was `CreditStealAndDrain`) -> `RPC_DrainStolen` -> `RPC_SettleSteal` (refund RPC removed); deposit `RPC_AddFood(amount, cargo)` -> `RPC_SettleDeposit` banked / bounced, deposit stat counted on banked only (`RPC_AddDeposit` removed). Open requests reserve room (`ChickenCargo.FreeSpace`). |
+
+- **Owed (live, `tools/run-clients.ps1`, 2 clients, one remote human):** comeback surge/bounty lands on the remote player; remote peck / steal / deposit credit within one round trip and feel right (the thief's own `+n` may now wait for `StealSelfPopFallbackSeconds` if the kernels land before the credit); a remote player's range rings, badges and shell match its real kit; two birds pecking the last grains of one pile; a deposit from the edge of the base radius is banked or bounces back, never vanishes.
+- **Known, accepted:** a settle report that arrives after `FoodTransferRules.SettleWindowSeconds` (2.5 s) is refused and that food is lost; `InvariantProbe` has no total-food conservation check (in-flight requests are only visible to the peer that sent them, and restock / golden pile / execute bounty / match-end bonus are legal sources).
+- **Batch runner note:** the batch suite showed one flaky render test once on the untouched baseline (`MarkScreenEffectTests.RealRender_DimColdRed_DoWhatTheRulesSay("PC")`, 3262/3263); it passed in all five later runs.
+
 ## 🛠 2026-11-10 - Feedback fix batch J (decisions E9-E13, `simplify-abilities`)
 
 Maestro's answers of 10 Nov (spec §12): e9c + note "always draw the player above the others", e10a, e11c (no work), e12a + note "also with an exact timer", e13b. One specialist at a time from the main session; one commit per item; suite green and a capture per item.
