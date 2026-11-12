@@ -41,7 +41,7 @@ namespace CluckWars.Tests
             AbilityTargeting.Mode = _savedMode;
             foreach (var c in _chickens)
             {
-                ChickenController.ActiveControllers.Remove(c);
+                RegistryTestAccess.Unregister(c);
                 if (c != null) UnityEngine.Object.DestroyImmediate(c.gameObject);
             }
             _chickens.Clear();
@@ -55,7 +55,7 @@ namespace CluckWars.Tests
             go.transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
             var c = go.AddComponent<ChickenController>();
             _chickens.Add(c);
-            ChickenController.ActiveControllers.Add(c);
+            RegistryTestAccess.Register(c);
             return c;
         }
 

@@ -64,7 +64,7 @@ namespace CluckWars.Diagnostics
         {
             if (_log == null || gm.State != MatchState.Active || gm.StartRound == _respawnCheckedForRound) return;
             _respawnCheckedForRound = gm.StartRound;
-            if (_map == null) _map = FindFirstObjectByType<MapGenerator>();
+            if (_map == null) _map = MapGenerator.Instance;
             var spawns = _map != null ? _map.SpawnPoints : null;
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)

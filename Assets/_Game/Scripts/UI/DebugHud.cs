@@ -311,7 +311,7 @@ namespace CluckWars.UI
             // --- GameManager ---
             sb.AppendLine();
             sb.AppendLine("[Match]");
-            var gm = FindFirstObjectByType<GameManager>();
+            var gm = GameManager.Instance;
             if (gm == null || gm.Object == null || !gm.Object.IsValid)
             {
                 sb.AppendLine("GameManager: (none)");
@@ -361,8 +361,8 @@ namespace CluckWars.UI
             // --- World ---
             sb.AppendLine();
             sb.AppendLine("[World]");
-            var bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < bases.Length; i++)
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
             {
                 var b = bases[i];
                 if (b == null) continue;

@@ -232,7 +232,7 @@ namespace CluckWars.Diagnostics
                 if (p == null || p.Object == null || !p.Object.IsValid) continue;
                 _piles.Add((p.Amount, p.MaxAmount));
             }
-            if (_map == null) _map = FindFirstObjectByType<MapGenerator>();
+            if (_map == null) _map = MapGenerator.Instance;
 
             // B10 leftovers: what the previous round placed must be gone (the check runs during the intro: nobody can cast).
             int zones = 0, auras = 0, decoys = 0;

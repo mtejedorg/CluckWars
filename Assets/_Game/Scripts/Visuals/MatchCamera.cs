@@ -169,6 +169,16 @@ namespace CluckWars.Visuals
         [Inject]
         public void Construct(ILogService log) => _log = log;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetInstance() => Instance = null;
+
+        // A destroyed camera must not stay reachable: a caller holding the stale reference would pass a plain
+        // null check written with ?. and then touch a dead object.
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
         private void Awake()
         {
             Instance = this;

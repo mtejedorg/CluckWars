@@ -1575,13 +1575,22 @@ namespace CluckWars.UI
         /// a full-screen overlay rather than being hidden outright. Driven from
         /// <see cref="Update"/> for the intro, match-end and lobby modals alike.
         /// </summary>
-        private static void SetTopBarDimmed(bool dimmed) => MatchHudController.Instance?.SetIntroDimmed(dimmed);
+        // Explicit Unity null checks: ?. on a MonoBehaviour singleton skips the destroyed-object check.
+        private static void SetTopBarDimmed(bool dimmed)
+        {
+            var hud = MatchHudController.Instance;
+            if (hud != null) hud.SetIntroDimmed(dimmed);
+        }
 
         /// <summary>
         /// The live top bar is HIDDEN (not dimmed) under the opaque match-end / lobby modals: dimmed,
         /// its "ENDED" + standings read through the scrim above the panel on 4:3 (Phase 1 review).
         /// </summary>
-        private static void SetTopBarHidden(bool hidden) => MatchHudController.Instance?.SetHiddenByModal(hidden);
+        private static void SetTopBarHidden(bool hidden)
+        {
+            var hud = MatchHudController.Instance;
+            if (hud != null) hud.SetHiddenByModal(hidden);
+        }
 
         // ========================================================================
         //  Data helpers

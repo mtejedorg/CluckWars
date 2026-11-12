@@ -32,7 +32,20 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Cargo";
 
-        public static readonly System.Collections.Generic.List<ChickenCargo> ActiveCargos = new System.Collections.Generic.List<ChickenCargo>();
+        private static readonly System.Collections.Generic.List<ChickenCargo> s_activeCargos = new System.Collections.Generic.List<ChickenCargo>();
+
+        /// <summary>
+        /// Every live cargo on this peer, in registration order. Read-only: only ChickenCargo adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<ChickenCargo> ActiveCargos { get; } = s_activeCargos.AsReadOnly();
+
+        private static void Register(ChickenCargo item) => s_activeCargos.Add(item);
+        private static void Unregister(ChickenCargo item) => s_activeCargos.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeCargos.Clear();
 
         [Tooltip("Generous broadphase radius for finding piles/bases. Per-target ranges (FoodPile.IsWithinCollectRange / PlayerBase.DepositRadius) gate the actual interaction.")]
         [Min(0.5f)]
@@ -215,7 +228,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActiveCargos.Add(this);
+            Register(this);
             SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
@@ -231,7 +244,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            ActiveCargos.Remove(this);
+            Unregister(this);
         }
 
         /// <summary>

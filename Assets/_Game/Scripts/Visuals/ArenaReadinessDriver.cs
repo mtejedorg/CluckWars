@@ -182,7 +182,7 @@ namespace CluckWars.Visuals
         private bool SceneGateHolds(GameManager gm, float t)
         {
             if (gm == null) return false;
-            if (_map == null) _map = FindFirstObjectByType<MapGenerator>();
+            if (_map == null) _map = MapGenerator.Instance;
             int expectedBases = 0, expectedPiles = 0;
             if (_map != null)
             {

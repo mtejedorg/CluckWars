@@ -580,7 +580,7 @@ namespace CluckWars.Gameplay
         /// <c>HomeCornerIndex</c>. Null if the chicken hasn't spawned, has no
         /// stamped corner, or the matching base is taken.
         /// </summary>
-        private PlayerBase FindHomeCornerBaseForPlayer(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
+        private PlayerBase FindHomeCornerBaseForPlayer(System.Collections.Generic.IReadOnlyList<PlayerBase> bases, PlayerRef player)
         {
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count; i++)
@@ -607,7 +607,7 @@ namespace CluckWars.Gameplay
         /// </summary>
 
 
-        private static bool PlayerHasBase(System.Collections.Generic.List<PlayerBase> bases, PlayerRef player)
+        private static bool PlayerHasBase(System.Collections.Generic.IReadOnlyList<PlayerBase> bases, PlayerRef player)
         {
             for (int i = 0; i < bases.Count; i++)
             {
@@ -976,7 +976,7 @@ namespace CluckWars.Gameplay
             // everyone where they started. MapGenerator.SpawnPoints is in the same
             // order as PlayerBase.CornerIndex, so the playerId-modulo mapping that
             // MatchBootstrapper uses on join is reproduced here.
-            var mapGen = FindFirstObjectByType<MapGenerator>();
+            var mapGen = MapGenerator.Instance;
             var spawnPoints = mapGen != null ? mapGen.SpawnPoints : null;
             _log?.Debug(Source, $"ResetWorldForNewRound: {bases.Count} bases, {piles.Count} piles reset. " +
                 $"spawnPoints={(spawnPoints != null ? spawnPoints.Count.ToString() : "null")}.");

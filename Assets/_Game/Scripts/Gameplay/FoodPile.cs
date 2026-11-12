@@ -146,7 +146,20 @@ namespace CluckWars.Gameplay
         [Min(0f)]
         [SerializeField] private float _permanentRegenPerSecond = 0.5f;
 
-        public static readonly System.Collections.Generic.List<FoodPile> ActivePiles = new System.Collections.Generic.List<FoodPile>();
+        private static readonly System.Collections.Generic.List<FoodPile> s_activePiles = new System.Collections.Generic.List<FoodPile>();
+
+        /// <summary>
+        /// Every live food pile on this peer, in registration order. Read-only: only FoodPile adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<FoodPile> ActivePiles { get; } = s_activePiles.AsReadOnly();
+
+        private static void Register(FoodPile item) => s_activePiles.Add(item);
+        private static void Unregister(FoodPile item) => s_activePiles.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activePiles.Clear();
 
         [Networked] public float Amount { get; set; }
         [Networked] public float MaxAmount { get; set; }
@@ -276,7 +289,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActivePiles.Add(this);
+            Register(this);
             SelfInject.Ensure(this, _log != null);
 
             // Every peer applies the stamped yaw (and, off the authority, the stamped position) itself — the root has no
@@ -315,7 +328,7 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             _placed = false;   // pooled: the next life re-applies its own stamp
-            ActivePiles.Remove(this);
+            Unregister(this);
         }
 
         /// <summary>

@@ -922,9 +922,12 @@ namespace CluckWars.Visuals
 
             if (_controller.HasInputAuthority && !_controller.IsDecoy)
             {
-                MatchCamera.Instance?.ApplyShake(
-                    FeedbackTuning.VictimHitShakeMagnitude,
-                    FeedbackTuning.VictimHitShakeDurationSeconds);
+                // Explicit Unity null check: ?. skips it and would call into a destroyed camera.
+                var camera = MatchCamera.Instance;
+                if (camera != null)
+                    camera.ApplyShake(
+                        FeedbackTuning.VictimHitShakeMagnitude,
+                        FeedbackTuning.VictimHitShakeDurationSeconds);
                 // The phone buzz rides the same local gate as the shake: only the victim's own peer, never a decoy.
                 _haptics?.Buzz(haptic);
             }

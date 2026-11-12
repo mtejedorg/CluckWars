@@ -73,6 +73,25 @@ Consumers handle empty fields gracefully — a null `AudioClip` plays nothing in
 
 ---
 
+## Finding scene objects: one rule (A13, 2026-11-12)
+
+Three kinds of thing, one way each. Do not reach the same object two ways.
+
+| What | How | Never |
+|---|---|---|
+| **A service** (`ILogService`, `INetworkService`, `IAudioService`, a registry SO, `MatchConfigSO`) | A `Construct()` parameter (see "Self-injection") | `Find*`, a static, `ProjectContext...Resolve` |
+| **Many live objects of a kind** (chickens, cargos, combats, match stats, piles, bases, zones) | The type's read-only registry: `ChickenController.ActiveControllers`, `ChickenCargo.ActiveCargos`, `ChickenCombat.ActiveCombats`, `ChickenMatchStats.ActiveStats`, `FoodPile.ActivePiles`, `PlayerBase.ActiveBases`, `AbilityZone.ActiveZones` | `FindObjectsByType<T>()` |
+| **The one object of a kind in the scene** | Its static accessor: `GameManager.Instance`, `MapGenerator.Instance`, `MatchCamera.Instance`, `MatchHudController.Instance`, `TouchControlsController.Instance`, `AbilityTelegraph.Active`; the local chicken is `ChickenController.Local` | `FindFirstObjectByType<T>()` |
+
+- **A registry is an `IReadOnlyList<T>` over a private list.** Only the owning type adds and removes (`Register` / `Unregister`, private, called from `Spawned` / `Despawned`), and it clears the list on subsystem registration. Nothing else can add, remove or clear: it does not compile, and a cast back to a list throws. Tests that need a never-spawned chicken in the registry use `RegistryTestAccess`.
+- **Iterate a registry by index.** `for (int i = 0; i < list.Count; i++)`. A `foreach` or LINQ over the interface boxes an enumerator every call: garbage in a per-frame path.
+- **A registry holds spawned objects.** An object is in it from `Spawned` to `Despawned`, so every entry has a valid `Object`; code that used to find an instantiated-but-not-spawned object and then test `Object.IsValid` needs no extra case.
+- **A singleton sets itself in `Awake` / `OnEnable` / `Spawned` and clears itself**: `if (Instance == this) Instance = null;` in `OnDestroy` / `OnDisable` / `Despawned`, plus a subsystem-registration reset. A scene with none has a null `Instance` (the Ability Lab has no `MapGenerator`): callers check.
+- **Check a Unity-object singleton with `!= null`, never `?.`.** `MatchCamera.Instance?.ApplyShake()` compares the C# reference and calls into a destroyed object; `if (camera != null)` uses Unity's check.
+- **`Find*` is for one-time bootstrap and for dev tools** (`Diagnostics/`, `AbilityLab/`, editor code): an `EventSystem` check in `Awake`, the master-promotion sweeps, the discovery of the baked map's fence renderers and haze set (retried once a second until the Map scene is loaded, then never again). Never in `Update` / `LateUpdate` / `Render` / `FixedUpdateNetwork` / `OnGUI` or anything they call every frame. Every remaining call in game code is listed, with its reason, in `SceneObjectAccessTests.AllowedFinds`; a new one fails the suite until it is added there. (`MapGenerator` is not a binding because its consumers include network-spawned chickens and the project-scoped probes, and the Ability Lab scene has none.)
+
+---
+
 ## Networking patterns
 
 ### State authority gate

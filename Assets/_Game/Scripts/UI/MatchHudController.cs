@@ -73,7 +73,8 @@ namespace CluckWars.UI
         private int              _boardWantsCorner = -1;
         private readonly int[]   _drawRows = new int[4];
 
-        private PlayerBase[] _bases = System.Array.Empty<PlayerBase>();
+        // The live bases: the registry itself (PlayerBase registers in Spawned), never a scene search.
+        private static IReadOnlyList<PlayerBase> _bases => PlayerBase.ActiveBases;
         private GameManager  _gameManager;
         private float        _nextRefresh;
 
@@ -221,7 +222,7 @@ namespace CluckWars.UI
                 _nextRefresh = 0f;
             }
 
-            if (Time.unscaledTime >= _nextRefresh || _bases.Length == 0 || _gameManager == null)
+            if (Time.unscaledTime >= _nextRefresh || _bases.Count == 0 || _gameManager == null)
             {
                 _nextRefresh = Time.unscaledTime + _refreshInterval;
                 RefreshSceneRefs();
@@ -354,21 +355,8 @@ namespace CluckWars.UI
 
         private void RefreshSceneRefs()
         {
-            if (_bases.Length == 0 || HasStaleBase())
-                _bases = FindObjectsByType<PlayerBase>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
             if (_gameManager == null || _gameManager.Object == null || !_gameManager.Object.IsValid)
-                _gameManager = FindFirstObjectByType<GameManager>();
-        }
-
-        private bool HasStaleBase()
-        {
-            for (int i = 0; i < _bases.Length; i++)
-            {
-                var b = _bases[i];
-                if (b == null || b.Object == null || !b.Object.IsValid) return true;
-            }
-            return false;
+                _gameManager = GameManager.Instance;
         }
 
         private void RefreshTimer()
@@ -404,8 +392,8 @@ namespace CluckWars.UI
 
         private void RefreshScores()
         {
-            var sorted = new List<(int corner, float total)>(_bases.Length);
-            for (int i = 0; i < _bases.Length; i++)
+            var sorted = new List<(int corner, float total)>(_bases.Count);
+            for (int i = 0; i < _bases.Count; i++)
             {
                 var b = _bases[i];
                 // No row for a corner nobody plays (round-2 leftover; the same rule as post-match).

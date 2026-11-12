@@ -260,8 +260,8 @@ namespace CluckWars.Tests
             var caster = Probe(Vector3.zero, Vector3.forward);
             var rival = Probe(new Vector3(Mathf.Sin(25f * Mathf.Deg2Rad), 0f, Mathf.Cos(25f * Mathf.Deg2Rad)) * 3f, Vector3.back);
             var scratch = new Vector2[8];
-            ChickenController.ActiveControllers.Add(caster);
-            ChickenController.ActiveControllers.Add(rival);
+            RegistryTestAccess.Register(caster);
+            RegistryTestAccess.Register(rival);
             try
             {
                 Vector3 toRival = (rival.transform.position - caster.transform.position).normalized;
@@ -294,8 +294,8 @@ namespace CluckWars.Tests
             finally
             {
                 AbilityTargeting.Mode = savedMode;
-                ChickenController.ActiveControllers.Remove(caster);
-                ChickenController.ActiveControllers.Remove(rival);
+                RegistryTestAccess.Unregister(caster);
+                RegistryTestAccess.Unregister(rival);
                 Object.DestroyImmediate(caster.gameObject);
                 Object.DestroyImmediate(rival.gameObject);
             }

@@ -67,7 +67,20 @@ namespace CluckWars.Gameplay
         /// <summary>Shipped flag lift (Phase 8 D7): chosen by a sweep (1.0 / 1.15 / 1.3 / 1.45) so the rendered flag lands within 10 dE00 of the sunlit half of the rendered pad ring, all four seats, both tiers (1.3: 3.5-6.3 dE00) (Phase8ChunkD7PennantTests pins the setup, tools/ui_capture/capture_d7_pennant.py measures it).</summary>
         public const float DefaultFlagLift = 1.3f;
 
-        public static readonly System.Collections.Generic.List<PlayerBase> ActiveBases = new System.Collections.Generic.List<PlayerBase>();
+        private static readonly System.Collections.Generic.List<PlayerBase> s_activeBases = new System.Collections.Generic.List<PlayerBase>();
+
+        /// <summary>
+        /// Every live base on this peer, in registration order. Read-only: only PlayerBase adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<PlayerBase> ActiveBases { get; } = s_activeBases.AsReadOnly();
+
+        private static void Register(PlayerBase item) => s_activeBases.Add(item);
+        private static void Unregister(PlayerBase item) => s_activeBases.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeBases.Clear();
 
         [Networked] public float FoodTotal { get; set; }
         [Networked] public PlayerRef Owner { get; set; }
@@ -213,7 +226,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActiveBases.Add(this);
+            Register(this);
             SelfInject.Ensure(this, _log != null);
 
             // A base not spawned through MapGenerator (scene-baked, Ability Lab) stamps its own spot for the other peers.
@@ -237,7 +250,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            ActiveBases.Remove(this);
+            Unregister(this);
             _placed = false;   // pooled: the next life re-applies its own stamp
         }
 

@@ -225,7 +225,7 @@ namespace CluckWars.Gameplay
                     _abilityRegistry != null ? _abilityRegistry.Passives : null, _selection?.DevBotSubclasses)
                 : null;
 
-            var mapGen   = FindFirstObjectByType<MapGenerator>();
+            var mapGen   = MapGenerator.Instance;
             var spawnPts = mapGen != null ? mapGen.SpawnPoints : null;
 
             int count = Mathf.Min(_soloBotsToSpawn, 3);
@@ -703,7 +703,7 @@ namespace CluckWars.Gameplay
         {
             // Prefer MapGenerator's computed corners. Lookup is cached; null check
             // re-resolves if the MapGenerator was added after Start ran.
-            if (_mapGenerator == null) _mapGenerator = FindFirstObjectByType<MapGenerator>();
+            if (_mapGenerator == null) _mapGenerator = MapGenerator.Instance;
             if (_mapGenerator != null && _mapGenerator.SpawnPoints != null && _mapGenerator.SpawnPoints.Count > 0)
             {
                 var points = _mapGenerator.SpawnPoints;
@@ -773,7 +773,7 @@ namespace CluckWars.Gameplay
                     _log?.Info(Source, "Local peer promoted to Master Client. Re-arming match generators.");
                     TrySpawnGameManager();
 
-                    var mapGen = FindFirstObjectByType<MapGenerator>();
+                    var mapGen = MapGenerator.Instance;
                     if (mapGen != null)
                     {
                         mapGen.ReArmForMasterPromotion();

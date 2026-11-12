@@ -67,7 +67,20 @@ namespace CluckWars.Gameplay
         /// All currently alive AbilityZones on this peer. Read by
         /// <see cref="ChickenController"/> to apply slow sources without RPCs.
         /// </summary>
-        public static readonly List<AbilityZone> ActiveZones = new List<AbilityZone>();
+        private static readonly System.Collections.Generic.List<AbilityZone> s_activeZones = new System.Collections.Generic.List<AbilityZone>();
+
+        /// <summary>
+        /// Every live zone on this peer, in registration order. Read-only: only AbilityZone adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<AbilityZone> ActiveZones { get; } = s_activeZones.AsReadOnly();
+
+        private static void Register(AbilityZone item) => s_activeZones.Add(item);
+        private static void Unregister(AbilityZone item) => s_activeZones.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeZones.Clear();
 
         // ---- Serialized tunables ----------------------------------------------
 
@@ -413,7 +426,7 @@ namespace CluckWars.Gameplay
         {
             SelfInject.Ensure(this, _log != null);
 
-            ActiveZones.Add(this);
+            Register(this);
             LocalJoinClock.Note(Runner);   // a zone in a joiner's first snapshot can be the first thing it sees
 
             if (HasStateAuthority && !HasSpawnPosition)
@@ -448,7 +461,7 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             MatchSignals.RoundReset -= OnRoundReset;
-            ActiveZones.Remove(this);
+            Unregister(this);
             // From the local snapshot, never gated on hasState (W1): see ObserveRootEvidence.
             if (_seenAsRoot) RememberDespawnedRoot(_seen);
             _seenAsRoot = false;   // pooled: the next life observes its own

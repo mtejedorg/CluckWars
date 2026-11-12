@@ -139,7 +139,20 @@ namespace CluckWars.Gameplay
         /// value, never networked: VFX tint feathers with it.</summary>
         public Color ClassBodyTint { get; private set; } = Color.white;
 
-        public static readonly System.Collections.Generic.List<ChickenController> ActiveControllers = new System.Collections.Generic.List<ChickenController>();
+        private static readonly System.Collections.Generic.List<ChickenController> s_activeControllers = new System.Collections.Generic.List<ChickenController>();
+
+        /// <summary>
+        /// Every live chicken on this peer, in registration order. Read-only: only ChickenController adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<ChickenController> ActiveControllers { get; } = s_activeControllers.AsReadOnly();
+
+        private static void Register(ChickenController item) => s_activeControllers.Add(item);
+        private static void Unregister(ChickenController item) => s_activeControllers.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeControllers.Clear();
 
         private ChickenLocalEvents _localEvents;
 
@@ -602,7 +615,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActiveControllers.Add(this);
+            Register(this);
             s_localDirty = true;
             LocalEvents.Reset();           // pooled or respawned: every one-shot baseline is taken again
             LocalJoinClock.Note(Runner);   // a joiner's first snapshot carries every chicken (root evidence, qa W1)
@@ -899,7 +912,7 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             _traversal?.Abort();
-            ActiveControllers.Remove(this);
+            Unregister(this);
             if (s_local == this) s_local = null;
             s_localDirty = true;
             _localEvents?.Reset();

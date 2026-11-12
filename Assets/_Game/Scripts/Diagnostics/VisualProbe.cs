@@ -155,7 +155,7 @@ namespace CluckWars.Diagnostics
 
             var main = Camera.main;
             _scanMask = main != null ? main.cullingMask : 0;
-            _scanInArena = FindFirstObjectByType<MapGenerator>() != null;
+            _scanInArena = MapGenerator.Instance != null;
             _scanHalf = MapGenerator.ArenaHalfSize;
             _scanReason = reason;
             _scanIndex = 0;

@@ -132,7 +132,7 @@ namespace CluckWars.UI
             }
 
             if (_gameManager == null || _gameManager.Object == null || !_gameManager.Object.IsValid)
-                _gameManager = FindFirstObjectByType<GameManager>();
+                _gameManager = GameManager.Instance;
         }
 
         // ---- Per-frame data → UI -----------------------------------------------

@@ -24,7 +24,20 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "MatchStats";
 
-        public static readonly System.Collections.Generic.List<ChickenMatchStats> ActiveStats = new System.Collections.Generic.List<ChickenMatchStats>();
+        private static readonly System.Collections.Generic.List<ChickenMatchStats> s_activeStats = new System.Collections.Generic.List<ChickenMatchStats>();
+
+        /// <summary>
+        /// Every live stats behaviour on this peer, in registration order. Read-only: only ChickenMatchStats adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<ChickenMatchStats> ActiveStats { get; } = s_activeStats.AsReadOnly();
+
+        private static void Register(ChickenMatchStats item) => s_activeStats.Add(item);
+        private static void Unregister(ChickenMatchStats item) => s_activeStats.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeStats.Clear();
 
         /// <summary>Number of kills this chicken scored this round.</summary>
         [Networked] public int Kills { get; set; }
@@ -62,13 +75,13 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActiveStats.Add(this);
+            Register(this);
             SelfInject.Ensure(this, _log != null);
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            ActiveStats.Remove(this);
+            Unregister(this);
         }
 
         /// <summary>

@@ -19,7 +19,20 @@ namespace CluckWars.Gameplay
     {
         private const string Source = "Combat";
 
-        public static readonly System.Collections.Generic.List<ChickenCombat> ActiveCombats = new System.Collections.Generic.List<ChickenCombat>();
+        private static readonly System.Collections.Generic.List<ChickenCombat> s_activeCombats = new System.Collections.Generic.List<ChickenCombat>();
+
+        /// <summary>
+        /// Every live combat on this peer, in registration order. Read-only: only ChickenCombat adds and removes itself
+        /// (Spawned / Despawned), so nothing else can leave a stale or foreign entry. Iterate by index (a
+        /// <c>foreach</c> over the interface boxes its enumerator).
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<ChickenCombat> ActiveCombats { get; } = s_activeCombats.AsReadOnly();
+
+        private static void Register(ChickenCombat item) => s_activeCombats.Add(item);
+        private static void Unregister(ChickenCombat item) => s_activeCombats.Remove(item);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_activeCombats.Clear();
 
         [Tooltip("Removal duration after execute.")]
         [Min(0f)]
@@ -72,7 +85,7 @@ namespace CluckWars.Gameplay
 
         public override void Spawned()
         {
-            ActiveCombats.Add(this);
+            Register(this);
             SelfInject.Ensure(this, _log != null);
 
             _controller = GetComponent<ChickenController>();
@@ -86,7 +99,7 @@ namespace CluckWars.Gameplay
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            ActiveCombats.Remove(this);
+            Unregister(this);
         }
 
         public override void FixedUpdateNetwork()
@@ -435,7 +448,7 @@ namespace CluckWars.Gameplay
         private void QueueRespawnTeleport()
         {
             _respawnTeleportQueued = true;
-            var map = FindFirstObjectByType<MapGenerator>();
+            var map = MapGenerator.Instance;
             int corner = _controller != null ? _controller.HomeCornerIndex : -1;
             if (!ExecuteRespawnRules.TrySpawnPoint(corner, map != null ? map.SpawnPoints : null, out Vector3 home))
             {
@@ -461,7 +474,7 @@ namespace CluckWars.Gameplay
                 for (int s = 0; s < AbilityController.SlotCount; s++) cd = Mathf.Max(cd, abilities.CooldownRemaining(s));
             var p = transform.position;
             int home = _controller != null ? _controller.HomeCornerIndex : -1;
-            var map = FindFirstObjectByType<MapGenerator>();
+            var map = MapGenerator.Instance;
             float dist = ExecuteRespawnRules.TrySpawnPoint(home, map != null ? map.SpawnPoints : null, out Vector3 sp)
                 ? Vector2.Distance(new Vector2(p.x, p.z), new Vector2(sp.x, sp.z)) : -1f;
             // Matrix evidence (merge.ps1 / verify.ps1 can key on it): at its base, empty, cooldowns still running.

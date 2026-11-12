@@ -65,12 +65,12 @@ namespace CluckWars.Tests
         /// </summary>
         private static void Register(params ChickenController[] chickens)
         {
-            foreach (var c in chickens) ChickenController.ActiveControllers.Add(c);
+            foreach (var c in chickens) RegistryTestAccess.Register(c);
         }
 
         private static void Unregister(params ChickenController[] chickens)
         {
-            foreach (var c in chickens) ChickenController.ActiveControllers.Remove(c);
+            foreach (var c in chickens) RegistryTestAccess.Unregister(c);
         }
 
         // ---- Pure geometry: AbilityAim.InShape -----------------------------

@@ -346,8 +346,19 @@ namespace CluckWars.Gameplay
             return renderer;
         }
 
+        /// <summary>
+        /// The scene's map generator, or null in a scene that has none (the Ability Lab) and before its Awake. The one
+        /// way to reach it (docs/CONVENTIONS.md "Finding scene objects"): it is a scene object whose consumers include
+        /// network-spawned chickens and the project-scoped probes, which a scene binding cannot reach.
+        /// </summary>
+        public static MapGenerator Instance { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetInstance() => Instance = null;
+
         private void Awake()
         {
+            Instance = this;
             ArenaHalfSize = _planeSize * 0.5f;
             ComputeSpawnPoints();
 
@@ -418,6 +429,7 @@ namespace CluckWars.Gameplay
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (_network != null) _network.OnRunnerReady -= HandleRunnerReady;
             DestroyObstacleMaterials();
         }
