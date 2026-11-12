@@ -51,7 +51,7 @@ namespace CluckWars.Diagnostics
     /// <see cref="MenuUiController.AutoTestShowPage"/>, lets it settle, asks <see cref="UiLayoutProbe"/> for a scan tagged with
     /// the page (<c>ui offenders=N scope=menu page=&lt;id&gt;</c>) and saves <c>menu-&lt;page&gt;[-&lt;tag&gt;].png</c> next to the
     /// in-match <c>-cw_shots</c> (<c>&lt;logdir&gt;/shots</c>). Then it returns to the main menu and releases the hold on
-    /// <see cref="MenuUiController.AutoTestIdle"/>, so a <c>-cw_autosolo</c> / <c>-cw_autohost</c> flow starts only afterwards.
+    /// the auto-test (<c>AutoTestDriver.MenuIsIdle</c> reads <see cref="Holding"/>), so a <c>-cw_autosolo</c> / <c>-cw_autohost</c> flow starts only afterwards.
     /// </summary>
     /// <remarks>
     /// Pages are shown, never acted on: no button handler runs, no lobby is created (THE COOP is opened in Solo or Join

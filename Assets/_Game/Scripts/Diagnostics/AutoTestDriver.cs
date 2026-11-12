@@ -160,12 +160,17 @@ namespace CluckWars.Diagnostics
 
         // ---- menu: HOST / JOIN -> class -> loadout -> READY -> START / JOIN MATCH ---------------------------------
 
+        /// <summary>The main menu is built, nothing is loading, and no <c>-cw_menushots</c> walk is holding it: the
+        /// auto-test may start pressing. The hold is a diagnostics matter, so it is combined here and not in the menu.</summary>
+        private static bool MenuIsIdle(MenuUiController menu) =>
+            menu != null && menu.AutoTestPagesReady && !MenuShotsDriver.Holding;
+
         private IEnumerator MenuFlow()
         {
             var role = _cfg.AutoHost ? "host" : _cfg.AutoJoin != null ? "join" : "solo";
             float t0 = Time.realtimeSinceStartup;
             MenuUiController menu = null;
-            while (menu == null || !menu.AutoTestIdle)
+            while (!MenuIsIdle(menu))
             {
                 if (Time.realtimeSinceStartup - t0 > MenuWaitSeconds)
                 {

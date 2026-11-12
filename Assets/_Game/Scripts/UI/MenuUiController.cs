@@ -2692,10 +2692,8 @@ namespace CluckWars.UI
 
         private int _autoTestJoinFailures;
 
-        /// <summary>Pages built and nothing loading: the auto-test may start pressing (after any <c>-cw_menushots</c> walk).</summary>
-        public bool AutoTestIdle => AutoTestPagesReady && !CluckWars.Diagnostics.MenuShotsDriver.Holding;
-
-        /// <summary>Pages built and nothing loading (the menu-shot walk's own readiness; it ignores its own hold).</summary>
+        /// <summary>Pages built and nothing loading: an auto-test may start pressing. The menu does not know about the
+        /// <c>-cw_menushots</c> walk: the auto-test driver adds that hold itself (<c>AutoTestDriver.MenuIsIdle</c>).</summary>
         public bool AutoTestPagesReady => DevToolsAvailable && _lobby != null && _selection != null && !_isBusy;
 
         /// <summary>

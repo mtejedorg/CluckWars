@@ -385,7 +385,13 @@ namespace CluckWars.Tests
             Assert.Greater(installer.IndexOf("Bind<MenuShotsDriver>()", diag, System.StringComparison.Ordinal), diag);
 
             string menu = Read("Assets/_Game/Scripts/UI/MenuUiController.cs");
-            StringAssert.Contains("AutoTestIdle => AutoTestPagesReady && !CluckWars.Diagnostics.MenuShotsDriver.Holding", menu);
+            // A5 (audit batch 4): the hold is combined by the auto-test driver; the menu (presentation) names no diagnostics type.
+            string driver = Read("Assets/_Game/Scripts/Diagnostics/AutoTestDriver.cs");
+            StringAssert.Contains("menu != null && menu.AutoTestPagesReady && !MenuShotsDriver.Holding;", driver);
+            StringAssert.Contains("while (!MenuIsIdle(menu))", driver, "the menu flow waits on the pages AND the menu-shot hold");
+            StringAssert.Contains("public bool AutoTestPagesReady =>", menu);
+            StringAssert.DoesNotContain("MenuShotsDriver", menu);
+            StringAssert.DoesNotContain("AutoTestIdle", menu);
             StringAssert.Contains("public bool AutoTestShowPage(string id)", menu);
 
             string probe = Read("Assets/_Game/Scripts/Diagnostics/UiLayoutProbe.cs");
