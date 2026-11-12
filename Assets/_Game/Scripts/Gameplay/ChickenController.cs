@@ -330,8 +330,15 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public int HomeCornerIndex { get; set; } = -1;
 
-        [Networked] public NetworkBool UnderdogSurgeActive { get; set; }
-        [Networked] public NetworkBool LeaderBountyActive { get; set; }
+        /// <summary>
+        /// The two comeback effects (GameManager's mid-match event). Written only on this chicken's state authority:
+        /// switched on by <see cref="RPC_GrantComeback"/> (match authority only), off by the round reset. The setters
+        /// are private because the match authority does not own a remote human's chicken in Shared Mode, and a direct
+        /// write from there is silently lost.
+        /// </summary>
+        [Networked] public NetworkBool UnderdogSurgeActive { get; private set; }
+        /// <inheritdoc cref="UnderdogSurgeActive"/>
+        [Networked] public NetworkBool LeaderBountyActive { get; private set; }
 
         // WP4 (PROTOCOL CHANGE, B4): the Feather Aura triplet (the bool + radius + factor emitter flags) was
         // removed from this behaviour's networked layout. Feather Aura is a Caster-anchored AbilityZone now, slowed through
@@ -1257,6 +1264,32 @@ namespace CluckWars.Gameplay
             _log?.Debug(Source, $"Teleport queued to {position}.");
         }
 
+        /// <summary>
+        /// Switches on the comeback effect(s) in <paramref name="grant"/> for this chicken. The only caller is
+        /// <c>GameManager</c>'s comeback event; sender-restricted exactly like <see cref="RPC_TeleportTo"/>, and for
+        /// the same reason: the match authority has to reach a chicken it does not own by RPC.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_GrantComeback(ComebackGrant grant, RpcInfo info = default)
+        {
+            if (!IsFromMatchAuthority(info, out string rejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_GrantComeback({grant}) from {info.Source} — {rejection}");
+                return;
+            }
+            if (!ComebackRules.IsValid(grant))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_GrantComeback({(byte)grant}) from {info.Source} — it names no known comeback effect.");
+                return;
+            }
+
+            bool surge = UnderdogSurgeActive, bounty = LeaderBountyActive;
+            ComebackRules.Apply(grant, ref surge, ref bounty);
+            UnderdogSurgeActive = surge;
+            LeaderBountyActive = bounty;
+            _log?.Info(Source, $"{name}: comeback granted ({grant}) -> surge={surge}, bounty={bounty}.");
+        }
+
         /// <summary>State authority only: the same queued teleport the round reset uses (an executed chicken's respawn).</summary>
         internal void QueueTeleport(Vector3 position)
         {
@@ -1367,7 +1400,7 @@ namespace CluckWars.Gameplay
 
             if (info.Source != gm.Object.StateAuthority)
             {
-                rejection = $"only the match authority ({gm.Object.StateAuthority}) may place chickens.";
+                rejection = $"only the match authority ({gm.Object.StateAuthority}) may send this.";
                 return false;
             }
 

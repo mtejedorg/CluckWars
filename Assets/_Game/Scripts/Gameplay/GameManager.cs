@@ -1136,7 +1136,8 @@ namespace CluckWars.Gameplay
 
             if (underdog != null)
             {
-                underdog.UnderdogSurgeActive = true;
+                // By RPC: in Shared Mode the underdog may be a remote human's chicken, which this peer does not own.
+                underdog.RPC_GrantComeback(ComebackGrant.UnderdogSurge);
                 _log?.Info(Source, $"UnderdogSurge applied to {underdog.name} (Corner {underdog.HomeCornerIndex}, Food: {lowestFood}).");
             }
         }
@@ -1162,7 +1163,7 @@ namespace CluckWars.Gameplay
 
             if (leader != null)
             {
-                leader.LeaderBountyActive = true;
+                leader.RPC_GrantComeback(ComebackGrant.LeaderBounty);   // by RPC, as the surge above
                 _log?.Info(Source, $"LeaderBounty applied to {leader.name} (Corner {leader.HomeCornerIndex}, Food: {highestFood}).");
             }
         }
