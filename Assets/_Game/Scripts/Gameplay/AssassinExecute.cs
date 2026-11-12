@@ -55,7 +55,7 @@ namespace CluckWars.Gameplay
         }
 
         // The one MarkKill asset, read through the registry so every peer has it: a proxy needs the same numbers for the
-        // receiver-side bounds (ExecuteRules, CW-230) and loadouts are not replicated.
+        // receiver-side bounds (ExecuteRules, CW-230), and a bound must not hang on a loadout its owner replicates.
         private MarkKillAbilitySO _tuning;
 
         /// <summary>Tuned reach of the Kill press (<c>MarkKill.asset</c>).</summary>

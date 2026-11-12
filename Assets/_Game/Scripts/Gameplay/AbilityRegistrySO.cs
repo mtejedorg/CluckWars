@@ -61,6 +61,31 @@ namespace CluckWars.Gameplay
             return list.FirstOrDefault(p => p.IsSignature) ?? list[0];
         }
 
+        // ---- Replication codes (a chicken's loadout on the wire) ---------------
+        //
+        // A loadout is replicated as one byte per slot: the asset's position in All, plus one. Passives live in All
+        // too, so they share the code space. 0 means "none": an empty slot, or an asset this registry does not list.
+        // Every peer ships the same registry asset, so a code names the same asset everywhere. Reordering All changes
+        // the codes, which is harmless: they are never stored, only sent between peers running one build.
+
+        /// <summary>The code of "no ability": an empty slot, or an asset that is not in <see cref="All"/>.</summary>
+        public const byte NoAbilityCode = 0;
+
+        /// <summary>The most entries <see cref="All"/> can hold and still give each one a code.</summary>
+        public const int MaxCodedAbilities = byte.MaxValue;
+
+        /// <summary>The replication code of <paramref name="ability"/>, or <see cref="NoAbilityCode"/> for null or an unlisted asset.</summary>
+        public byte CodeOf(AbilityBaseSO ability)
+        {
+            if (ability == null || All == null) return NoAbilityCode;
+            int index = System.Array.IndexOf(All, ability);
+            return index >= 0 && index < MaxCodedAbilities ? (byte)(index + 1) : NoAbilityCode;
+        }
+
+        /// <summary>The asset <paramref name="code"/> names, or null for <see cref="NoAbilityCode"/> and for a code past the end of <see cref="All"/>.</summary>
+        public AbilityBaseSO FromCode(byte code) =>
+            code != NoAbilityCode && All != null && code <= All.Length ? All[code - 1] : null;
+
         // ---- Class-gated pools (ADR 0003 Decision 3) -------------------------
 
         /// <summary>Bit flag for a class, so callers don't re-derive the mapping.</summary>

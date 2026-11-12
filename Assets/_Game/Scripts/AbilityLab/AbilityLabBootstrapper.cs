@@ -257,9 +257,9 @@ namespace CluckWars.AbilityLab
         /// comparison possible at all.
         /// </summary>
         /// <remarks>
-        /// Sound because <c>AbilityController</c>'s slot fields are plain <c>[SerializeField]</c>s
-        /// rather than <c>[Networked]</c> state, so this is a purely local write with nothing to
-        /// replicate — and because <c>PassiveAbilitySO.OnActivate</c> is an empty no-op: passives
+        /// Sound because <c>AbilityController.SetSlots</c> is the one loadout entry point: it ends
+        /// what the old assets were running, swaps the slots and republishes the replicated loadout
+        /// codes in the same call — and because <c>PassiveAbilitySO.OnActivate</c> is an empty no-op: passives
         /// express themselves through query hooks consulted live at each call site, so swapping
         /// one needs no unapply/reapply pass.
         /// </remarks>

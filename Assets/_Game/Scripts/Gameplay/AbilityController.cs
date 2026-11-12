@@ -105,6 +105,24 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public NetworkBool PeckChainActive { get; private set; }
 
+        /// <summary>
+        /// The equipped loadout as <see cref="AbilityRegistrySO"/> codes: entries 0..3 are the slots,
+        /// <see cref="PassiveCodeIndex"/> is the passive; <see cref="AbilityRegistrySO.NoAbilityCode"/> means "nothing
+        /// replicated for this entry, keep the prefab's own default" (the same asset on every peer). Written by the
+        /// state authority only (<see cref="PublishLoadout"/>), resolved back to assets on every other peer
+        /// (<see cref="ApplyReplicatedLoadout"/>), so <see cref="GetSlot"/> and <see cref="Passive"/> answer alike
+        /// everywhere. Before this the slots were plain fields set on the spawning peer alone, and every proxy drew
+        /// range rings, badges and telegraphs for the prefab defaults.
+        /// </summary>
+        [Networked, Capacity(SlotCount + 1)]
+        private NetworkArray<byte> LoadoutCodes => default;
+
+        private const int PassiveCodeIndex = SlotCount;
+
+        // The codes this peer's plain slot fields currently reflect (what it last published or applied).
+        private readonly byte[] _appliedCodes = new byte[SlotCount + 1];
+        private AbilityRegistrySO _registry;
+
         public PassiveAbilitySO Passive => _passive;
         public AbilityBaseSO Slot0 => _slot0;
         public AbilityBaseSO Slot1 => _slot1;
@@ -269,11 +287,20 @@ namespace CluckWars.Gameplay
                 LastCastSlot = InvalidSlot;
             }
 
+            // A proxy takes the loadout its state authority replicated before anything below reads a slot. Cleared first:
+            // a reused object must not skip a code because its previous occupant happened to hold the same one.
+            System.Array.Clear(_appliedCodes, 0, _appliedCodes.Length);
+            if (!HasStateAuthority) ApplyReplicatedLoadout();
+
             if (_passive == null && _controller != null)
             {
-                var reg = ProjectContext.Instance.Container.TryResolve<AbilityRegistrySO>();
+                var reg = ResolveRegistry();
                 if (reg != null) _passive = reg.GetDefaultPassiveForClass(_controller.Class);
             }
+
+            // Again here, not only in SetSlots: a chicken spawned without it (a decoy), the class-default passive just
+            // resolved above, and a SetSlots that ran before this object could write networked state.
+            if (HasStateAuthority) PublishLoadout();
 
             if (_passive != null)
             {
@@ -296,6 +323,12 @@ namespace CluckWars.Gameplay
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
             if (_combat != null) _combat.OnDeathAuthority -= HandleOwnerDeath;
+        }
+
+        /// <summary>Every peer but the state authority: picks up a live loadout swap (five byte compares when nothing changed).</summary>
+        public override void Render()
+        {
+            if (_initialized && !HasStateAuthority) ApplyReplicatedLoadout();
         }
 
         public override void FixedUpdateNetwork()
@@ -765,10 +798,11 @@ namespace CluckWars.Gameplay
         public float ResolvedCooldownFor(int slot) => ResolveCooldownFor(GetSlot(slot));
 
         /// <summary>
-        /// Assigns ability assets before <see cref="Spawned"/> runs.
-        /// Called by <see cref="MatchBootstrapper"/> inside the <c>onBeforeSpawned</c>
-        /// callback so every peer already has the chosen abilities on first <c>Spawned</c>
-        /// read. Null arguments leave the existing (prefab-default) value unchanged.
+        /// Equips a loadout and replicates it. The one entry point for players, bots and the Ability Lab:
+        /// <see cref="MatchBootstrapper"/> and the lab call it inside the <c>onBeforeSpawned</c> callback (so the choice is
+        /// networked state from tick zero), and the lab calls it again for a live swap. Runs on the peer that holds
+        /// state authority; every other peer resolves the same assets from <see cref="LoadoutCodes"/>. Null arguments
+        /// leave the existing (prefab-default) value unchanged.
         /// </summary>
         public void SetSlots(PassiveAbilitySO passive, AbilityBaseSO slot0, AbilityBaseSO slot1,
             AbilityBaseSO slot2 = null, AbilityBaseSO slot3 = null)
@@ -782,6 +816,88 @@ namespace CluckWars.Gameplay
             if (slot1 != null) _slot1 = slot1;
             if (slot2 != null) _slot2 = slot2;
             if (slot3 != null) _slot3 = slot3;
+
+            PublishLoadout();
+        }
+
+        /// <summary>
+        /// State authority: writes the current loadout into <see cref="LoadoutCodes"/>. A no-op on any other peer, and
+        /// on an object that cannot take networked writes yet (<see cref="Spawned"/> publishes again).
+        /// </summary>
+        private void PublishLoadout()
+        {
+            if (Object == null || !Object.IsValid || !HasStateAuthority) return;
+
+            var registry = ResolveRegistry();
+            if (registry == null)
+            {
+                _log?.Error(Source, $"{name}: no AbilityRegistry is bound, so this chicken's loadout cannot be replicated - " +
+                    "every other peer will show its prefab-default abilities. Check ProjectInstaller._abilityRegistry.");
+                return;
+            }
+
+            for (int i = 0; i <= SlotCount; i++)
+            {
+                AbilityBaseSO ability = i == PassiveCodeIndex ? _passive : GetSlot(i);
+                byte code = registry.CodeOf(ability);
+                if (ability != null && code == AbilityRegistrySO.NoAbilityCode)
+                {
+                    _log?.Error(Source, $"{name}: '{ability.name}' ({LoadoutEntryName(i)}) is not listed in AbilityRegistry.All, " +
+                        "so it cannot be replicated - every other peer will show the prefab default there. Add the asset to the registry.");
+                }
+                if (LoadoutCodes[i] != code) LoadoutCodes.Set(i, code);
+                _appliedCodes[i] = code;
+            }
+        }
+
+        /// <summary>
+        /// Every peer but the state authority: turns <see cref="LoadoutCodes"/> back into the slot and passive assets,
+        /// for the entries whose code changed since the last call.
+        /// </summary>
+        private void ApplyReplicatedLoadout()
+        {
+            AbilityRegistrySO registry = null;
+            for (int i = 0; i <= SlotCount; i++)
+            {
+                byte code = LoadoutCodes[i];
+                if (code == _appliedCodes[i]) continue;
+                _appliedCodes[i] = code;
+
+                // "None" keeps what this peer already holds: the authority had nothing it could replicate there.
+                if (code == AbilityRegistrySO.NoAbilityCode) continue;
+
+                if (registry == null) registry = ResolveRegistry();
+                var ability = registry != null ? registry.FromCode(code) : null;
+                var passive = ability as PassiveAbilitySO;
+                bool wrongKind = ability != null && (i == PassiveCodeIndex) != (passive != null);
+                if (ability == null || wrongKind)
+                {
+                    // Peers on one build share one registry, so this is a bound-registry or build-mismatch fault.
+                    _log?.Error(Source, $"{name}: replicated loadout code {code} for {LoadoutEntryName(i)} resolves to " +
+                        $"{(ability != null ? ability.name : "nothing")} in this peer's AbilityRegistry " +
+                        $"({(registry != null ? "wrong kind of ability, or a different build" : "none bound")}) - " +
+                        "this peer keeps showing its previous ability there.");
+                    continue;
+                }
+
+                switch (i)
+                {
+                    case 0: _slot0 = ability; break;
+                    case 1: _slot1 = ability; break;
+                    case 2: _slot2 = ability; break;
+                    case 3: _slot3 = ability; break;
+                    default: _passive = passive; break;
+                }
+            }
+        }
+
+        private static string LoadoutEntryName(int index) => index == PassiveCodeIndex ? "the passive" : $"slot {index}";
+
+        /// <summary>The project-wide registry (bound in <c>ProjectInstaller</c>); null only when it is not bound at all.</summary>
+        private AbilityRegistrySO ResolveRegistry()
+        {
+            if (_registry == null) _registry = ProjectContext.Instance.Container.TryResolve<AbilityRegistrySO>();
+            return _registry;
         }
 
         public void SetSlots(AbilityBaseSO slot0, AbilityBaseSO slot1,
@@ -1210,6 +1326,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         private void OnAuthorityGained()
         {
+            // The loadout the previous authority replicated, in case a swap landed since this peer's last Render.
+            ApplyReplicatedLoadout();
             DeactivateAll();
             if (_controller == null) return;
             for (int i = 0; i < SlotCount; i++)

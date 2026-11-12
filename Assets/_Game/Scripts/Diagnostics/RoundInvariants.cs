@@ -53,8 +53,9 @@ namespace CluckWars.Diagnostics
             roundStartCooldown > 0f ? Mathf.Abs(remaining - (introRemaining + roundStartCooldown)) : remaining;
 
         /// <summary>
-        /// <see cref="CooldownLeftover"/> for a slot whose ability this peer cannot see: loadouts are not replicated, so a
-        /// proxy does not know which remote slot holds Death Mark. The slot may hold nothing (0) or exactly the opening
+        /// <see cref="CooldownLeftover"/> for a slot whose ability this peer cannot name: an empty slot (until audit A03
+        /// replicated loadouts this was every remote slot, so a proxy did not know which one held Death Mark). The slot
+        /// may hold nothing (0) or exactly the opening
         /// cooldown of any registered ability that has one (<paramref name="knownRoundStartCooldown"/>, the registry's
         /// largest); the leftover is the distance to the nearer of the two, so a stale cooldown is still reported.
         /// </summary>

@@ -60,9 +60,9 @@ namespace CluckWars.Gameplay
     /// </list>
     /// <para>
     /// <b>Pool-wide bounds, not the caster's own loadout.</b> Same choice as
-    /// <see cref="StealRules.MaxSingleSteal"/>: the victim's peer does not know a remote chicken's
-    /// slots (they are set in <c>onBeforeSpawned</c> on the spawning peer only and never
-    /// replicated), and class legality changes for balance reasons, so the bound is the worst case
+    /// <see cref="StealRules.MaxSingleSteal"/>: a remote chicken's slots are replicated by its own
+    /// peer (<c>AbilityController.LoadoutCodes</c>), which makes them a claim rather than a fact,
+    /// and class legality changes for balance reasons, so the bound is the worst case
     /// across the whole registry. A forged call from across the arena, a 10 s stun or a 0.1 slow
     /// is still refused.
     /// </para>

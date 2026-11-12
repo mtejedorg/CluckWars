@@ -200,10 +200,11 @@ namespace CluckWars.Diagnostics
                 if (a != null)
                     for (int s = 0; s < AbilityController.SlotCount; s++)
                     {
-                        // Only the state authority knows the slot's ability: loadouts are not replicated, and a proxy's
-                        // slots still hold the prefab defaults (shared2 2026-11-03: a proxy read Peck where the host held
-                        // Death Mark). A remote slot may legally hold the opening cooldown or nothing.
-                        var ability = a.HasStateAuthority ? a.GetSlot(s) : null;
+                        // Loadouts are replicated (AbilityController.LoadoutCodes, audit A03), so GetSlot names the same
+                        // ability on every peer. Before that a proxy's slots held the prefab defaults (shared2
+                        // 2026-11-03: a proxy read Peck where the host held Death Mark). An empty slot still takes the
+                        // unknown-slot rule: the opening cooldown or nothing.
+                        var ability = a.GetSlot(s);
                         float remaining = a.CooldownRemaining(s);
                         cd = Mathf.Max(cd, ability != null
                             ? RoundInvariants.CooldownLeftover(remaining, ability.RoundStartCooldown, intro)
