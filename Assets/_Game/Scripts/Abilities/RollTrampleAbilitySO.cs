@@ -117,7 +117,7 @@ namespace CluckWars.Abilities
                 // after OnActivate for a Capsule shape. By the time the victim's authority
                 // applies this the thief will be a jump further on, which is what
                 // StealRules.Reach's CastPoseIsUnreconstructable allowance pays for.
-                thiefCargo.CreditStealAndDrain(targetCargo, stolen);
+                thiefCargo.RequestSteal(targetCargo, stolen);
             }
         }
 

@@ -69,10 +69,9 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The ONE thief-side gate for the steal-proof state: every caller of
         /// <c>RPC_DrainStolen</c> / <c>RPC_TransferAllToBountyBag</c> (Snatch, Sneaky Steal, Scrap,
-        /// Dive Bomb, Spine Coat, Death Mark) asks this BEFORE crediting itself. Thieves credit
-        /// optimistically ahead of the RPC, so skipping the call after crediting would create food.
-        /// Death Mark credits nothing ahead (its loot is reported back by the victim), but still
-        /// gates here so a shelled victim is not even asked to drain.
+        /// Dive Bomb, Spine Coat, Death Mark) asks this BEFORE sending its request. No thief credits
+        /// anything ahead of the victim's report (<see cref="FoodTransferRules"/>), so the gate
+        /// creates no food either way; it is there so a shelled victim is not even asked to drain.
         /// </summary>
         public static bool CanStealFrom(ChickenController victim) => victim != null && !victim.IsStealProof;
 
@@ -92,14 +91,6 @@ namespace CluckWars.Gameplay
             fromCargo = Mathf.Min(want, Mathf.Max(0f, cargo));
             fromBag = Mathf.Min(want - fromCargo, Mathf.Max(0f, bountyBag));
         }
-
-        /// <summary>
-        /// How much a thief gives back when the victim's authority refused a steal that was
-        /// credited optimistically: the refused amount, never more than the thief holds and never
-        /// negative.
-        /// </summary>
-        public static float RefundAmount(float refused, float thiefCargo) =>
-            Mathf.Min(Mathf.Max(0f, refused), Mathf.Max(0f, thiefCargo));
 
         /// <summary>
         /// The most an Assassin execute may bank as looted cargo: the victim's carry capacity, or

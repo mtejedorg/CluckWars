@@ -406,30 +406,53 @@ namespace CluckWars.Gameplay
         /// Fusion (existing call sites pass nothing) and carries the sender —
         /// <see cref="TryResolveDepositor"/> turns that into the chicken the caller is entitled to
         /// speak for, and refuses to credit anything without one.
+        /// <para>
+        /// <b>Every flush is answered</b> (<c>ChickenCargo.RPC_SettleDeposit</c>). The chicken debited its cargo
+        /// before sending, so a silent refusal destroyed the food; a refusal now bounces it back, and an
+        /// acceptance is what counts the chicken's deposit stat. The answer only ever goes to a cargo the sender
+        /// owns, so a forged call cannot aim a bounce at somebody else, and the cargo honours it only against a
+        /// flush it recorded.
+        /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_AddFood(float amount, RpcInfo info = default)
+        public void RPC_AddFood(float amount, NetworkBehaviourId depositorCargoId, RpcInfo info = default)
         {
+            ChickenCargo cargo = ResolveSenderCargo(depositorCargoId, info);
+
             if (!IsPlausibleAmount(amount, out string amountRejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — {amountRejection}");
+                cargo?.RPC_SettleDeposit(amount, banked: false, Id);
                 return;
             }
 
-            if (!TryResolveDepositor(info, out var depositor))
+            if (cargo == null || !TryResolveDepositor(info, out var depositor) || depositor.Cargo != cargo)
             {
                 // Rate-limited per caller (a parked chicken flushes 4x a second) and detailed: the HOST's view of the base
                 // and of every chicken that could have been the depositor, so one line tells which check failed.
                 if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
                     _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — " +
                         $"no chicken that caller is entitled to speak for is standing at corner " +
-                        $"{CornerIndex} with a matching HomeCornerIndex. {DescribeRejection(info)}" +
+                        $"{CornerIndex} with a matching HomeCornerIndex" +
+                        (cargo == null ? $" (and {depositorCargoId} is not a cargo that caller owns, so nothing is sent back)" : string.Empty) +
+                        $". {DescribeRejection(info)}" +
                         (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                cargo?.RPC_SettleDeposit(amount, banked: false, Id);
                 return;
             }
 
             FoodTotal += amount;
+            cargo.RPC_SettleDeposit(amount, banked: true, Id);
             _log?.Debug(Source, $"{name}: +{amount:0.00} from {depositor.name} → FoodTotal={FoodTotal:0.0}.");
+        }
+
+        /// <summary>The cargo a flush names, if the sender may speak for it (local invoke: simulated here; off the wire: its state authority). Null otherwise.</summary>
+        private ChickenCargo ResolveSenderCargo(NetworkBehaviourId cargoId, in RpcInfo info)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(cargoId, out ChickenCargo cargo) ||
+                cargo == null || cargo.Object == null || !cargo.Object.IsValid) return null;
+            bool speaksFor = info.IsInvokeLocal ? cargo.Object.HasStateAuthority : cargo.Object.StateAuthority == info.Source;
+            return speaksFor ? cargo : null;
         }
 
         // One detailed rejection line per caller per 2 s (shared by all bases: a caller rejected at one base is the story).

@@ -17,8 +17,8 @@ namespace CluckWars.Tests
     /// <remarks>
     /// The enforcement hinges on a <c>[Networked]</c> <c>TickTimer</c> read against a live Runner,
     /// which EditMode never has. So, like <c>ControlImmunityFeedbackTests</c>, the wiring is
-    /// pinned from comment-stripped source (ordering: the thief-side gate must come BEFORE the
-    /// optimistic self-credit, or food is duplicated) and every pure rule is asserted for real.
+    /// pinned from comment-stripped source (ordering: the thief-side gate must come BEFORE the steal
+    /// is asked for, so a shelled victim is never asked) and every pure rule is asserted for real.
     /// </remarks>
     public sealed class StealProofTests
     {
@@ -88,39 +88,38 @@ namespace CluckWars.Tests
 
         // ---- 2. Victim-side refusal + refund ----------------------------------
 
-        [TestCase(5f, 8f, 5f)]
-        [TestCase(5f, 3f, 3f)]
-        [TestCase(5f, 0f, 0f)]
-        [TestCase(-4f, 9f, 0f)]
-        public void RefundAmount_IsTheRefusedCredit_NeverMoreThanHeld_NeverNegative(float refused, float held, float expected) =>
-            Assert.AreEqual(expected, StealRules.RefundAmount(refused, held), 1e-5f);
+        // A02: the thief no longer credits itself ahead of the drain, so a refusal has nothing to refund. It reports
+        // zero, which closes the thief's open request (FoodTransferRulesTests plays the amounts out).
 
         [Test]
-        public void RpcDrainStolen_RefusesWhenStealProof_AndRefundsTheThief_BeforeAnyDrain()
+        public void RpcDrainStolen_RefusesWhenStealProof_AndReportsZero_BeforeAnyDrain()
         {
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
             int proof  = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
-            int refund = body.IndexOf("RPC_RefundRefusedSteal(amount", StringComparison.Ordinal);
+            int report = body.IndexOf("ReportSteal(thief, 0f)", StringComparison.Ordinal);
             int drain  = body.IndexOf("StealRules.SplitDrain(", StringComparison.Ordinal);
             int stamp  = body.IndexOf("StealEventId++", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
-            Assert.Greater(refund, proof, "the refund is sent from the refusal branch");
-            Assert.Greater(drain, refund, "refusal must return before the drain");
-            Assert.Greater(stamp, refund, "a refused steal must not name a thief (no LastThiefId/StealEventId)");
+            Assert.Greater(report, proof, "the zero report is sent from the refusal branch");
+            Assert.Greater(drain, report, "refusal must return before the drain");
+            Assert.Greater(stamp, report, "a refused steal must not name a thief (no LastThiefId/StealEventId)");
             StringAssert.Contains("return;", body.Substring(proof, drain - proof));
         }
 
         [Test]
-        public void RpcRefundRefusedSteal_TakesTheSender_ChecksPlausibility_AndOnlyHonoursTheVictimsAuthority()
+        public void RpcSettleSteal_TakesTheSender_AndOnlyHonoursTheVictimsAuthority()
         {
-            var m = typeof(ChickenCargo).GetMethod(nameof(ChickenCargo.RPC_RefundRefusedSteal));
+            var m = typeof(ChickenCargo).GetMethod(nameof(ChickenCargo.RPC_SettleSteal));
             Assert.IsNotNull(m);
             Assert.IsTrue(m.GetParameters().Any(p => p.ParameterType == typeof(Fusion.RpcInfo)));
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_RefundRefusedSteal(", 3000);
-            StringAssert.Contains("IsPlausibleAmount", body);
-            StringAssert.Contains("victim.Object.StateAuthority == info.Source", body);
-            StringAssert.Contains("victim.Object.HasStateAuthority", body);
-            StringAssert.Contains("StealRules.RefundAmount(allowed, Cargo)", body);
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_SettleSteal(", 3000);
+            StringAssert.Contains("SpeaksFor(victim, info)", body);
+            StringAssert.Contains("FoodTransferRules.Credit(requested, amount)", body);
+
+            string speaks = Body(Src("Gameplay/ChickenCargo.cs"), "private static bool SpeaksFor(", 600);
+            StringAssert.Contains("owner.Object.StateAuthority == info.Source", speaks, "off the wire: the owner's state authority");
+            StringAssert.Contains("owner.Object.HasStateAuthority", speaks, "local invoke: simulated here");
+            Assert.IsNull(typeof(ChickenCargo).GetMethod("RPC_RefundRefusedSteal"), "the optimistic credit and its refund are back");
         }
 
         [Test]
@@ -135,11 +134,11 @@ namespace CluckWars.Tests
 
         // ---- 3. The six thief sites: gate BEFORE the self-credit ---------------
 
-        [TestCase("Abilities/SnatchAbilitySO.cs",      "CreditStealAndDrain(")]
-        [TestCase("Abilities/SneakyStealAbilitySO.cs", "CreditStealAndDrain(")]
-        [TestCase("Abilities/ScrapAbilitySO.cs",       "CreditStealAndDrain(")]
-        [TestCase("Abilities/RollTrampleAbilitySO.cs", "CreditStealAndDrain(")]
-        [TestCase("Gameplay/ChickenController.cs",     "CreditStealAndDrain(")]
+        [TestCase("Abilities/SnatchAbilitySO.cs",      "RequestSteal(")]
+        [TestCase("Abilities/SneakyStealAbilitySO.cs", "RequestSteal(")]
+        [TestCase("Abilities/ScrapAbilitySO.cs",       "RequestSteal(")]
+        [TestCase("Abilities/RollTrampleAbilitySO.cs", "RequestSteal(")]
+        [TestCase("Gameplay/ChickenController.cs",     "RequestSteal(")]
         public void ThiefSite_ChecksStealProof_BeforeCreditingItself(string file, string credit)
         {
             string src = Src(file);
@@ -196,7 +195,7 @@ namespace CluckWars.Tests
                 string norm = path.Replace('\\', '/');
                 if (norm.Contains("/Editor/") || Path.GetFileName(path) == "ChickenCargo.cs") continue;
                 string src = Src(norm.Substring(Dir.Length));
-                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".CreditStealAndDrain(") && !src.Contains(".RPC_TransferAllToBountyBag(")) continue;
+                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".RequestSteal(") && !src.Contains(".RPC_TransferAllToBountyBag(")) continue;
                 StringAssert.Contains("StealRules.CanStealFrom(", src, $"{Path.GetFileName(path)} steals without the steal-proof gate.");
             }
         }

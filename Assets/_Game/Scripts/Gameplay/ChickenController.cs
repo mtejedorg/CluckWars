@@ -1861,11 +1861,11 @@ namespace CluckWars.Gameplay
                         if (stolen > 0f)
                         {
                             // Spine Coat is a steal too, so it names its thief like every other
-                            // caller — see ChickenCargo.CreditStealAndDrain. This one is trivially
+                            // caller — see ChickenCargo.RequestSteal. This one is trivially
                             // in range (CollisionSlowRadius) and the receiver's bound comes off
                             // SpineCoatAbilitySO.NominalStealAmount, which is the same authored
                             // number StealBackAmount was set from.
-                            Cargo.CreditStealAndDrain(other.Cargo, stolen);
+                            Cargo.RequestSteal(other.Cargo, stolen);
                         }
                         var dir = (other.transform.position - transform.position);
                         dir.y = 0f;

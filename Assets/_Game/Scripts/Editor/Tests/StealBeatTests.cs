@@ -387,9 +387,9 @@ namespace CluckWars.Tests
         public void ThiefPop_CargoRendersRouteOnlyTheOwnStealGain_TheVictimLossStaysImmediate()
         {
             var src = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
-            int credit = src.IndexOf("public void CreditStealAndDrain(", System.StringComparison.Ordinal);
+            int credit = src.IndexOf("public void RPC_SettleSteal(", System.StringComparison.Ordinal);
             Assert.Greater(credit, 0);
-            StringAssert.Contains("_stealCreditFrame = Time.frameCount;", src.Substring(credit, 900),
+            StringAssert.Contains("_stealCreditFrame = Time.frameCount;", src.Substring(credit, 1800),
                 "the thief credit is stamped where it is written (local, no networked signal)");
 
             int render = src.IndexOf("public override void Render()", System.StringComparison.Ordinal);

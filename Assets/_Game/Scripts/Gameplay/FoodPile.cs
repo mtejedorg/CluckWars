@@ -443,29 +443,41 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Asks the pile's state authority to remove up to <paramref name="amount"/> food.
-        /// Caller is expected to have already credited their own cargo for the same amount;
-        /// any over-request (pile empty / under-supplied) just clamps to whatever's left
-        /// above <see cref="DrainFloor"/>.
+        /// Asks the pile's state authority to remove up to <paramref name="amount"/> food for the chicken whose
+        /// cargo is <paramref name="peckerCargoId"/> (<c>ChickenCargo.RequestPeck</c>). The pecker has credited
+        /// nothing: the pile removes what is really left above <see cref="DrainFloor"/> and reports that amount
+        /// back (<c>ChickenCargo.RPC_SettlePeck</c>), zero included, so two peckers on the last grain share it.
         /// </summary>
+        /// <remarks>
+        /// Nothing is drained for a cargo that does not resolve or that the sender does not own: the report would
+        /// have nobody to credit, and the food would simply vanish.
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_Drain(float amount)
+        public void RPC_Drain(float amount, NetworkBehaviourId peckerCargoId, RpcInfo info = default)
         {
-            if (amount <= 0f) return;
+            if (!(amount > 0f)) return;
+
+            if (Runner == null || !Runner.TryFindBehaviour(peckerCargoId, out ChickenCargo pecker) ||
+                pecker == null || pecker.Object == null || !pecker.Object.IsValid ||
+                !(info.IsInvokeLocal ? pecker.Object.HasStateAuthority : pecker.Object.StateAuthority == info.Source))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_Drain({amount:0.00}) from {info.Source} - {peckerCargoId} is not a chicken it speaks for.");
+                return;
+            }
 
             float before = Amount;
             float next = FoodPileMath.Drain(before, MaxAmount, FloorFraction, amount);
-            if (Mathf.Approximately(next, before)) return;
-
-            Amount = next;
-
-            float actual = before - next;
-            float floor = DrainFloor;
-
-            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+            float actual = Mathf.Approximately(next, before) ? 0f : before - next;
+            if (actual > 0f)
             {
-                _log.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount} (floor {floor:0.0}).");
+                Amount = next;
+                if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+                {
+                    _log.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount} (floor {DrainFloor:0.0}).");
+                }
             }
+
+            pecker.RPC_SettlePeck(actual, Id);
         }
     }
 }

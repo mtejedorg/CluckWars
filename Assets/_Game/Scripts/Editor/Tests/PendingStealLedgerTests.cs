@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// Security hardening of the steal-proof refund (<c>RPC_RefundRefusedSteal</c>) and the
+    /// Security hardening of the steal settlement (<c>RPC_SettleSteal</c>) and the
     /// Death Mark transfer (<c>RPC_TransferAllToBountyBag</c>): neither may be driven by a peer
     /// without a real steal / mark behind it. The ledger is pure and asserted for real; the
     /// Fusion-side wiring is pinned from comment-stripped source.
@@ -164,12 +164,12 @@ namespace CluckWars.Tests
         // ---- Wiring (source guards) ---------------------------------------------
 
         [Test]
-        public void RefundRpc_ConsumesAPendingRecord_BeforeTouchingCargo()
+        public void SettleRpc_ConsumesAPendingRecord_BeforeTouchingCargo()
         {
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_RefundRefusedSteal(", 3200);
-            int consume = body.IndexOf("_pendingSteals.TryConsume(victimId", StringComparison.Ordinal);
-            int cargo = body.IndexOf("Cargo -= refund", StringComparison.Ordinal);
-            Assert.Greater(consume, 0, "the refund must be matched against a pending record");
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_SettleSteal(", 3200);
+            int consume = body.IndexOf("_pendingSteals.TryConsumeOldest(victimId", StringComparison.Ordinal);
+            int cargo = body.IndexOf("Cargo += credit", StringComparison.Ordinal);
+            Assert.Greater(consume, 0, "the report must be matched against a pending record");
             Assert.Greater(cargo, consume);
             StringAssert.Contains("return;", body.Substring(consume, cargo - consume), "no record -> reject");
             StringAssert.Contains("_log?.Warn", body.Substring(consume, cargo - consume));
@@ -179,13 +179,12 @@ namespace CluckWars.Tests
         public void HelperRecordsBeforeItSendsTheDrain_AndEveryDrainGoesThroughIt()
         {
             string cargo = Src("Gameplay/ChickenCargo.cs");
-            string helper = Body(cargo, "public void CreditStealAndDrain(", 1100);
-            int credit = helper.IndexOf("Cargo += amount", StringComparison.Ordinal);
+            string helper = Body(cargo, "public void RequestSteal(", 1100);
             int record = helper.IndexOf("_pendingSteals.Record(", StringComparison.Ordinal);
             int rpc = helper.IndexOf("RPC_DrainStolen(amount", StringComparison.Ordinal);
-            Assert.Greater(credit, 0);
-            Assert.Greater(record, credit);
-            Assert.Greater(rpc, record, "a local invoke can refund synchronously, so the record must exist first");
+            Assert.Greater(record, 0);
+            Assert.Greater(rpc, record, "a local invoke settles synchronously, so the record must exist first");
+            StringAssert.DoesNotContain("Cargo +=", helper, "A02: the request credits nothing; RPC_SettleSteal does");
 
             foreach (var path in Directory.GetFiles(Dir, "*.cs", SearchOption.AllDirectories))
             {
@@ -205,7 +204,7 @@ namespace CluckWars.Tests
         public void DrainSite_UsesTheHelper_AndNoLongerSelfCreditsByHand(string file)
         {
             string src = Src(file);
-            StringAssert.Contains(".CreditStealAndDrain(", src);
+            StringAssert.Contains(".RequestSteal(", src);
             Assert.IsFalse(Regex.IsMatch(src, @"Cargo\s*\+=\s*(stolen|take)\b"),
                 $"{file} still credits itself by hand; the pending record would be missing.");
         }

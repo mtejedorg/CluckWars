@@ -29,7 +29,7 @@ namespace CluckWars.Abilities
     /// you are committed for, and it is deliberately shorter than every class's cooldown so
     /// the lock never fully overlaps the next press.
     ///
-    /// <b>Food is credited at activation, not at the end of the peck.</b> Crediting on
+    /// <b>Food is asked for at activation (and credited when the pile answers), not at the end of the peck.</b> Crediting on
     /// <see cref="OnDeactivate"/> would read better — the beak reaches the grain — but that
     /// callback also fires when the ability is torn down early (death, match stop), so it
     /// would need to distinguish "finished" from "interrupted" before it could pay out. The
@@ -62,7 +62,7 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool RequiresEnemyInRange => false;
 
-        /// <summary>Casting any other move cancels the 0.4 s lock (the food was already credited on peck start).</summary>
+        /// <summary>Casting any other move cancels the 0.4 s lock (the food was already asked for on peck start).</summary>
         public override bool EndsOnNextMove => true;
 
         /// <summary>Per-class, solved against the SCT axiom. Falls back to the authored
@@ -85,7 +85,7 @@ namespace CluckWars.Abilities
 
             var cargo = caster.Cargo;
             if (cargo == null) return false;
-            if (cargo.Cargo >= cargo.Capacity) return false;
+            if (cargo.FreeSpace <= 0f) return false;   // full, or the room is held by a peck still being answered
 
             return FindPile(caster) != null;
         }
@@ -111,19 +111,18 @@ namespace CluckWars.Abilities
             if (cargo == null || pile == null) return;
 
             float amount = ResolveAmount(chicken);
-            float spaceLeft = cargo.Capacity - cargo.Cargo;
 
             // pile.Available, not pile.Amount — the centre island is permanent and holds a
-            // floor that is terrain, not food. Crediting against Amount would make it an
+            // floor that is terrain, not food. Asking against Amount would make it an
             // infinite source.
-            float take = Mathf.Min(amount, spaceLeft, pile.Available);
+            float take = Mathf.Min(amount, cargo.FreeSpace, pile.Available);
             if (take <= 0f) return;
 
-            // Optimistic credit then drain, the same shape every steal in the game uses:
-            // the pile's authority clamps to whatever is actually there, so an over-request
-            // from a stale local view is harmless.
-            cargo.Cargo += take;
-            pile.RPC_Drain(take);
+            // Ask, do not credit: this peer's view of the pile can be stale (another chicken
+            // pecking it in the same tick). The pile's authority removes what is really there
+            // and reports it, and only that report credits the cargo (FoodTransferRules) — at
+            // once when this peer owns the pile, one round trip later otherwise.
+            cargo.RequestPeck(pile, take);
         }
 
         public override void OnDeactivate(AbilityContext ctx)

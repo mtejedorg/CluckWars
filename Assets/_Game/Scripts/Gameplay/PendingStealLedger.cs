@@ -4,32 +4,33 @@ using System.Collections.Generic;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The thief's local record of optimistic steal credits that the victim's authority has not
-    /// yet confirmed, so <c>ChickenCargo.RPC_RefundRefusedSteal</c> can only undo a credit that
-    /// actually happened. Pure and Fusion-free (the key is generic) so the EditMode suite can
-    /// exercise every branch.
+    /// A chicken's local record of the food transfers it has opened and that the other authority
+    /// has not answered yet: steals and pecks it asked for, deposit flushes it sent, executes whose
+    /// loot it expects. The settle RPCs on <c>ChickenCargo</c> honour a report only against a record
+    /// here. Pure and Fusion-free (the key is generic) so the EditMode suite can exercise every branch.
     /// </summary>
     /// <remarks>
-    /// <b>Why it exists.</b> The refund RPC is <c>RpcSources.All</c> and its sender check only
-    /// proves "this peer owns the named victim". Without a pending record, any client that owns
-    /// some chicken could name it as a victim and remove a plausible steal from any other
-    /// chicken, as often as it liked. With the ledger a refund is honoured only against a credit
-    /// this thief really made, for at most the amount it credited, once.
+    /// <b>Why it exists.</b> Every settle RPC is <c>RpcSources.All</c> and its sender check only
+    /// proves "this peer owns the named pile, victim or base". Without a pending record, any client
+    /// that owns some chicken could name it as a victim and report a plausible steal to any other
+    /// chicken, as often as it liked. With the ledger a report is honoured only against a request
+    /// this chicken really made, for at most the amount it asked for, once.
     /// <para>
-    /// Local to the thief's state authority and never replicated (Shared Mode trusts clients by
+    /// Local to the requesting chicken's state authority and never replicated (Shared Mode trusts clients by
     /// design; this only closes the unsolicited-call gap). A fixed ring: when full, the oldest
-    /// record is overwritten, which can only make a genuine refund fail after eight unconfirmed
-    /// steals inside one window, a rate no ability set can produce.
+    /// record is overwritten, which can only make a genuine report fail after eight unanswered
+    /// requests inside one window: no ability set produces that, and deposit flushes (4 a second)
+    /// reach it only when no acknowledgement has come back for two seconds.
     /// </para>
     /// </remarks>
     public sealed class PendingStealLedger<TKey> where TKey : struct
     {
         /// <summary>
-        /// How long a credit stays refundable, in seconds. The refund travels credit, then
-        /// RPC_DrainStolen to the victim's authority, then RPC_RefundRefusedSteal back: one full
-        /// round trip plus two tick boundaries. At a pessimistic 250 ms RTT that is about 0.3 s,
-        /// so 1.0 s covers it with margin for jitter and a missed snapshot, while still being
-        /// short enough that a forged refund must be timed to a steal that just happened.
+        /// The default window, in seconds: one full round trip plus two tick boundaries (about 0.3 s
+        /// at a pessimistic 250 ms RTT) with margin for jitter and a missed snapshot, while still
+        /// short enough that a forged report must be timed to a request that was just made. The
+        /// ledgers in production pass their own, longer window (two relayed trips):
+        /// <c>FoodTransferRules.SettleWindowSeconds</c> and <c>StealRules.ExecuteLootWindowSeconds</c>.
         /// </summary>
         public const float WindowSeconds = 1.0f;
 
@@ -67,7 +68,7 @@ namespace CluckWars.Gameplay
         /// <summary>This ledger's consumable window, in seconds.</summary>
         public float Window => _windowSeconds;
 
-        /// <summary>Records an optimistic credit of <paramref name="amount"/> taken from <paramref name="key"/>.</summary>
+        /// <summary>Records a transfer of <paramref name="amount"/> opened with <paramref name="key"/>.</summary>
         public void Record(TKey key, float amount, float now)
         {
             if (amount <= 0f) return;
@@ -110,6 +111,47 @@ namespace CluckWars.Gameplay
             allowed = Math.Min(_entries[pick].Amount, requested);
             _entries[pick].Live = false;
             return true;
+        }
+
+        /// <summary>
+        /// Consumes the oldest unexpired record from <paramref name="key"/>, whatever its amount, and returns that amount.
+        /// The settle half of a food transfer (<see cref="FoodTransferRules"/>): reports from one owner arrive in the
+        /// order the requests were sent, and a report of zero must still close its request.
+        /// </summary>
+        /// <returns>False (and 0) when there is no unexpired record from that key.</returns>
+        public bool TryConsumeOldest(TKey key, float now, out float recorded)
+        {
+            recorded = 0f;
+            int pick = -1;
+            for (int i = 0; i < Capacity; i++)
+            {
+                if (!IsLive(i, now)) continue;
+                if (!EqualityComparer<TKey>.Default.Equals(_entries[i].Key, key)) continue;
+                if (pick < 0 || _entries[i].Time < _entries[pick].Time) pick = i;
+            }
+            if (pick < 0) return false;
+
+            recorded = _entries[pick].Amount;
+            _entries[pick].Live = false;
+            return true;
+        }
+
+        /// <summary>The sum of every unexpired record: what is still asked for and not yet settled.</summary>
+        public float Outstanding(float now)
+        {
+            float total = 0f;
+            for (int i = 0; i < Capacity; i++)
+                if (IsLive(i, now)) total += _entries[i].Amount;
+            return total;
+        }
+
+        // Expired records are dropped on the way, as TryConsume does.
+        private bool IsLive(int i, float now)
+        {
+            if (!_entries[i].Live) return false;
+            if (now - _entries[i].Time <= _windowSeconds) return true;
+            _entries[i].Live = false;
+            return false;
         }
 
         /// <summary>Drops every record (new round).</summary>

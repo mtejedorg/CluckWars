@@ -145,11 +145,20 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Record deposited food. Called by <see cref="ChickenCargo"/> on the
-        /// depositing chicken's StateAuthority each time food is dropped at a base.
+        /// Count banked food. Called by <c>ChickenCargo.RPC_SettleDeposit</c> when the base acknowledges a
+        /// flush, which already runs on this chicken's state authority (same NetworkObject), so no RPC is
+        /// needed and food a base refused is never counted.
         /// </summary>
-        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_AddDeposit(float amount) { FoodDeposited += amount; }
+        public void RecordDeposit(float amount)
+        {
+            if (!HasStateAuthority)
+            {
+                // RPC_SettleDeposit targets the state authority, so reaching here elsewhere is a wiring bug.
+                _log?.Error(Source, $"{name}: RecordDeposit({amount:0.00}) called without state authority - deposit not counted.");
+                return;
+            }
+            if (amount > 0f) FoodDeposited += amount;
+        }
 
         /// <summary>
         /// Count one applied stun. Called by <c>ChickenController.RPC_ApplyStun</c>, which already

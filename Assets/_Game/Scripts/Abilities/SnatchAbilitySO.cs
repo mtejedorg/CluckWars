@@ -86,7 +86,7 @@ namespace CluckWars.Abilities
                     : 0f;
                 if (stolen > 0f)
                 {
-                    thiefCargo.CreditStealAndDrain(targetCargo, stolen);
+                    thiefCargo.RequestSteal(targetCargo, stolen);
                 }
 
                 if (KnockbackStrength > 0f)

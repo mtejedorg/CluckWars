@@ -150,7 +150,7 @@ namespace CluckWars.Tests
         [Test]
         public void PermanentPile_AtItsFloor_HasNothingCollectable()
         {
-            // THE bug this guards: cargo credits optimistically against Available.
+            // THE bug this guards: a peck is asked for (and drained) against Available.
             // If Available were computed from Amount instead, the centre pile would
             // be an infinite food source parked at its floor.
             float floorFrac = FoodPileMath.FloorFraction(true, PermFloorFrac);

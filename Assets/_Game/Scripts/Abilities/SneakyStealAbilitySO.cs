@@ -8,8 +8,8 @@ namespace CluckWars.Abilities
     /// One-shot non-combat ability: find the nearest enemy chicken in range and yank
     /// a chunk of their cargo over to yours. Bypasses the fight entirely — the only
     /// utility ability in the pool. Uses <see cref="ChickenCargo.RPC_DrainStolen"/>
-    /// for cross-authority cargo moves; the thief credits itself optimistically and
-    /// the victim's authority clamps to whatever's actually there.
+    /// for cross-authority cargo moves; the thief asks, the victim's authority drains
+    /// whatever is actually there and reports it, and only that report credits the thief.
     /// </summary>
     /// <remarks>
     /// <see cref="OnDeactivate"/> is a no-op — the steal happens at activation time
@@ -71,7 +71,7 @@ namespace CluckWars.Abilities
             float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Stealable, spaceLeft);
             if (take <= 0f) return;
 
-            thiefCargo.CreditStealAndDrain(target, take);
+            thiefCargo.RequestSteal(target, take);
             thief.LockStealOn(_scratch[0], SameVictimCooldownSeconds);
         }
 
