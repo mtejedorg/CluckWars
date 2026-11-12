@@ -25,6 +25,36 @@ namespace CluckWars.Tests
         private static float CapsuleBottom(float pivotY, float centerY, float height, float scaleY) =>
             pivotY + (centerY - height * 0.5f) * scaleY;
 
+        /// <summary>A4a (batch 4): the capsule maths moved to gameplay; the presentation helper forwards, value for value.</summary>
+        [Test]
+        public void TheCapsuleMaths_LivesInGameplay_AndChickenGroundForwardsIt()
+        {
+            foreach (float scale in new[] { 0.5f, 1f, 1.35f, -2f, 0f })
+                foreach (float ground in new[] { 0f, 0.4f })
+                    Assert.AreEqual(ChickenCapsule.StandingPivotY(0.1f, 1.6f, 0.08f, scale, ground),
+                        ChickenGround.StandingPivotY(0.1f, 1.6f, 0.08f, scale, ground), $"scale {scale}, ground {ground}");
+            Assert.AreEqual(0.88f, ChickenCapsule.StandingPivotY(0f, 1.6f, 0.08f, 1f), 1e-6f, "half the capsule plus the skin");
+
+            Assert.AreEqual(ChickenCapsule.FallbackLocalFeetY, ChickenGround.FallbackLocalFeetY);
+            Assert.AreEqual(-0.8f, ChickenCapsule.LocalFeetY(null));
+            Assert.AreEqual(ChickenCapsule.LocalFeetY(null), ChickenGround.LocalFeetY(null));
+            var go = new GameObject("capsule");
+            try
+            {
+                var cc = go.AddComponent<CharacterController>();
+                cc.height = 1.4f; cc.center = new Vector3(0f, 0.2f, 0f);
+                Assert.AreEqual(-0.5f, ChickenCapsule.LocalFeetY(cc), 1e-6f);
+                Assert.AreEqual(ChickenCapsule.LocalFeetY(cc), ChickenGround.LocalFeetY(cc));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+
+            string controller = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs");
+            StringAssert.Contains("ChickenCapsule.LocalFeetY(_characterController)", controller);
+            StringAssert.Contains("ChickenCapsule.StandingPivotY(cc.center.y, cc.height, cc.skinWidth, transform.lossyScale.y)", controller);
+            StringAssert.DoesNotContain("ChickenGround.LocalFeetY", controller);
+            StringAssert.DoesNotContain("ChickenGround.StandingPivotY", controller);
+        }
+
         [TestCase(1f)]
         [TestCase(1.3f)]
         [TestCase(0.8f)]

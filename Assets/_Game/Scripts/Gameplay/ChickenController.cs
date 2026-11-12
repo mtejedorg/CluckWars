@@ -726,7 +726,7 @@ namespace CluckWars.Gameplay
             // to the bottom of the capsule puts the feet on the ground. The pivot sits at the
             // capsule's mid-height (center is zero), i.e. half the height above ground contact —
             // parenting at localPosition zero would leave every chicken hovering by that much.
-            float groundLocalY = ChickenGround.LocalFeetY(_characterController);
+            float groundLocalY = ChickenCapsule.LocalFeetY(_characterController);
             model.transform.localPosition = new Vector3(0f, groundLocalY, 0f);
             model.transform.localRotation = Quaternion.identity;
 
@@ -1447,12 +1447,12 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>Root-pivot world Y at which this chicken (its CharacterController and current root scale) stands on the
-        /// ground at Y 0. See <see cref="ChickenGround.StandingPivotY"/>.</summary>
+        /// ground at Y 0. See <see cref="ChickenCapsule.StandingPivotY"/>.</summary>
         private float StandingPivotY()
         {
             var cc = _characterController != null ? _characterController : GetComponent<CharacterController>();
             if (cc == null) return transform.position.y;
-            return ChickenGround.StandingPivotY(cc.center.y, cc.height, cc.skinWidth, transform.lossyScale.y);
+            return ChickenCapsule.StandingPivotY(cc.center.y, cc.height, cc.skinWidth, transform.lossyScale.y);
         }
 
         /// <summary>State authority, once in <see cref="Spawned"/>: seats the freshly spawned chicken on the ground. A plain
