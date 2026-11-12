@@ -545,7 +545,7 @@ namespace CluckWars.Tests
 
             StringAssert.Contains("new GamepadInputProvider()", Read("Assets/_Game/Scripts/Installers/ProjectInstaller.cs"));
 
-            string net = Read("Assets/_Game/Scripts/Networking/FusionNetworkService.cs");
+            string net = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
             StringAssert.Contains("Aim = aim", net);
             StringAssert.Contains("InputButton.QuickMoves", net);
             StringAssert.Contains("InputButton.SoftLockTouch", net);

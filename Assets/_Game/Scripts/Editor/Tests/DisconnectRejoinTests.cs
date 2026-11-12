@@ -97,7 +97,7 @@ namespace CluckWars.Tests
             Assert.AreEqual("Lost the signal to the barn.", SessionEndCopy.For(kind, ShutdownReason.DisconnectedByPluginLogic));
 
             // ...and a reason left over from an earlier runner cannot leak into it: StartAsync resets it, OnShutdown does not.
-            string src = Read("Assets/_Game/Scripts/Networking/FusionNetworkService.cs");
+            string src = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
             int start = src.IndexOf("private async Task StartAsync(", StringComparison.Ordinal);
             Assert.Greater(src.IndexOf("LastDisconnectReason = null;", start, StringComparison.Ordinal), start);
             int shutdown = src.IndexOf("INetworkRunnerCallbacks.OnShutdown", StringComparison.Ordinal);
@@ -108,7 +108,7 @@ namespace CluckWars.Tests
         [Test]
         public void Rejoin_StillALobbyMember_ReReadsTheLobby_KeepsHostOwnership_AndLogsTheUgsReason()
         {
-            string src = Read("Assets/_Game/Scripts/Services/UGSService.cs");
+            string src = Read("Assets/_Game/Scripts/App/UGSService.cs");
             int join = src.IndexOf("public async Task<LobbyInfo> JoinLobbyByCodeAsync(", StringComparison.Ordinal);
             string body = src.Substring(join, src.IndexOf("public async Task<LobbyInfo> JoinLobbyAsync(", join, StringComparison.Ordinal) - join);
             int reRead = body.IndexOf("LobbyService.Instance.GetLobbyAsync(member.Id)", StringComparison.Ordinal);
@@ -191,7 +191,7 @@ namespace CluckWars.Tests
         [Test]
         public void UgsService_KeepsTheCodeOnCreateAndJoin_ClearsItOnLeave_AndAChecksNeverThrow()
         {
-            string src = Read("Assets/_Game/Scripts/Services/UGSService.cs");
+            string src = Read("Assets/_Game/Scripts/App/UGSService.cs");
             Assert.AreEqual(2, Regex.Matches(src, @"LastJoinCode\s*=\s*lobby\.LobbyCode").Count, "create + join by code");
             StringAssert.IsMatch(@"LastJoinCode\s*=\s*joined\.LobbyCode", src, "join by id");
             StringAssert.IsMatch(@"LastJoinCode\s*=\s*null", src, "leave");
@@ -245,7 +245,7 @@ namespace CluckWars.Tests
         [Test]
         public void FusionService_RecordsTheTransportReason_BeforeShutdown_AndResetsItPerRunner()
         {
-            string src = Read("Assets/_Game/Scripts/Networking/FusionNetworkService.cs");
+            string src = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
             int disconnected = src.IndexOf("INetworkRunnerCallbacks.OnDisconnectedFromServer", StringComparison.Ordinal);
             Assert.Greater(disconnected, 0);
             Assert.Greater(src.IndexOf("LastDisconnectReason = reason;", disconnected, StringComparison.Ordinal), disconnected);
@@ -350,7 +350,7 @@ namespace CluckWars.Tests
         {
             // The host also dropped in that run (PhotonCloudTimeout) and its heartbeat stopped on the first timeout, so its
             // lobby would expire before its own REJOIN.
-            string src = Read("Assets/_Game/Scripts/Services/UGSService.cs");
+            string src = Read("Assets/_Game/Scripts/App/UGSService.cs");
             int loop = src.IndexOf("private async Task HeartbeatLoopAsync(", StringComparison.Ordinal);
             string body = src.Substring(loop, src.IndexOf("// ---- Helpers", loop, StringComparison.Ordinal) - loop);
             StringAssert.Contains("LobbyExceptionReason.LobbyNotFound", body, "a deleted lobby stops the loop");

@@ -124,7 +124,7 @@ namespace CluckWars.Tests
         [Test]
         public void Network_WhileTheSheetIsUp_SendsNoMovesAndNoPresses()
         {
-            string src = Read("Assets/_Game/Scripts/Networking/FusionNetworkService.cs");
+            string src = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
             int onInput = src.IndexOf("INetworkRunnerCallbacks.OnInput(", System.StringComparison.Ordinal);
             int gate = src.IndexOf("if (LeaveSheetState.IsOpen)", onInput, System.StringComparison.Ordinal);
             int movement = src.IndexOf("_inputProvider.GetMovement()", onInput, System.StringComparison.Ordinal);
