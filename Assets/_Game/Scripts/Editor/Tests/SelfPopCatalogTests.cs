@@ -137,7 +137,7 @@ namespace CluckWars.Tests
                         cargoPop.IndexOf("SpawnCargoDelta(", System.StringComparison.Ordinal),
                         "the owner's word must be tried before the remote cargo popup");
 
-            string cargo = Read("Gameplay/ChickenCargo.cs");
+            string cargo = Read("Visuals/HitFeedback.cs");   // the cargo change listener (ChickenCargo raises, it draws)
             StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", cargo);
             StringAssert.DoesNotContain("SpawnCargoDelta(", cargo, "one cargo pop per event: no direct delta popup");
 

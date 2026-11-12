@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Logging;
-using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -646,7 +645,7 @@ namespace CluckWars.Gameplay
             {
                 var chicken = all[i];
                 if (!IsCaught(chicken, center, radius) || !_confirmed.Add(chicken.Id)) continue;
-                chicken.GetComponent<HitFeedback>()?.NotifyAttacker(center);   // missing component: see NotifyCaughtVictims
+                chicken.LocalEvents.RaiseAttackerNamed(center);   // nobody listening: see NotifyCaughtVictims
                 caughtSomeone = true;
             }
             if (caughtSomeone) NotifyOwnerZoneTriggered(Runner);
@@ -697,10 +696,10 @@ namespace CluckWars.Gameplay
                 var chicken = all[i];
                 if (!IsCaught(chicken, center, radius)) continue;
 
-                // Same lookup NotifyOwnerZoneTriggered uses. A missing component is already
-                // reported loudly there once per zone; staying quiet here avoids one warning
-                // per victim per frame for the same prefab fault.
-                chicken.GetComponent<HitFeedback>()?.NotifyAttacker(center);
+                // A local event the victim's presentation listens to (HitFeedback draws the bearing). Nobody
+                // listening is the prefab fault NotifyOwnerZoneTriggered reports once per zone; staying quiet
+                // here avoids one warning per victim per frame for the same fault.
+                chicken.LocalEvents.RaiseAttackerNamed(center);
             }
         }
 
@@ -756,15 +755,12 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            var feedback = owner.GetComponent<HitFeedback>();
-            if (feedback == null)
+            // A local event the caster's presentation listens to (HitFeedback draws the confirmation).
+            if (!owner.LocalEvents.RaiseZoneTriggered())
             {
-                _log?.Warn(Source, $"Zone owner '{owner.name}' has no HitFeedback component — " +
-                    "placed-zone cast confirmation dropped. Check the Chicken prefab.");
-                return;
+                _log?.Warn(Source, $"Zone owner '{owner.name}' has nothing listening for the zone confirmation " +
+                    "(no HitFeedback component?) — placed-zone cast confirmation dropped. Check the Chicken prefab.");
             }
-
-            feedback.NotifyZoneTriggered();
         }
     }
 }

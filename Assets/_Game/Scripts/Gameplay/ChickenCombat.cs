@@ -1,7 +1,6 @@
 using System;
 using CluckWars.Audio;
 using CluckWars.Logging;
-using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -29,7 +28,6 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer StunTimer { get; set; }
 
         private ChickenController _controller;
-        private ChickenAnimator _animator;
         private CharacterController _body;
         private AssassinExecute _execute;
         private bool _missingControllerLogged;
@@ -43,6 +41,13 @@ namespace CluckWars.Gameplay
         /// Fires on every peer when this chicken transitions into execute removal.
         /// </summary>
         public event Action OnDeath;
+
+        /// <summary>
+        /// Fires on every peer when this chicken's execute removal ends (it stands up again). With
+        /// <see cref="OnDeath"/>, how presentation follows the removal: this behaviour calls no animator, camera
+        /// or HUD type.
+        /// </summary>
+        public event Action OnRespawn;
 
         /// <summary>
         /// Fires only on the StateAuthority when execute removal occurs.
@@ -69,7 +74,6 @@ namespace CluckWars.Gameplay
             }
 
             _controller = GetComponent<ChickenController>();
-            _animator = GetComponent<ChickenAnimator>();
             _execute = GetComponent<AssassinExecute>();
             _detector = GetChangeDetector(ChangeDetector.Source.SimulationState);
 
@@ -116,7 +120,6 @@ namespace CluckWars.Gameplay
                     case nameof(IsRemoved):
                     {
                         var (_, cur) = _stunReader.Read(previous, current);
-                        _animator?.SetStunned(cur);
                         // Out: no body to bump into on any peer (the respawn teleport toggles it around itself and leaves it as found).
                         if (_body == null) _body = GetComponent<CharacterController>();
                         if (_body != null && _controller != null && !_controller.IsDecoy) _body.enabled = !cur;
@@ -124,26 +127,14 @@ namespace CluckWars.Gameplay
                         {
                             _log?.Info(Source, "Execute removal begin.");
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
+                            // The stunned pose, the death shake, the feathers and the hit-stop all hang off this
+                            // event (ChickenAnimator, HitFeedback): presentation observes, gameplay does not call it.
                             OnDeath?.Invoke();
-                            // FEEDBACK.md §3.4's death shake. Stays the SINGLE call site for
-                            // it — Stage 4's HitFeedback deliberately does not re-issue it,
-                            // it only layers the feather burst and hit-stop on top of this
-                            // same OnDeath moment. The literals (0.35 / 0.45) that used to
-                            // sit here are what FeedbackTuning.DeathShake* were derived
-                            // from; reading them back keeps a re-tune effective.
-                            // !IsDecoy as well as HasInputAuthority: a decoy shares its
-                            // caster's InputAuthority, so HasInputAuthority is TRUE on the
-                            // decoy on the caster's own peer. Without the second term,
-                            // killing a decoy shook the caster's camera as if they had died.
-                            if (HasInputAuthority && _controller != null && !_controller.IsDecoy)
-                                CluckWars.Visuals.MatchCamera.Instance?.ApplyShake(
-                                    CluckWars.Visuals.FeedbackTuning.DeathShakeMagnitude,
-                                    CluckWars.Visuals.FeedbackTuning.DeathShakeDurationSeconds);
                         }
                         else
                         {
                             _log?.Info(Source, "Removal ended; respawned.");
-                            if (HasInputAuthority && _controller != null && !_controller.IsDecoy) LocalRespawnCue.Raise();
+                            OnRespawn?.Invoke();   // the pose back up and the local "BACK IN" cue are the listeners'
                         }
                         break;
                     }

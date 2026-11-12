@@ -245,7 +245,12 @@ namespace CluckWars.Tests
             StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", beat, "the held +n is the same cargo pop, only later");
 
             var cargoSrc = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs");
-            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(cargoSrc, @"FloatingCombatText\.Spawn\w*\(").Count,
+            Assert.AreEqual(0, System.Text.RegularExpressions.Regex.Matches(cargoSrc, @"FloatingCombatText\.Spawn\w*\(").Count,
+                "gameplay draws no pop: it raises the cargo change");
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(cargoSrc, @"LocalEvents\.RaiseCargoChanged\(").Count,
+                "one cargo event per cargo change on any peer");
+            string onCargo = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Visuals/HitFeedback.cs", "private void OnCargoChanged(CargoChangeEvent e)");
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(onCargo, @"FloatingCombatText\.Spawn\w*\(").Count,
                 "one pop per cargo change on any peer (SpawnCargoPop: the self word on the owner, corn text for rivals)");
         }
 
@@ -392,14 +397,19 @@ namespace CluckWars.Tests
             StringAssert.Contains("_stealCreditFrame = Time.frameCount;", src.Substring(credit, 1800),
                 "the thief credit is stamped where it is written (local, no networked signal)");
 
+            // Gameplay raises the change with the credit frame; the hold / pop / loss decision is HitFeedback's.
             int render = src.IndexOf("public override void Render()", System.StringComparison.Ordinal);
-            int held = src.IndexOf("_hitFeedback.HoldStealGainPop(delta)", render, System.StringComparison.Ordinal);
-            int pop = src.IndexOf("FloatingCombatText.SpawnCargoPop(", render, System.StringComparison.Ordinal);
-            int loss = src.IndexOf("_hitFeedback?.NotifyCargoLoss(", render, System.StringComparison.Ordinal);
-            Assert.Greater(held, render);
+            int raise = src.IndexOf("_controller?.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame)", render, System.StringComparison.Ordinal);
+            Assert.Greater(raise, render, "ChickenCargo.Render hands the delta and the steal credit frame to its listeners");
+
+            string handler = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Visuals/HitFeedback.cs", "private void OnCargoChanged(CargoChangeEvent e)");
+            int held = handler.IndexOf("HoldStealGainPop(delta)", System.StringComparison.Ordinal);
+            int pop = handler.IndexOf("FloatingCombatText.SpawnCargoPop(", System.StringComparison.Ordinal);
+            int loss = handler.IndexOf("NotifyCargoLoss(-delta)", System.StringComparison.Ordinal);
+            Assert.Greater(held, 0);
             Assert.Less(held, pop, "the own steal gain is held before the immediate pop");
-            string gate = src.Substring(render, held - render);
-            StringAssert.Contains("delta > 0f && StealGainPopHold.IsStealCredit(_stealCreditFrame, Time.frameCount)", gate,
+            string gate = handler.Substring(0, held);
+            StringAssert.Contains("delta > 0f && StealGainPopHold.IsStealCredit(e.StealCreditFrame, Time.frameCount)", gate,
                 "only a gain that is this thief own credit is held: the victim -n and pile pickups pop at once");
             StringAssert.Contains("FloatingCombatText.IsSelfPopTarget(_controller)", gate, "only the thief own screen waits");
             Assert.Greater(loss, pop, "the victim loss beat follows the immediate pop, unchanged (E4a)");

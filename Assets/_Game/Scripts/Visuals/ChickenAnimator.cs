@@ -215,6 +215,7 @@ namespace CluckWars.Visuals
 
         // The jump one-shot comes from ChickenLocalEvents; latched here and consumed in LateUpdate.
         private ChickenLocalEvents _events;
+        private ChickenCombat _combat;   // while subscribed to its removal events
         private bool _jumpPending;
 
         /// <summary>
@@ -361,6 +362,13 @@ namespace CluckWars.Visuals
             _events = _controller.LocalEvents;
             _events.Jump += OnJump;
             _events.Cast += OnCast;
+
+            _combat = GetComponent<ChickenCombat>();
+            if (_combat != null)
+            {
+                _combat.OnDeath   += OnRemoved;
+                _combat.OnRespawn += OnRespawned;
+            }
         }
 
         private void OnDisable()
@@ -371,10 +379,20 @@ namespace CluckWars.Visuals
                 _events.Cast -= OnCast;
                 _events = null;
             }
+            if (_combat != null)
+            {
+                _combat.OnDeath   -= OnRemoved;
+                _combat.OnRespawn -= OnRespawned;
+                _combat = null;
+            }
             _jumpPending = false;
         }
 
         private void OnJump() => _jumpPending = true;
+
+        // The removed (executed) pose follows ChickenCombat's every-peer removal events.
+        private void OnRemoved()   => SetStunned(true);
+        private void OnRespawned() => SetStunned(false);
 
         /// <summary>
         /// Cast and peck beats this peer has played for this chicken. Local, never networked: a diagnostic that

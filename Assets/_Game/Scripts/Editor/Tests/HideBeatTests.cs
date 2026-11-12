@@ -205,7 +205,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("IsSuppressedAt(controller)", cargoPop);
             Assert.Less(cargoPop.IndexOf("IsSuppressedAt(controller)", System.StringComparison.Ordinal),
                         cargoPop.IndexOf("SpawnSelfPop(", System.StringComparison.Ordinal), "the gate comes before either pop");
-            StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", Read("Gameplay/ChickenCargo.cs"));
+            StringAssert.Contains("FloatingCombatText.SpawnCargoPop(", Read("Visuals/HitFeedback.cs"));   // the cargo change listener
         }
 
         [Test]

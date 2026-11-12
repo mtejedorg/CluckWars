@@ -48,11 +48,11 @@ namespace CluckWars.Tests
         {
             string src = File.ReadAllText(CargoPath);
             int consume = src.IndexOf("_silentWrite.ConsumeChange()", StringComparison.Ordinal);
-            int pop = src.IndexOf("FloatingCombatText.SpawnCargoPop(", StringComparison.Ordinal);
-            int loss = src.IndexOf("_hitFeedback?.NotifyCargoLoss(", StringComparison.Ordinal);
+            // The pop and the cargo-loss beat are drawn by the listener of this one local event (HitFeedback.OnCargoChanged).
+            int raise = src.IndexOf("LocalEvents.RaiseCargoChanged(", StringComparison.Ordinal);
             Assert.Greater(consume, 0, "ChickenCargo.Render no longer consults the silent-write marker.");
-            Assert.Less(consume, pop, "The marker must be checked before the cargo pop.");
-            Assert.Less(consume, loss, "The marker must be checked before the cargo-loss beat.");
+            Assert.Greater(raise, 0, "ChickenCargo.Render no longer raises the cargo change.");
+            Assert.Less(consume, raise, "The marker must be checked before the cargo pop and the cargo-loss beat are raised.");
             StringAssert.Contains("_silentWrite.EndRender(", src);
         }
 

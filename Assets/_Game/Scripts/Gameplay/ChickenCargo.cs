@@ -160,7 +160,6 @@ namespace CluckWars.Gameplay
 
         private ChickenController _controller;
         private ChickenCombat _combat;
-        private HitFeedback _hitFeedback;
         private ILogService _log;
 
         // ---- Local cargo-delta observation (FEEDBACK.md §3.2, case 12) --------
@@ -228,7 +227,6 @@ namespace CluckWars.Gameplay
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
-            _hitFeedback = GetComponent<HitFeedback>();
 
             _cargoDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
             _cargoReader = GetPropertyReader<float>(nameof(Cargo));
@@ -245,9 +243,10 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Local-only, on every peer: the replicated <see cref="Cargo"/> value turned into the §3.2
-        /// <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, with a *loss* fed into
-        /// <see cref="HitFeedback"/> as one more victim-hit trigger (case 12 is a hit as much
-        /// as a knockback is — someone just took your food). The <see cref="StealEventId"/> edge that gives that
+        /// <c>-5 🌽</c> / <c>+5 🌽</c> floating numbers, with a *loss* treated as one more victim-hit trigger
+        /// (case 12 is a hit as much as a knockback is — someone just took your food). This behaviour only decides
+        /// that the change is meaningful and raises <see cref="ChickenLocalEvents.CargoChanged"/>; the number and
+        /// the hit beat are drawn by its listener (<c>HitFeedback</c>). The <see cref="StealEventId"/> edge that gives that
         /// hit a <i>direction</i> is observed by <see cref="ChickenLocalEvents"/> (its <c>Stolen</c> event).
         /// </summary>
         /// <remarks>
@@ -286,20 +285,11 @@ namespace CluckWars.Gameplay
                 // A drain into a base is not a loss to anyone — it is the point of the game.
                 if (delta < 0f && IsDepositing) continue;
 
-                // I5: the thief own +n waits for the stolen kernels (HitFeedback releases it on their arrival);
-                // pile pickups, the victim -n and every other peer view pop at once, as before.
-                if (delta > 0f && StealGainPopHold.IsStealCredit(_stealCreditFrame, Time.frameCount) &&
-                    _hitFeedback != null && FloatingCombatText.IsSelfPopTarget(_controller))
-                {
-                    _stealCreditFrame = -1;
-                    _hitFeedback.HoldStealGainPop(delta);
-                    continue;
-                }
-
-                FloatingCombatText.SpawnCargoPop(_controller,
-                    _controller.PopAnchor, delta);
-
-                if (delta < 0f) _hitFeedback?.NotifyCargoLoss(-delta);
+                // The floating number, the held steal +n (I5) and the cargo-loss hit beat are presentation: HitFeedback
+                // draws them from this local event. A gain uses up the pending steal credit whether or not it is held.
+                int stealCreditFrame = _stealCreditFrame;
+                if (delta > 0f) _stealCreditFrame = -1;
+                _controller?.LocalEvents.RaiseCargoChanged(delta, stealCreditFrame);
             }
 
             _silentWrite.EndRender(Time.frameCount);

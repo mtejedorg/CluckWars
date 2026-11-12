@@ -203,7 +203,7 @@ namespace CluckWars.Tests
 
             string confirm = Body(ZonePath, "private void ConfirmEachFirstEntry()");
             StringAssert.Contains("if (!IsCaught(chicken, center, radius) || !_confirmed.Add(chicken.Id)) continue;", confirm);
-            StringAssert.Contains("NotifyAttacker(center)", confirm, "B6: the bearing points at the centre = the caster");
+            StringAssert.Contains("RaiseAttackerNamed(center)", confirm, "B6: the bearing points at the centre = the caster");
             StringAssert.Contains("NotifyOwnerZoneTriggered(Runner)", confirm);
             StringAssert.DoesNotContain("_slowZoneOccupied", confirm);
         }

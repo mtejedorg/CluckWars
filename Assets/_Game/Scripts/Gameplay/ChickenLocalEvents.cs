@@ -1,6 +1,7 @@
 using System;
 using CluckWars.Abilities;
 using Fusion;
+using UnityEngine;
 
 namespace CluckWars.Gameplay
 {
@@ -38,6 +39,22 @@ namespace CluckWars.Gameplay
     {
         public readonly NetworkBehaviourId Thief;
         public StealEvent(NetworkBehaviourId thief) { Thief = thief; }
+    }
+
+    /// <summary>A meaningful change of the food this chicken carries, as <c>ChickenCargo.Render</c> saw it.</summary>
+    public readonly struct CargoChangeEvent
+    {
+        /// <summary>Positive: gained. Negative: lost.</summary>
+        public readonly float Delta;
+        /// <summary>The frame this peer last credited this chicken a steal (-1: none). A gain observed in that
+        /// frame or the next one is that credit, which its listener may present later than an ordinary pickup.</summary>
+        public readonly int StealCreditFrame;
+
+        public CargoChangeEvent(float delta, int stealCreditFrame)
+        {
+            Delta = delta;
+            StealCreditFrame = stealCreditFrame;
+        }
     }
 
     /// <summary>
@@ -85,6 +102,11 @@ namespace CluckWars.Gameplay
     /// compares and allocates nothing.
     /// </para>
     /// <para>
+    /// <b>Local moments too.</b> A moment that gameplay notices in <c>Render</c> from continuous replicated state
+    /// (a cargo delta, a zone catching someone, the class model being attached) is raised here by the behaviour
+    /// that owns that state (the <c>Raise...</c> methods), so gameplay never calls a presentation type.
+    /// </para>
+    /// <para>
     /// <b>Baselines.</b> One <see cref="EventEdge"/> per counter (its remarks hold the rules: seed first, fire once
     /// per change, wrap is a change, several bumps fire once). <see cref="Reset"/> on spawn and despawn re-seeds.
     /// </para>
@@ -112,6 +134,42 @@ namespace CluckWars.Gameplay
         public event Action<StealEvent> Stolen;
         /// <summary><c>ChickenCargo.DepositEventId</c> moved: this chicken finished banking its whole load.</summary>
         public event Action Deposited;
+
+        // ---- Local moments, raised from Render by the gameplay behaviour that owns the state ----
+
+        /// <summary>The carried food changed by a meaningful amount (not the trickle of collecting or depositing).</summary>
+        public event Action<CargoChangeEvent> CargoChanged;
+        /// <summary>Something that just hit this chicken came from this world position (a zone's centre).</summary>
+        public event Action<Vector3> AttackerNamed;
+        /// <summary>A zone this chicken placed just caught someone: the caster's confirmation.</summary>
+        public event Action ZoneTriggered;
+        /// <summary>The per-class model was parented under this chicken (its renderers exist from now on).</summary>
+        public event Action ClassModelAttached;
+
+        /// <summary>From <c>ChickenCargo.Render</c>, every peer.</summary>
+        public void RaiseCargoChanged(float delta, int stealCreditFrame) =>
+            CargoChanged?.Invoke(new CargoChangeEvent(delta, stealCreditFrame));
+
+        /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens.</summary>
+        public bool RaiseAttackerNamed(Vector3 attackerWorldPosition)
+        {
+            var listeners = AttackerNamed;
+            if (listeners == null) return false;
+            listeners(attackerWorldPosition);
+            return true;
+        }
+
+        /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens (a prefab fault the caller reports).</summary>
+        public bool RaiseZoneTriggered()
+        {
+            var listeners = ZoneTriggered;
+            if (listeners == null) return false;
+            listeners();
+            return true;
+        }
+
+        /// <summary>From <c>ChickenController.Spawned</c>, once the class model is attached.</summary>
+        public void RaiseClassModelAttached() => ClassModelAttached?.Invoke();
 
         /// <param name="controller">The chicken observed; null only in tests, which feed snapshots.</param>
         public ChickenLocalEvents(ChickenController controller = null) { _controller = controller; }

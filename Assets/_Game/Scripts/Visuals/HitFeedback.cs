@@ -271,6 +271,7 @@ namespace CluckWars.Visuals
                 // ChangeDetector on IsRemoved — re-detecting the same transition here would
                 // be a second source of truth for one event.
                 _combat.OnDeath += HandleRemoval;
+                _combat.OnRespawn += HandleRespawn;
                 _subscribedToDeath = true;
             }
 
@@ -294,6 +295,7 @@ namespace CluckWars.Visuals
             if (_combat != null && _subscribedToDeath)
             {
                 _combat.OnDeath -= HandleRemoval;
+                _combat.OnRespawn -= HandleRespawn;
                 _subscribedToDeath = false;
             }
             EndFlash();
@@ -309,6 +311,10 @@ namespace CluckWars.Visuals
             _events.Cast      += OnCast;
             _events.Stolen    += OnStolen;
             _events.Deposited += OnDeposited;
+            _events.CargoChanged       += OnCargoChanged;
+            _events.AttackerNamed      += NotifyAttacker;
+            _events.ZoneTriggered      += NotifyZoneTriggered;
+            _events.ClassModelAttached += RefreshBodyRenderers;
         }
 
         private void OnDisable()
@@ -319,6 +325,10 @@ namespace CluckWars.Visuals
                 _events.Cast      -= OnCast;
                 _events.Stolen    -= OnStolen;
                 _events.Deposited -= OnDeposited;
+                _events.CargoChanged       -= OnCargoChanged;
+                _events.AttackerNamed      -= NotifyAttacker;
+                _events.ZoneTriggered      -= NotifyZoneTriggered;
+                _events.ClassModelAttached -= RefreshBodyRenderers;
                 _events = null;
             }
             _knockPending = false;
@@ -338,6 +348,31 @@ namespace CluckWars.Visuals
         }
 
         private void OnDeposited() => PlayOwnSfx(SfxId.Deposit);
+
+        /// <summary>
+        /// The carried food changed by a meaningful amount (<c>ChickenCargo.Render</c>, every peer): the floating
+        /// <c>+n</c> / <c>-n</c>, with a loss treated as one more victim hit (§3.2 case 12).
+        /// </summary>
+        /// <remarks>
+        /// I5: this thief's own steal gain is not popped at once. It is held until the stolen kernels land
+        /// (<see cref="HoldStealGainPop"/>); pile pickups, the victim's <c>-n</c> and every other peer's view pop
+        /// immediately.
+        /// </remarks>
+        private void OnCargoChanged(CargoChangeEvent e)
+        {
+            if (_controller == null) return;
+            float delta = e.Delta;
+
+            if (delta > 0f && StealGainPopHold.IsStealCredit(e.StealCreditFrame, Time.frameCount) &&
+                FloatingCombatText.IsSelfPopTarget(_controller))
+            {
+                HoldStealGainPop(delta);
+                return;
+            }
+
+            FloatingCombatText.SpawnCargoPop(_controller, _controller.PopAnchor, delta);
+            if (delta < 0f) NotifyCargoLoss(-delta);
+        }
 
         /// <summary>
         /// A04: this chicken's own cast / deposit sound, by id, for the audience <see cref="OwnSoundRules"/> names
@@ -1345,10 +1380,9 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// Fired by <see cref="ChickenCombat.OnDeath"/> on every peer the instant
-        /// <c>IsRemoved</c> goes true. The death camera shake stays where it already lives
-        /// (<c>ChickenCombat.Render</c>, <c>HasInputAuthority</c>-gated, now reading
-        /// <see cref="FeedbackTuning.DeathShakeMagnitude"/>) rather than being re-issued
-        /// here — two call sites for one shake is how a re-tune silently stops working.
+        /// <c>IsRemoved</c> goes true. The death camera shake is issued here and only here
+        /// (it lived in <c>ChickenCombat.Render</c> until gameplay stopped calling presentation): two call sites
+        /// for one shake is how a re-tune silently stops working.
         /// </summary>
         private void HandleRemoval()
         {
@@ -1367,6 +1401,21 @@ namespace CluckWars.Visuals
                     FeedbackTuning.ExecuteHitStopTimeScale,
                     FeedbackTuning.ExecuteHitStopDurationSeconds);
             }
+
+            // FEEDBACK.md §3.4's death shake, on the victim's own peer. !IsDecoy as well as HasInputAuthority: a
+            // decoy shares its caster's InputAuthority, so without the second term killing a decoy shook the
+            // caster's camera as if they had died.
+            if (HasInputAuthority && _controller != null && !_controller.IsDecoy && MatchCamera.Instance != null)
+                MatchCamera.Instance.ApplyShake(FeedbackTuning.DeathShakeMagnitude, FeedbackTuning.DeathShakeDurationSeconds);
+        }
+
+        /// <summary>
+        /// Fired by <see cref="ChickenCombat.OnRespawn"/> on every peer when the removal ends: the local player's
+        /// "BACK IN" cue, on the peer of the chicken that came back (never for a decoy, which shares input authority).
+        /// </summary>
+        private void HandleRespawn()
+        {
+            if (HasInputAuthority && _controller != null && !_controller.IsDecoy) LocalRespawnCue.Raise();
         }
 
         // ---- Particles --------------------------------------------------------

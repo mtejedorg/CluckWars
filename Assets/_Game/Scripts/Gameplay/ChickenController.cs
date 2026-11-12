@@ -725,9 +725,9 @@ namespace CluckWars.Gameplay
             ApplyOverlayHeadLift(_characterController.height * (modelScale.y - 1f), modelScale.y);
             ChickenFootprint.Apply(this, model.transform);   // foot rings clear the body (Phase 8 chunk C R3)
 
-            // Caches its renderer set in Spawned, which may already have run — and could not have
-            // included the model in any case, since the model only exists now.
-            GetComponent<HitFeedback>()?.RefreshBodyRenderers();
+            // Presentation that cached a renderer set (HitFeedback) refreshes it now: its Spawned may already
+            // have run, and could not have included the model in any case, since the model only exists now.
+            LocalEvents.RaiseClassModelAttached();
 
             _skeletalAnimationActive = BindSkeletalAnimation(entry);
 
