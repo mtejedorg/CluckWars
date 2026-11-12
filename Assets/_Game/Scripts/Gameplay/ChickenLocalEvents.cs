@@ -1,7 +1,9 @@
 using System;
 using CluckWars.Abilities;
+using CluckWars.Logging;
 using Fusion;
 using UnityEngine;
+using LogLevel = CluckWars.Logging.LogLevel;
 
 namespace CluckWars.Gameplay
 {
@@ -122,54 +124,61 @@ namespace CluckWars.Gameplay
         private AbilityBaseSO _lastCharging;
         private bool _raising;
 
+        // One list per event instead of a multicast delegate: every subscriber is called on its own, so one that
+        // throws is reported and the rest still get the beat (S-1). A raise allocates nothing.
+        private readonly ListenerList<Action<CastEvent>> _castListeners = new ListenerList<Action<CastEvent>>();
+        private readonly ListenerList<Action> _knockbackListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action> _selfImpulseListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action> _jumpListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action<StealEvent>> _stolenListeners = new ListenerList<Action<StealEvent>>();
+        private readonly ListenerList<Action> _depositedListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action<CargoChangeEvent>> _cargoChangedListeners = new ListenerList<Action<CargoChangeEvent>>();
+        private readonly ListenerList<Action<Vector3>> _attackerNamedListeners = new ListenerList<Action<Vector3>>();
+        private readonly ListenerList<Action> _zoneTriggeredListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action> _classModelAttachedListeners = new ListenerList<Action>();
+
+        /// <summary>Where a throwing listener is reported. The chicken sets it once it has its logger; until then
+        /// (and in tests that set none) the report still goes out, through a plain <see cref="UnityLogService"/>
+        /// (<see cref="LocalRaise"/>).</summary>
+        public ILogService Log { get; set; }
+
         /// <summary><c>AbilityController.LastCastEventId</c> moved: this chicken cast.</summary>
-        public event Action<CastEvent> Cast;
+        public event Action<CastEvent> Cast { add => _castListeners.Add(value); remove => _castListeners.Remove(value); }
         /// <summary><c>ChickenController.KnockbackEventId</c> moved: somebody knocked this chicken back.</summary>
-        public event Action Knockback;
+        public event Action Knockback { add => _knockbackListeners.Add(value); remove => _knockbackListeners.Remove(value); }
         /// <summary><c>ChickenController.SelfImpulseEventId</c> moved: this chicken displaced itself (a dodge, not a hit).</summary>
-        public event Action SelfImpulse;
+        public event Action SelfImpulse { add => _selfImpulseListeners.Add(value); remove => _selfImpulseListeners.Remove(value); }
         /// <summary><c>ChickenController.JumpEventId</c> moved: a teleport jump moved this chicken.</summary>
-        public event Action Jump;
+        public event Action Jump { add => _jumpListeners.Add(value); remove => _jumpListeners.Remove(value); }
         /// <summary><c>ChickenCargo.StealEventId</c> moved: this chicken was robbed.</summary>
-        public event Action<StealEvent> Stolen;
+        public event Action<StealEvent> Stolen { add => _stolenListeners.Add(value); remove => _stolenListeners.Remove(value); }
         /// <summary><c>ChickenCargo.DepositEventId</c> moved: this chicken finished banking its whole load.</summary>
-        public event Action Deposited;
+        public event Action Deposited { add => _depositedListeners.Add(value); remove => _depositedListeners.Remove(value); }
 
         // ---- Local moments, raised from Render by the gameplay behaviour that owns the state ----
 
         /// <summary>The carried food changed by a meaningful amount (not the trickle of collecting or depositing).</summary>
-        public event Action<CargoChangeEvent> CargoChanged;
+        public event Action<CargoChangeEvent> CargoChanged { add => _cargoChangedListeners.Add(value); remove => _cargoChangedListeners.Remove(value); }
         /// <summary>Something that just hit this chicken came from this world position (a zone's centre).</summary>
-        public event Action<Vector3> AttackerNamed;
+        public event Action<Vector3> AttackerNamed { add => _attackerNamedListeners.Add(value); remove => _attackerNamedListeners.Remove(value); }
         /// <summary>A zone this chicken placed just caught someone: the caster's confirmation.</summary>
-        public event Action ZoneTriggered;
+        public event Action ZoneTriggered { add => _zoneTriggeredListeners.Add(value); remove => _zoneTriggeredListeners.Remove(value); }
         /// <summary>The per-class model was parented under this chicken (its renderers exist from now on).</summary>
-        public event Action ClassModelAttached;
+        public event Action ClassModelAttached { add => _classModelAttachedListeners.Add(value); remove => _classModelAttachedListeners.Remove(value); }
 
         /// <summary>From <c>ChickenCargo.Render</c>, every peer.</summary>
         public void RaiseCargoChanged(float delta, int stealCreditFrame) =>
-            CargoChanged?.Invoke(new CargoChangeEvent(delta, stealCreditFrame));
+            LocalRaise.Invoke(_cargoChangedListeners, nameof(CargoChanged), Log, _controller, new CargoChangeEvent(delta, stealCreditFrame));
 
         /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens.</summary>
-        public bool RaiseAttackerNamed(Vector3 attackerWorldPosition)
-        {
-            var listeners = AttackerNamed;
-            if (listeners == null) return false;
-            listeners(attackerWorldPosition);
-            return true;
-        }
+        public bool RaiseAttackerNamed(Vector3 attackerWorldPosition) =>
+            LocalRaise.Invoke(_attackerNamedListeners, nameof(AttackerNamed), Log, _controller, attackerWorldPosition);
 
         /// <summary>From <c>AbilityZone.Render</c>, every peer. False when nothing listens (a prefab fault the caller reports).</summary>
-        public bool RaiseZoneTriggered()
-        {
-            var listeners = ZoneTriggered;
-            if (listeners == null) return false;
-            listeners();
-            return true;
-        }
+        public bool RaiseZoneTriggered() => LocalRaise.Invoke(_zoneTriggeredListeners, nameof(ZoneTriggered), Log, _controller);
 
         /// <summary>From <c>ChickenController.Spawned</c>, once the class model is attached.</summary>
-        public void RaiseClassModelAttached() => ClassModelAttached?.Invoke();
+        public void RaiseClassModelAttached() => LocalRaise.Invoke(_classModelAttachedListeners, nameof(ClassModelAttached), Log, _controller);
 
         /// <param name="controller">The chicken observed; null only in tests, which feed snapshots.</param>
         public ChickenLocalEvents(ChickenController controller = null) { _controller = controller; }
@@ -229,17 +238,18 @@ namespace CluckWars.Gameplay
                 {
                     if (s.ChargingAbility != null) _lastCharging = s.ChargingAbility;
                     if (_cast.Observe(s.CastEventId))
-                        Cast?.Invoke(new CastEvent(s.CastSlot, s.CastAbility, s.CastAbility != null ? s.CastAbility : _lastCharging, s.CastHitCount));
+                        LocalRaise.Invoke(_castListeners, nameof(Cast), Log, _controller,
+                            new CastEvent(s.CastSlot, s.CastAbility, s.CastAbility != null ? s.CastAbility : _lastCharging, s.CastHitCount));
                 }
 
-                if (_knockback.Observe(s.KnockbackEventId)) Knockback?.Invoke();
-                if (_selfImpulse.Observe(s.SelfImpulseEventId)) SelfImpulse?.Invoke();
-                if (_jump.Observe(s.JumpEventId)) Jump?.Invoke();
+                if (_knockback.Observe(s.KnockbackEventId)) LocalRaise.Invoke(_knockbackListeners, nameof(Knockback), Log, _controller);
+                if (_selfImpulse.Observe(s.SelfImpulseEventId)) LocalRaise.Invoke(_selfImpulseListeners, nameof(SelfImpulse), Log, _controller);
+                if (_jump.Observe(s.JumpEventId)) LocalRaise.Invoke(_jumpListeners, nameof(Jump), Log, _controller);
 
                 if (s.HasCargo)
                 {
-                    if (_steal.Observe(s.StealEventId)) Stolen?.Invoke(new StealEvent(s.Thief));
-                    if (_deposit.Observe(s.DepositEventId)) Deposited?.Invoke();
+                    if (_steal.Observe(s.StealEventId)) LocalRaise.Invoke(_stolenListeners, nameof(Stolen), Log, _controller, new StealEvent(s.Thief));
+                    if (_deposit.Observe(s.DepositEventId)) LocalRaise.Invoke(_depositedListeners, nameof(Deposited), Log, _controller);
                 }
             }
             finally

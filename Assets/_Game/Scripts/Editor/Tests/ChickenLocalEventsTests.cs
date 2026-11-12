@@ -284,18 +284,111 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, knocks, "the outer pass still delivers the rest");
         }
 
+        private sealed class ErrorLog : CluckWars.Logging.ILogService
+        {
+            public readonly List<(string message, System.Exception exception)> Errors = new List<(string, System.Exception)>();
+            public CluckWars.Logging.LogLevel MinLevel { get; set; }
+            public bool IsEnabled(CluckWars.Logging.LogLevel level) => true;
+            public void Verbose(string source, string message) { }
+            public void Debug(string source, string message) { }
+            public void Info(string source, string message) { }
+            public void Warn(string source, string message) { }
+            public void Error(string source, string message, System.Exception exception = null) => Errors.Add(($"[{source}] {message}", exception));
+        }
+
+        private sealed class BrokenCastListener
+        {
+            public int Calls;
+            public void OnCast(CastEvent e) { Calls++; throw new System.InvalidOperationException("listener"); }
+        }
+
         [Test]
-        public void AListenerThatThrows_IsNotSwallowed_AndTheObserverRecovers()
+        public void AListenerThatThrows_IsReported_AndEveryOtherListenerStillGetsTheBeat()
+        {
+            // S-1: the edge has already advanced when the listeners run, so a throw that stopped the raise would
+            // cost every later subscriber the beat for good and unwind into whoever observed (ChickenCargo.Render).
+            var log = new ErrorLog();
+            var events = new ChickenLocalEvents { Log = log };
+            var broken = new BrokenCastListener();
+            int before = 0, after = 0, knocks = 0;
+            events.Cast += _ => before++;
+            events.Cast += broken.OnCast;
+            events.Cast += _ => after++;
+            events.Knockback += () => knocks++;
+            events.Observe(Snapshot());
+
+            Assert.DoesNotThrow(() => events.Observe(Snapshot(cast: 1, knock: 1)));
+
+            Assert.AreEqual((1, 1, 1), (before, broken.Calls, after), "the subscribers either side of the broken one ran");
+            Assert.AreEqual(1, knocks, "the rest of the observation ran: the next event of the same pass is delivered");
+            Assert.AreEqual(1, log.Errors.Count, "reported, not swallowed");
+            StringAssert.Contains("[ChickenEvents] A Cast listener (BrokenCastListener.OnCast) threw", log.Errors[0].message);
+            Assert.IsInstanceOf<System.InvalidOperationException>(log.Errors[0].exception);
+
+            // Rate-limited per event and listener type: a listener that throws on every cast does not flood the log.
+            events.Observe(Snapshot(cast: 2, knock: 1));
+            Assert.AreEqual((2, 2, 2), (before, broken.Calls, after), "the observer keeps working after a listener threw");
+            Assert.AreEqual(1, log.Errors.Count, "the second failure inside the interval is counted, not logged");
+        }
+
+        [Test]
+        public void ALocalRaise_SurvivesAThrowingListenerToo()
+        {
+            var log = new ErrorLog();
+            var events = new ChickenLocalEvents { Log = log };
+            int seen = 0;
+            events.CargoChanged += _ => throw new System.ArgumentException("cargo listener");
+            events.CargoChanged += _ => seen++;
+
+            Assert.DoesNotThrow(() => events.RaiseCargoChanged(2f, -1));
+
+            Assert.AreEqual(1, seen);
+            Assert.AreEqual(1, log.Errors.Count);
+            StringAssert.Contains("A CargoChanged listener", log.Errors[0].message);
+        }
+
+        [Test]
+        public void Subscriptions_BehaveLikeDelegates()
         {
             var events = new ChickenLocalEvents();
-            bool fail = true;
-            int casts = 0;
-            events.Cast += _ => { casts++; if (fail) throw new System.InvalidOperationException("listener"); };
+            int a = 0, b = 0;
+            System.Action onA = () => a++;
+            System.Action onB = null;
+            onB = () => { b++; events.Knockback -= onB; };   // unsubscribing mid-raise does not disturb the raise
+            events.Knockback += onA;
+            events.Knockback += onB;
+            events.Knockback += onA;
             events.Observe(Snapshot());
-            Assert.Throws<System.InvalidOperationException>(() => events.Observe(Snapshot(cast: 1)));
-            fail = false;
-            events.Observe(Snapshot(cast: 2));
-            Assert.AreEqual(2, casts, "the observer is usable after a listener threw");
+
+            events.Observe(Snapshot(knock: 1));
+            Assert.AreEqual((2, 1), (a, b), "a delegate subscribed twice runs twice");
+
+            events.Knockback -= onA;                        // removes one subscription, as -= does
+            events.Observe(Snapshot(knock: 2));
+            Assert.AreEqual((3, 1), (a, b));
+        }
+
+        [Test]
+        public void TheListenerList_OnlyBuildsANewArrayWhenASubscriptionChanges()
+        {
+            // What a raise iterates: the same array instance until someone subscribes or unsubscribes, so raising
+            // allocates nothing and a raise in progress is never disturbed.
+            var list = new ListenerList<System.Action>();
+            System.Action one = () => { }, two = () => { };
+            list.Add(one);
+            list.Add(two);
+            var items = list.Items;
+            Assert.AreSame(items, list.Items);
+            CollectionAssert.AreEqual(new[] { one, two }, items);
+
+            list.Remove(one);
+            Assert.AreNotSame(items, list.Items);
+            CollectionAssert.AreEqual(new[] { one, two }, items, "the array a raise already holds is untouched");
+            CollectionAssert.AreEqual(new[] { two }, list.Items);
+
+            list.Remove(one);                               // not subscribed: nothing changes
+            list.Add(null);
+            Assert.AreEqual(1, list.Count);
         }
 
         // ---- Source guards (what no test can run without a live runner) ---------------------------------------------
