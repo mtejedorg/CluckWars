@@ -1,3 +1,4 @@
+using CluckWars.Gameplay;
 using UnityEngine;
 
 namespace CluckWars.Visuals
@@ -22,52 +23,9 @@ namespace CluckWars.Visuals
         // Telegraph / hold — FEEDBACK.md §2
         // ================================================================
 
-        /// <summary>
-        /// The cost/feedback ramp boundary, in seconds: how long an ability button must
-        /// stay down before the cast stops being free and starts being <i>aimed</i>.
-        /// Consumed by <c>AbilityHoldStateMachine.Decide</c> via
-        /// <c>AbilityController.FixedUpdateNetwork</c>.
-        ///
-        /// <b>This is not a tap window, and nothing waits it out.</b> Maestro's casting
-        /// model (v0.6.1): "no window, fire on release — if the user holds, there is
-        /// feedback; if not, there is speed." A release always fires immediately, from
-        /// either side of this line. What crossing it buys is the aim package —
-        /// ground telegraph, target marks, opponent-visible wind-up glow — and what it
-        /// costs is the aim-rotate movement lock. Under the threshold you get none of
-        /// the four: no draw, no tell, and full movement speed.
-        ///
-        /// 120 ms sits at the low end of standard press-vs-hold thresholds (100–200 ms
-        /// across mobile game UIs). Below ~100 ms an ordinary confident press would trip
-        /// the aim package by accident and the movement stutter would feel like a bug;
-        /// above ~150 ms a player deliberately reaching for the aim has to consciously
-        /// wait for it, which reads as unresponsive telegraphing rather than a fluid
-        /// gesture. Neither failure mode is about the cast's latency any more — that is
-        /// now constant.
-        ///
-        /// <b>Measured on the simulation tick, and that is correct here.</b> The previous
-        /// revision of this comment warned at length that the threshold had to be clocked
-        /// off local raw input and never off the replicated <c>PlayerNetworkInput</c> hold
-        /// bit, because Shared Mode's ~50 ms input latency would inflate the felt
-        /// threshold to ~170 ms. That reasoning was sound <i>for the model it was written
-        /// against</i>, where a tap had to wait out the window before the game would
-        /// commit to firing — there, input latency stacked on top of the wait and the
-        /// player ate both. It does not survive the new model. Release fires on the tick
-        /// the release arrives, with exactly the same latency it always had; the threshold
-        /// only measures a <i>duration</i>, and a duration is preserved under a constant
-        /// input delay (both the press and the release are shifted by the same amount).
-        /// Accumulating <c>Runner.DeltaTime</c> on the state authority is therefore the
-        /// right clock, and has the added property that every peer agrees on when the
-        /// wind-up tell should have appeared. Jitter still perturbs the measurement by up
-        /// to a tick either way, which at 32 Hz is ±31 ms on a 120 ms boundary — and a tick
-        /// of slop on "did the glow appear" is invisible, where a tick of slop on "did my
-        /// ability fire" would not have been.
-        ///
-        /// Quantisation note: the accumulator advances in whole 32 Hz ticks, so the real
-        /// boundary is the first multiple of 0.03125 that clears this value — 0.125 s
-        /// (4 ticks). See the tick arithmetic comment on
-        /// <c>AbilityController._pendingHoldSlot</c>.
-        /// </summary>
-        public const float TapHoldThresholdSeconds = 0.12f;
+        /// <summary>The tap / hold boundary, in seconds. A simulation constant: the value and its reasoning live on
+        /// <see cref="AbilityHoldStateMachine.TapHoldThresholdSeconds"/>; this is the same compile-time value for presentation.</summary>
+        public const float TapHoldThresholdSeconds = AbilityHoldStateMachine.TapHoldThresholdSeconds;
 
         /// <summary>
         /// Poll rate for the target-scan during hold (marking valid/immune targets
@@ -369,20 +327,10 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float FloatingTextStackClearance = 0.20f;
 
-        /// <summary>
-        /// Smallest cargo change, in food units, that earns a floating <c>±N 🌽</c> popup.
-        /// ADDED for Stage 4. Cargo is a <c>float</c> that ticks up continuously while
-        /// collecting and down continuously while depositing, so a naive "any change"
-        /// trigger would fire a popup on literally every frame a chicken stands on a pile.
-        /// The fastest continuous rate in the game is the deposit drain
-        /// (<c>MatchConfigSO.DepositRatePerSecond</c>, 6/s) which is only ~0.2 per frame at
-        /// 30 fps and ~1.2 even at a badly degraded 5 fps; the discrete events this popup
-        /// exists for — a Sneaky Steal (~4–5), a Spine Coat steal-back (4), an execute
-        /// transfer or a death drop (a whole load) — all clear 1.5 comfortably. That gap is
-        /// what makes a single threshold separate "an event happened to my cargo" from
-        /// "cargo is doing its normal continuous thing" without needing any new state.
-        /// </summary>
-        public const float FloatingTextCargoDeltaThreshold = 1.5f;
+        /// <summary>Smallest cargo change, in food units, that earns a floating popup. A simulation constant (it decides
+        /// when <c>ChickenCargo</c> raises <c>CargoChanged</c>): the value and its reasoning live on
+        /// <see cref="ChickenCargo.CargoChangeEventThreshold"/>; this is the same compile-time value for presentation.</summary>
+        public const float FloatingTextCargoDeltaThreshold = ChickenCargo.CargoChangeEventThreshold;
 
         /// <summary>
         /// Colour for a cargo *loss* popup (<c>-5 🌽</c> at the victim). ADDED for Stage 4 —

@@ -99,19 +99,33 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheGameplayFiles_ThatStillImportVisuals_AreTheKnownFour()
+        public void TheGameplayFiles_ThatStillImportVisuals_AreTheKnownTwo()
         {
-            // What is left is not a one-shot effect: tuning constants, the palette, and the chicken's composition root.
+            // What is left is not a one-shot effect: the palette and the chicken's composition root.
             // Batch 4 of the audit owns these. A new import here is a new dependency from gameplay on presentation.
             var expected = new[]
             {
                 $"{ScriptsRoot}/Abilities/AbilityBaseSO.cs",      // AccentKey / FeedbackPalette (the ability's colour)
-                $"{ScriptsRoot}/Gameplay/AbilityController.cs",   // FeedbackTuning constants (tap / hold threshold, sfx volumes)
-                $"{ScriptsRoot}/Gameplay/ChickenCargo.cs",        // FeedbackTuning.FloatingTextCargoDeltaThreshold
                 $"{ScriptsRoot}/Gameplay/ChickenController.cs",   // composition: model attach, head lift, pop anchor, indicator accessors
             };
             var actual = GameplayFiles().Where(p => Code(p).Contains("CluckWars.Visuals")).OrderBy(p => p).ToArray();
             CollectionAssert.AreEqual(expected.OrderBy(p => p).ToArray(), actual);
+        }
+
+        [Test]
+        public void TheTwoSimulationConstants_LiveInGameplay_AndFeedbackTuningIsTheSameValue()
+        {
+            // A1 (batch 4): the tick reads these, so gameplay owns them; presentation keeps its names as aliases.
+            Assert.AreEqual(0.12f, AbilityHoldStateMachine.TapHoldThresholdSeconds);
+            Assert.AreEqual(1.5f, ChickenCargo.CargoChangeEventThreshold);
+            Assert.AreEqual(AbilityHoldStateMachine.TapHoldThresholdSeconds, CluckWars.Visuals.FeedbackTuning.TapHoldThresholdSeconds);
+            Assert.AreEqual(ChickenCargo.CargoChangeEventThreshold, CluckWars.Visuals.FeedbackTuning.FloatingTextCargoDeltaThreshold);
+
+            string tuning = Code($"{ScriptsRoot}/Visuals/FeedbackTuning.cs");
+            StringAssert.Contains("TapHoldThresholdSeconds = AbilityHoldStateMachine.TapHoldThresholdSeconds;", tuning, "an alias, not a second literal");
+            StringAssert.Contains("FloatingTextCargoDeltaThreshold = ChickenCargo.CargoChangeEventThreshold;", tuning, "an alias, not a second literal");
+            StringAssert.Contains("AbilityHoldStateMachine.TapHoldThresholdSeconds,", Code($"{ScriptsRoot}/Gameplay/AbilityController.cs"));
+            StringAssert.Contains("< CargoChangeEventThreshold", Code($"{ScriptsRoot}/Gameplay/ChickenCargo.cs"));
         }
 
         [Test]

@@ -55,7 +55,7 @@ namespace CluckWars.Gameplay
         /// Promote <see cref="ChargeDecision.Slot"/> from pending to a real, everyone-visible
         /// aim charge: the caller sets <c>ChargingSlot</c> and clears the pending state. Only
         /// ever reached once a pending hold has outlasted
-        /// <c>FeedbackTuning.TapHoldThresholdSeconds</c> — this is the moment the player
+        /// <see cref="AbilityHoldStateMachine.TapHoldThresholdSeconds"/> — this is the moment the player
         /// starts paying for the aim (telegraph, target marks, wind-up glow, aim-rotate
         /// movement lock all key off <c>ChargingSlot</c>).
         /// </summary>
@@ -125,7 +125,7 @@ namespace CluckWars.Gameplay
     /// swallows an input. What the threshold decides is only <i>how much the gesture cost</i>:
     ///
     /// <list type="bullet">
-    ///   <item><b>Below</b> <c>FeedbackTuning.TapHoldThresholdSeconds</c> — the slot sits in
+    ///   <item><b>Below</b> <see cref="AbilityHoldStateMachine.TapHoldThresholdSeconds"/> — the slot sits in
     ///   the <i>pending</i> state (<see cref="ChargeAction.BeginPendingHold"/>). Caller-local
     ///   scratch only; <c>ChargingSlot</c> stays 0, so the ground telegraph, the target marks,
     ///   the opponent-visible wind-up glow and the aim-rotate movement lock — all four of
@@ -145,6 +145,55 @@ namespace CluckWars.Gameplay
         /// dependency-free.</summary>
         public const int NoPendingSlot = -1;
 
+        /// <summary>
+        /// The cost/feedback ramp boundary, in seconds: how long an ability button must
+        /// stay down before the cast stops being free and starts being <i>aimed</i>.
+        /// Consumed by <see cref="Decide"/> via
+        /// <c>AbilityController.FixedUpdateNetwork</c>.
+        ///
+        /// <b>This is not a tap window, and nothing waits it out.</b> Maestro's casting
+        /// model (v0.6.1): "no window, fire on release — if the user holds, there is
+        /// feedback; if not, there is speed." A release always fires immediately, from
+        /// either side of this line. What crossing it buys is the aim package —
+        /// ground telegraph, target marks, opponent-visible wind-up glow — and what it
+        /// costs is the aim-rotate movement lock. Under the threshold you get none of
+        /// the four: no draw, no tell, and full movement speed.
+        ///
+        /// 120 ms sits at the low end of standard press-vs-hold thresholds (100–200 ms
+        /// across mobile game UIs). Below ~100 ms an ordinary confident press would trip
+        /// the aim package by accident and the movement stutter would feel like a bug;
+        /// above ~150 ms a player deliberately reaching for the aim has to consciously
+        /// wait for it, which reads as unresponsive telegraphing rather than a fluid
+        /// gesture. Neither failure mode is about the cast's latency any more — that is
+        /// now constant.
+        ///
+        /// <b>Measured on the simulation tick, and that is correct here.</b> The previous
+        /// revision of this comment warned at length that the threshold had to be clocked
+        /// off local raw input and never off the replicated <c>PlayerNetworkInput</c> hold
+        /// bit, because Shared Mode's ~50 ms input latency would inflate the felt
+        /// threshold to ~170 ms. That reasoning was sound <i>for the model it was written
+        /// against</i>, where a tap had to wait out the window before the game would
+        /// commit to firing — there, input latency stacked on top of the wait and the
+        /// player ate both. It does not survive the new model. Release fires on the tick
+        /// the release arrives, with exactly the same latency it always had; the threshold
+        /// only measures a <i>duration</i>, and a duration is preserved under a constant
+        /// input delay (both the press and the release are shifted by the same amount).
+        /// Accumulating <c>Runner.DeltaTime</c> on the state authority is therefore the
+        /// right clock, and has the added property that every peer agrees on when the
+        /// wind-up tell should have appeared. Jitter still perturbs the measurement by up
+        /// to a tick either way, which at 32 Hz is ±31 ms on a 120 ms boundary — and a tick
+        /// of slop on "did the glow appear" is invisible, where a tick of slop on "did my
+        /// ability fire" would not have been.
+        ///
+        /// Quantisation note: the accumulator advances in whole 32 Hz ticks, so the real
+        /// boundary is the first multiple of 0.03125 that clears this value — 0.125 s
+        /// (4 ticks). See the tick arithmetic comment on
+        /// <c>AbilityController._pendingHoldSlot</c>.
+        /// </summary>
+        /// <remarks>Lives here, not in <c>FeedbackTuning</c>: the simulation reads it every tick, and gameplay does not
+        /// depend on presentation. <see cref="AbilityHoldStateMachine.TapHoldThresholdSeconds"/> is this same value.</remarks>
+        public const float TapHoldThresholdSeconds = 0.12f;
+
 
         /// <param name="chargingSlot">Current <c>AbilityController.ChargingSlot</c> encoding: 0 = none, 1..N = slot+1.</param>
         /// <param name="pendingSlot">Slot whose hold is being clocked but has not yet earned a
@@ -152,7 +201,7 @@ namespace CluckWars.Gameplay
         /// <param name="pendingHeldSeconds">How long <paramref name="pendingSlot"/> has been held,
         /// accumulated by the caller from <c>Runner.DeltaTime</c>. Ignored when there is no pending slot.</param>
         /// <param name="tapHoldThresholdSeconds">The cost/feedback ramp boundary,
-        /// <c>FeedbackTuning.TapHoldThresholdSeconds</c>. Passed in rather than referenced so this
+        /// <see cref="AbilityHoldStateMachine.TapHoldThresholdSeconds"/>. Passed in rather than referenced so this
         /// stays a pure function of its arguments.</param>
         /// <param name="canCast">False while stunned (<c>ControlRules.CanCast</c>).</param>
         /// <param name="cancelPressed">This tick's edge-triggered cancel bit (Esc / touch drag-off).</param>

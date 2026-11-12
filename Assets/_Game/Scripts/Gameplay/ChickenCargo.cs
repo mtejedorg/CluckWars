@@ -1,6 +1,5 @@
 using CluckWars.Injection;
 using CluckWars.Logging;
-using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -31,6 +30,23 @@ namespace CluckWars.Gameplay
     public sealed class ChickenCargo : NetworkBehaviour
     {
         private const string Source = "Cargo";
+
+        /// <summary>
+        /// Smallest cargo change, in food units, that is raised as a <c>CargoChanged</c> event (and so earns a floating <c>±N 🌽</c> popup).
+        /// ADDED for Stage 4. Cargo is a <c>float</c> that ticks up continuously while
+        /// collecting and down continuously while depositing, so a naive "any change"
+        /// trigger would fire a popup on literally every frame a chicken stands on a pile.
+        /// The fastest continuous rate in the game is the deposit drain
+        /// (<c>MatchConfigSO.DepositRatePerSecond</c>, 6/s) which is only ~0.2 per frame at
+        /// 30 fps and ~1.2 even at a badly degraded 5 fps; the discrete events this popup
+        /// exists for — a Sneaky Steal (~4–5), a Spine Coat steal-back (4), an execute
+        /// transfer or a death drop (a whole load) — all clear 1.5 comfortably. That gap is
+        /// what makes a single threshold separate "an event happened to my cargo" from
+        /// "cargo is doing its normal continuous thing" without needing any new state.
+        /// </summary>
+        /// <remarks>Lives here, not in <c>FeedbackTuning</c>: it decides which replicated changes become a local event, and
+        /// gameplay does not depend on presentation. <c>FeedbackTuning.FloatingTextCargoDeltaThreshold</c> is this same value.</remarks>
+        public const float CargoChangeEventThreshold = 1.5f;
 
         private static readonly System.Collections.Generic.List<ChickenCargo> s_activeCargos = new System.Collections.Generic.List<ChickenCargo>();
 
@@ -262,7 +278,7 @@ namespace CluckWars.Gameplay
         ///
         /// Only discrete, meaningful changes surface: continuous collection and deposit
         /// drain move Cargo by a fraction per frame and are filtered by
-        /// <see cref="FeedbackTuning.FloatingTextCargoDeltaThreshold"/> — see that constant
+        /// <see cref="CargoChangeEventThreshold"/> — see that constant
         /// for why a single threshold cleanly separates the two. Deposits deliberately get
         /// no popup: the base's own deposit burst and the score readout already tell that
         /// story, and a stream of <c>-1 🌽</c> at your own base would be noise, not feedback.
@@ -286,7 +302,7 @@ namespace CluckWars.Gameplay
 
                 var (before, after) = _cargoReader.Read(previous, current);
                 float delta = after - before;
-                if (Mathf.Abs(delta) < FeedbackTuning.FloatingTextCargoDeltaThreshold) continue;
+                if (Mathf.Abs(delta) < CargoChangeEventThreshold) continue;
 
                 // A drain into a base is not a loss to anyone — it is the point of the game.
                 if (delta < 0f && IsDepositing) continue;

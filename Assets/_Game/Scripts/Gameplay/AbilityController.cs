@@ -2,7 +2,6 @@ using CluckWars.Abilities;
 using CluckWars.Injection;
 using CluckWars.Logging;
 using CluckWars.Networking;
-using CluckWars.Visuals;
 using Fusion;
 using UnityEngine;
 using Zenject;
@@ -214,7 +213,7 @@ namespace CluckWars.Gameplay
         // The pre-commitment half of the casting model (FEEDBACK.md §2, revised v0.6.1).
         // A hold enters "pending" first and is only promoted to ChargingSlot — the
         // networked, every-peer-visible aim state — once it has survived
-        // FeedbackTuning.TapHoldThresholdSeconds. Releasing before then still fires
+        // AbilityHoldStateMachine.TapHoldThresholdSeconds. Releasing before then still fires
         // (release ALWAYS fires); it just never paid for a telegraph, target marks, the
         // opponent-visible wind-up glow, or the turn toward the aim, all four of
         // which gate themselves on ChargingSlot and so need no changes of their own.
@@ -407,7 +406,7 @@ namespace CluckWars.Gameplay
             if (_pendingHoldSlot != InvalidSlot) _pendingHoldSeconds += Runner.DeltaTime;
 
             var decision = AbilityHoldStateMachine.Decide(
-                ChargingSlot, _pendingHoldSlot, _pendingHoldSeconds, FeedbackTuning.TapHoldThresholdSeconds,
+                ChargingSlot, _pendingHoldSlot, _pendingHoldSeconds, AbilityHoldStateMachine.TapHoldThresholdSeconds,
                 canCast, cancelPressed, _holdBits, _pressBits, _canBeginCharge, quickCast);
 
             switch (decision.Action)
