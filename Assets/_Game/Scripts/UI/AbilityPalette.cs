@@ -15,7 +15,7 @@ namespace CluckWars.UI
     /// differs, because the dark moss that carries a cream label read near-black next to the other three on a
     /// hex, so its fill is a mid moss (<see cref="DefenseFill"/>).
     /// <para>
-    /// <b>UI only.</b> <see cref="AbilityBaseSO.AccentColor"/> stays the in-match VFX colour
+    /// <b>UI only.</b> <c>AbilityAccent.AccentColor</c> stays the in-match VFX colour
     /// (telegraphs, cast bursts, range rings); the menus and the in-match hexes read the category colour.
     /// </para>
     /// <para>

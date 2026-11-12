@@ -99,13 +99,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheGameplayFiles_ThatStillImportVisuals_AreTheKnownTwo()
+        public void TheGameplayFiles_ThatStillImportVisuals_AreTheKnownOne()
         {
-            // What is left is not a one-shot effect: the palette and the chicken's composition root.
-            // Batch 4 of the audit owns these. A new import here is a new dependency from gameplay on presentation.
+            // What is left is not a one-shot effect: the chicken's composition root.
+            // Batch 4 of the audit owns it. A new import here is a new dependency from gameplay on presentation.
             var expected = new[]
             {
-                $"{ScriptsRoot}/Abilities/AbilityBaseSO.cs",      // AccentKey / FeedbackPalette (the ability's colour)
                 $"{ScriptsRoot}/Gameplay/ChickenController.cs",   // composition: model attach, head lift, pop anchor, indicator accessors
             };
             var actual = GameplayFiles().Where(p => Code(p).Contains("CluckWars.Visuals")).OrderBy(p => p).ToArray();

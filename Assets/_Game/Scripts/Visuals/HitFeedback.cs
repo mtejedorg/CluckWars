@@ -720,7 +720,7 @@ namespace CluckWars.Visuals
                 }
             }
 
-            if (ability is SnatchAbilitySO && canReDeriveTargets) BeginGrabLines(ability.AccentColor);
+            if (ability is SnatchAbilitySO && canReDeriveTargets) BeginGrabLines(ability.AccentColor());
 
             // Caster's own punch. Gated on HasInputAuthority exactly like ChickenVFX's
             // existing §3.1 every-cast shake — peers must never feel each other's camera.

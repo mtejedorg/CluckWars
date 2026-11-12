@@ -200,7 +200,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("StunBeatRules.WhiffArcsApply(ability)", cast, "the arcs hang off LastCastEventId, gated to the Wing Slam");
             StringAssert.Contains("AccentKey.Stun", hit, "the arcs read the palette Stun accent");
             var slam = AssetDatabase.LoadAssetAtPath<AbilityBaseSO>(Dir + "WingSlam.asset");
-            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Stun), slam.AccentColor, "the arcs match the cast flash");
+            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Stun), slam.AccentColor(), "the arcs match the cast flash");
         }
 
         [Test]

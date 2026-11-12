@@ -460,7 +460,7 @@ namespace CluckWars.Visuals
         /// ring and the hex read <c>AccentColor</c> directly and are untouched.
         /// </summary>
         public static Color CastBurstColorFor(AbilityBaseSO ability) =>
-            ability is TurtleModeAbilitySO ? FeedbackPalette.Current.CreamColor : ability.AccentColor;
+            ability is TurtleModeAbilitySO ? FeedbackPalette.Current.CreamColor : ability.AccentColor();
 
         /// <summary>
         /// H12: how many shard pieces a cast throws: <see cref="FeedbackTuning.ShellCastShardCount"/> for the Shield, else 0,
@@ -788,7 +788,7 @@ namespace CluckWars.Visuals
             if (active && !_wasSpeedActive && !suppressed)
             {
                 var edge = _speedEdge;
-                edge.Color = speedSO.AccentColor;
+                edge.Color = speedSO.AccentColor();
                 edge.Count = SpeedBodyCueRules.EdgeSparkleCount(reduced);
                 if (reduced) edge.SpeedMin = edge.SpeedMax = 0f;
                 EmitSparkles(in edge, 0.1f);
@@ -806,7 +806,7 @@ namespace CluckWars.Visuals
                 Vector3 dir = delta / Mathf.Max(delta.magnitude, 1e-5f);
                 int streaks = SpeedBodyCueRules.Take(ref _streakAccum, step, SpeedBodyCueRules.StreaksPerMetre(reduced));
                 int dust = SpeedBodyCueRules.Take(ref _speedDustAccum, step, SpeedBodyCueRules.DustPerMetre(reduced));
-                Color accent = speedSO.AccentColor;
+                Color accent = speedSO.AccentColor();
                 accent.a = FeedbackTuning.SpeedStreakAlpha;
                 for (int i = 0; i < streaks; i++)
                     EmitStreak(Vector3.Lerp(prev, pos, (i + 1f) / (streaks + 1f)), dir, accent);
@@ -1195,7 +1195,7 @@ namespace CluckWars.Visuals
             // Shove (D6): the shock ring goes out BEFORE the burst, so when the sparkle family is full it is the burst that
             // loses its last sparkles (a sphere of 16), never the ring that carries the "burst out from me" read.
             if (ability is CluckShockAbilitySO && !hidden && !ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity))
-                EmitShoveRing(ability.AccentColor);
+                EmitShoveRing(ability.AccentColor());
 
             // The burst needs AccentColor, so an unresolved ability means no burst. None on a hidden bird (A1).
             if (ability != null && !hidden)

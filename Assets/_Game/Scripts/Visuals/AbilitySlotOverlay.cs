@@ -282,7 +282,7 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            Color c = ability.AccentColor;
+            Color c = ability.AccentColor();
             c.a = AlphaFor(slot, aimGestureLive: aimedSlot >= 0);
             lr.startColor = lr.endColor = c;
 

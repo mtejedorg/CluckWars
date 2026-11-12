@@ -648,7 +648,7 @@ namespace CluckWars.Tests
             var others = all.Where(a => !(a is CluckWars.Abilities.TurtleModeAbilitySO)).Take(2).ToList();
             Assert.AreEqual(2, others.Count, "two non-Shield shipped abilities");
             foreach (var a in others)
-                Assert.AreEqual(a.AccentColor, ChickenVFX.CastBurstColorFor(a), a.name + " keeps its accent");
+                Assert.AreEqual(a.AccentColor(), ChickenVFX.CastBurstColorFor(a), a.name + " keeps its accent");
         }
 
         [Test]

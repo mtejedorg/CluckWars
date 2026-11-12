@@ -187,8 +187,8 @@ namespace CluckWars.Visuals
             // RequiresEnemyInRange.
             bool whiff = ability.ZeroHitsIsAWhiff && _cast.HitCount == 0;
 
-            _flashColor      = whiff ? Desaturate(ability.AccentColor, FeedbackTuning.WhiffRingSaturationMultiplier)
-                                     : ability.AccentColor;
+            _flashColor      = whiff ? Desaturate(ability.AccentColor(), FeedbackTuning.WhiffRingSaturationMultiplier)
+                                     : ability.AccentColor();
             _flashAlphaScale = whiff ? FeedbackTuning.WhiffRingAlphaMultiplier : 1f;
             _flashTimer      = 0f;
         }

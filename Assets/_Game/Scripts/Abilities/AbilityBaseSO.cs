@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
-using CluckWars.Visuals;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -84,9 +83,8 @@ namespace CluckWars.Abilities
         [FormerlySerializedAs("AccentColor")]
         public Color CustomAccentColor = new Color(0.45f, 0.7f, 1f, 1f);
 
-        /// <summary>Accent colour for VFX / range guides / telegraphs: the palette accent for <see cref="AccentKey"/>,
-        /// or <see cref="CustomAccentColor"/> when the key is Custom.</summary>
-        public Color AccentColor => AccentKey == AccentKey.Custom ? CustomAccentColor : FeedbackPalette.Current.Accent(AccentKey);
+        // The colour itself is presentation's to resolve: AbilityAccent.AccentColor(this AbilityBaseSO) in Visuals
+        // (the palette accent for AccentKey, or CustomAccentColor when the key is Custom).
         [Tooltip("GDD §7.2 category. Used by the character-select ability grid to group abilities.")]
         public AbilityCategory Category = AbilityCategory.Utility;
 

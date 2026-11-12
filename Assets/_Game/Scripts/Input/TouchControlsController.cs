@@ -42,7 +42,7 @@ namespace CluckWars.Input
     /// otherwise, and the two must fire opposite outcomes on the network.
     ///
     /// Per-slot visuals mirror the old <c>TouchControlsHud.Update()</c>: accent
-    /// tint from the equipped <see cref="AbilityBaseSO.AccentColor"/>, a bottom-up
+    /// tint from the equipped <see cref="AbilityAccent.AccentColor"/>, a bottom-up
     /// cooldown clip (ART §6.6 layer 6), slot-3 hidden unless the Combo (Assassin)
     /// slot is equipped, icon sprite + short label + slot badge + cooldown-seconds
     /// number. The local chicken is resolved the same way the old HUD did
@@ -1320,7 +1320,7 @@ namespace CluckWars.Input
                 _eggDigitShown[slot] = true;
                 _appliedEggTenths[slot] = int.MinValue;
                 // The digit wears the Egg Shell asset's own accent (text colour only; the hex TINT stays the category palette, PlayerPaletteTests).
-                label.style.color = shield.AccentColor;
+                label.style.color = shield.AccentColor();
                 label.style.display = DisplayStyle.Flex;
             }
             if (_eggTenths[slot] != _appliedEggTenths[slot])

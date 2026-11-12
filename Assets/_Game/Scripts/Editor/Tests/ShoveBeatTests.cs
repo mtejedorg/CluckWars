@@ -102,7 +102,7 @@ namespace CluckWars.Tests
             var so = AssetDatabase.LoadAssetAtPath<CluckShockAbilitySO>(ShovePath);
             Assert.IsNotNull(so);
             Assert.AreEqual(AccentKey.Shove, so.AccentKey, "the ring colour is the palette Shove accent via the ability");
-            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Shove), so.AccentColor);
+            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Shove), so.AccentColor());
             // The ring is emitted before the 16-sparkle cast burst: the ring is never clipped, the burst keeps most of itself.
             Assert.GreaterOrEqual(ChickenVFX.SparkleMaxParticles, FeedbackTuning.ShoveRingCount, "the ring always fits");
             Assert.GreaterOrEqual(ChickenVFX.SparkleMaxParticles - FeedbackTuning.ShoveRingCount, 12, "the burst keeps at least 12 of its 16");

@@ -433,7 +433,7 @@ namespace CluckWars.Visuals
             float hiddenAlpha = HiddenVisibilityRules.AlphaFor(_controller);
             if (hiddenAlpha <= 0f) { _buffRing.Hide(); return; }
 
-            Color c = ability.AccentColor;
+            Color c = ability.AccentColor();
             c.a = SelfBuffRingAlpha * hiddenAlpha;
 
             Vector3 center = _controller.transform.position;
@@ -614,7 +614,7 @@ namespace CluckWars.Visuals
             float scale01 = Mathf.Lerp(FeedbackTuning.WindupGlowMinScale, FeedbackTuning.WindupGlowMaxScale, t);
 
             var ability = _abilities.ChargingAbility;
-            Color c = ability != null ? ability.AccentColor : Color.white;
+            Color c = ability != null ? ability.AccentColor() : Color.white;
             c.a = WindupGlowPeakAlpha * t;
 
             _windupGlow.color = c;

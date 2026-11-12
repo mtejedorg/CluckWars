@@ -27,6 +27,52 @@ namespace CluckWars.Tests
         private static readonly AccentKey[] Keys =
             System.Enum.GetValues(typeof(AccentKey)).Cast<AccentKey>().Where(k => k != AccentKey.Custom).ToArray();
 
+        /// <summary>
+        /// A3 (batch 4): the enum moved from <c>CluckWars.Visuals</c> to <c>CluckWars.Abilities</c>. Every ability
+        /// <c>.asset</c> stores it as an int, so a reorder or an inserted member silently recolours shipped abilities.
+        /// </summary>
+        [Test]
+        public void AccentKey_KeepsItsSerializedNumbers_AndLivesWithTheAbilities()
+        {
+            var expected = new (AccentKey key, int value)[]
+            {
+                (AccentKey.Custom, 0), (AccentKey.Steal, 1), (AccentKey.Stun, 2), (AccentKey.Shove, 3), (AccentKey.Slow, 4),
+                (AccentKey.Speed, 5), (AccentKey.Jump, 6), (AccentKey.EggShell, 7), (AccentKey.Hide, 8), (AccentKey.Peck, 9),
+                (AccentKey.Hunt, 10),
+            };
+            foreach (var (key, value) in expected) Assert.AreEqual(value, (int)key, key.ToString());
+            Assert.AreEqual(expected.Length, System.Enum.GetValues(typeof(AccentKey)).Length, "a new key is appended here with its number");
+            Assert.AreEqual("CluckWars.Abilities.AccentKey", typeof(AccentKey).FullName);
+            Assert.AreEqual(typeof(int), System.Enum.GetUnderlyingType(typeof(AccentKey)));
+
+            // The shipped assets still say what they said: the active Shove ability wears key 3 on disk.
+            var shove = Active().First(a => a.AccentKey == AccentKey.Shove);
+            string yaml = System.IO.File.ReadAllText(UnityEditor.AssetDatabase.GetAssetPath(shove));
+            StringAssert.Contains("AccentKey: 3", yaml, shove.name);
+        }
+
+        [Test]
+        public void AccentColor_IsResolvedByPresentation_WithTheSameRuleTheAbilityUsed()
+        {
+            var ability = ScriptableObject.CreateInstance<CluckShockAbilitySO>();
+            try
+            {
+                ability.CustomAccentColor = new Color(0.1f, 0.2f, 0.3f, 1f);
+                ability.AccentKey = AccentKey.Custom;
+                Assert.AreEqual(ability.CustomAccentColor, ability.AccentColor(), "Custom = the ability's own literal");
+                foreach (var key in Keys)
+                {
+                    ability.AccentKey = key;
+                    Assert.AreEqual(FeedbackPalette.Current.Accent(key), ability.AccentColor(), key.ToString());
+                }
+            }
+            finally { Object.DestroyImmediate(ability); }
+
+            string so = System.IO.File.ReadAllText("Assets/_Game/Scripts/Abilities/AbilityBaseSO.cs");
+            StringAssert.DoesNotContain("FeedbackPalette.", so, "an ability names its accent; it does not read the palette");
+            StringAssert.Contains("[FormerlySerializedAs(\"AccentColor\")]", so, "assets saved before the palette keep their literal");
+        }
+
         private static FeedbackPaletteSO Shipped()
         {
             var p = AssetDatabase.LoadAssetAtPath<FeedbackPaletteSO>(PalettePath);
@@ -60,7 +106,7 @@ namespace CluckWars.Tests
                 var a = AssetDatabase.LoadAssetAtPath<AbilityBaseSO>(AssetDatabase.GUIDToAssetPath(guid));
                 if (a == null || !a.Retired) continue;
                 Assert.AreEqual(AccentKey.Custom, a.AccentKey, a.name);
-                Assert.AreEqual(a.CustomAccentColor, a.AccentColor, a.name);
+                Assert.AreEqual(a.CustomAccentColor, a.AccentColor(), a.name);
             }
         }
 
@@ -157,7 +203,7 @@ namespace CluckWars.Tests
                 FeedbackPalette.Current = probe;
                 Assert.AreEqual(probe.StunColor, FeedbackTuning.CanonicalStunColor);
                 var hunter = Active().First(a => a.AccentKey == AccentKey.Hunt);
-                Assert.AreEqual(probe.HuntAccent, hunter.AccentColor, hunter.name);
+                Assert.AreEqual(probe.HuntAccent, hunter.AccentColor(), hunter.name);
             }
             finally
             {

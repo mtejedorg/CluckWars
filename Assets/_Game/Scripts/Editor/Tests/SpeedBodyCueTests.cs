@@ -73,7 +73,7 @@ namespace CluckWars.Tests
                 .Select(g => AssetDatabase.LoadAssetAtPath<SpeedBurstAbilitySO>(AssetDatabase.GUIDToAssetPath(g))).FirstOrDefault(a => a != null);
             Assert.IsNotNull(so, "SpeedBurst asset missing");
             Assert.Greater(so.SpeedMultiplier, 1f);
-            Assert.Greater(so.AccentColor.maxColorComponent, 0f, "the cue tints with the ability accent");
+            Assert.Greater(so.AccentColor().maxColorComponent, 0f, "the cue tints with the ability accent");
         }
 
         [Test]

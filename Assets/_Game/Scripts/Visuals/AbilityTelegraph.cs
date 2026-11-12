@@ -794,7 +794,7 @@ namespace CluckWars.Visuals
                 : 1f;
             _illegal01 = Mathf.MoveTowards(_illegal01, illegal ? 1f : 0f, step);
 
-            Color accent = ability.AccentColor;
+            Color accent = ability.AccentColor();
             accent.a = FeedbackTuning.TelegraphPreviewAlpha;
             PreviewColor = Color.Lerp(accent, FeedbackTuning.IllegalCastTintColor, _illegal01);
 

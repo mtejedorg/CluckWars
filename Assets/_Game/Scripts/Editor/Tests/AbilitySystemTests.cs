@@ -6,6 +6,7 @@ using UnityEngine;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.UI;
+using CluckWars.Visuals;
 
 namespace CluckWars.Tests
 {
@@ -158,7 +159,7 @@ namespace CluckWars.Tests
             // tints the hex to nothing.
             foreach (var a in AllAssets())
             {
-                Assert.Greater(a.AccentColor.a, 0f,
+                Assert.Greater(a.AccentColor().a, 0f,
                     $"{a.name}: AccentColor alpha is 0 — its hex button renders fully transparent.");
             }
         }

@@ -1,25 +1,9 @@
 using System;
+using CluckWars.Abilities;
 using UnityEngine;
 
 namespace CluckWars.Visuals
 {
-    /// <summary>Which palette accent an ability wears (spec D3a). <see cref="Custom"/> = the ability's own
-    /// serialized literal (retired assets keep theirs); every other key reads <see cref="FeedbackPaletteSO.Accent"/>.</summary>
-    public enum AccentKey
-    {
-        Custom = 0,
-        Steal,
-        Stun,
-        Shove,
-        Slow,
-        Speed,
-        Jump,
-        EggShell,
-        Hide,
-        Peck,
-        Hunt,
-    }
-
     /// <summary>
     /// The feedback colours in one config asset (spec 2026-11-06 §12 D3a): the control-state colours
     /// <c>FeedbackTuning</c> exposes, plus one accent per ability job. The shipped values live in
@@ -95,7 +79,7 @@ namespace CluckWars.Visuals
 
     /// <summary>
     /// The live palette for code with no injection context (<c>FeedbackTuning</c>'s static colours,
-    /// <c>AbilityBaseSO.AccentColor</c>). Pushed once by <c>ProjectInstaller</c>, like
+    /// <c>AbilityAccent.AccentColor</c>). Pushed once by <c>ProjectInstaller</c>, like
     /// <c>AbilityTargeting.Mode</c>; unbound, it is <see cref="FeedbackPaletteSO.BuiltInDefaults"/>.
     /// </summary>
     public static class FeedbackPalette

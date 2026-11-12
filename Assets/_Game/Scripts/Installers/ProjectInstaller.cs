@@ -217,7 +217,7 @@ namespace CluckWars.Installers
             // Ability SOs read the targeting rule from static code with no context, so it is pushed once, here, before any
             // scene loads (AbilityTargeting remarks). Every peer installs the same asset.
             CluckWars.Abilities.AbilityTargeting.Mode = matchConfig.TargetingMode;
-            // Same reason for the feedback palette: FeedbackTuning's colours and AbilityBaseSO.AccentColor are static reads.
+            // Same reason for the feedback palette: FeedbackTuning's colours and AbilityAccent.AccentColor are static reads.
             FeedbackPalette.Current = _feedbackPalette;
             if (_feedbackPalette == null)
             {
