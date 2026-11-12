@@ -14,8 +14,9 @@ a hard-won bug. Don't rediscover them.
 - **All log output goes through `ILogService`.** No ad-hoc `Debug.Log`. Pass a `Source` tag per call. `MinLevel` defaults to `Verbose` during dev; raise via `ProjectInstaller._logMinLevel` for release builds.
 - **State writes gated on `HasStateAuthority`.** Always early-return at the top of `FixedUpdateNetwork` if not authoritative. Cross-authority writes go through RPCs.
 - **URP materials only.** No Built-in RP shaders. Lit / Unlit / custom URP Shader Graph.
-- **Animation is local.** `ChickenAnimator` reads `[Networked]` state via `ChangeDetector` and triggers animations on every peer locally. Nothing animation-related is networked.
-- **VFX are local.** Same pattern as animation — observed-state-driven, never RPC'd.
+- **Animation is local.** `ChickenAnimator` plays on every peer from replicated state: the cast, peck and jump beats from the chicken's `ChickenLocalEvents`, the removed pose from `ChickenCombat.OnDeath` / `OnRespawn`. Nothing animation-related is RPC'd, and gameplay never calls the animator.
+- **VFX, audio cues and HUD reactions are local.** Same pattern: observed from replicated state, never RPC'd. See "Replicated moments" below for the one rule.
+- **One local chicken.** "The chicken this peer drives" is `ChickenController.Local` (`LocalDriven` for device input: never a bot). Do not scan for `HasInputAuthority`: a Doppelganger decoy shares its caster's.
 
 ---
 
@@ -74,7 +75,7 @@ var fallback = _audioRegistry != null
 Container.Bind<AudioRegistrySO>().FromInstance(fallback).AsSingle();
 ```
 
-Consumers handle empty fields gracefully — a null `AudioClip` is a silent no-op in `UnityAudioService`, etc.
+Consumers handle empty fields gracefully — a null `AudioClip` plays nothing in `UnityAudioService`, which reports it once per call site (Warn, source `Audio`); a typed `SfxId` with no clip is reported once per id.
 
 ---
 
@@ -93,23 +94,68 @@ Damage, drain, deposit, steal — caller is any client, executed on the target's
 public void RPC_ApplyDamage(float amount, PlayerRef attacker) { ... }
 ```
 
-### ChangeDetector for local reactions
+### Replicated moments: one rule (D2a, 2026-11-12)
 
-`ChickenCombat.Render` uses a `ChangeDetector` + cached `PropertyReader<T>` to fire local visuals (Hit/Attack/Stunned anims) on every peer in response to `[Networked]` state changes. Pattern reference:
+How presentation (visuals, animation, audio, HUD) learns about a replicated gameplay moment. One pattern, no exceptions:
+
+1. **A one-shot moment is a `[Networked] byte XEventId` bumped by the state authority**, with whatever ids describe it written to networked fields BEFORE the bump (`AbilityController.LastCastSlot` / `LastCastHitCount` then `LastCastEventId++`). The value wraps at 255 by design: only the change matters. Never reset one (writing 0 is itself an edge).
+2. **Exactly one per-chicken local observer watches those counters**: `ChickenLocalEvents`, reached through `ChickenController.LocalEvents`. It seeds each baseline on its first observation (late-join safe), re-seeds on spawn / despawn, and raises plain C# events: `Cast`, `Knockback`, `SelfImpulse`, `Jump`, `Stolen`, `Deposited`. **Presentation subscribes; no component keeps its own `_last*EventId` cursor** (a guard test fails if a file under `Visuals/`, `UI/`, `Input/`, `AbilityLab/` or `Audio/` reads a counter). The cursor rules are in `EventEdge`: a change fires once, the wrap is a change, several bumps between two observations fire once.
+3. **Payloads are small structs of ids, enums and numbers** (`CastEvent`: slot, ability asset, hit count, `CastArchetype`; `StealEvent`: the thief's id). **Never a localized string, never an `AudioClip`.** The listener resolves text through `UiText` / `UiKeys` and sound through a typed `SfxId` (`IAudioService.PlaySFX(SfxId)`), so a language pack swaps text and voice without touching gameplay.
+4. **Gameplay never calls presentation.** Code in `FixedUpdateNetwork` changes replicated state and nothing else: no animator, VFX, camera, audio one-shot or floating text. A moment that gameplay notices in `Render` from continuous state is raised as a local C# event by the behaviour that owns the state (`ChickenLocalEvents.RaiseCargoChanged` / `RaiseAttackerNamed` / `RaiseZoneTriggered`, `ChickenCombat.OnDeath` / `OnRespawn`). `ChickenLocalEvents` references no Visuals, UI or Audio type; Visuals depends on Gameplay, not the reverse.
+5. **Continuous replicated state stays as it is**: a `ChangeDetector` in `Render` on the NetworkBehaviour that declares the property (`ChickenCombat.IsRemoved`, `ChickenCargo.Cargo`), or polled by presentation (slot active mask, control flags, opacity).
+
+Subscribing (pair every `+=` with a `-=`: `OnEnable` / `OnDisable` on the chicken's own components, bind / unbind when a HUD changes its chicken):
+
+```csharp
+private void OnEnable()
+{
+    if (_controller == null || _events != null) return;
+    _events = _controller.LocalEvents;
+    _events.Cast += OnCast;
+}
+
+private void OnDisable()
+{
+    if (_events != null) { _events.Cast -= OnCast; _events = null; }
+    _castPending = false;
+}
+```
+
+**Same-frame ordering.** `ChickenController.Render` observes once a frame. A listener that must act at its own point in the frame (after other work in its `LateUpdate`, in a HUD `Update`) does not act in the handler: it latches the event, calls `_events.Observe()` at that point, then consumes the latch. Whichever call sees the counter move first raises the event, so the listener acts in the same frame and at the same point as if it polled the byte itself. Observing is a few byte compares and allocates nothing.
+
+```csharp
+private void OnCast(CastEvent e) { _cast = e; _castPending = true; }
+
+private void LateUpdate()
+{
+    _events?.Observe();          // this frame's edges, before the latch is read
+    if (!_castPending) return;
+    _castPending = false;
+    // ... react to _cast (ids only: resolve text and clips here)
+}
+```
+
+**Who hears a sound is a rule, written down.** A chicken's own cast and deposit sounds follow `OwnSoundRules`: only the human who drives that chicken hears them (never a bot's, a rival's or a decoy's). A sound played from gameplay plays on whichever peer holds state authority, which for bots is the master: that is the bug this rule replaced.
+
+### ChangeDetector for continuous state
+
+`ChickenCombat.Render` uses a `ChangeDetector` + cached `PropertyReader<T>` to turn a change of its own `[Networked]` state into a local C# event on every peer. Pattern reference:
 
 ```csharp
 _detector = GetChangeDetector(ChangeDetector.Source.SimulationState);
-_hpReader = GetPropertyReader<float>(nameof(HP));
+_removedReader = GetPropertyReader<bool>(nameof(IsRemoved));
 
 public override void Render() {
     foreach (var prop in _detector.DetectChanges(this, out var prev, out var cur)) {
-        if (prop == nameof(HP)) {
-            var (prevHp, curHp) = _hpReader.Read(prev, cur);
-            if (curHp < prevHp) _animator?.TriggerHit();
+        if (prop == nameof(IsRemoved)) {
+            var (_, removed) = _removedReader.Read(prev, cur);
+            if (removed) OnDeath?.Invoke(); else OnRespawn?.Invoke();   // presentation subscribes
         }
     }
 }
 ```
+
+The detector only resolves for the behaviour that declares the property. It is for state, not for one-shot counters: those go through `ChickenLocalEvents`.
 
 ### `[Networked]` defaults
 
