@@ -167,8 +167,8 @@ namespace CluckWars.Tests
         public void SettleRpc_ConsumesAPendingRecord_BeforeTouchingCargo()
         {
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_SettleSteal(", 3200);
-            int consume = body.IndexOf("_pendingSteals.TryConsumeOldest(victimId", StringComparison.Ordinal);
-            int cargo = body.IndexOf("Cargo += credit", StringComparison.Ordinal);
+            int consume = body.IndexOf("_requests.SettleSteal(victimId, requestId", StringComparison.Ordinal);
+            int cargo = body.IndexOf("Cargo += settled.ToCargo", StringComparison.Ordinal);
             Assert.Greater(consume, 0, "the report must be matched against a pending record");
             Assert.Greater(cargo, consume);
             StringAssert.Contains("return;", body.Substring(consume, cargo - consume), "no record -> reject");
@@ -180,8 +180,8 @@ namespace CluckWars.Tests
         {
             string cargo = Src("Gameplay/ChickenCargo.cs");
             string helper = Body(cargo, "public void RequestSteal(", 1100);
-            int record = helper.IndexOf("_pendingSteals.Record(", StringComparison.Ordinal);
-            int rpc = helper.IndexOf("RPC_DrainStolen(amount", StringComparison.Ordinal);
+            int record = helper.IndexOf("_requests.AskSteal(", StringComparison.Ordinal);
+            int rpc = helper.IndexOf("RPC_DrainStolen(asked", StringComparison.Ordinal);
             Assert.Greater(record, 0);
             Assert.Greater(rpc, record, "a local invoke settles synchronously, so the record must exist first");
             StringAssert.DoesNotContain("Cargo +=", helper, "A02: the request credits nothing; RPC_SettleSteal does");

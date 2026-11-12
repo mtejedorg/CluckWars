@@ -46,11 +46,13 @@ namespace CluckWars.Gameplay
             public float Amount;
             public float Time;
             public bool Live;
+            public ushort Id;
         }
 
-        private readonly Entry[] _entries = new Entry[Capacity];
+        private readonly Entry[] _entries;
         private readonly float _windowSeconds;
         private int _next;
+        private ushort _nextId;
 
         /// <param name="windowSeconds">
         /// How long a record stays consumable. Defaults to <see cref="WindowSeconds"/> (the steal
@@ -58,12 +60,19 @@ namespace CluckWars.Gameplay
         /// report makes two relayed trips in Shared Mode (see
         /// <c>StealRules.ExecuteLootWindowSeconds</c>).
         /// </param>
-        public PendingStealLedger(float windowSeconds = WindowSeconds)
+        /// <param name="size">Slots in the ring; defaults to <see cref="Capacity"/>.</param>
+        public PendingStealLedger(float windowSeconds = WindowSeconds, int size = Capacity)
         {
             if (!(windowSeconds > 0f))
                 throw new ArgumentOutOfRangeException(nameof(windowSeconds), windowSeconds, "window must be positive");
+            if (size < 1)
+                throw new ArgumentOutOfRangeException(nameof(size), size, "the ring needs at least one slot");
             _windowSeconds = windowSeconds;
+            _entries = new Entry[size];
         }
+
+        /// <summary>Slots in this ledger's ring.</summary>
+        public int Size => _entries.Length;
 
         /// <summary>This ledger's consumable window, in seconds.</summary>
         public float Window => _windowSeconds;
@@ -72,8 +81,21 @@ namespace CluckWars.Gameplay
         public void Record(TKey key, float amount, float now)
         {
             if (amount <= 0f) return;
-            _entries[_next] = new Entry { Key = key, Amount = amount, Time = now, Live = true };
-            _next = (_next + 1) % Capacity;
+            Open(key, amount, now);
+        }
+
+        /// <summary>
+        /// Records a transfer like <see cref="Record"/> and returns the id that names it: a per-ledger counter that
+        /// wraps at 65536. The request carries the id, the report echoes it, and <see cref="TryClose"/> closes exactly
+        /// that record, so a report can never settle a different request that happens to be open with the same key.
+        /// </summary>
+        public ushort Open(TKey key, float amount, float now)
+        {
+            ushort id = _nextId++;
+            if (amount <= 0f) return id;
+            _entries[_next] = new Entry { Key = key, Amount = amount, Time = now, Live = true, Id = id };
+            _next = (_next + 1) % _entries.Length;
+            return id;
         }
 
         /// <summary>
@@ -89,7 +111,7 @@ namespace CluckWars.Gameplay
 
             int best = -1;      // oldest record that covers the request
             int fallback = -1;  // oldest record from this key at all
-            for (int i = 0; i < Capacity; i++)
+            for (int i = 0; i < _entries.Length; i++)
             {
                 if (!_entries[i].Live) continue;
                 if (now - _entries[i].Time > _windowSeconds)
@@ -114,33 +136,29 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Consumes the oldest unexpired record from <paramref name="key"/>, whatever its amount, and returns that amount.
-        /// The settle half of a food transfer (<see cref="FoodTransferRules"/>): reports from one owner arrive in the
-        /// order the requests were sent, and a report of zero must still close its request.
+        /// Closes the unexpired record <paramref name="id"/> opened with <paramref name="key"/> and returns its amount.
+        /// The settle half of a food transfer (<see cref="FoodTransferRules"/>); a report of zero still closes its request.
         /// </summary>
-        /// <returns>False (and 0) when there is no unexpired record from that key.</returns>
-        public bool TryConsumeOldest(TKey key, float now, out float recorded)
+        /// <returns>False (and 0) when that record is not open: never opened, already closed, expired or overwritten.</returns>
+        public bool TryClose(TKey key, ushort id, float now, out float recorded)
         {
             recorded = 0f;
-            int pick = -1;
-            for (int i = 0; i < Capacity; i++)
+            for (int i = 0; i < _entries.Length; i++)
             {
-                if (!IsLive(i, now)) continue;
+                if (!IsLive(i, now) || _entries[i].Id != id) continue;
                 if (!EqualityComparer<TKey>.Default.Equals(_entries[i].Key, key)) continue;
-                if (pick < 0 || _entries[i].Time < _entries[pick].Time) pick = i;
+                recorded = _entries[i].Amount;
+                _entries[i].Live = false;
+                return true;
             }
-            if (pick < 0) return false;
-
-            recorded = _entries[pick].Amount;
-            _entries[pick].Live = false;
-            return true;
+            return false;
         }
 
         /// <summary>The sum of every unexpired record: what is still asked for and not yet settled.</summary>
         public float Outstanding(float now)
         {
             float total = 0f;
-            for (int i = 0; i < Capacity; i++)
+            for (int i = 0; i < _entries.Length; i++)
                 if (IsLive(i, now)) total += _entries[i].Amount;
             return total;
         }
@@ -155,6 +173,6 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>Drops every record (new round).</summary>
-        public void Clear() => Array.Clear(_entries, 0, Capacity);
+        public void Clear() => Array.Clear(_entries, 0, _entries.Length);
     }
 }

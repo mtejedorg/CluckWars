@@ -96,7 +96,7 @@ namespace CluckWars.Tests
         {
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
             int proof  = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
-            int report = body.IndexOf("ReportSteal(thief, 0f)", StringComparison.Ordinal);
+            int report = body.IndexOf("ReportSteal(thief, 0f, requestId)", StringComparison.Ordinal);
             int drain  = body.IndexOf("StealRules.SplitDrain(", StringComparison.Ordinal);
             int stamp  = body.IndexOf("StealEventId++", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
@@ -114,7 +114,7 @@ namespace CluckWars.Tests
             Assert.IsTrue(m.GetParameters().Any(p => p.ParameterType == typeof(Fusion.RpcInfo)));
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_SettleSteal(", 3000);
             StringAssert.Contains("SpeaksFor(victim, info)", body);
-            StringAssert.Contains("FoodTransferRules.Credit(requested, amount)", body);
+            StringAssert.Contains("_requests.SettleSteal(victimId, requestId, amount", body);
 
             string speaks = Body(Src("Gameplay/ChickenCargo.cs"), "private static bool SpeaksFor(", 600);
             StringAssert.Contains("owner.Object.StateAuthority == info.Source", speaks, "off the wire: the owner's state authority");

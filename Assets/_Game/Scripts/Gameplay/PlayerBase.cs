@@ -410,19 +410,20 @@ namespace CluckWars.Gameplay
         /// <b>Every flush is answered</b> (<c>ChickenCargo.RPC_SettleDeposit</c>). The chicken debited its cargo
         /// before sending, so a silent refusal destroyed the food; a refusal now bounces it back, and an
         /// acceptance is what counts the chicken's deposit stat. The answer only ever goes to a cargo the sender
-        /// owns, so a forged call cannot aim a bounce at somebody else, and the cargo honours it only against a
-        /// flush it recorded.
+        /// owns, so a forged call cannot aim a bounce at somebody else; a call naming a cargo the sender does not
+        /// own (or none) is the one exit with no answer, because there is nobody it could honestly go to. The
+        /// answer echoes the flush's <paramref name="requestId"/>.
         /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_AddFood(float amount, NetworkBehaviourId depositorCargoId, RpcInfo info = default)
+        public void RPC_AddFood(float amount, NetworkBehaviourId depositorCargoId, ushort requestId, RpcInfo info = default)
         {
             ChickenCargo cargo = ResolveSenderCargo(depositorCargoId, info);
 
             if (!IsPlausibleAmount(amount, out string amountRejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — {amountRejection}");
-                cargo?.RPC_SettleDeposit(amount, banked: false, Id);
+                cargo?.RPC_SettleDeposit(amount, banked: false, Id, requestId);
                 return;
             }
 
@@ -437,12 +438,12 @@ namespace CluckWars.Gameplay
                         (cargo == null ? $" (and {depositorCargoId} is not a cargo that caller owns, so nothing is sent back)" : string.Empty) +
                         $". {DescribeRejection(info)}" +
                         (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
-                cargo?.RPC_SettleDeposit(amount, banked: false, Id);
+                cargo?.RPC_SettleDeposit(amount, banked: false, Id, requestId);
                 return;
             }
 
             FoodTotal += amount;
-            cargo.RPC_SettleDeposit(amount, banked: true, Id);
+            cargo.RPC_SettleDeposit(amount, banked: true, Id, requestId);
             _log?.Debug(Source, $"{name}: +{amount:0.00} from {depositor.name} → FoodTotal={FoodTotal:0.0}.");
         }
 

@@ -110,7 +110,7 @@ namespace CluckWars.Abilities
             var pile = FindPile(chicken);
             if (cargo == null || pile == null) return;
 
-            float amount = ResolveAmount(chicken);
+            float amount = AmountFor(chicken);
 
             // pile.Available, not pile.Amount — the centre island is permanent and holds a
             // floor that is terrain, not food. Asking against Amount would make it an
@@ -130,8 +130,9 @@ namespace CluckWars.Abilities
             if (ctx.Controller != null) ctx.Controller.Effects.RemoveMovementLock(ctx.Slot);
         }
 
-        /// <summary>Food taken per press for this caster's class.</summary>
-        private static float ResolveAmount(ChickenController caster)
+        /// <summary>Food taken per press for this caster's class. Also the bound the pile and the pecker's own
+        /// settlement hold a single peck to (<c>FoodTransferRules.ServePeck</c>).</summary>
+        public static float AmountFor(ChickenController caster)
         {
             var stats = caster != null ? caster.Stats : null;
             return stats != null && stats.PeckAmount > 0f ? stats.PeckAmount : 3f;

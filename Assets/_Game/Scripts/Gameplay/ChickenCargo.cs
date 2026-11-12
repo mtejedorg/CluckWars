@@ -125,9 +125,7 @@ namespace CluckWars.Gameplay
         {
             get
             {
-                float now = Time.unscaledTime;
-                return FoodTransferRules.FreeSpace(Capacity, Cargo,
-                    _pendingSteals.Outstanding(now) + _pendingPecks.Outstanding(now));
+                return _requests.FreeSpace(Capacity, Cargo, Time.unscaledTime);
             }
         }
 
@@ -181,18 +179,14 @@ namespace CluckWars.Gameplay
         private float _maxStealReach;
         private bool  _stealBoundsResolved;
 
-        // Requests this chicken has sent and their owner has not settled yet (FoodTransferRules): steals keyed by
-        // victim, pecks keyed by pile. They gate RPC_SettleSteal / RPC_SettlePeck (a report nobody asked for credits
-        // nothing) and hold their room in the hold (FreeSpace).
-        private readonly PendingStealLedger<NetworkBehaviourId> _pendingSteals = FoodTransferRules.NewLedger<NetworkBehaviourId>();
-        private readonly PendingStealLedger<NetworkBehaviourId> _pendingPecks = FoodTransferRules.NewLedger<NetworkBehaviourId>();
-
-        // Deposit flushes sent to a base and neither acknowledged nor bounced yet, keyed by base; gates RPC_SettleDeposit.
-        private readonly PendingStealLedger<NetworkBehaviourId> _pendingDeposits = FoodTransferRules.NewLedger<NetworkBehaviourId>();
+        // This chicken's side of every food transfer (FoodTransferRules): the steals and pecks it has asked for and
+        // not been answered, and the deposit flushes it has sent. Open requests gate the settle RPCs and hold their
+        // room in the hold (FreeSpace). Local to this state authority, never replicated.
+        private readonly FoodRequests<NetworkBehaviourId> _requests = new FoodRequests<NetworkBehaviourId>();
 
         // Executes this assassin has sent and not yet been paid for, keyed by victim, valued at
         // the most that victim could have carried; gates RPC_CreditExecuteLoot. A separate ring
-        // from _pendingSteals so a loot report can never consume a refund record or vice versa,
+        // from the steal requests so a loot report can never close a steal request or vice versa,
         // and with its own longer window (StealRules.ExecuteLootWindowSeconds): the report makes
         // two relayed trips in Shared Mode, not the refund's one round trip.
         private readonly PendingStealLedger<NetworkBehaviourId> _pendingExecutes = StealRules.NewExecuteLootLedger<NetworkBehaviourId>();
@@ -426,8 +420,15 @@ namespace CluckWars.Gameplay
                     // Recorded before the RPC: a base this peer owns (master, bots) settles synchronously inside the call.
                     // The cargo was debited tick by tick; the base answers with "banked" (the stat is counted then)
                     // or bounces the flush back (RPC_SettleDeposit).
-                    _pendingDeposits.Record(_activeBaseTarget.Id, _pendingBaseFood, Time.unscaledTime);
-                    _activeBaseTarget.RPC_AddFood(_pendingBaseFood, Id);
+                    ushort flushId = _requests.SendDeposit(_activeBaseTarget.Id, _pendingBaseFood, Time.unscaledTime);
+                    _activeBaseTarget.RPC_AddFood(_pendingBaseFood, Id, flushId);
+                }
+                else
+                {
+                    // The base went away between the debit and the flush (despawn, scene unload). Nobody can bank
+                    // it or bounce it, so it goes straight back into the hold instead of being dropped.
+                    AddToHold(_pendingBaseFood);
+                    _log?.Warn(Source, $"{name}: the base went away with {_pendingBaseFood:0.00} food debited for it - returned to the hold.");
                 }
                 _pendingBaseFood = 0f;
             }
@@ -535,15 +536,10 @@ namespace CluckWars.Gameplay
             int ticksToFlush = Mathf.RoundToInt(BaseDepositRules.FlushSeconds * Runner.TickRate);
             if (_baseDepositTicks >= ticksToFlush || (Cargo <= 0f && BountyBag <= 0f))
             {
-                bool isDone = (Cargo <= 0f && BountyBag <= 0f);
+                // Nothing is zeroed and nothing is played here: both were already drained to exactly 0 above, a base
+                // this peer owns may bounce the flush back inside FlushBaseDeposit, and "deposit complete" is only
+                // true once the base says so (RPC_SettleDeposit).
                 FlushBaseDeposit();
-                if (isDone)
-                {
-                    // Nothing is zeroed here: both were already drained to exactly 0 above, and a base this peer
-                    // owns may have bounced the flush back into them inside FlushBaseDeposit.
-                    _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
-                    _log?.Debug(Source, $"Deposited complete at {playerBase.name}.");
-                }
             }
         }
 
@@ -657,6 +653,29 @@ namespace CluckWars.Gameplay
             owner != null && owner.Object != null && owner.Object.IsValid &&
             (info.IsInvokeLocal ? owner.Object.HasStateAuthority : owner.Object.StateAuthority == info.Source);
 
+        /// <summary>Puts arriving food into the hold: the cargo up to its free room, the rest into the bounty bag.</summary>
+        private void AddToHold(float amount)
+        {
+            FoodTransferRules.Place(amount, FreeSpace, out float toCargo, out float toBag);
+            if (toCargo > 0f) Cargo += toCargo;
+            if (toBag > 0f) BountyBag += toBag;
+        }
+
+        /// <summary>One bite of this chicken's class: the most a single peck can be worth (<c>PeckAbilitySO</c>).</summary>
+        public float MaxPeck => Abilities.PeckAbilitySO.AmountFor(_controller);
+
+        // One "settled without an open request" line per owner per 2 s (a stall produces a burst of them).
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter LateSettleLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+
+        private void WarnLateSettle(string rpc, in RpcInfo info, string owner, ushort requestId, float credited)
+        {
+            if (!LateSettleLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held)) return;
+            _log?.Warn(Source, $"{name}: {rpc} #{requestId} from {owner} matched no open request (expired or overwritten); " +
+                $"the sender is its state authority, so {credited:0.00} was honoured, capped at one request's worth." +
+                (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+        }
+
         /// <summary>
         /// The ONE pecker-side entry point for foraging: asks <paramref name="pile"/>'s authority for up to
         /// <paramref name="amount"/> and records the request. Nothing is credited here; the pile answers with what
@@ -665,21 +684,20 @@ namespace CluckWars.Gameplay
         public void RequestPeck(FoodPile pile, float amount)
         {
             if (pile == null) return;
-            amount = FoodTransferRules.Request(amount, FreeSpace);
-            if (amount <= 0f) return;
 
-            // Recorded before the RPC: a pile this peer owns settles synchronously inside the call.
-            _pendingPecks.Record(pile.Id, amount, Time.unscaledTime);
-            pile.RPC_Drain(amount, Id);
+            // Opened before the RPC: a pile this peer owns settles synchronously inside the call.
+            if (!_requests.AskPeck(pile.Id, amount, Capacity, Cargo, Time.unscaledTime, out float asked, out ushort requestId)) return;
+            pile.RPC_Drain(asked, Id, requestId);
         }
 
         /// <summary>
-        /// The pile's answer to <see cref="RequestPeck"/>: <paramref name="amount"/> is what it actually removed
-        /// (0 when another pecker got there first). Honoured only from the pile's own authority and only against an
-        /// open request, for at most what was asked.
+        /// The pile's answer to <see cref="RequestPeck"/>: <paramref name="amount"/> is what it actually removed for
+        /// request <paramref name="requestId"/> (0 when another pecker got there first, or the pile refused).
+        /// Honoured only from the pile's own authority. With that verified, a report whose request is no longer open
+        /// (expired, overwritten) is still credited, up to one bite: the pile has already debited it.
         /// </summary>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_SettlePeck(float amount, NetworkBehaviourId pileId, RpcInfo info = default)
+        public void RPC_SettlePeck(float amount, NetworkBehaviourId pileId, ushort requestId, RpcInfo info = default)
         {
             if (Runner == null || !Runner.TryFindBehaviour(pileId, out FoodPile pile) || !SpeaksFor(pile, info))
             {
@@ -687,19 +705,14 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (!_pendingPecks.TryConsumeOldest(pileId, Time.unscaledTime, out float requested))
-            {
-                _log?.Warn(Source, $"{name}: rejected RPC_SettlePeck({amount:0.00}) from {info.Source} - no open peck on {pile.name} " +
-                    "(unsolicited, already settled, or it arrived after the settle window: that food is lost).");
-                return;
-            }
+            var settled = _requests.SettlePeck(pileId, requestId, amount, MaxPeck, Capacity, Cargo, Time.unscaledTime);
+            if (settled.Credited <= 0f) return;   // the pile was emptied first, or it refused: a legal no-op
 
-            float credit = FoodTransferRules.Credit(requested, amount);
-            if (credit <= 0f) return;   // the pile was emptied first: a legal no-op
-
-            Cargo += credit;
-            if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
-                _log.Verbose(Source, $"Pecked +{credit:0.00} from {pile.name} (asked {requested:0.00}) → Cargo={Cargo:0.0}.");
+            if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
+            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
+            if (settled.Outcome == SettleOutcome.Late) WarnLateSettle(nameof(RPC_SettlePeck), info, pile.name, requestId, settled.Credited);
+            else if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
+                _log.Verbose(Source, $"Pecked +{settled.Credited:0.00} from {pile.name} (asked {settled.Requested:0.00}) → Cargo={Cargo:0.0}.");
         }
 
         /// <summary>
@@ -710,7 +723,7 @@ namespace CluckWars.Gameplay
         /// even asked.
         /// </summary>
         /// <remarks>
-        /// The record is what lets <see cref="RPC_SettleSteal"/> refuse a report no steal asked for. It is written
+        /// The open request is what lets <see cref="RPC_SettleSteal"/> refuse a report no steal asked for. It is opened
         /// before the RPC because a local invoke (bot or solo victim) settles synchronously inside the call.
         /// </remarks>
         public void RequestSteal(ChickenCargo victim, float amount)
@@ -723,12 +736,9 @@ namespace CluckWars.Gameplay
             }
 
             // The caller clamped to capacity minus cargo; requests still open hold room too (the other rivals of one
-            // multi-target Snatch), so FreeSpace has the last word.
-            amount = FoodTransferRules.Request(amount, FreeSpace);
-            if (amount <= 0f) return;
-
-            _pendingSteals.Record(victim._controller.Id, amount, Time.unscaledTime);
-            victim.RPC_DrainStolen(amount, _controller.Id);
+            // multi-target Snatch), so the free room has the last word.
+            if (!_requests.AskSteal(victim._controller.Id, amount, Capacity, Cargo, Time.unscaledTime, out float asked, out ushort requestId)) return;
+            victim.RPC_DrainStolen(asked, _controller.Id, requestId);
         }
 
         /// <summary>
@@ -758,17 +768,19 @@ namespace CluckWars.Gameplay
         /// </para>
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_DrainStolen(float amount, NetworkBehaviourId thiefId, RpcInfo info = default)
+        public void RPC_DrainStolen(float amount, NetworkBehaviourId thiefId, ushort requestId, RpcInfo info = default)
         {
             if (!IsPlausibleAmount(amount, out string amountRejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_DrainStolen({amount:0.00}) from {info.Source} — {amountRejection}");
+                ReportRefusalToSender(thiefId, requestId, info);
                 return;
             }
 
             if (!TryResolveThief(thiefId, info, out var thief, out string thiefRejection))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_DrainStolen({amount:0.00}) from {info.Source} — {thiefRejection}");
+                ReportRefusalToSender(thiefId, requestId, info);
                 return;
             }
 
@@ -782,7 +794,7 @@ namespace CluckWars.Gameplay
             {
                 _log?.Info(Source, $"{name}: steal by {thief.name} hit {(walled ? "a base wall" : "a shell that went up")} " +
                                    "inside one round trip — nothing drained.");
-                ReportSteal(thief, 0f);
+                ReportSteal(thief, 0f, requestId);
                 return;
             }
 
@@ -792,7 +804,7 @@ namespace CluckWars.Gameplay
                 // this tick (another thief may have taken it first). The thief is told so and
                 // credits nothing: its estimate of this load never became food.
                 _log?.Debug(Source, $"{thief.name} stole from an empty load — nothing to drain.");
-                ReportSteal(thief, 0f);
+                ReportSteal(thief, 0f, requestId);
                 return;
             }
 
@@ -814,18 +826,18 @@ namespace CluckWars.Gameplay
             _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
                                $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
 
-            ReportSteal(thief, actual);
+            ReportSteal(thief, actual, requestId);
         }
 
         /// <summary>
-        /// Victim side: tells the thief's authority what was really drained, 0 for a refusal or an empty load, so
-        /// its open request is closed and it credits exactly that.
+        /// Victim side: tells the thief's authority what was really drained for its request, 0 for a refusal or an
+        /// empty load, so that request is closed and the thief credits exactly that.
         /// </summary>
-        private void ReportSteal(ChickenController thief, float actual)
+        private void ReportSteal(ChickenController thief, float actual, ushort requestId)
         {
             if (thief.Cargo != null)
             {
-                thief.Cargo.RPC_SettleSteal(actual, _controller.Id);
+                thief.Cargo.RPC_SettleSteal(actual, _controller.Id, requestId);
                 return;
             }
 
@@ -835,17 +847,30 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// A rejected <see cref="RPC_DrainStolen"/> still answers when the named thief is a chicken the sender owns: a
+        /// report of zero for that request, so it is closed now instead of holding room in the thief's hold until it
+        /// expires (an honest steal at the edge of reach is refused this way). A call naming a chicken the sender
+        /// does not own gets no answer.
+        /// </summary>
+        private void ReportRefusalToSender(NetworkBehaviourId thiefId, ushort requestId, in RpcInfo info)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(thiefId, out ChickenController named)) return;
+            if (named == _controller || !SpeaksFor(named, info)) return;
+            ReportSteal(named, 0f, requestId);
+        }
+
+        /// <summary>
         /// The victim's answer to <see cref="RequestSteal"/>: <paramref name="amount"/> is what its authority
-        /// actually drained (0 when a shell, a base wall or an empty load refused the steal).
+        /// actually drained for request <paramref name="requestId"/> (0 when the steal was refused or the load was gone).
         /// </summary>
         /// <remarks>
         /// Honoured only when the sender is entitled to speak for the named victim (<see cref="SpeaksFor"/>: a bot
-        /// victim is owned by the master) and only against a request this chicken recorded in
-        /// <see cref="RequestSteal"/>, which is consumed: a report cannot be sent without a steal having been asked
-        /// for, and it is worth at most what was asked (<see cref="FoodTransferRules.Credit"/>).
+        /// victim is owned by the master) and only against the open request it names, which is closed: a report
+        /// cannot be sent without a steal having been asked for, and it is worth at most what was asked. Strict on
+        /// purpose, unlike the pile and base reports: the sender is any client that owns a chicken.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_SettleSteal(float amount, NetworkBehaviourId victimId, RpcInfo info = default)
+        public void RPC_SettleSteal(float amount, NetworkBehaviourId victimId, ushort requestId, RpcInfo info = default)
         {
             if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) ||
                 victim == _controller || !SpeaksFor(victim, info))
@@ -854,34 +879,35 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // Unsolicited-report guard: only a steal this chicken really asked this victim for, inside the window, once.
-            if (!_pendingSteals.TryConsumeOldest(victimId, Time.unscaledTime, out float requested))
+            var settled = _requests.SettleSteal(victimId, requestId, amount, Capacity, Cargo, Time.unscaledTime);
+            if (settled.Outcome == SettleOutcome.Refused)
             {
-                _log?.Warn(Source, $"{name}: rejected RPC_SettleSteal({amount:0.00}) from {info.Source} - no open steal on {victim.name} " +
-                    "(unsolicited, already settled, or it arrived after the settle window: that food is lost).");
+                _log?.Warn(Source, $"{name}: rejected RPC_SettleSteal({amount:0.00}) #{requestId} from {info.Source} - no such steal is open on {victim.name} " +
+                    "(unsolicited, already settled or expired).");
                 return;
             }
+            if (settled.Credited <= 0f) return;   // refused, or the load was gone: a legal no-op
 
-            float credit = FoodTransferRules.Credit(requested, amount);
-            if (credit <= 0f) return;   // refused, or the load was gone: a legal no-op
-
-            Cargo += credit;
+            if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
+            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
             _stealCreditFrame = Time.frameCount;   // I5: Render holds this gain own +n until the kernels land
-            _log?.Debug(Source, $"Steal settled: +{credit:0.00} from {victim.name} (asked {requested:0.00}) → Cargo={Cargo:0.0}.");
+            _log?.Debug(Source, $"Steal settled: +{settled.Credited:0.00} from {victim.name} (asked {settled.Requested:0.00}) → Cargo={Cargo:0.0}.");
         }
 
         /// <summary>
-        /// The base's answer to a deposit flush (<see cref="FlushBaseDeposit"/>): <paramref name="banked"/> when it
-        /// was added to the base's total, otherwise the base refused it and the food comes back.
+        /// The base's answer to deposit flush <paramref name="requestId"/> (<see cref="FlushBaseDeposit"/>):
+        /// <paramref name="banked"/> when it was added to the base's total, otherwise the base refused it and the
+        /// food comes back.
         /// </summary>
         /// <remarks>
         /// The cargo was debited when the flush was built, so a refusal used to destroy the food (the host seeing the
         /// chicken a step outside the radius was enough). A bounce returns it to the cargo, or to the bounty bag for
-        /// whatever no longer fits (<see cref="FoodTransferRules.SplitRefund"/>). The deposit stat is counted here, on
-        /// "banked" only. Honoured only from the base's own authority and only against a flush this chicken recorded.
+        /// whatever no longer fits. The deposit stat is counted here, on "banked" only, and so is the deposit sound.
+        /// Honoured only from the base's own authority; with that verified, an answer whose flush is no longer on
+        /// record is still honoured, up to one flush.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_SettleDeposit(float amount, bool banked, NetworkBehaviourId baseId, RpcInfo info = default)
+        public void RPC_SettleDeposit(float amount, bool banked, NetworkBehaviourId baseId, ushort requestId, RpcInfo info = default)
         {
             if (Runner == null || !Runner.TryFindBehaviour(baseId, out PlayerBase playerBase) || !SpeaksFor(playerBase, info))
             {
@@ -889,28 +915,32 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (!_pendingDeposits.TryConsumeOldest(baseId, Time.unscaledTime, out float sent))
-            {
-                _log?.Warn(Source, $"{name}: rejected RPC_SettleDeposit({amount:0.00}, banked={banked}) from {info.Source} - no open flush to {playerBase.name} " +
-                    "(unsolicited, already settled, or it arrived after the settle window" + (banked ? ")." : ": that food is lost)."));
-                return;
-            }
-
-            float settled = FoodTransferRules.Credit(sent, amount);
-            if (settled <= 0f) return;
+            float now = Time.unscaledTime;
+            float maxFlush = BaseDepositRules.MaxSingleDeposit(_matchConfig != null ? _matchConfig.DepositRatePerSecond : 6f);
+            var settled = _requests.SettleDeposit(baseId, requestId, amount, banked, maxFlush, Capacity, Cargo, now);
+            if (settled.Outcome == SettleOutcome.Late && settled.Banked + settled.Credited > 0f)
+                WarnLateSettle(nameof(RPC_SettleDeposit), info, playerBase.name, requestId, settled.Banked + settled.Credited);
 
             if (banked)
             {
-                if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordDeposit(settled);
-                else _log?.Warn(Source, $"{name}: no ChickenMatchStats - {settled:0.00} banked food not counted in MATCH SUMMARY.");
+                if (settled.Banked <= 0f) return;
+                if (TryGetComponent(out ChickenMatchStats stats)) stats.RecordDeposit(settled.Banked);
+                else _log?.Warn(Source, $"{name}: no ChickenMatchStats - {settled.Banked:0.00} banked food not counted in MATCH SUMMARY.");
+
+                // The whole load is in the base: nothing left to carry, nothing still unanswered.
+                if (Cargo <= 0f && BountyBag <= 0f && _pendingBaseFood <= 0f && _requests.DepositsInFlight(now) <= 0f)
+                {
+                    _audio?.PlaySFX(_audioReg != null ? _audioReg.Deposit : null);
+                    _log?.Debug(Source, $"Deposit complete at {playerBase.name}.");
+                }
                 return;
             }
 
-            FoodTransferRules.SplitRefund(settled, FreeSpace, out float toCargo, out float toBag);
-            Cargo += toCargo;
-            BountyBag += toBag;
-            _log?.Info(Source, $"Deposit of {settled:0.00} bounced by {playerBase.name}: back in the hold " +
-                               $"(cargo +{toCargo:0.00}, bag +{toBag:0.00}) → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
+            if (settled.Credited <= 0f) return;
+            if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
+            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
+            _log?.Info(Source, $"Deposit of {settled.Credited:0.00} bounced by {playerBase.name}: back in the hold " +
+                               $"(cargo +{settled.ToCargo:0.00}, bag +{settled.ToBag:0.00}) → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
         }
 
         /// <summary>Magnitude check, with the reason so the caller can log it.</summary>
@@ -1278,9 +1308,7 @@ namespace CluckWars.Gameplay
             _pendingBaseFood = 0f;
             _activeBaseTarget = null;
             _baseDepositTicks = 0;
-            _pendingSteals.Clear();
-            _pendingPecks.Clear();
-            _pendingDeposits.Clear();
+            _requests.Clear();
             _pendingExecutes.Clear();
 
             Cargo = 0f;

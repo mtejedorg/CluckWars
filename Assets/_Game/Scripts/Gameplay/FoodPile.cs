@@ -450,13 +450,14 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// Nothing is drained for a cargo that does not resolve or that the sender does not own: the report would
-        /// have nobody to credit, and the food would simply vanish.
+        /// have nobody to credit, and the food would simply vanish. For a cargo the sender does own, the request is
+        /// held to one bite of that chicken's class and to a chicken standing at the pile
+        /// (<see cref="FoodTransferRules.ServePeck"/>), so one client cannot empty every pile from its spawn; a
+        /// refusal still reports zero for <paramref name="requestId"/>, which closes the pecker's request.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_Drain(float amount, NetworkBehaviourId peckerCargoId, RpcInfo info = default)
+        public void RPC_Drain(float amount, NetworkBehaviourId peckerCargoId, ushort requestId, RpcInfo info = default)
         {
-            if (!(amount > 0f)) return;
-
             if (Runner == null || !Runner.TryFindBehaviour(peckerCargoId, out ChickenCargo pecker) ||
                 pecker == null || pecker.Object == null || !pecker.Object.IsValid ||
                 !(info.IsInvokeLocal ? pecker.Object.HasStateAuthority : pecker.Object.StateAuthority == info.Source))
@@ -465,9 +466,13 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            float before = Amount;
-            float next = FoodPileMath.Drain(before, MaxAmount, FloorFraction, amount);
-            float actual = Mathf.Approximately(next, before) ? 0f : before - next;
+            // A local invocation has no wire time (and Source may be None).
+            float latency = info.IsInvokeLocal ? 0f : (float)Runner.GetPlayerRtt(info.Source);
+            float distance = DistanceToSurface(pecker.transform.position);
+            bool inReach = FoodTransferRules.IsWithinPeckReach(distance, _collectReach,
+                ChickenCargo.DriftSpeed(pecker.GetComponent<ChickenController>()), latency);
+
+            float actual = FoodTransferRules.ServePeck(amount, pecker.MaxPeck, inReach, Amount, MaxAmount, FloorFraction, out float next);
             if (actual > 0f)
             {
                 Amount = next;
@@ -476,8 +481,17 @@ namespace CluckWars.Gameplay
                     _log.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount} (floor {DrainFloor:0.0}).");
                 }
             }
+            else if (!inReach && DrainRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_Drain({amount:0.00}) from {info.Source} - {pecker.name} is {distance:0.0} m from the pile, " +
+                    $"past its {_collectReach:0.0} m reach plus drift." + (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+            }
 
-            pecker.RPC_SettlePeck(actual, Id);
+            pecker.RPC_SettlePeck(actual, Id, requestId);
         }
+
+        // One out-of-reach line per sender per 2 s, shared by every pile.
+        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter DrainRejectionLimiter =
+            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
     }
 }
