@@ -1,4 +1,3 @@
-using CluckWars.Audio;
 using CluckWars.Logging;
 using CluckWars.Visuals;
 using Fusion;
