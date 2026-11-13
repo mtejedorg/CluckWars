@@ -62,6 +62,29 @@ namespace CluckWars.Tests
             }
         }
 
+        /// <summary>
+        /// Playtest 2026-11-13: once a chicken has woken, <see cref="ChickenVFX.BuildMaterial()"/> hands the warm-up proxy the
+        /// shared asset itself, and the proxy destroyed "its" material when the warm-up ended. The Editor refuses to destroy
+        /// an asset (an error line, nothing else), a player really unloads it: every chicken particle system then drew with a
+        /// null material (magenta) for the rest of the session. A refused destroy logs an error, which fails this test.
+        /// </summary>
+        [Test]
+        public void WarmupProxies_NeverDestroyTheSharedFxMaterial()
+        {
+            var shared = Shared();
+            Assert.AreSame(shared, ChickenVFX.BuildMaterial(), "a chicken has woken: the factory hands out the shared asset");
+
+            var proxies = new ArenaWarmupProxies();
+            proxies.Create(Vector3.zero, null);
+            Assert.IsTrue(proxies.IsAlive);
+            proxies.Destroy();
+
+            Assert.IsFalse(proxies.IsAlive);
+            Assert.IsTrue(shared != null, "the warm-up proxies destroyed Fx_Particles.mat");
+            foreach (var ps in _systems)
+                Assert.AreSame(shared, ps.GetComponent<ParticleSystemRenderer>().sharedMaterial, ps.name + " lost the shared material");
+        }
+
         [Test]
         public void EveryParticleSystem_IsInSpriteMode_WithTheFxSprites()
         {

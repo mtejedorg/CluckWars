@@ -19,6 +19,7 @@ namespace CluckWars.Visuals
     {
         private GameObject _root;
         private Material _particleMaterial, _lineMaterial;
+        private bool _ownsParticleMaterial;   // false when it is the shared Fx_Particles.mat asset: never destroyed here
 
         public bool IsAlive => _root != null;
 
@@ -32,7 +33,7 @@ namespace CluckWars.Visuals
             _root = new GameObject("ArenaWarmupProxies") { hideFlags = HideFlags.DontSave };
             _root.transform.position = at;
 
-            _particleMaterial = ChickenVFX.BuildMaterial();
+            _particleMaterial = ChickenVFX.BuildMaterial(out _ownsParticleMaterial);
             if (_particleMaterial != null)
             {
                 var go = new GameObject("ParticleProxy");
@@ -81,13 +82,21 @@ namespace CluckWars.Visuals
             }
         }
 
-        /// <summary>Removes the proxies and the materials they made. Safe when nothing was created.</summary>
+        /// <summary>Removes the proxies and the materials they made (never the shared particle asset, which the chickens
+        /// keep drawing with). Safe when nothing was created.</summary>
         public void Destroy()
         {
-            if (_root != null) Object.Destroy(_root);
-            if (_particleMaterial != null) Object.Destroy(_particleMaterial);
-            if (_lineMaterial != null) Object.Destroy(_lineMaterial);
-            _root = null; _particleMaterial = null; _lineMaterial = null;
+            if (_root != null) Release(_root);
+            if (_ownsParticleMaterial && _particleMaterial != null) Release(_particleMaterial);
+            if (_lineMaterial != null) Release(_lineMaterial);
+            _root = null; _particleMaterial = null; _lineMaterial = null; _ownsParticleMaterial = false;
+        }
+
+        // DestroyImmediate outside Play mode, so the EditMode suite can run Create and Destroy.
+        private static void Release(Object o)
+        {
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
         }
     }
 }

@@ -1249,8 +1249,16 @@ namespace CluckWars.Visuals
         /// material built from the same shader and the same <see cref="ConfigureParticleMaterial"/> settings, so the shader
         /// variant it warms is the one the match draws. The fallback is never used by a wired chicken.
         /// </summary>
-        public static Material BuildMaterial()
+        public static Material BuildMaterial() => BuildMaterial(out _);
+
+        /// <summary>
+        /// <see cref="BuildMaterial()"/>, telling the caller whether the material is its own to destroy.
+        /// <paramref name="ownedByCaller"/> is false for the shared asset (and for null): destroying that one unloads
+        /// <c>Fx_Particles.mat</c> for every chicken in a player build (the Editor only refuses with an error line).
+        /// </summary>
+        public static Material BuildMaterial(out bool ownedByCaller)
         {
+            ownedByCaller = false;
             if (s_sharedMaterial != null) return s_sharedMaterial;
             Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             if (sh == null) sh = Shader.Find("Particles/Standard Unlit");
@@ -1258,6 +1266,7 @@ namespace CluckWars.Visuals
             if (sh == null) return null;
             var m = new Material(sh);
             ConfigureParticleMaterial(m);
+            ownedByCaller = true;
             return m;
         }
 
