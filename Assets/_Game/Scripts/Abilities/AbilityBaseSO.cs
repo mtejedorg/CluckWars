@@ -39,7 +39,7 @@ namespace CluckWars.Abilities
     /// <summary>
     /// How the bot AI should use this ability.
     /// <c>Auto</c> derives the role from <see cref="AbilityCategory"/>:
-    /// Damage→Offense, Control→Control, Defense→Defense, Utility→Escape.
+    /// Steal→Steal, Control→Control, Defense→Defense, Utility→Escape.
     /// Override only when Auto would be wrong (e.g. Sneaky Steal = Steal).
     /// </summary>
     public enum BotRole : byte
@@ -205,7 +205,7 @@ namespace CluckWars.Abilities
         /// <summary>
         /// Returns the effective <see cref="BotRole"/> for this ability.
         /// When <see cref="BotRole"/> is <c>Auto</c>, derives from
-        /// <see cref="Category"/>: Damage→Offense, Control→Control,
+        /// <see cref="Category"/>: Steal→Steal, Control→Control,
         /// Defense→Defense, Utility→Escape.
         /// </summary>
         public BotRole ResolveBotRole() => BotRole switch

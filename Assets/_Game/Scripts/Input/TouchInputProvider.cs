@@ -30,7 +30,7 @@ namespace CluckWars.Input
                     if (hud != null)
                     {
                         active = hud.Movement.sqrMagnitude > 0f;
-                        for (int slot = 0; slot < 4 && !active; slot++) active = hud.IsAbilityHeld(slot);
+                        for (int slot = 0; slot < Gameplay.AbilityController.SlotCount && !active; slot++) active = hud.IsAbilityHeld(slot);
                     }
                     // Any finger on the screen counts, not just one on a control: on the desktop / pad layout the
                     // joystick is hidden and the hexes take no pointer, so this is how a touchscreen laptop gets the

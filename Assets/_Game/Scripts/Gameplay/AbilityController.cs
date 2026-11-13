@@ -75,7 +75,7 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// Hold-to-aim charge state (FEEDBACK.md §2, Stage 2). 0 = nothing charging;
-        /// 1..3 = slot (index-1) currently being aimed, i.e. its hold button is down and
+        /// 1..SlotCount (1..4) = slot (index-1) currently being aimed, i.e. its hold button is down and
         /// no ability has fired yet. Drives the opponent-visible wind-up tell (§2.4) —
         /// every peer observes this, not just the caster. 1 byte.
         /// </summary>
