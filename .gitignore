@@ -183,3 +183,7 @@ Assets/Resources/PerformanceTestRun*
 
 # ...but the synthetic log fixtures for tools/test-session/selftest.ps1 are tracked
 !/tools/test-session/fixtures/**/*.log
+
+# Python bytecode (tools/docs, tools/test-session helpers)
+__pycache__/
+*.pyc

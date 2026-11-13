@@ -26,6 +26,9 @@ should rarely need edits.
 | **Where are we right now?** Current state, what works, latest tag, recent commits, open bugs, what's deferred. | `docs/STATE.md` |
 | **How does the code fit together?** Scene graph, DI scopes, networking model, chicken architecture, ability system, asset locations. | `docs/ARCHITECTURE.md` |
 | **What rules / patterns must I follow?** Self-injection, RPC patterns, networked-state defaults, footguns we hit and how to avoid them. | `docs/CONVENTIONS.md` |
+| **Which rule covers this, and what enforces it?** Every architecture rule with a stable ID (`ARCH-…`), what test or compiler boundary enforces it (or `NONE`), the pattern catalogue, the audit lens criteria, and the table of unenforced rules. Where it disagrees with an older doc, it wins; its Appendix A lists the stale lines. | `docs/ARCHITECTURE_RULES.md` |
+| **Same, for code, text, UI, tests, process and design constraints?** Rules `CODE-…` with their enforcement, the test pattern catalogue, the worked example "numbers in ability text come from the data". | `docs/CODE_RULES.md` |
+| **Where does X live, which assembly owns it, where does a new one go?** Assembly table, folder map, key files, data map, "adding X goes in Y". Its generated blocks are checked by `python -I tools/docs/file_structure.py check`. | `docs/FILE_STRUCTURE.md` |
 | **How do I build / run / diagnose?** Build menu shortcuts, debug HUD (F1), adb logcat commands, source-tag reference, diagnostic flows per bug type. | `docs/TESTING.md` |
 | **What's the plan, what's shipped, what's next?** Per-phase status, dedicated test session work list. | `docs/ROADMAP.md` |
 | **Why does the design look like this?** GDD / TDD / ART. | `docs/GDD.md` / `docs/TDD.md` / `docs/ART.md` |

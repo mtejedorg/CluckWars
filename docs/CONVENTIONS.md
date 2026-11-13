@@ -4,6 +4,13 @@ Rules of the road for Cluck Wars contributors (human and agent). Everything
 here is enforced by either a `[Networked]` boundary, a Zenject binding, or
 a hard-won bug. Don't rediscover them.
 
+> **See also.** The same rules, with stable IDs, the mechanism that enforces
+> each one (or `NONE`), and the places where an older line is stale, are in
+> [`ARCHITECTURE_RULES.md`](ARCHITECTURE_RULES.md) and
+> [`CODE_RULES.md`](CODE_RULES.md); the map of folders and assemblies is
+> [`FILE_STRUCTURE.md`](FILE_STRUCTURE.md). Where this file and those disagree,
+> they win until the stale line here is fixed (their Appendix A lists each one).
+
 ---
 
 ## Core rules
