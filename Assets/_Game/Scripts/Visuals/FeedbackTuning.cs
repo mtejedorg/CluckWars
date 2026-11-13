@@ -1179,6 +1179,42 @@ namespace CluckWars.Visuals
         /// (white) wherever it appears; reproduced for completeness.</summary>
         public static Color CanonicalKnockColor => FeedbackPalette.Current.KnockColor;
 
+        // ---- Carry and health ramp colours (A22, 2026-11-13) --------------
+        //
+        // The two world bars over a chicken's head (ChickenWorldBars) read "how
+        // full is my sack" and "how close am I to being taken out" at a glance.
+        // Both ramps were written as literals inside that one file, and the cargo
+        // ramp twice over (once for the fill, once for the number beside it), so a
+        // tweak could and did change one and not the other. The values are
+        // unchanged; they just have names now. They are code constants, not
+        // FeedbackPaletteSO entries, because adding a field to the shipped palette
+        // asset would read as black until somebody re-authored it.
+
+        /// <summary>Carry bar, under 70% full: the "plenty of room left" yellow.</summary>
+        public static readonly Color CargoLowColor = new Color(0.95f, 0.88f, 0.20f, 1f);
+
+        /// <summary>Carry bar, 70% or more: the "nearly full, think about banking" orange.</summary>
+        public static readonly Color CargoHighColor = new Color(1f, 0.55f, 0.05f, 1f);
+
+        /// <summary>Carry bar at capacity: the FULL red. The one state that also stops a pick-up.</summary>
+        public static readonly Color CargoFullColor = new Color(1f, 0.18f, 0.08f, 1f);
+
+        /// <summary>HP bar, full health end of the ramp.</summary>
+        public static readonly Color HealthHighColor = new Color(0.30f, 0.80f, 0.32f, 1f);
+
+        /// <summary>HP bar, the midpoint both halves of the ramp meet at.</summary>
+        public static readonly Color HealthMidColor = new Color(0.95f, 0.82f, 0.20f, 1f);
+
+        /// <summary>HP bar, empty end of the ramp.</summary>
+        public static readonly Color HealthLowColor = new Color(0.90f, 0.20f, 0.16f, 1f);
+
+        /// <summary>The skull a removed chicken's nameplate shows instead of its name.</summary>
+        public static readonly Color CanonicalRemovedNameColor = new Color(0.75f, 0.20f, 0.20f, 0.85f);
+
+        /// <summary>How long the ground shockwave of a landed knockback runs (ControlStateVFX). A juice
+        /// timing, so it lives here with the other forty rather than as a private const beside one ring.</summary>
+        public const float KnockRingSeconds = 0.3f;
+
         // ---- Threat-overlay colours (§2.2) --------------------------------
         //
         // "Valid target" intentionally has no colour constant here: per §2.2 it

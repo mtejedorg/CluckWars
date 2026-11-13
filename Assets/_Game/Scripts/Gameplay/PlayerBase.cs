@@ -198,6 +198,8 @@ namespace CluckWars.Gameplay
             return best;
         }
 
+        // A22: stays here, not in FeedbackTuning. PlayerBase is Gameplay and FeedbackTuning is
+        // Presentation; Gameplay < Presentation, so this file cannot name it.
         private static readonly Color UnownedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
 
         // Shader property IDs — cached once so SetPropertyBlock is alloc-free.

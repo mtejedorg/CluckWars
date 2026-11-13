@@ -262,7 +262,7 @@ namespace CluckWars.Visuals
                 ShowMarks(false, false, Color.clear);
                 if (_slowGlyph != null) _slowGlyph.enabled = false;
                 _text.text  = "☠";
-                _text.color = new Color(0.75f, 0.20f, 0.20f, 0.85f);
+                _text.color = FeedbackTuning.CanonicalRemovedNameColor;
                 BillboardToCamera();
                 return;
             }

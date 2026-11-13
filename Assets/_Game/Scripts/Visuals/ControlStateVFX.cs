@@ -96,7 +96,6 @@ namespace CluckWars.Visuals
         private Vector3[] _flashBuf;
 
         private float _knockTimer = -1f;
-        private const float KnockDuration = 0.3f;
         // The one-shot cursors live in ChickenLocalEvents; its events are latched here and consumed in LateUpdate.
         private ChickenLocalEvents _events;
         private bool  _knockPending;
@@ -481,7 +480,7 @@ namespace CluckWars.Visuals
             if (_knockTimer < 0f) return;
 
             _knockTimer += Time.deltaTime;
-            float t = _knockTimer / KnockDuration;
+            float t = _knockTimer / FeedbackTuning.KnockRingSeconds;
             if (t >= 1f)
             {
                 _knockTimer = -1f;

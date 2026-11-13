@@ -248,18 +248,10 @@ namespace CluckWars.Visuals
 
             int   carried = Mathf.FloorToInt(_cargo.Cargo);
             int   capInt  = Mathf.FloorToInt(_cargo.Capacity);
-            if (frac >= 1f)
-            {
-                _cargoText.text  = UiText.Get(UiKeys.HudPopFull);
-                _cargoText.color = new Color(1f, 0.18f, 0.08f, 1f);
-            }
-            else
-            {
-                _cargoText.text  = $"{carried}/{capInt}";
-                _cargoText.color = frac >= 0.7f
-                    ? new Color(1f, 0.55f, 0.05f, 1f)
-                    : new Color(0.95f, 0.88f, 0.20f, 1f);
-            }
+            // The number says the same thing as the bar under it, so it takes the bar's own colour
+            // (A22: this ramp used to be a second, hand-copied one).
+            _cargoText.text  = frac >= 1f ? UiText.Get(UiKeys.HudPopFull) : $"{carried}/{capInt}";
+            _cargoText.color = CargoColor(frac);
         }
 
         private void UpdateFill(SpriteRenderer fill, float frac, float height)
@@ -368,13 +360,13 @@ namespace CluckWars.Visuals
 
         /// <summary>Green above half, ramping through yellow to red as HP drains.</summary>
         private static Color HpColor(float frac) => frac > 0.5f
-            ? Color.Lerp(new Color(0.95f, 0.82f, 0.20f, 1f), new Color(0.30f, 0.80f, 0.32f, 1f), (frac - 0.5f) * 2f)
-            : Color.Lerp(new Color(0.90f, 0.20f, 0.16f, 1f), new Color(0.95f, 0.82f, 0.20f, 1f), frac * 2f);
+            ? Color.Lerp(FeedbackTuning.HealthMidColor, FeedbackTuning.HealthHighColor, (frac - 0.5f) * 2f)
+            : Color.Lerp(FeedbackTuning.HealthLowColor, FeedbackTuning.HealthMidColor, frac * 2f);
 
         /// <summary>Yellow → orange → bright red as the sack fills (red = FULL).</summary>
         private static Color CargoColor(float frac) =>
-            frac >= 1f   ? new Color(1f, 0.18f, 0.08f, 1f) :
-            frac >= 0.7f ? new Color(1f, 0.55f, 0.05f, 1f) :
-                           new Color(0.95f, 0.88f, 0.20f, 1f);
+            frac >= 1f   ? FeedbackTuning.CargoFullColor :
+            frac >= 0.7f ? FeedbackTuning.CargoHighColor :
+                           FeedbackTuning.CargoLowColor;
     }
 }
