@@ -113,7 +113,9 @@ namespace CluckWars.Tests
             int passiveGate = apply.IndexOf("LoadoutClaimRules.IsLegalPassive(passive, cls)", System.StringComparison.Ordinal);
             int passiveWrite = apply.IndexOf("_passive = passive", System.StringComparison.Ordinal);
             int slotGate = apply.IndexOf("LoadoutClaimRules.IsLegalSlot(ability, i, cls, _passive, mode", System.StringComparison.Ordinal);
-            int slotWrite = apply.IndexOf("_slot0 = ability", System.StringComparison.Ordinal);
+            // The slot fields are written only through AbilityController.SetSlot (AbilitySlotFanOutTests);
+            // the call is the write, and it must still sit after the gate.
+            int slotWrite = apply.IndexOf("SetSlot(i, ability)", System.StringComparison.Ordinal);
             Assert.Greater(passiveGate, 0);
             Assert.Greater(passiveWrite, passiveGate, "the passive is judged before it is applied");
             Assert.Greater(slotGate, passiveWrite, "the slots are judged after, and against, the passive");

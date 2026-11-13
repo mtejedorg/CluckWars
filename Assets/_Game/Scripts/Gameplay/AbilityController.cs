@@ -312,11 +312,7 @@ namespace CluckWars.Gameplay
             _wasAuthority = HasStateAuthority;
             if (_controller != null) _lastKnockbackId = _controller.KnockbackEventId;
             _initialized = true;
-            _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, " +
-                $"Slot0={(Slot0 != null ? Slot0.name : "(none)")}, " +
-                $"Slot1={(Slot1 != null ? Slot1.name : "(none)")}, " +
-                $"Slot2={(Slot2 != null ? Slot2.name : "(none)")}, " +
-                $"Slot3={(Slot3 != null ? Slot3.name : "(none)")}.");
+            _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, {DescribeSlots()}.");
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
@@ -814,10 +810,10 @@ namespace CluckWars.Gameplay
             if (_initialized && HasStateAuthority) DeactivateAll();
 
             if (passive != null) _passive = passive;
-            if (slot0 != null) _slot0 = slot0;
-            if (slot1 != null) _slot1 = slot1;
-            if (slot2 != null) _slot2 = slot2;
-            if (slot3 != null) _slot3 = slot3;
+            if (slot0 != null) SetSlot(0, slot0);
+            if (slot1 != null) SetSlot(1, slot1);
+            if (slot2 != null) SetSlot(2, slot2);
+            if (slot3 != null) SetSlot(3, slot3);
 
             PublishLoadout();
         }
@@ -919,13 +915,7 @@ namespace CluckWars.Gameplay
                     ability = fallback;
                 }
 
-                switch (i)
-                {
-                    case 0: _slot0 = ability; break;
-                    case 1: _slot1 = ability; break;
-                    case 2: _slot2 = ability; break;
-                    default: _slot3 = ability; break;
-                }
+                SetSlot(i, ability);
             }
         }
 
@@ -994,6 +984,36 @@ namespace CluckWars.Gameplay
             3 => _slot3,
             _ => null,
         };
+
+        /// <summary>
+        /// Writes slot <paramref name="slot"/>. The mirror of <see cref="GetSlot"/> and the only place the
+        /// four serialized fields are assigned: the slots are unrolled fields because Fusion weaves the four
+        /// <c>ActiveTimer</c>/<c>Cooldown</c> properties beside them, so the fan-out exists exactly once.
+        /// Out-of-range slots are ignored, as <see cref="GetSlot"/> returns null for them.
+        /// </summary>
+        private void SetSlot(int slot, AbilityBaseSO ability)
+        {
+            switch (slot)
+            {
+                case 0: _slot0 = ability; break;
+                case 1: _slot1 = ability; break;
+                case 2: _slot2 = ability; break;
+                case 3: _slot3 = ability; break;
+            }
+        }
+
+        /// <summary>"Slot0=Peck, Slot1=(none), ..." for the spawn log line.</summary>
+        private string DescribeSlots()
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                var ability = GetSlot(i);
+                sb.Append("Slot").Append(i).Append('=').Append(ability != null ? ability.name : "(none)");
+            }
+            return sb.ToString();
+        }
 
         private TickTimer GetActiveTimer(int slot) => slot switch
         {
