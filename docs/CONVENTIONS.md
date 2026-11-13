@@ -235,7 +235,7 @@ An ability's `OnActivate` composes these; it does not re-implement them (each ha
 - **Steal:** `StealFrom(thief, victim, nominalAmount)` (ability base; applies the thief's passive) -> `ChickenCargo.StealFrom` (steal-proof gate, `StealMath.Clamp` to the thief's free room and the victim's load, request). `RequestSteal` is private. Declare the amount in `NominalStealAmount`.
 - **Stun / root / slow:** `SendControl(caster, victim)` sends the ability's own `EmittedControl` through `ChickenController.SendControl`, which applies the caster's passive (`ControlClaimRules.OutgoingSeconds`: stuns and slows are lengthened, roots never; the receiver's ceiling uses the same predicate). A zone acting for its owner uses `ChickenController.SendControlFrom`. Nothing else calls `RPC_ApplyStun` / `RPC_ApplyRoot` / `RPC_ApplyAbilitySlow` / `RPC_ApplyKnockbackFrom`.
 - **Lasting area:** set `AreaKind`, override `TryGetAreaEffect`, call `SpawnArea(ctx)`. The base `CanActivate` already refuses the press when the zone prefab chain is missing; an override adds its checks after `base.CanActivate(ctx)`.
-- **Ground-plane maths:** `Planar.Distance` / `SqrDistance` / `Flat` / `Forward` / `DirectionOr` (Core, root namespace `CluckWars`). Do not write another private planar helper.
+- **Ground-plane maths:** `Planar.Distance` / `SqrDistance` / `Flat` / `Forward` / `DirectionOr` (Core, root namespace `CluckWars`). Do not write another private planar helper, and do not write `v.y = 0f` instead of `Planar.Flat(v)` (`PlanarTests` fails on both). **One measured exception: a range verdict keeps its own inline `dx * dx + dz * dz <= limit * limit`.** Computing both sides of the comparison in one method is not bit-for-bit the same as comparing `Planar.SqrDistance`'s returned float against the squared limit; routing the five pure rule files through it in batch 6 refused a thief standing at exactly the reach (`SenderLatencyTests.ALocalSteal_HasNoAllowance`). `HitAttribution.TryBearing`'s remarks describe the same hazard. Use `Planar` for a flatten, a direction, or a distance you are going to read.
 - **A timed window on a chicken** (stun, root, the immunities, steal-proof): a `[Networked] TickTimer` read and granted through `EffectWindow.Remaining` / `IsOpen` / `TryGrant`.
 
 `OnDeactivate` is virtual and empty by default: override it only to undo what `OnActivate` switched on.
@@ -243,6 +243,38 @@ An ability's `OnActivate` composes these; it does not re-implement them (each ha
 ### One definition per class
 
 `ChickenClasses` (`Gameplay/ChickenClassInfo.cs`) holds, per class, the ability-mask flag (`1 << class`), the forage rule, the wording keys and the bot profile, and the solo bot roster. Tuned numbers stay on the class's `ChickenStatsSO` (through `ChickenClassRegistrySO`). Do not switch on `ChickenClass` for any of these. Per-class presentation data that still lives beside its consumer (the deliberate menu tints and class tiles in `MenuUiController`, `PodiumLayout.StaticHeadAnchor`, `UiAudioSO.CluckFor`) must answer for every class: `ChickenClassTableTests` fails, naming the place, when one does not. Adding a class = the enum value (append only), its flag bit, a `ChickenClasses` entry, a stats asset, and whatever that test then lists.
+
+---
+
+## Status effects, colours, UI plumbing and oversized components (audit batch 6, 2026-11-13)
+
+### One table for the status effects
+
+Five enums name the same handful of effects in different orders, three of them networked: `ControlKind` (what a caster sends), `ControlState` (the severity ladder), `ControlVfx` (the replicated flag byte), `ChickenStatusBadges.Badge` (the HUD row) and `ZoneEffect` (what a zone applies). `StatusEffects` (`Scripts/Visuals/StatusEffects.cs`) is the one row-per-effect table relating them, and the one place a badge's glyph, word, countdown rule and text colour are declared. Translate through it; do not write a sixth switch.
+
+- `Default` on a column means "no counterpart in that vocabulary" (`ControlKind.None`, `ControlState.Free`, `ControlVfx.None`, `Badge.None`, `HasZone` false). `StatusEffectTableTests` fails when a value of any of the five enums has neither a row nor that marker, so a new enum value cannot be forgotten.
+- **It lives in Presentation** because `Badge` is a HUD row and Gameplay < Presentation. The Gameplay side therefore keeps its own facts-to-enum computations (`ChickenController.CurrentControlState`, its `ControlVfx` composition, `AbilityZone`'s zone branches); the same tests pin them against the table so neither side can drift.
+- **Numeric values never move.** Three of the five are networked: the table says which value means the same as which, nothing more.
+
+### Colours and timings
+
+- A colour that carries **gameplay meaning** — carry level, health, a status, a removed chicken — is a named constant in `FeedbackTuning`, used by every consumer. So is a **juice timing**. A colour that is a texture pixel, a serialized prefab default or an alpha rebuild of a colour it already has stays where it is.
+- `FeedbackTuning` holds them as **code constants, not fields on `FeedbackPaletteSO` or `ColorSchemeSO`**: a new serialized field on a shipped palette asset reads as black until somebody re-authors it.
+- A **Gameplay** file cannot name `FeedbackTuning` (it is Presentation). Its colour stays local, with a comment saying why (`PlayerBase.UnownedColor`).
+
+### UI Toolkit plumbing
+
+`UiElements` (`Scripts/UI/UiElements.cs`) owns show/hide, the runtime `EventSystem` and named lookups. `UiElements.SetShown(element, shown)` instead of a local copy or an inline `style.display = cond ? Flex : None`; `UiElements.EnsureEventSystem()` in `Awake` (it is the one allowed `Find*` for it, listed in `SceneObjectAccessTests.AllowedFinds`); `UiElements.Bind` / `Query` instead of a bare `root.Q<T>(name)` that skips a missing element in silence — they report a renamed UXML element once per name through `ILogService`.
+
+No shared element-name constants exist, on the measurement: of 159 distinct `Q("...")` names exactly one appears in two runtime files, and that one is two different elements in two different UXML documents. The names a test also spells out are a deliberate two-sided check (the controller queries it, the test asserts the UXML has it); a shared constant would collapse that to one side.
+
+### Splitting an oversized MonoBehaviour
+
+A component a scene or prefab references **keeps its type, name, namespace, attributes, serialized fields and public API**. The only way to split one is a **partial class** — extra `Name.Concern.cs` files beside it — never moving its serialized state and never adding a component to a prefab. `TouchControlsController` (input contract / HUD), `MatchOverlaysController` (one file per overlay, navigation in the coordinator) and `MenuUiController` (one per page or concern, navigation in the coordinator) are the three done so far.
+
+**A source-scan guard is about the CLASS, not the file.** Read it with `TestSources.ReadClass(path)`, which returns the file plus its partial siblings; a guard deliberately about one file keeps `File.ReadAllText`. Splitting a file must never be what makes a guard pass.
+
+`ChickenController` was looked at and left whole: its control-claim RPCs are its own wire surface, not a foreign concern, and the two dozen single-file guards over them (who may write the comeback flags, who may send a control RPC, that each RPC judges before applying) are worth more than the line count.
 
 ---
 
