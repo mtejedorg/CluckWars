@@ -81,17 +81,22 @@ namespace CluckWars.Audio
             return s;
         }
 
-        public void PlaySFX(SfxId id, float volume = 1f)
+        public void PlaySFX(SfxId id, float volume = 1f, float pitch = 1f)
         {
             if (id == SfxId.None) return;
+            if (TryPlaySFX(id, volume, pitch)) return;
+
+            string line = _missing.MissingId(id, _registry != null);
+            if (line != null) _log?.Warn(Source, line);
+        }
+
+        public bool TryPlaySFX(SfxId id, float volume = 1f, float pitch = 1f)
+        {
+            if (id == SfxId.None) return false;
             var clip = _registry != null ? _registry.Resolve(id) : null;
-            if (clip == null)
-            {
-                string line = _missing.MissingId(id, _registry != null);
-                if (line != null) _log?.Warn(Source, line);
-                return;
-            }
-            PlaySFX(clip, volume);
+            if (clip == null) return false;
+            PlaySFX(clip, volume, pitch);
+            return true;
         }
 
         public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f,

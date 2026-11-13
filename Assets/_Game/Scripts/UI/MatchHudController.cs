@@ -73,8 +73,6 @@ namespace CluckWars.UI
         private int              _boardWantsCorner = -1;
         private readonly int[]   _drawRows = new int[4];
 
-        // The live bases: the registry itself (PlayerBase registers in Spawned), never a scene search.
-        private static IReadOnlyList<PlayerBase> _bases => PlayerBase.ActiveBases;
         private GameManager  _gameManager;
         private float        _nextRefresh;
 
@@ -222,7 +220,7 @@ namespace CluckWars.UI
                 _nextRefresh = 0f;
             }
 
-            if (Time.unscaledTime >= _nextRefresh || _bases.Count == 0 || _gameManager == null)
+            if (Time.unscaledTime >= _nextRefresh || PlayerBase.ActiveBases.Count == 0 || _gameManager == null)
             {
                 _nextRefresh = Time.unscaledTime + _refreshInterval;
                 RefreshSceneRefs();
@@ -387,10 +385,10 @@ namespace CluckWars.UI
 
         private void RefreshScores()
         {
-            var sorted = new List<(int corner, float total)>(_bases.Count);
-            for (int i = 0; i < _bases.Count; i++)
+            var sorted = new List<(int corner, float total)>(PlayerBase.ActiveBases.Count);
+            for (int i = 0; i < PlayerBase.ActiveBases.Count; i++)
             {
-                var b = _bases[i];
+                var b = PlayerBase.ActiveBases[i];
                 // No row for a corner nobody plays (round-2 leftover; the same rule as post-match).
                 if (b != null && b.Object != null && b.Object.IsValid
                     && MatchStandings.Listed(ChickenForCorner(b.CornerIndex) != null, b.FoodTotal))

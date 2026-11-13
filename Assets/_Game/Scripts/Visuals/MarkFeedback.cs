@@ -301,7 +301,7 @@ namespace CluckWars.Visuals
                 {
                     // E1: the HUNT! pop's own sting (the hunter's peer only, same gate as ShowsHuntPop). Until the clip is
                     // filled, the pitched-up lock sting keeps the moment audible.
-                    if (!AudioRegistrySO.TryPlay(_audio, _sfx.HuntLive, FeedbackTuning.MarkKillLiveAssassinVolume))
+                    if (_audio == null || !_audio.TryPlaySFX(SfxId.HuntLive, FeedbackTuning.MarkKillLiveAssassinVolume))
                         _audio.PlaySFX(_sfx.MarkLock, FeedbackTuning.MarkKillLiveAssassinVolume, FeedbackTuning.MarkKillLiveAssassinPitch);
                 }
                 else

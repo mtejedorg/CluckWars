@@ -26,7 +26,8 @@ namespace CluckWars.Tests
             public readonly List<(AudioClip Clip, float Volume, float Pitch)> Sfx = new();
             public void PlaySFX(AudioClip clip, float volume = 1f, float pitch = 1f, float delaySeconds = 0f,
                                 string callerFile = "", int callerLine = 0) => Sfx.Add((clip, volume, pitch));
-            public void PlaySFX(SfxId id, float volume = 1f) { }
+            public void PlaySFX(SfxId id, float volume = 1f, float pitch = 1f) { }
+            public bool TryPlaySFX(SfxId id, float volume = 1f, float pitch = 1f) => false;
             public void PlayMusic(AudioClip clip, float volume = 1f, bool loop = true, float fadeInSeconds = 0f) { }
             public void FadeOutMusic(float seconds) { }
             public void SetMusicLevel(float level01, float seconds) { }
@@ -119,7 +120,7 @@ namespace CluckWars.Tests
         {
             Assert.IsTrue(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Assassin, Events = MarkEvents.KillLive }));
             Assert.IsFalse(MarkFeedback.ShowsHuntPop(new MarkOutputs { Role = MarkRole.Victim, Events = MarkEvents.KillLive }));
-            StringAssert.Contains("AudioRegistrySO.TryPlay(_audio, _sfx.HuntLive", Src("Assets/_Game/Scripts/Visuals/MarkFeedback.cs"));
+            StringAssert.Contains("_audio.TryPlaySFX(SfxId.HuntLive", Src("Assets/_Game/Scripts/Visuals/MarkFeedback.cs"));
         }
 
         [Test]
@@ -136,7 +137,7 @@ namespace CluckWars.Tests
             string hit = Src("Assets/_Game/Scripts/Visuals/HitFeedback.cs");
             StringAssert.Contains("PlayOwnSfx(SfxId.HitConfirm)", hit);
             StringAssert.Contains("PlayOwnSfx(SfxId.CastWhiff, FeedbackTuning.WhiffSfxVolumeMultiplier)", hit);
-            StringAssert.Contains("AudioRegistrySO.TryPlay(_audio, _sfx.DeniedClick)", Src("Assets/_Game/Scripts/Input/TouchControlsController.cs"));
+            StringAssert.Contains("_audio.TryPlaySFX(SfxId.DeniedClick)", Src("Assets/_Game/Scripts/Input/TouchControlsController.cs"));
         }
     }
 }

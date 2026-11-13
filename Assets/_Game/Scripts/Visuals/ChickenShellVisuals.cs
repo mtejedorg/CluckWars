@@ -560,7 +560,7 @@ namespace CluckWars.Visuals
                 }
                 return;
             }
-            AudioRegistrySO.TryPlay(_audio, open ? _sfx.ShellOpen : _sfx.ShellClose);
+            _audio.TryPlaySFX(open ? SfxId.ShellOpen : SfxId.ShellClose);
         }
 
         private void ResetPose()

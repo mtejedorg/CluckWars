@@ -19,8 +19,16 @@ namespace CluckWars.Audio
                      [CallerFilePath] string callerFile = "", [CallerLineNumber] int callerLine = 0);
 
         /// <summary>One-shot 2D sound by typed id, resolved through the audio registry. <see cref="SfxId.None"/> is a
-        /// silent no-op; an id with no clip plays nothing and is reported once per id.</summary>
-        void PlaySFX(SfxId id, float volume = 1f);
+        /// silent no-op; an id with no clip plays nothing and is reported once per id. A <paramref name="pitch"/>
+        /// other than 1 plays on a pooled voice, as the clip overload does.</summary>
+        void PlaySFX(SfxId id, float volume = 1f, float pitch = 1f);
+
+        /// <summary>
+        /// Plays <paramref name="id"/> and returns whether it had a clip, WITHOUT reporting an empty slot: for the
+        /// few sounds whose slot is optional by design and whose caller has its own fallback (the Assassin's HUNT!
+        /// sting). Every other caller uses <see cref="PlaySFX(SfxId, float, float)"/>, so an empty slot is heard about.
+        /// </summary>
+        bool TryPlaySFX(SfxId id, float volume = 1f, float pitch = 1f);
 
         /// <summary>Starts the (single) music track, replacing whatever played. A positive
         /// <paramref name="fadeInSeconds"/> ramps it up from silence.</summary>

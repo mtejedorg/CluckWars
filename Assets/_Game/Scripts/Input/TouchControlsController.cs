@@ -1442,7 +1442,7 @@ namespace CluckWars.Input
                 }
                 return;
             }
-            AudioRegistrySO.TryPlay(_audio, _sfx.DeniedClick);
+            _audio.TryPlaySFX(SfxId.DeniedClick);
         }
 
         /// <summary>

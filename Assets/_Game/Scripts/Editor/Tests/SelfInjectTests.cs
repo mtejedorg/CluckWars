@@ -205,8 +205,10 @@ namespace CluckWars.Tests
         {
             SelfInject.OverrideProjectContainerForTests(() => throw new InvalidOperationException("no ProjectContext prefab"));
             var target = Make<SceneLoader>("Target");
-            // UnityLogService wraps the cause; Unity's console headline is the cause itself (the SelfInject line is in the trace).
-            LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: no ProjectContext prefab"));
+            // A23: UnityLogService used to wrap the cause in a second Exception, and Debug.LogException walks to
+            // the innermost one for the console headline, so the [SelfInject] line was invisible. The line is the
+            // headline now, with the cause under it.
+            LogAssert.Expect(LogType.Error, new Regex(@"\[SelfInject\][\s\S]*InvalidOperationException: no ProjectContext prefab"));
 
             bool result = true;
             Assert.DoesNotThrow(() => result = SelfInject.Ensure(target, alreadyInjected: false));

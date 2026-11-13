@@ -150,6 +150,14 @@ namespace CluckWars.Visuals
         ///   resurrected. Unsubscribe in <c>OnDisable</c> anyway.</item>
         /// </list>
         /// </summary>
+        /// <remarks>
+        /// <b>A23 (architecture audit 2026-11-12): still no subscriber, and kept on purpose.</b> The audit is
+        /// right that nothing listens — the §3.2 screen-edge arc was specified and never written. Writing it
+        /// here would change what a player sees, which this batch is not allowed to do; deleting it would throw
+        /// away a designed seam, the three shipped <c>FeedbackTuning.ScreenEdgeArc*</c> constants it is tuned
+        /// with, and the second consumer <see cref="ScreenEdgeProjection"/> names in its own remarks. It costs a
+        /// null check per landed hit on the victim's peer. It is in <c>docs/BACKLOG.md</c> instead.
+        /// </remarks>
         public static event System.Action<Vector3> OnLocalPlayerHit;
 
         // ---- Cached components ------------------------------------------------

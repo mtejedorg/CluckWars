@@ -141,6 +141,14 @@ namespace CluckWars.Gameplay
                         if (cur)
                         {
                             _log?.Info(Source, "Execute removal begin.");
+                            // Heard by EVERY peer, for every chicken, bots included — deliberately not the
+                            // OwnSoundRules audience (A23). That rule governs a player's confirmation of their
+                            // OWN action (cast, deposit, hit-confirm, the AbilityCue one-shots): nobody else's
+                            // business. A removal is the opposite, a public event in the match: somebody has
+                            // just been taken out and everyone is entitled to hear it, as everyone sees the
+                            // pose, the feathers and the skull on the nameplate. It is a 2D one-shot with no
+                            // falloff, so it carries the same from across the arena; that is the known cost
+                            // and the reason it is written down here rather than left to be rediscovered.
                             _audio?.PlaySFX(_audioReg != null ? _audioReg.Stun : null);
                             // The stunned pose, the death shake, the feathers and the hit-stop all hang off this
                             // event (ChickenAnimator, HitFeedback): presentation observes, gameplay does not call it.

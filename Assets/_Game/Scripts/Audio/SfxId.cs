@@ -23,5 +23,14 @@ namespace CluckWars.Audio
         HitConfirm = 7,
         /// <summary>The caster's own cast hit nobody.</summary>
         CastWhiff = 8,
+        /// <summary>A press the ability refused: the HUD's denied click.</summary>
+        DeniedClick = 9,
+        /// <summary>Egg Shell closing around its owner.</summary>
+        ShellClose = 10,
+        /// <summary>Egg Shell hatching open again.</summary>
+        ShellOpen = 11,
+        /// <summary>The Assassin's HUNT! sting. Deliberately optional: while the slot is empty the
+        /// hunter hears a pitched-up MarkLock instead, so the moment is never silent.</summary>
+        HuntLive = 12,
     }
 }

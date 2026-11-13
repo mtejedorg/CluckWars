@@ -30,8 +30,11 @@ namespace CluckWars.Logging
         {
             if (!IsEnabled(LogLevel.Error)) return;
             var line = Format(LogLevel.Error, source, message);
-            if (exception != null) UnityEngine.Debug.LogException(new Exception(line, exception));
-            else UnityEngine.Debug.LogError(line);
+            // Debug.LogException walks to the INNERMOST exception for the console headline, so wrapping
+            // our line in one hid it: the Console showed the cause's type and message and the [Source]
+            // tag was only visible inside the trace. LogError keeps our line as the headline, with the
+            // exception's own type, message and stack under it.
+            UnityEngine.Debug.LogError(exception != null ? line + "\n" + exception : line);
         }
 
         private void Emit(LogLevel level, string source, string message)

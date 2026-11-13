@@ -82,6 +82,10 @@ namespace CluckWars.Audio
             SfxId.AbilityExpire => AbilityExpire,
             SfxId.HitConfirm => HitConfirm,
             SfxId.CastWhiff => CastWhiff,
+            SfxId.DeniedClick => DeniedClick,
+            SfxId.ShellClose => ShellClose,
+            SfxId.ShellOpen => ShellOpen,
+            SfxId.HuntLive => HuntLive,
             _ => null,
         };
 
