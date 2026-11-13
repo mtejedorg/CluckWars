@@ -1550,53 +1550,64 @@ namespace CluckWars.Visuals
         public const float ShellModelHeight = 1.6f;
         public const float ShellBodyTopAllowance = 0.10f;
 
-        // ---- The bird vanishes inside the egg (Maestro 2026-11-13, second pass) -------------------------
+        // ---- The bird vanishes inside the egg (Maestro 2026-11-13, third pass) --------------------------
         // The egg is per-class off the size stat and capped, so the biggest classes do not fit it: their body
-        // clipped through the shell. Rather than resize anything, the body fades out along the same tuck ramp
-        // and is gone before the shell closes over it, then fades back in once the shell is gone.
+        // clipped through the shell. Rather than resize anything, the bird disappears INTO the egg and comes
+        // back out of the hatch.
         //
-        // The first pass faded out over the whole cap drop, which left the bird drawn as a dithered ghost while
-        // the cap was already coming down over it: on a bird bigger than its egg the stipple was punched through
-        // the shell's own art and haloed outside its silhouette, reading as a rendering glitch. So TWO rules now,
-        // and the body must satisfy both:
-        //   1. it is fully gone before the cap has come ShellBodyGoneByCapTravel of the way down, and
-        //   2. whatever is still drawn before that already FITS inside the seated egg, because the body also
-        //      shrinks on the conceal (ShellBodyVanishScale), ahead of the alpha (ShellBodyVanishLead).
-        // Only the BODY's transient scale moves. The egg's size, cap and per-class scaling are untouched.
+        // Passes one and two both faded during the CLOSE and both failed on capture, for the same reason: the
+        // close phase OPENS with the cap already a large object right over the bird (ShellCapDropFromScale is
+        // only 1.6 x the seam, barely a third of an egg above its seat) and with the cup still low around its
+        // legs. A bird larger than its egg therefore cannot fade anywhere inside the close without being drawn
+        // over the shell's own art and haloing outside its silhouette. There is no good moment in there.
         //
-        // Every fraction below is OF ITS OWN PHASE, so none can outlast the phase that drives it, and the two
-        // that matter are DERIVED from the curves the shell actually flies rather than tuned by eye.
+        // So the vanish moved OUT of the close and into the tail of the WALK, where there is no cap at all and
+        // the bird stands on the grass in a low cup. It shrinks, ducks down into the cup and fades together over
+        // ShellBodyVanishSeconds, finishing ShellBodyVanishLeadSeconds before the cap appears. The close is then
+        // pure shell animation with nothing of the bird drawn in it - EnterClose also hides outright, so the
+        // invariant holds even if the walk was cut short or never ran.
+        //
+        // The walk's end is predictable and replicated: ShieldRules.EggStartsNow starts the egg on the first tick
+        // the run has EggSeconds or less left, so (remaining - eggSeconds) IS the time until the cap exists, the
+        // same on every peer.
 
-        /// <summary>Ruling: the body is fully gone before the cap has come this far down (0 = cap still up where it
-        /// started, 1 = seated). At a quarter the cap is plainly still open, so the fade is only ever seen against a
-        /// shell that has not closed over the bird.</summary>
-        public const float ShellBodyGoneByCapTravel = 0.25f;
+        /// <summary>How long the bird takes to shrink, sink and fade away into the cup, at the END of the walk.
+        /// The shipped walk is 1 s, so this is its last third and leaves the waddle plainly readable first.</summary>
+        public const float ShellBodyVanishSeconds = 0.30f;
 
-        /// <summary>Ruling: from this much cap travel onward, whatever of the body is still drawn already fits inside the
-        /// SEATED egg for every shipped class — that is what the vanish shrink buys, and what the per-class guard asserts.</summary>
-        public const float ShellBodyFitByCapTravel = 0.05f;
+        /// <summary>The vanish finishes this long before the cap appears. Three frames at 60 fps: enough slack that a
+        /// dropped frame cannot leave the bird drawn into the close, short enough that the empty cup is never read.</summary>
+        public const float ShellBodyVanishLeadSeconds = 0.05f;
 
-        /// <summary>Fraction of the close phase the body fades out over. DERIVED, not tuned: <c>ChickenShellVisuals.CapSeatFactor</c>
-        /// flies an ease-in quad, so a travel of <c>t</c> is reached at <c>sqrt(t)</c> of <see cref="ShellCloseDropSeconds"/>.</summary>
-        public static float ShellBodyFadeOutFraction =>
-            (ShellCloseDropSeconds / ShellCloseSeconds) * Mathf.Sqrt(ShellBodyGoneByCapTravel);
-
-        /// <summary>Fraction of the open phase the body stays fully hidden for. DERIVED: exactly as long as the cup takes to
-        /// sink away (<see cref="ShellCupSinkSeconds"/>), so by the time the bird returns there is no shell left to be drawn
-        /// over — the cap has popped and the shards, yolk and cap feathers have long gone.</summary>
-        public static float ShellBodyFadeInDelayFraction => ShellCupSinkSeconds / ShellOpenSeconds;
-
-        /// <summary>Fraction of the open phase the body fades back in over. Delay + this is 0.925 &lt; 1: whole again before
-        /// the open phase hands back to <c>GoOff</c>, never after it.</summary>
-        public const float ShellBodyFadeInFraction = 0.30f;
-
-        /// <summary>The extra uniform shrink the body wears at full conceal, on top of its class tuck: the bird ducks down and
-        /// shrinks away into the egg rather than standing there dissolving at full size.</summary>
+        /// <summary>The uniform shrink the body wears at the end of the vanish, on top of its class tuck.</summary>
         public const float ShellBodyVanishScale = 0.18f;
 
-        /// <summary>The shrink runs on <c>conceal^this</c>, so it LEADS the alpha: by the time enough of the bird has faded to
-        /// read as a stipple, the bird is already small enough to sit inside the shell. Below 1 = leading.</summary>
+        /// <summary>The world metres the body ALSO ducks down into the cup as it vanishes (scaled with the egg, so a big
+        /// bird ducks proportionally). Shrink alone left feet and tail outside the cup; ducking lets the cup and the ground
+        /// occlude the bird from below, which is both cleaner and a better read: it climbs into the egg.</summary>
+        /// <remarks>Solved, not picked: at full conceal the body is <c>ShellModelHeight x classScale x ShellBodyVanishScale</c>
+        /// tall and this sink is scaled by <c>EggScale</c>, and 0.35 is the smallest round value that puts EVERY shipped class
+        /// entirely under the feet plane (the Fatty, whose class scale outruns the egg cap, is the binding one).</remarks>
+        public const float ShellBodyVanishSink = 0.35f;
+
+        /// <summary>Shrink and sink run on <c>conceal^this</c>, so they LEAD the alpha: by the time the bird is translucent
+        /// enough to read as a dither it is already small and low. Below 1 = leading.</summary>
         public const float ShellBodyVanishLead = 0.5f;
+
+        /// <summary>Fraction of the open phase the body stays fully hidden for. DERIVED: the later of the cup having sunk
+        /// away (<see cref="ShellCupSinkSeconds"/>) and the cap having started its scale-out
+        /// (<see cref="ShellOpenSeconds"/> - <see cref="ShellCapScaleOutSeconds"/>), so the bird returns over bare ground
+        /// with the shell on its way out, never over the cup's flat remnant disc.</summary>
+        public static float ShellBodyFadeInDelayFraction =>
+            Mathf.Max(ShellCupSinkSeconds, ShellOpenSeconds - ShellCapScaleOutSeconds) / ShellOpenSeconds;
+
+        /// <summary>Fraction of the open phase the body bursts back in over. Delay + this is 0.97 &lt; 1: whole again before
+        /// the open phase hands back to <c>GoOff</c>, never after it.</summary>
+        public const float ShellBodyFadeInFraction = 0.22f;
+
+        /// <summary>Below this scale a shell half is no longer drawn at all. The cup sinks to a flat disc and the cap shrinks
+        /// to a speck, and both used to keep rendering: the returning bird stood on a white pancake.</summary>
+        public const float ShellHalfGoneScale = 0.02f;
 
         /// <summary>At or above this conceal the bird counts as sealed in: <c>ChickenVisuals</c> disables the body renderers
         /// outright rather than trusting a dithered ghost at alpha 0 to clip every pixel.</summary>

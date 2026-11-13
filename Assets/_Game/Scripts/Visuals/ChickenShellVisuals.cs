@@ -139,22 +139,40 @@ namespace CluckWars.Visuals
         /// time it is translucent enough to read as a dither, it is already small enough to sit inside it.
         /// </summary>
         public static float BodyVanishScale(float conceal01) =>
-            Mathf.Lerp(1f, FeedbackTuning.ShellBodyVanishScale,
-                       Mathf.Pow(Mathf.Clamp01(conceal01), FeedbackTuning.ShellBodyVanishLead));
+            Mathf.Lerp(1f, FeedbackTuning.ShellBodyVanishScale, VanishRamp01(conceal01));
+
+        /// <summary>The conceal pulled forward by <see cref="FeedbackTuning.ShellBodyVanishLead"/>: the one curve the shrink
+        /// and the sink both ride, so they stay in step with each other and ahead of the alpha.</summary>
+        public static float VanishRamp01(float conceal01) =>
+            Mathf.Pow(Mathf.Clamp01(conceal01), FeedbackTuning.ShellBodyVanishLead);
+
+        /// <summary>The world metres the body ducks down into the cup as it vanishes, scaled with the egg like everything else
+        /// about the shell, so the big classes duck proportionally further.</summary>
+        public static float BodyVanishSink(float conceal01, float classScale) =>
+            FeedbackTuning.ShellBodyVanishSink * EggScale(classScale) * VanishRamp01(conceal01);
 
         /// <summary>
-        /// How far the body is concealed over the CLOSE phase: 0 at the start, 1 once
-        /// <see cref="FeedbackTuning.ShellBodyFadeOutFraction"/> of the phase has passed — by construction the moment the cap
-        /// seats and the egg seals. Smoothstepped so it rides the same shape as the tuck instead of reading as a cut.
+        /// How far the body has vanished during the WALK: 0 while the waddle is still plainly the bird, 1 by
+        /// <see cref="FeedbackTuning.ShellBodyVanishLeadSeconds"/> before the cap appears, smoothstepped over
+        /// <see cref="FeedbackTuning.ShellBodyVanishSeconds"/> in between.
         /// </summary>
-        /// <remarks>Taken as a fraction of the phase it belongs to, so it is identical for every class and for Reduced Motion
-        /// (which only shortens the phase), and can never outlast it.</remarks>
-        public static float CloseConceal01(float stateT, float closeSeconds)
+        /// <remarks>
+        /// Timed off the walk's END, not its start, because that is the moment that matters and it is knowable:
+        /// <c>ShieldRules.EggStartsNow</c> starts the egg on the first tick the run has <paramref name="eggSeconds"/> or
+        /// less left, so <c>remaining - eggSeconds</c> is exactly the time until the cap exists - replicated, so identical
+        /// on every peer. Two legal states return 0 rather than vanishing a bird that is staying: no follow-up phase at all,
+        /// and a walk whose pending egg was cancelled by another cast (<c>ShieldRules.RunAfterOtherCast</c> truncates the run
+        /// to the walk, which drives this difference negative).
+        /// </remarks>
+        public static float WalkConceal01(float remainingSeconds, float eggSeconds)
         {
-            if (closeSeconds <= 0f) return 1f;
-            float span = closeSeconds * FeedbackTuning.ShellBodyFadeOutFraction;
-            if (span <= 0f) return 1f;
-            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(stateT / span));
+            if (eggSeconds <= 0f) return 0f;
+            float untilCap = remainingSeconds - eggSeconds;
+            // Strictly negative, not zero: zero IS the instant the egg starts (EggStartsNow uses <=), where the bird must be
+            // gone. Only a run shorter than the egg phase means the egg is not coming at all.
+            if (untilCap < 0f) return 0f;
+            float span = Mathf.Max(0.0001f, FeedbackTuning.ShellBodyVanishSeconds);
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((span + FeedbackTuning.ShellBodyVanishLeadSeconds - untilCap) / span));
         }
 
         /// <summary>
@@ -574,6 +592,10 @@ namespace CluckWars.Visuals
             _cupYScale = 1f;
             _crack = 0f;
             _stripeAlpha = 1f;
+            // The cap exists from this frame on, so nothing of the bird may be drawn from this frame on. The walk's vanish
+            // has normally finished already; this is the guarantee for the paths where it could not (a close straight from
+            // Phase.None with no walk at all, a walk cut shorter than the vanish, a frame-rate hitch).
+            SetBodyConceal(1f);
             PushBlock();
 
             PlayEdgeSfx(open: false);
@@ -743,17 +765,18 @@ namespace CluckWars.Visuals
             // per class, so the larger classes never fit it and used to clip through the shell; hiding the body is the fix that
             // changes no size. The ramps ride the same phases as the tuck above, so the fade and the squash read as one move.
             //
-            // Reduced Motion gets no fade at all, on purpose: its close does not drop a cap, it grows the already-CLOSED egg
-            // from ShellReducedGrowFrom, and its open shrinks that whole egg away. There is no open shell for a translucent
-            // bird to be seen inside, so a partial alpha there could only ever be drawn over the egg. Hidden for the whole
-            // of close / idle / open, released by GoOff: "alpha only, no travel", which is the Reduced Motion rule anyway.
+            // The vanish lives in the WALK, where there is no cap: by the time the close begins the bird is already gone and
+            // the renderers are off, so the close is pure shell animation. Close and Idle are therefore a flat 1, not a ramp.
+            // Reduced Motion gets no vanish ramp at all: its close does not drop a cap, it grows an already-CLOSED egg, so a
+            // partial alpha there could only ever be drawn over the egg. Hard swap - "alpha only, no travel", its own rule.
             float conceal;
             switch (_state)
             {
-                case State.Close: conceal = _reduced ? 1f : CloseConceal01(_stateT, FeedbackTuning.ShellCloseSeconds); break;
+                case State.Walk:  conceal = _reduced ? 0f : WalkConceal01(remaining, eggSeconds); break;
+                case State.Close: conceal = 1f; break;
                 case State.Idle:  conceal = 1f; break;
                 case State.Open:  conceal = _reduced ? 1f : OpenConceal01(_stateT, FeedbackTuning.ShellOpenSeconds); break;
-                default:          conceal = 0f; break;
+                default:          conceal = 0f; break;   // Off and Fold: a walk that ended without an egg keeps its bird
             }
             SetBodyConceal(conceal);
 
@@ -761,7 +784,7 @@ namespace CluckWars.Visuals
             // The vanish shrink rides the conceal and LEADS it, so the body is already small enough to sit inside the shell
             // before it is translucent enough to read as a dither. Transient body scale only: the egg is untouched.
             _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x, cls), tuck01) * BodyVanishScale(conceal);
-            _bodySink = FeedbackTuning.ShellBodySinkFor(cls) * tuck01;
+            _bodySink = FeedbackTuning.ShellBodySinkFor(cls) * tuck01 + BodyVanishSink(conceal, transform.localScale.x);
             _bodySqueezeZ = Mathf.Lerp(1f, FeedbackTuning.ShellBodySqueezeZFor(cls), tuck01);
             if (_animator != null)
             {
@@ -865,6 +888,10 @@ namespace CluckWars.Visuals
             _capScale = _stateT <= outStart ? 1f : Mathf.Clamp01(1f - (_stateT - outStart) / FeedbackTuning.ShellCapScaleOutSeconds);
 
             _cupYScale = CupSinkYScale(_stateT);              // ease-in
+            // A sunk cup is a flat white disc and a scaled-out cap is a speck; both kept rendering, and the returning bird
+            // stood on the disc with the cap over its head. Below ShellHalfGoneScale a half is simply not drawn.
+            _cupVisible = _cupYScale > FeedbackTuning.ShellHalfGoneScale;
+            _capVisible = _capScale > FeedbackTuning.ShellHalfGoneScale;
             if (_stateT >= FeedbackTuning.ShellOpenSeconds) GoOff();
         }
 
