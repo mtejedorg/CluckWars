@@ -183,6 +183,11 @@ namespace CluckWars.Visuals
 
         private static Material s_sharedMaterial;
 
+        // A static outlives a play session when domain reload is off: the next session would hand out a material
+        // the previous one may have destroyed. Cleared like every other static of the match.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSharedMaterial() => s_sharedMaterial = null;
+
         private ChickenController _controller;
         private ChickenStateOverlays _overlays;   // H5: the class scale the bonk height follows
         private ChickenCombat     _combat;

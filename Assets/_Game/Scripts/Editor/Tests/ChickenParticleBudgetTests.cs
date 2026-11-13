@@ -69,6 +69,30 @@ namespace CluckWars.Tests
         /// null material (magenta) for the rest of the session. A refused destroy logs an error, which fails this test.
         /// </summary>
         [Test]
+        public void TheSharedFxMaterial_IsClearedOnSubsystemRegistration()
+        {
+            var reset = typeof(ChickenVFX).GetMethod("ResetSharedMaterial",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(reset, "ChickenVFX.s_sharedMaterial has no reset: it would survive into the next play session");
+            var attribute = (RuntimeInitializeOnLoadMethodAttribute)reset
+                .GetCustomAttributes(typeof(RuntimeInitializeOnLoadMethodAttribute), false).Single();
+            Assert.AreEqual(RuntimeInitializeLoadType.SubsystemRegistration, attribute.loadType);
+
+            var field = typeof(ChickenVFX).GetField("s_sharedMaterial",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var before = field.GetValue(null);
+            try
+            {
+                var probe = new Material(Shader.Find("Sprites/Default"));
+                field.SetValue(null, probe);
+                reset.Invoke(null, null);
+                Assert.IsNull(field.GetValue(null));
+                Object.DestroyImmediate(probe);
+            }
+            finally { field.SetValue(null, before); }
+        }
+
+        [Test]
         public void WarmupProxies_NeverDestroyTheSharedFxMaterial()
         {
             var shared = Shared();
