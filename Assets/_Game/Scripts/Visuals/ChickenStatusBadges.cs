@@ -67,15 +67,6 @@ namespace CluckWars.Visuals
     {
         private const string Source = "ChickenStatusBadges";
 
-        /// <summary>
-        /// Text fallbacks, used only when a state sprite field is null (see the class remarks).
-        /// They alias <see cref="CluckWars.UI.HudFeedbackStyle"/>'s consts so the HUD strip and the
-        /// world badge fall back to the same glyph.
-        /// </summary>
-        private const string StunGlyph = CluckWars.UI.HudFeedbackStyle.StunGlyph;
-        private const string RootGlyph = CluckWars.UI.HudFeedbackStyle.RootGlyph;
-        private const string SlowGlyph = CluckWars.UI.HudFeedbackStyle.SlowGlyph;
-
         // State glyph sprites, one per StateGlyphStyle state a badge can draw. Field names are
         // "_glyph" + the StateGlyph enum name: the wiring test derives the expected asset from that.
         [SerializeField] private Sprite _glyphStunned;
@@ -429,19 +420,8 @@ namespace CluckWars.Visuals
         // ---- Pure rules (public static so the EditMode tests drive them without a runner) ----------
 
         /// <summary>The state sprite a badge draws, or <c>false</c> when the badge has none and stays text (Root).</summary>
-        public static bool TryGlyphFor(Badge badge, out StateGlyphStyle.StateGlyph glyph)
-        {
-            switch (badge)
-            {
-                case Badge.Stun:   glyph = StateGlyphStyle.StateGlyph.Stunned;    return true;
-                case Badge.Slow:   glyph = StateGlyphStyle.StateGlyph.Slowed;     return true;
-                case Badge.Waddle: glyph = StateGlyphStyle.StateGlyph.ShieldWalk; return true;
-                case Badge.Egg:    glyph = StateGlyphStyle.StateGlyph.ShieldEgg;  return true;
-                case Badge.Hidden: glyph = StateGlyphStyle.StateGlyph.Hidden;     return true;
-                case Badge.Speed:  glyph = StateGlyphStyle.StateGlyph.Speeding;   return true;
-                default:           glyph = default;                               return false;
-            }
-        }
+        public static bool TryGlyphFor(Badge badge, out StateGlyphStyle.StateGlyph glyph) =>
+            StatusEffects.TryGlyph(badge, out glyph);
 
         /// <summary>
         /// The HIDDEN row is the owner's own cue (spec §5, "self only"): drawn when this is the input-authority
@@ -453,7 +433,11 @@ namespace CluckWars.Visuals
         /// behind it: the replicated <c>ControlVfx.Snared</c> bit (aura, trap). Pile drag and bump drag raise
         /// <c>Slowed</c> alone and are ambient: no row, on any peer.
         /// </summary>
-        public static bool ShowSlowRow(ControlVfx flags) => (flags & ControlVfx.Snared) != 0;
+        public static bool ShowSlowRow(ControlVfx flags) => HasBadgeFlag(flags, Badge.Slow);
+
+        /// <summary>Whether the replicated control byte carries the bit that earns <paramref name="badge"/> its row.</summary>
+        private static bool HasBadgeFlag(ControlVfx flags, Badge badge) =>
+            (flags & StatusEffects.For(badge).BadgeFlag) != 0;
 
         public static bool ShowHiddenRow(bool isLocal, float visualOpacity) =>
             isLocal && ControlStateVFX.IsFadedOpacity(visualOpacity);
@@ -532,7 +516,7 @@ namespace CluckWars.Visuals
             ReadAbilityState(ref shell, ref speeding, ref shellRemaining, ref eggSeconds);
             bool immune = _controller.IsControlImmune;
 
-            int n = Collect((flags & ControlVfx.Stunned) != 0, (flags & ControlVfx.Rooted) != 0,
+            int n = Collect(HasBadgeFlag(flags, Badge.Stun), HasBadgeFlag(flags, Badge.Root),
                             ShowSlowRow(flags), shell, immune,
                             ShowHiddenRow(_controller.HasInputAuthority, _controller.VisualOpacity), speeding, _active);
 
@@ -743,15 +727,7 @@ namespace CluckWars.Visuals
 
         /// <summary>Text glyph drawn only when the badge's sprite field is null. Empty when the badge has none
         /// (Root prints its own text glyph in <see cref="Compose"/>; the new states are covered by their word).</summary>
-        private static string FallbackGlyph(Badge badge)
-        {
-            switch (badge)
-            {
-                case Badge.Stun: return StunGlyph;
-                case Badge.Slow: return SlowGlyph;
-                default:         return string.Empty;
-            }
-        }
+        private static string FallbackGlyph(Badge badge) => StatusEffects.TextGlyph(badge);
 
         private void WarnMissingSprite(Badge badge)
         {
@@ -767,55 +743,14 @@ namespace CluckWars.Visuals
         /// <summary>Reduces a raw value to the integer the label actually shows, so the
         /// string is only rebuilt when a visible digit moves. Tenths of a second for the
         /// timed states, hundredths of a multiplier for slow.</summary>
-        public static int Quantize(Badge badge, float value)
-        {
-            if (value <= 0f) return 0;
-            return badge == Badge.Slow ? 1 : Mathf.CeilToInt(value * 10f);
-        }
+        public static int Quantize(Badge badge, float value) => StatusEffects.Quantize(badge, value);
 
         /// <summary>The row text without a glyph: a countdown, a word, both, or nothing. Root keeps its text
         /// glyph (it has no sprite).</summary>
-        private static string Compose(Badge badge, int quantity)
-        {
-            string secs = quantity > 0 ? CluckWars.UI.HudFeedbackStyle.Seconds(quantity) : string.Empty;
-            switch (badge)
-            {
-                // E2 (spec section 12): the row owns the countdown, word first like EGG 1.0s; pops are words only.
-                case Badge.Stun:
-                    return WordWithCountdown(UiText.Get(UiKeys.HudStatusStun), secs);
-                case Badge.Root:
-                    return RootGlyph + " " + WordWithCountdown(UiText.Get(UiKeys.HudStatusStuck), secs);
-                case Badge.Slow:
-                    // E6a (2026-11-09): the no-number rule stays (slow has no deadline and a x0.45 means nothing to a
-                    // kid), but the row carries the word like HIDDEN / FAST so the word channel is uniform.
-                    return UiText.Get(UiKeys.HudStatusSlow);
-                case Badge.Waddle: return WordWithCountdown(UiText.Get(UiKeys.HudBadgeWaddle), secs);
-                case Badge.Egg:    return WordWithCountdown(UiText.Get(UiKeys.HudBadgeEgg), secs);
-                case Badge.Hidden: return UiText.Get(UiKeys.HudBadgeHidden);
-                case Badge.Speed:  return UiText.Get(UiKeys.HudBadgeFast);
-                default:
-                    return string.Empty;
-            }
-        }
-
-        private static string WordWithCountdown(string word, string secs) =>
-            secs.Length > 0 ? word + " " + secs : word;
+        private static string Compose(Badge badge, int quantity) => StatusEffects.Compose(badge, quantity);
 
         /// <summary>The row TEXT colour (the glyph keeps its own art colours).</summary>
-        private static Color ColorFor(Badge badge)
-        {
-            switch (badge)
-            {
-                case Badge.Stun:   return FeedbackTuning.CanonicalStunColor;
-                case Badge.Root:   return FeedbackTuning.CanonicalRootColor;
-                case Badge.Slow:   return FeedbackTuning.CanonicalSlowTextColor;
-                case Badge.Waddle:
-                case Badge.Egg:    return FeedbackPalette.Current.Accent(AccentKey.EggShell);
-                case Badge.Hidden: return FeedbackTuning.CanonicalHideTextColor;
-                case Badge.Speed:  return FeedbackPalette.Current.Accent(AccentKey.Speed);
-                default:           return Color.white;
-            }
-        }
+        private static Color ColorFor(Badge badge) => StatusEffects.TextColor(badge);
 
         private void HideStack()
         {
