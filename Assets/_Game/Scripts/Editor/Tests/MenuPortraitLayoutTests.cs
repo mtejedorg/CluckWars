@@ -20,8 +20,8 @@ namespace CluckWars.Tests
         /// <summary>UiLayoutRules.TouchTargetMinGapPx (8 dp).</summary>
         private const float MinGapPx = 19f;
 
-        private static string Read(string rel) =>
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), rel));
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         private static string Theme => Read("Assets/UI/Styles/CluckWarsTheme.uss");
         private static string Overlays => Read("Assets/UI/Styles/MatchOverlays.uss");
