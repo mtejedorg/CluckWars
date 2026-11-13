@@ -1594,16 +1594,14 @@ namespace CluckWars.Visuals
         /// enough to read as a dither it is already small and low. Below 1 = leading.</summary>
         public const float ShellBodyVanishLead = 0.5f;
 
-        /// <summary>Fraction of the open phase the body stays fully hidden for. DERIVED: the later of the cup having sunk
-        /// away (<see cref="ShellCupSinkSeconds"/>) and the cap having started its scale-out
-        /// (<see cref="ShellOpenSeconds"/> - <see cref="ShellCapScaleOutSeconds"/>), so the bird returns over bare ground
-        /// with the shell on its way out, never over the cup's flat remnant disc.</summary>
-        public static float ShellBodyFadeInDelayFraction =>
-            Mathf.Max(ShellCupSinkSeconds, ShellOpenSeconds - ShellCapScaleOutSeconds) / ShellOpenSeconds;
-
-        /// <summary>Fraction of the open phase the body bursts back in over. Delay + this is 0.97 &lt; 1: whole again before
-        /// the open phase hands back to <c>GoOff</c>, never after it.</summary>
-        public const float ShellBodyFadeInFraction = 0.22f;
+        /// <summary>
+        /// How long the bird takes to come back once the shell is COMPLETELY gone. The return used to live inside the open
+        /// phase, which left it two things it could not have at once: runway, and a guarantee that the cap had cleared. It
+        /// reads better and is simpler to guarantee on the other side of <c>GoOff</c> - the cup has sunk, the cap has scaled
+        /// out, nothing of the shell is drawn - with the hatch debris (shards, yolk, feathers, all living 0.55 s or more from
+        /// a hatch that lasts 0.40 s) still in the air around the bird as it grows back out of the ground.
+        /// </summary>
+        public const float ShellBodyReturnSeconds = 0.18f;
 
         /// <summary>Below this scale a shell half is no longer drawn at all. The cup sinks to a flat disc and the cap shrinks
         /// to a speck, and both used to keep rendering: the returning bird stood on a white pancake.</summary>

@@ -22,7 +22,6 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class ShellBodyHiddenTests
     {
-        private const float Open = FeedbackTuning.ShellOpenSeconds;
         private const float Span = FeedbackTuning.ShellBodyVanishSeconds;
         private const float Lead = FeedbackTuning.ShellBodyVanishLeadSeconds;
 
@@ -217,39 +216,81 @@ namespace CluckWars.Tests
             StringAssert.Contains("case State.Walk:  conceal = _reduced ? 0f : WalkConceal01(remaining, eggSeconds); break;", shell);
         }
 
-        // ---- The hatch: back out over bare ground, with the shell on its way out --------------------
+        // ---- The hatch: the bird returns only after every piece of shell has gone ------------------
 
         [Test]
-        public void TheBirdBurstsBackIn_OverTheOpen_OnlyOnceTheShellIsLeaving()
+        public void TheBirdStaysHidden_ForTheWholeHatch_AndReturnsOnlyAfterIt()
         {
-            float delay = Open * FeedbackTuning.ShellBodyFadeInDelayFraction;
-            Assert.AreEqual(1f, ChickenShellVisuals.OpenConceal01(0f, Open), 1e-5f, "the hatch starts with no bird in sight");
-            Assert.AreEqual(1f, ChickenShellVisuals.OpenConceal01(delay * 0.99f, Open), 1e-5f,
-                            "still hidden while the cap pops and the shards, yolk and cap feathers leave");
-            float back = delay + Open * FeedbackTuning.ShellBodyFadeInFraction;
-            Assert.AreEqual(0f, ChickenShellVisuals.OpenConceal01(back, Open), 1e-5f, "whole again before the phase ends");
-            Assert.AreEqual(0f, ChickenShellVisuals.OpenConceal01(Open, Open), 1e-5f, "and still whole at the end of the phase");
+            // The return used to live inside the open phase and could not have both runway and a guarantee that the cap had
+            // cleared: the cap only finishes scaling out at the very end of the phase. It now runs as a tail AFTER GoOff,
+            // where the cup has sunk, the cap has scaled out and the shell root is deactivated.
+            string shell = Src(ShellPath);
+            StringAssert.Contains("case State.Open:  conceal = 1f;", shell, "nothing of the bird is drawn during the hatch itself");
+            StringAssert.Contains("if (_stateT >= FeedbackTuning.ShellOpenSeconds) GoOffReleasing();", shell,
+                                  "and the hatch is the one caller that asks for the gradual hand-back");
+            Assert.IsFalse(shell.Contains("OpenConceal01"), "the open must not re-grow a fade of its own");
 
-            float prev = 2f;
-            for (int i = 0; i <= 10; i++)
-            {
-                float c = ChickenShellVisuals.OpenConceal01(delay + (back - delay) * i / 10f, Open);
-                Assert.LessOrEqual(c, prev, "the return never goes backwards");
-                prev = c;
-            }
+            // GoOff is where every shell renderer goes off and the root is deactivated - so the tail starts with no shell at all.
+            int off = shell.IndexOf("private void GoOffReleasing()", System.StringComparison.Ordinal);
+            Assert.Greater(off, 0);
+            int end = shell.IndexOf("\n        }", off, System.StringComparison.Ordinal);
+            string body = shell.Substring(off, end - off);
+            StringAssert.Contains("_releasing = true;", body);
+            int stop = shell.IndexOf("private void GoOff()", System.StringComparison.Ordinal);
+            Assert.Greater(stop, 0);
+            int stopEnd = shell.IndexOf("\n        }", stop, System.StringComparison.Ordinal);
+            string stopBody = shell.Substring(stop, stopEnd - stop);
+            StringAssert.Contains("_capVisible = _cupVisible = false;", stopBody);
+            StringAssert.Contains("_shellRoot.gameObject.SetActive(false)", stopBody);
         }
 
         [Test]
-        public void TheHatchDelay_IsTheLaterOfTheCupBeingGoneAndTheCapLeaving()
+        public void TheReturn_IsAFade_NotAPop()
         {
-            // Derived from the two curves TickOpen actually flies, not a hand-picked delay.
-            float delay = Open * FeedbackTuning.ShellBodyFadeInDelayFraction;
-            Assert.AreEqual(0f, ChickenShellVisuals.CupSinkYScale(delay), 1e-5f, "the cup has fully sunk before the bird returns");
-            Assert.GreaterOrEqual(delay, Open - FeedbackTuning.ShellCapScaleOutSeconds - 1e-5f,
-                                  "and the cap has begun scaling out for good before the bird returns");
-            // The cap is also at the top of its pop arc by then, as far from the bird as it ever gets.
-            float u = Mathf.Clamp01(delay / FeedbackTuning.ShellCapPopSeconds);
-            Assert.Greater(1f - (1f - u) * (1f - u), 0.95f, "the cap is at its apex and leaving before the bird shows");
+            Assert.AreEqual(1f, ChickenShellVisuals.ReturnConceal01(0f), 1e-5f, "it starts from nothing");
+            Assert.AreEqual(0f, ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds), 1e-5f, "and ends whole");
+            Assert.AreEqual(0f, ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds * 2f), 1e-5f);
+            Assert.That(ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds * 0.5f), Is.InRange(0.2f, 0.8f),
+                        "half way through the return the bird is half there");
+
+            float prev = 2f;
+            for (int i = 0; i <= 20; i++)
+            {
+                float c = ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds * i / 20f);
+                Assert.LessOrEqual(c, prev, "the return never goes backwards");
+                prev = c;
+            }
+            Assert.GreaterOrEqual(FeedbackTuning.ShellBodyReturnSeconds, 8f / 60f,
+                                  "a return this short reads as a pop, which is what the capture caught");
+        }
+
+        [Test]
+        public void TheReturn_GrowsTheBirdBackAndLiftsItOutOfItsSink()
+        {
+            // The same two levers as the vanish, run backwards: it climbs out rather than appearing at full size.
+            float early = ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds * 0.1f);
+            float late = ChickenShellVisuals.ReturnConceal01(FeedbackTuning.ShellBodyReturnSeconds * 0.9f);
+            Assert.Less(ChickenShellVisuals.BodyVanishScale(early), ChickenShellVisuals.BodyVanishScale(late),
+                        "the bird grows as the return runs");
+            Assert.Greater(ChickenShellVisuals.BodyVanishSink(early, 1f), ChickenShellVisuals.BodyVanishSink(late, 1f),
+                           "and rises out of the sink as it goes");
+            StringAssert.Contains("conceal = ReturnConceal01(_releaseT);", Src(ShellPath));
+        }
+
+        [Test]
+        public void OnlyTheHatchHandsTheBirdBackSlowly_EveryOtherStopSnaps()
+        {
+            // A death, a folded walk or a disabled component must not leave a bird fading in underneath whatever comes next.
+            string shell = Src(ShellPath);
+            StringAssert.Contains("if (_releasing) EndRelease();   // the death VFX owns this moment", shell);
+            StringAssert.Contains("if (_releasing) EndRelease();   // a new Shield cast owns the body again", shell);
+            int dis = shell.IndexOf("private void OnDisable()", System.StringComparison.Ordinal);
+            int end = shell.IndexOf("\n        }", dis, System.StringComparison.Ordinal);
+            StringAssert.Contains("_releasing = false;", shell.Substring(dis, end - dis));
+            // EndRelease is the one place the animator goes back to rest.
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(
+                shell, @"_animator\.ExtraUniformScale = 1f; _animator\.ExtraZScale = 1f; _animator\.ExtraYOffset = 0f;").Count - 1,
+                "OnDisable and EndRelease, and nowhere else");
         }
 
         [Test]
@@ -260,22 +301,8 @@ namespace CluckWars.Tests
             StringAssert.Contains("_cupVisible = _cupYScale > FeedbackTuning.ShellHalfGoneScale;", shell);
             StringAssert.Contains("_capVisible = _capScale > FeedbackTuning.ShellHalfGoneScale;", shell);
             StringAssert.Contains("if (_cupRenderer != null && _cupRenderer.enabled != _cupVisible) _cupRenderer.enabled = _cupVisible;", shell);
-
-            float delay = Open * FeedbackTuning.ShellBodyFadeInDelayFraction;
-            Assert.LessOrEqual(ChickenShellVisuals.CupSinkYScale(delay), FeedbackTuning.ShellHalfGoneScale,
-                               "so the cup is already not drawn by the time the bird returns");
+            Assert.AreEqual(0f, ChickenShellVisuals.CupSinkYScale(FeedbackTuning.ShellCupSinkSeconds), 1e-5f);
             Assert.That(FeedbackTuning.ShellHalfGoneScale, Is.InRange(0f, 0.1f), "a threshold, not a visible size");
-        }
-
-        [Test]
-        public void EveryFade_StaysInsideItsOwnPhase()
-        {
-            Assert.That(FeedbackTuning.ShellBodyFadeInDelayFraction + FeedbackTuning.ShellBodyFadeInFraction, Is.LessThan(1f),
-                        "the hatch return must finish before the open phase hands back to GoOff");
-            Assert.That(FeedbackTuning.ShellBodyFadeInDelayFraction, Is.InRange(0f, 1f));
-            foreach (float dur in new[] { Open, FeedbackTuning.ShellOpenReducedSeconds })
-                Assert.AreEqual(0f, ChickenShellVisuals.OpenConceal01(dur, dur), 1e-5f);
-            Assert.AreEqual(0f, ChickenShellVisuals.OpenConceal01(0f, 0f), "a zero-length open shows the bird, never leaves it gone");
         }
 
         // ---- Local and remote alike, and the Invisibility floor is untouched -------------------------
@@ -368,7 +395,7 @@ namespace CluckWars.Tests
         public void TheShellReleasesTheBird_WheneverItStops()
         {
             string shell = Src(ShellPath);
-            foreach (var where in new[] { "private void OnDisable()", "private void GoOff()" })
+            foreach (var where in new[] { "private void OnDisable()", "private void EndRelease()" })
             {
                 int i = shell.IndexOf(where, System.StringComparison.Ordinal);
                 Assert.Greater(i, 0, where + " still exists");
@@ -387,7 +414,7 @@ namespace CluckWars.Tests
             // open shrinks that whole egg away. Any partial alpha there could only be drawn OVER the egg, so there is none.
             string shell = Src(ShellPath);
             StringAssert.Contains("case State.Walk:  conceal = _reduced ? 0f : WalkConceal01(remaining, eggSeconds); break;", shell);
-            StringAssert.Contains("case State.Open:  conceal = _reduced ? 1f : OpenConceal01(_stateT, FeedbackTuning.ShellOpenSeconds); break;", shell);
+            StringAssert.Contains("if (_stateT >= dur) GoOff();   // Reduced Motion: a hard swap back, like its hard swap out", shell);
         }
 
         [Test]
@@ -411,6 +438,48 @@ namespace CluckWars.Tests
             Assert.IsNotNull(prefab);
             Assert.IsNotNull(prefab.GetComponent<ChickenShellVisuals>(), "the shell driver");
             Assert.IsNotNull(prefab.GetComponent<ChickenVisuals>(), "the body opacity owner the shell pushes the conceal to");
+        }
+
+        [Test]
+        public void NoCarriedPropIsAttachedToTheChicken_SoNoneCanOutliveTheHide()
+        {
+            // The conceal covers ChickenVisuals._renderers, which SetModelRoot scopes to the CLASS MODEL root, so anything
+            // instantiated under the chicken root instead would survive the hide. Audited 2026-11-13 after a capture showed a
+            // crate beside a sealed egg: that crate is arena cover dressing baked into Map.unity (CoverBoxDresser), not
+            // carried. Carried food is shown by the cargo bar and count above the head, never by a prop on the bird. These
+            // pin that, so a future carry prop cannot be added without this failing.
+            string root = Path.Combine(Path.GetDirectoryName(Application.dataPath), "Assets/_Game/Scripts/Visuals/");
+            var withGameObjectFields = Directory.GetFiles(root, "*.cs")
+                .Where(f => File.ReadAllText(f).Contains("[SerializeField] private GameObject"))
+                .Select(Path.GetFileName).ToArray();
+            Assert.That(withGameObjectFields, Is.EqualTo(new[] { "ChickenShellVisuals.cs" }),
+                        "the shell model is the only prefab any chicken presentation attaches; a new one must be hidden with the bird");
+
+            string controller = File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath),
+                "Assets/_Game/Scripts/Gameplay/ChickenController.cs"));
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(controller, @"Instantiate\(").Count,
+                            "the class model is the only thing instantiated under a chicken, and it IS the conceal's renderer set");
+            StringAssert.Contains("Instantiate(entry.ModelPrefab, transform)", controller);
+            StringAssert.Contains("visuals.SetModelRoot(modelRoot);",
+                File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath),
+                    "Assets/_Game/Scripts/Visuals/ChickenModelPresenter.cs")),
+                "and the conceal's renderer set is pointed at exactly that model");
+        }
+
+        [Test]
+        public void TheEggDeliberatelyKeepsItsOwnTells_NameplateBadgesBarsAndStripe()
+        {
+            // What the hide must NOT take away: the player has to keep knowing whose egg it is and how long is left.
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(TestAssets.ChickenPrefabPath);
+            Assert.IsNotNull(prefab.GetComponent<ChickenNameplate>(), "the name stays");
+            Assert.IsNotNull(prefab.GetComponent<ChickenWorldBars>(), "the cargo and health bars stay");
+            Assert.IsNotNull(prefab.GetComponent<ChickenStatusBadges>(), "the badges and the egg countdown stay");
+            // The shell asks none of them to hide anything (a stun cannot land during the egg), and the conceal is a body-only
+            // mechanism: it is pushed to ChickenVisuals, which owns the class model's renderers and nothing else.
+            string shell = Src(ShellPath);
+            foreach (var overlay in new[] { "ChickenNameplate", "ChickenWorldBars", "ChickenStatusBadges", "ChickenStateOverlays" })
+                Assert.IsFalse(shell.Contains(overlay + "."), shell + " must not reach into " + overlay);
+            StringAssert.Contains("_bars.FlashIdentityRing", shell, "except the identity ring flash it already owned");
         }
 
         [Test]

@@ -176,19 +176,13 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>
-        /// How far the body is still concealed over the OPEN phase: fully hidden for the first
-        /// <see cref="FeedbackTuning.ShellBodyFadeInDelayFraction"/> of it (the cap pops, the shards and yolk fly, the cap
-        /// feathers climb), then back to 0 over <see cref="FeedbackTuning.ShellBodyFadeInFraction"/> — finished before the
-        /// phase ends, so the bird is whole by the time the shell is gone and never appears before it has broken.
+        /// How far the body is still concealed during the RETURN, which runs after the shell has entirely gone (the tail that
+        /// starts at <c>GoOff</c>): 1 at the start, 0 after <see cref="FeedbackTuning.ShellBodyReturnSeconds"/>. The bird grows
+        /// back out of its vanish scale and rises out of its sink on the same ramp, so it climbs out of the ground among the
+        /// hatch debris rather than popping into place.
         /// </summary>
-        public static float OpenConceal01(float stateT, float openSeconds)
-        {
-            if (openSeconds <= 0f) return 0f;
-            float delay = openSeconds * FeedbackTuning.ShellBodyFadeInDelayFraction;
-            float span = openSeconds * FeedbackTuning.ShellBodyFadeInFraction;
-            if (span <= 0f) return stateT < delay ? 1f : 0f;
-            return 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((stateT - delay) / span));
-        }
+        public static float ReturnConceal01(float releaseT) =>
+            1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(releaseT / Mathf.Max(0.0001f, FeedbackTuning.ShellBodyReturnSeconds)));
 
         /// <summary>Fraction of the egg phase already elapsed, from the slot's remaining seconds.</summary>
         public static float EggElapsed01(float remainingSeconds, float eggSeconds) =>
@@ -253,6 +247,8 @@ namespace CluckWars.Visuals
         private ChickenVisuals _visuals;      // the one body-opacity path (ghost fade + renderer toggle), shared with Invisibility
         private bool _missingVisualsReported;
         private float _bodyConceal;           // 0 the bird draws, 1 it is sealed inside the egg (Maestro 2026-11-13)
+        private bool _releasing;              // the post-shell return tail is running
+        private float _releaseT;
         private float _bodyScale = 1f;
         private float _bodySink;              // E1a: world metres the bird sinks into the egg, eased with the tuck
         private float _bodySqueezeZ = 1f;     // E1a: front-back squeeze (model local z), eased with the tuck
@@ -335,6 +331,8 @@ namespace CluckWars.Visuals
         private void OnDisable()
         {
             if (_animator != null) { _animator.ExtraRollDegrees = 0f; _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
+            _releasing = false;
+            _releaseT = 0f;
             SetBodyConceal(0f);
             _bodyScale = 1f;
             _bodySink = 0f;
@@ -480,7 +478,7 @@ namespace CluckWars.Visuals
             // ReadShell reports "not active" as false; fold that into the phase.
             Observe(cur, remaining, eggSeconds);
 
-            if (_state == State.Off && _waddleBlend <= 0f) return;
+            if (_state == State.Off && _waddleBlend <= 0f && !_releasing) return;
             Tick(dt, remaining, eggSeconds);
             Apply();
         }
@@ -532,6 +530,7 @@ namespace CluckWars.Visuals
             if (_combat.IsRemoved)
             {
                 _prevPhase = cur;
+                if (_releasing) EndRelease();   // the death VFX owns this moment; no bird fading in underneath it
                 if (_state != State.Off) GoOff();
                 return;
             }
@@ -556,6 +555,7 @@ namespace CluckWars.Visuals
 
         private void PrepareShell()
         {
+            if (_releasing) EndRelease();   // a new Shield cast owns the body again
             ApplyShadowTier();
             _lastPos = transform.position;
             _dustDist = 0f;
@@ -696,17 +696,44 @@ namespace CluckWars.Visuals
             _bodySqueezeZ = 1f;
         }
 
+        /// <summary>
+        /// The hatch's hand-back: arms the return tail, THEN stops the shell. Only the hatch does this, and only here, where
+        /// every shell renderer is about to be switched off - which is the whole point, the bird cannot be drawn over a cap or
+        /// a cup that no longer exists. Every other stop (death, a walk that folded, OnDisable) goes through
+        /// <see cref="GoOff"/> and snaps.
+        /// </summary>
+        private void GoOffReleasing()
+        {
+            _releasing = true;
+            _releaseT = 0f;
+            GoOff();
+        }
+
+        /// <summary>The shell stops. Hands the body back at once unless a return tail is already running.</summary>
         private void GoOff()
         {
             _state = State.Off;
             ResetPose();
-            SetBodyConceal(0f);
             _crack = 0f;
             _stripeAlpha = 1f;
             PushBlock();   // F2: the renderers carry a clean block while off, so nothing re-shows a stale crack web
             _capVisible = _cupVisible = false;
-            if (_animator != null) { _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
             if (_shellRoot != null && _rootActive) { _shellRoot.gameObject.SetActive(false); _rootActive = false; }
+
+            // Tick drives the conceal, the scale and the sink down to rest over the tail; without one, snap.
+            if (!_releasing) EndRelease();
+        }
+
+        /// <summary>Hands the body back immediately and clears the tail: the one place that returns the animator to rest.</summary>
+        private void EndRelease()
+        {
+            _releasing = false;
+            _releaseT = 0f;
+            SetBodyConceal(0f);
+            _bodyScale = 1f;
+            _bodySink = 0f;
+            _bodySqueezeZ = 1f;
+            if (_animator != null) { _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
         }
 
         // ---- Per-state pose --------------------------------------------------------------------
@@ -770,13 +797,24 @@ namespace CluckWars.Visuals
             // Reduced Motion gets no vanish ramp at all: its close does not drop a cap, it grows an already-CLOSED egg, so a
             // partial alpha there could only ever be drawn over the egg. Hard swap - "alpha only, no travel", its own rule.
             float conceal;
-            switch (_state)
+            if (_releasing)
             {
-                case State.Walk:  conceal = _reduced ? 0f : WalkConceal01(remaining, eggSeconds); break;
-                case State.Close: conceal = 1f; break;
-                case State.Idle:  conceal = 1f; break;
-                case State.Open:  conceal = _reduced ? 1f : OpenConceal01(_stateT, FeedbackTuning.ShellOpenSeconds); break;
-                default:          conceal = 0f; break;   // Off and Fold: a walk that ended without an egg keeps its bird
+                // The return tail, after GoOff: no cup, no cap, nothing of the shell is drawn, so the bird has nothing to be
+                // drawn over and can take as long as it needs.
+                _releaseT += dt;
+                conceal = ReturnConceal01(_releaseT);
+                if (_releaseT >= FeedbackTuning.ShellBodyReturnSeconds) { EndRelease(); return; }
+            }
+            else
+            {
+                switch (_state)
+                {
+                    case State.Walk:  conceal = _reduced ? 0f : WalkConceal01(remaining, eggSeconds); break;
+                    case State.Close: conceal = 1f; break;
+                    case State.Idle:  conceal = 1f; break;
+                    case State.Open:  conceal = 1f; break;   // hidden for the WHOLE hatch; the return is the tail after it
+                    default:          conceal = 0f; break;   // Off and Fold: a walk that ended without an egg keeps its bird
+                }
             }
             SetBodyConceal(conceal);
 
@@ -875,7 +913,7 @@ namespace CluckWars.Visuals
                 float u = Mathf.Clamp01(_stateT / dur);
                 _uniform = 1f - u;
                 _cupRise = 1f; _cupYScale = 1f; _capSeatFactor = 1f; _capLift = _capDrift = _capTumble = 0f; _capScale = 1f;
-                if (_stateT >= dur) GoOff();
+                if (_stateT >= dur) GoOff();   // Reduced Motion: a hard swap back, like its hard swap out
                 return;
             }
 
@@ -892,7 +930,7 @@ namespace CluckWars.Visuals
             // stood on the disc with the cap over its head. Below ShellHalfGoneScale a half is simply not drawn.
             _cupVisible = _cupYScale > FeedbackTuning.ShellHalfGoneScale;
             _capVisible = _capScale > FeedbackTuning.ShellHalfGoneScale;
-            if (_stateT >= FeedbackTuning.ShellOpenSeconds) GoOff();
+            if (_stateT >= FeedbackTuning.ShellOpenSeconds) GoOffReleasing();
         }
 
         // ---- Apply ------------------------------------------------------------------------------
