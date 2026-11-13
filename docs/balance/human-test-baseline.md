@@ -29,8 +29,10 @@ Slippery's), Thief Slow for Shove, Spoiler Hide for Slow. Slippery no longer sho
 end 40% sooner (timed slows only; a zone or the Slow aura gives the weaker slow for as long as it stands inside, BL-123). Sneaky (Assassin) speed 12.15 -> 11.1
 (SCT-exempt). The tables below are rewritten to these numbers.
 
+**Update 2026-11-13 (branch `simplify-abilities`, commits `8eae659a`, `2341c869`, `b404d8ac`, not merged):** Maestro split Slow into two abilities. **Slow** (`Slow.asset`, SLOW, snail icon) is an instant cast: every rival within 6.48 m is slowed to 55% for 3 s and stays slowed after leaving the circle (a timed slow, so Slippery, Relentless and Bulwark change it and the Shield walk and egg refuse it). **Slow Area** (`FeatherAura.asset`, AREA, snail-in-a-disc icon) keeps the zone: its `AreaKind` picks an aura that follows the caster (default) or a patch left where it was cast; 6.48 m, 55% while inside, 5 s and cooldown 7 s are placeholders to balance. Kits by role: Relentless, Featherfoot and Slippery carry Slow; Hoarder and Thief carry Slow Area. Ability and perk texts now fill every number from the asset. The table below lists 11 abilities including Peck and Death Mark. The Oracle gate stayed green; nothing was run in the game yet (BL-159, BL-160).
+
 This is a starting point to iterate, not a final roster. Every value below is data: kits on the passive assets (or the Balance
-Editor's kits panel), rule numbers on `MatchConfig.asset`, `MarkKill.asset`, `WingSlam.asset` (Stun), `Snatch.asset` (Steal), `CluckShock.asset` (Shove), `FeatherAura.asset` (Slow), `TurtleMode.asset` (Shield) and `Shadowstep.asset` (Jump).
+Editor's kits panel), rule numbers on `MatchConfig.asset`, `MarkKill.asset`, `WingSlam.asset` (Stun), `Snatch.asset` (Steal), `CluckShock.asset` (Shove), `Slow.asset` (Slow), `FeatherAura.asset` (Slow Area), `TurtleMode.asset` (Egg Shell) and `Shadowstep.asset` (Jump).
 `MatchConfigSO.LoadoutMode = Free` brings back free picking; `MatchConfigSO.TargetingMode = Shaped` brings back the cones (Steal 140 deg arc, Stun 120 deg cone). Numbers here were read from the assets on 2026-11-05.
 
 ## The eight kits
@@ -43,12 +45,12 @@ The class shows as **Sneaky**; in code it stays `ChickenClass.Assassin`.
 | Warrior | Relentless | Peck | Steal | Slow | Speed |
 | Speedy | Featherfoot | Peck | Speed | Slow | Shove |
 | Speedy | Slippery | Peck | Speed | Slow | Shove |
-| Fatty | Bulwark | Peck | Stun | Shove | Shield |
-| Fatty | Hoarder | Peck | Shield | Slow | Steal |
+| Fatty | Bulwark | Peck | Stun | Shove | Egg Shell |
+| Fatty | Hoarder | Peck | Egg Shell | Slow Area | Steal |
 | Sneaky | Assassin (Spoiler) | Death Mark | Stun | Jump | Hide |
-| Sneaky | Thief | Steal | Hide | Jump | Slow |
+| Sneaky | Thief | Steal | Hide | Jump | Slow Area |
 
-## The 10 abilities
+## The 11 abilities
 
 All reach figures are a radius around the caster. Cooldowns are the asset values; Bully multiplies every move except Peck by 0.75
 (Steal 3 s, Stun 5.25 s, Jump 1.5 s). Relentless leaves cooldowns alone: its stuns and slows last 30% longer (Stun 1.3 -> 1.69 s, the Slow aura
@@ -61,13 +63,14 @@ and end 40% sooner (timed slows x0.6; a zone or aura has no duration, so it gets
 | Steal (ROB) | `Snatch.asset` | 4 s | robs 5 food from every rival carrier within 5.16 m, no knockback (Thief x1.6) |
 | Stun (STUN) | `WingSlam.asset` | 7 s | every rival within 5.4 m, 1.3 s (Slippery too; 0.845 s on Bulwark, 0.975 s on Relentless) |
 | Shove (PUSH) | `CluckShock.asset` | 5 s | every rival within 5.4 m, knockback force 16.2 |
-| Slow (SLOW) | `FeatherAura.asset` | 6 s | aura 6.48 m, 55% speed while inside, 3 s (Slippery: 73%, first 1.8 s only) |
+| Slow (SLOW) | `Slow.asset` | 6 s | instant: every rival within 6.48 m slowed to 55% for 3 s, kept after leaving the circle (Slippery: 73%, 1.8 s) |
+| Slow Area (AREA) | `FeatherAura.asset` | 7 s (placeholder) | `AreaKind` aura (follows the caster, default) or placed zone (stays where cast): 6.48 m, 55% speed while inside, 5 s (placeholder; Slippery 73% while inside) |
 | Speed (FAST) | `SpeedBurst.asset` | 4 s | 1.3x for 1.5 s |
 | Jump (JUMP) | `Shadowstep.asset` | 2 s | 3x for 0.18 s (5.99 m for the Sneaky at 11.1, 5.47 m for the Warrior), over walls; not Speedy |
-| Shield (SHLD) | `TurtleMode.asset` | 8 s | walk 1 s at 0.5x (immune to ability slows only: timed slow, zone, Slow aura; stun, shove, theft and execution still land), then an automatic egg for 2 s (immobile; immune to stun, slow, root and shove; steal-proof). Press again ends it; casting another move ends the egg only |
+| Egg Shell (EGG) | `TurtleMode.asset` | 8 s | walk 1 s at 0.5x (immune to ability slows only: timed slow, zone, Slow aura; stun, shove, theft and execution still land), then an automatic egg for 2 s (immobile; immune to stun, slow, root and shove; steal-proof). Press again ends it; casting another move ends the egg only |
 | Hide (HIDE) | `Invisibility.asset` | 4.5 s | ghostly outline 2 s, opacity 0.2; breaks on the next move |
 | Peck | `Peck.asset` | 0.8 s | per-class amount and cadence (SCT axiom) |
-| Death Mark (EXEC) | `MarkKill.asset` | 4 s after a miss, 8 s after a kill | see the rule numbers below; kill range 6.2 m (was 8 m); its stun comes from Stun (1.3 s) |
+| Hunt (HUNT, then POUNCE; Death Mark in code) | `MarkKill.asset` | 4 s after a miss, 8 s after a kill | see the rule numbers below; kill range 6.2 m (was 8 m); its stun comes from Stun (1.3 s) |
 
 Free-mode pools: Warrior, Fatty and Sneaky pick from the 7 everyone-abilities plus Jump; Speedy from the 7 only (Quick Drop is retired). Peck and Death Mark are pre-equip-only.
 
@@ -113,16 +116,16 @@ New for 2026-11-05 (simplified abilities):
 - **Range-only feel:** with no cone, does the 5.4 m circle around you read as "everyone near me"? Do players still try to aim? Does the telegraph (a circle with every rival inside marked) match exactly who gets hit? Does anyone feel hit "from behind" or from the side and find it unfair, or is the circle easier for kids?
 - **Shield phases:** the 1 s walk refuses slows only (a stun still lands, theft and execution do not); the 2 s egg that follows on its own refuses everything and cannot move. Is one press and 3 s total understood? Does casting something else to cancel the egg feel right (a manual Peck counts as a cast)? Do rivals understand why nothing lands (the grey no-effect mark and SAFE)? Does a Slow aimed at a walking Shield look like a hit though it does nothing?
 - **Spoiler stun -> kill:** Death Mark now stuns with the generic Stun (1.3 s, 5.4 m, 7 s cooldown). Is it timed into the last 1.0 s of the 4 s mark, does a Stun landed early still count at the kill, and does the Spoiler land kills more or less often than with Ambush? Stun reach 5.4 m plus the 6.2 m kill range is 11.6 m, the same as the Ambush era; watch whether the shorter kill range (was 8 m) makes the final approach feel tighter.
-- **One ability per job:** can a child say what each of the 11 does from its name and short label (ROB, STUN, PUSH, SLOW, FAST, JUMP, SHLD, HIDE)? Is Steal on five of eight kits too samey?
+- **One ability per job:** can a child say what each of the 11 does from its name and short label (ROB, STUN, PUSH, SLOW, AREA, FAST, JUMP, EGG, HIDE)? Is Steal on five of eight kits too samey?
 - **Steal without knockback:** Steal robs 5 from every carrier in 5.16 m and does not push. Do Thieves and Hoarders feel safe afterwards, and does a Bully (Steal every 3.75 s) still outpace everyone?
-- **Slow aura:** 6.48 m, 55%, 3 s. Is the aura (a zone around you) understood, or do players expect a one-shot slow?
+- **Slow and Slow Area:** is the instant Slow (6.48 m, 55%, 3 s, kept after leaving the circle) understood, and does Slow Area (aura or placed patch, 5 s placeholder) read as a different move? Which shape feels right?
 - **Shorter cooldowns (2026-11-05):** with Jump every 2 s, Steal and Speed every 4 s and Stun every 7 s, does the 45 s match feel busier in a good way, or does a Bully (Jump 1.5 s, Steal 3 s) spam too much? Is Hide (2 s, every 4.5 s) still worth a slot?
 - **Slippery vs Featherfoot:** both Speedys now carry Peck, Speed, Slow, Shove. Can kids tell them apart (Slippery shrugs off ability slows, Featherfoot ignores pile and bump slows and banks a little faster)? Does Slippery feel stunnable enough now that stuns land in full?
 - **Sneaky speed 11.1:** does the Assassin still reach a mark in time, and can a Speedy now outrun him?
 - **Featherfoot banking speed:** deposits are 10% faster for good (Oracle 29.62 s, on the Speedy target 30 s). Is the bonus noticeable at all, or does Featherfoot read only as "piles and bumps never slow me"? If it feels like nothing, say so: a bigger bonus needs a declared exception or a cost elsewhere.
-- **Relentless longer crowd control:** do your stuns (1.69 s) and Slow aura (3.9 s) feel stronger, and do you shrug off rivals' stuns and timed slows (x0.75)? Is it too strong against Slippery (its stuns now land the full 1.69 s)?
+- **Relentless longer crowd control:** do your stuns (1.69 s) and Slow (3.9 s) feel stronger, and do you shrug off rivals' stuns and timed slows (x0.75)? Is it too strong against Slippery (its stuns now land the full 1.69 s)?
 - **Bully cooldowns:** with every move except Peck recharging 25% faster, does the Warrior feel like the cooldown spammer, and does it stay an all-rounder rather than a thief?
-- **Kits at a glance:** Bully (Stun, Jump) and Relentless (Slow, Speed) differ by crowd control and mobility; Bulwark/Hoarder by Stun+Shove vs Slow+Steal. Do these pairs play differently?
+- **Kits at a glance:** Bully (Stun, Jump) and Relentless (Slow, Speed) differ by crowd control and mobility; Bulwark/Hoarder by Stun+Shove vs Slow Area+Steal. Do these pairs play differently?
 
 Carried from earlier sessions (rewritten where an ability was retired):
 
