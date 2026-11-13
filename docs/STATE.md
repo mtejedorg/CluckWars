@@ -6,6 +6,25 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-13 - Architecture audit fix batch 4, phase B (five assemblies; `simplify-abilities`)
+
+The runtime code is now five assemblies, `CluckWars.Core` < `Gameplay` < `Presentation` < `Diagnostics` < `App` (rules in `docs/CONVENTIONS.md` "Assemblies"). No C# gameplay code, prefab, scene or gameplay `.asset` changed; the only non-code asset edited is `NetworkProjectConfig.fusion` (`AssembliesToWeave` gained the four Fusion-referencing assemblies, all old entries kept). Phase A missed no edge: every assembly compiled first time. Validated in batch mode only (`unity test --mode EditMode`, Editor closed) plus one batch Windows player build; **the game has not been run since the split**.
+
+| Step | Status | Commit | Notes |
+|---|---|---|---|
+| B1 Core | Done (3468/3468) | `4c6244b4` | `Logging/CluckWars.Core.asmdef` + asmrefs in `Localization`, `Injection`, `Services`, `Bootstrap`, `Diagnostics/Shared`. Zenject only; `overrideReferences` with `Zenject-usage.dll` (it declares `[Inject]`, used by `SceneLoader`). |
+| B2 Gameplay | Done (3468/3468) | `242ba7e9` | `Gameplay/CluckWars.Gameplay.asmdef` + asmrefs in `Abilities`, `Networking`, `Settings`, `Audio`, `Balance`. Woven. Guard proof: with `CluckWars.Gameplay` removed from the weave list and `Library/Bee` deleted, 3 `WeavingGuardTests` fail naming the gameplay behaviours and `PlayerNetworkInput` (3465/3468); restored, 3468/3468. |
+| B3 Presentation | Done (3468/3468) | `0e1e2ed4` | `Visuals/CluckWars.Presentation.asmdef` + asmrefs in `UI`, `Input`. Woven (`HitFeedback`). |
+| B4 Diagnostics | Done (3468/3468) | `b6730959` | `Diagnostics/CluckWars.Diagnostics.asmdef` + asmref in `AbilityLab`. `Diagnostics/Shared` stays in Core (7 sources in Core's compile list, 0 in Diagnostics'). |
+| B5 App | Done (3468/3468) | `7a3d62a6` | `App/CluckWars.App.asmdef` + asmref in `Installers`. 335 runtime sources: 23 Core, 153 Gameplay, 127 Presentation, 28 Diagnostics, 4 App. `Assembly-CSharp` is no longer built. |
+| B6 tests + docs | Done (3483/3483) | `c8d652d6` + this commit | `AssemblyLayoutTests` (15 cases). `SceneObjectAccessTests`: `Diagnostics/Shared` lost the dev-tool exemption (it is Core). |
+| B7 player build | Done | (no commit) | `CluckWarsBuildMenu.BuildWindows` in batch: `Build Finished, Result: Success`, 227.1 MB, 78 s, devtools off. The player's `CluckWars.Gameplay.dll` and `CluckWars.Presentation.dll` carry the weaver's stamp; no `CluckWars.*.dll` in the player names `UnityEditor`. The build was not started. |
+
+- **Left as is:** `ChickenLocalEventsTests` (presentation folders only: `App`, `Installers` and `Diagnostics` read none of the one-shot counters today), `GameplayPresentationBoundaryTests` (the compiler now stops Gameplay naming a Presentation type; the source guard still covers the call patterns), `RuntimeSourceGuardTests` (scans every folder, `App` included).
+- **Stale file:** `Builds/Windows/CluckWars_Data/Managed/Assembly-CSharp.dll` (2026-11-11) is left over from the previous build. The player does not load it (`ScriptingAssemblies.json` lists the five `CluckWars.*` only), but delete `Builds/Windows` before a release build.
+- **`.claude/CLAUDE.md` line not added** (the agent may not edit it): proposed text is in the phase B hand-back.
+- **Owed (live, not verified):** (1) open the Editor once: expect `m_EditorClassIdentifier: Assembly-CSharp::...` to be rewritten in up to 147 places in assets when they are next saved (cosmetic; commit separately), no missing-script warning, no "has not been weaved" in the Console; (2) `tools/run-clients.ps1`, 2 clients + bots, one full round: chickens, piles, bases and the GameManager spawn, no `[SelfInject]` error and no "has not been weaved" / "no IChickenModelPresenter is bound" in either log (Zenject injection across assemblies in a player, spawn-time Fusion registration); hit feedback plays (`HitFeedback` is the only woven Presentation type); (3) a `CLUCKWARS_DEV_TOOLS` build (`Cluck Wars / Build / Test Session`): F1 debug HUD and `-cw_autosolo` still work (the define reaches the five assemblies through `extraScriptingDefines`); (4) Android / IL2CPP build and launch on the phone: managed stripping against the new assemblies was not exercised (the Windows build here is Mono).
+
 ## 🛠 2026-11-13 - Architecture audit fix batch 4, phase A (layering: last cross-layer references removed, files moved; `simplify-abilities`)
 
 Preparation for splitting `Assembly-CSharp` into five assemblies (Core < Gameplay < Presentation < Diagnostics < App). Everything still compiles into one assembly: **no `.asmdef` / `.asmref` exists yet and `NetworkProjectConfig.fusion` is untouched (phase B)**. Validated in batch mode only (`unity test --mode EditMode`, Editor closed); **nothing was looked at in a running game**. No `.asset`, prefab or scene was touched; no networked field or RPC changed. Every file move is a `git mv` of the `.cs` and its `.meta` (script GUIDs unchanged, namespaces unchanged except `AccentKey`).

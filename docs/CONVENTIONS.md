@@ -378,9 +378,39 @@ gameplay-code changes.
 
 ---
 
+## Assemblies (2026-11-13)
+
+The runtime code under `Assets/_Game/Scripts` is five assemblies. Each one references only the ones to its left, so a lower layer that names an upper type no longer compiles:
+
+`CluckWars.Core` < `CluckWars.Gameplay` < `CluckWars.Presentation` < `CluckWars.Diagnostics` < `CluckWars.App`
+
+| Assembly | `.asmdef` in | Other folders (`.asmref`) | What goes there | Woven by Fusion |
+|---|---|---|---|---|
+| `CluckWars.Core` | `Logging/` | `Localization/`, `Injection/`, `Services/`, `Bootstrap/`, `Diagnostics/Shared/` | Logging, text keys, `SelfInject`, service interfaces and their `Null*` versions, the scene loader, the small diagnostics state every layer reads. References Zenject only: **no Fusion, no package**. | No (cannot reference Fusion) |
+| `CluckWars.Gameplay` | `Gameplay/` (with `Session/`) | `Abilities/`, `Networking/`, `Settings/`, `Audio/`, `Balance/` | The simulation: every NetworkBehaviour of the match, abilities, network input, rules, settings and audio interfaces. | Yes |
+| `CluckWars.Presentation` | `Visuals/` | `UI/`, `Input/` | Everything a player sees or touches: VFX, camera, HUD, menus, device input. | Yes (`HitFeedback`) |
+| `CluckWars.Diagnostics` | `Diagnostics/` | `AbilityLab/` | Dev tools: probes, auto-test drivers, the Ability Lab. | Listed as a guard |
+| `CluckWars.App` | `App/` | `Installers/` | The composition root: Zenject installers and the two concrete services that see every layer (`FusionNetworkService`, `UGSService`). | Listed as a guard |
+
+Editor tools and the tests stay in the built-in `Assembly-CSharp-Editor` (`Scripts/Editor/`, `Assets/_Game/Editor/`); it sees the five because they are `autoReferenced`. Nothing compiles into `Assembly-CSharp` any more.
+
+Rules:
+
+- **Never add an upward reference** to make something compile. Move the type down, or put an interface in the lower layer and bind the implementation in an installer (`IChickenModelPresenter` is the example).
+- **The weaving rule.** Fusion's IL weaver only processes assemblies named in `AssembliesToWeave` of `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`. A NetworkBehaviour in an unlisted assembly compiles, passes most tests, and throws "has not been weaved" at spawn. Any new assembly that references Fusion goes into that list **in the same commit** as its `.asmdef`. In batch mode a config-only change does not re-weave an assembly that is already compiled: delete `Library/Bee` first. `WeavingGuardTests` is the proof (it was checked to fail when `CluckWars.Gameplay` is removed from the list).
+- **Adding a folder.** A new top-level folder under `Scripts/` compiles into `Assembly-CSharp` until it gets a `<Assembly>.asmref` (`{ "reference": "CluckWars.<Layer>" }`). Add the file, then the folder to `AssemblyLayoutTests.FolderAssembly`. A subfolder of an existing folder needs nothing.
+- **No `Editor` folder inside a runtime folder.** Below an asmdef it is not editor-only: it would compile into the runtime assembly and break the player build. Editor code goes in `Scripts/Editor/`.
+- **`Diagnostics/Shared/` is Core**, although it sits inside the Diagnostics folder and keeps the namespace `CluckWars.Diagnostics`. Its own `.asmref` is what keeps it out of `CluckWars.Diagnostics`.
+- **A new package reference** is added to the asmdef that needs it and to `AssemblyLayoutTests.References` (the lists are pinned exactly). Core uses `overrideReferences` with `Zenject-usage.dll` (the DLL that declares `[Inject]`) as its only prebuilt DLL.
+- `internal` now means "this assembly", not "the whole game". No `InternalsVisibleTo` exists; tests reach internals of the runtime assemblies only through public API.
+
+Guards: `AssemblyLayoutTests` (folder -> assembly, exact reference lists, settings, no upward reference in the compiled DLLs, the weave list), `WeavingGuardTests`, `MissingScriptsTests`.
+
+---
+
 ## Folder conventions
 
-- `Assets/_Game/Scripts/Editor/` — editor-only. Unity auto-compiles into the editor assembly. Don't reference editor APIs from runtime scripts.
+- `Assets/_Game/Scripts/Editor/` — editor-only. Unity auto-compiles into the editor assembly. Don't reference editor APIs from runtime scripts. Every other folder under `Scripts/` belongs to one of the five runtime assemblies (see "Assemblies").
 - `Assets/_Game/Data/` — SO assets only (`.asset` files). Source SO `.cs` definitions live in `Scripts/Gameplay/`.
 - `Assets/_Game/Resources/` — Unity loads anything here on demand. Used for `ProjectContext.prefab` which Zenject auto-discovers. **Don't dump general assets here** — bloats the build.
 
