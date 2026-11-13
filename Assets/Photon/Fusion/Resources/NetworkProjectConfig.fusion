@@ -69,7 +69,8 @@
         "Fusion.Addons.Physics",
         "Fusion.Addons.FSM",
         "CluckWars.Gameplay",
-        "CluckWars.Presentation"
+        "CluckWars.Presentation",
+        "CluckWars.Diagnostics"
     ],
     "UseSerializableDictionary": true,
     "NullChecksForNetworkedProperties": true,
