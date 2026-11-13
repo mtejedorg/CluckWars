@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpeedBurstAbilitySO
   DisplayName: Speed
   ShortLabel: FAST
-  Description: A 1.5s sprint at 1.3x movement speed.
+  Description: Run 1.3x faster for 1.5s.
   AccentKey: 5
   CustomAccentColor: {r: 0.3, g: 0.85, b: 0.95, a: 1}
   Category: 3

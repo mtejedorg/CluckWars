@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.InvisibilityAbilitySO
   DisplayName: Hide
   ShortLabel: HIDE
-  Description: Fades you to a ghostly outline for 2s. Using a move breaks it.
+  Description: Turn almost invisible for 2s. Using a move ends it.
   AccentKey: 8
   CustomAccentColor: {r: 0.55, g: 0.85, b: 0.85, a: 1}
   Category: 3

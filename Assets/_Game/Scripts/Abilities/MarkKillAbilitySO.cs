@@ -21,7 +21,10 @@ namespace CluckWars.Abilities
 
         public override string DescriptionKey => UiKeys.AbilityMarkKillDesc;
         public override (string name, object value)[] DescriptionArgs() =>
-            new (string, object)[] { ("r", Num(KillRange)) };
+            new (string, object)[] { ("window", Num(WindowSeconds)), ("live", Num(LiveSeconds)), ("r", Num(KillRange)) };
+
+        /// <summary>The seconds in which a press can kill: the window after the arm (the kill lands in WindowSeconds - ArmSeconds).</summary>
+        public float LiveSeconds => Mathf.Max(0f, WindowSeconds - ArmSeconds);
 
         private const string Source = "MarkKill";
 
@@ -29,7 +32,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Hunt";   // UI name (spec D5b); internally still Death Mark
             ShortLabel = "HUNT";
-            Description = "Hunt a rival far from home. Stun them within 6.2m, then press again to pounce and take all they carry.";
+            Description = "Picks a rival to hunt for 4s. In the last 1s, if they are stunned and within 6.2m, press again to pounce and take all their food.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;

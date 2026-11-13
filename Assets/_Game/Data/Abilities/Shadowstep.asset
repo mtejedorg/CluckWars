@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ShadowstepAbilitySO
   DisplayName: Jump
   ShortLabel: JUMP
-  Description: A quick dash forward, straight over walls.
+  Description: "Dash forward, right over walls."
   AccentKey: 6
   CustomAccentColor: {r: 0.4, g: 0.2, b: 0.9, a: 1}
   Category: 3

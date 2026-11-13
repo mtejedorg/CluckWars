@@ -24,7 +24,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Hide";
             ShortLabel = "HIDE";
-            Description = "Fades you to a ghostly outline for 2s. Using a move breaks it.";
+            Description = "Turn almost invisible for 2s. Using a move ends it.";
             Category = AbilityCategory.Utility;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 2f;

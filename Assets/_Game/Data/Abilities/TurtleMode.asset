@@ -14,8 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TurtleModeAbilitySO
   DisplayName: Egg Shell
   ShortLabel: EGG
-  Description: 'Waddle for 1s (slows bounce off), then be an egg for 2s: nothing can touch
-    you. Press again to hatch.'
+  Description: "Walk slowly for 1s (slows can't stop you), then turn into an egg for 2s: nothing can touch you. Press again to come out early."
   AccentKey: 7
   CustomAccentColor: {r: 0.55, g: 0.42, b: 0.25, a: 1}
   Category: 2

@@ -14,8 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
   DisplayName: Hunt
   ShortLabel: HUNT
-  Description: Hunt a rival far from home. Stun them within 6.2m, then press again
-    to pounce and take all they carry.
+  Description: "Picks a rival to hunt for 4s. In the last 1s, if they are stunned and within 6.2m, press again to pounce and take all their food."
   AccentKey: 10
   CustomAccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   Category: 1

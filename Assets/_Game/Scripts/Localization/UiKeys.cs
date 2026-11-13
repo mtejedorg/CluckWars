@@ -86,13 +86,15 @@ namespace CluckWars.Localization
         [UiArgs("r", "pct", "secs")] public const string AbilityDustKickDesc = "ability.dustkick.desc";
         [UiArgs("secs")] public const string AbilityEggShellDesc = "ability.eggshell.desc";
         [UiArgs("r", "pct", "secs")] public const string AbilityFeatherAuraDesc = "ability.featheraura.desc";
+        [UiArgs("r", "pct", "secs")] public const string AbilityFeatherAuraZoneDesc = "ability.featheraura.zone.desc";
+        [UiArgs("r", "pct", "secs")] public const string AbilitySlowDesc = "ability.slow.desc";
         [UiArgs("secs", "pct")] public const string AbilityFeatherTrapDesc = "ability.feathertrap.desc";
         public const string AbilityFeintDesc = "ability.feint.desc";
         [UiArgs("r", "secs")] public const string AbilityGroundQuakeDesc = "ability.groundquake.desc";
         [UiArgs("r", "secs")] public const string AbilityHeadbuttDesc = "ability.headbutt.desc";
         [UiArgs("secs")] public const string AbilityImmovableDesc = "ability.immovable.desc";
         [UiArgs("secs")] public const string AbilityInvisibilityDesc = "ability.invisibility.desc";
-        [UiArgs("r")] public const string AbilityMarkKillDesc = "ability.markkill.desc";
+        [UiArgs("window", "live", "r")] public const string AbilityMarkKillDesc = "ability.markkill.desc";
         public const string AbilityPeckDesc = "ability.peck.desc";
         [UiArgs("mult", "secs")] public const string AbilityQuickDropDesc = "ability.quickdrop.desc";
         [UiArgs("mult", "secs")] public const string AbilityRollPushDesc = "ability.rollpush.desc";

@@ -48,34 +48,36 @@ callout.assassin.weak,"Light load, slow beak."
 glyph.plus,+
 glyph.minus,−
 ability.ambush.desc,Stuns rivals within {r}m for {secs}s.
-ability.wingslam.desc,Stuns every rival within {r}m for {secs}s.
+ability.wingslam.desc,Stun every rival within {r}m for {secs}s.
 ability.bellyflop.desc,"Launch your whole weight forward and land hard, stunning rivals within {r}m for {secs}s."
-ability.cluckshock.desc,Shoves every rival within {r}m away.
+ability.cluckshock.desc,Push every rival within {r}m away.
 ability.divebomb.desc,"Dive forward in a lunge and rob {n} food from every rival you touch."
 ability.doppelganger.desc,Spawns a decoy copy beside you for {secs}s to soak up rival attacks.
 ability.dustkick.desc,Kicks dust backwards: chasers within {r}m slow to {pct}% speed for {secs}s.
 ability.eggshell.desc,"Hide in an egg for {secs} seconds. You can't move, but nobody can push you, stop you or steal your food."
-ability.featheraura.desc,Slows every rival within {r}m to {pct}% speed for {secs}s.
+ability.featheraura.desc,"For {secs}s, rivals within {r}m of you move at {pct}% speed."
+ability.featheraura.zone.desc,Leave a slow patch ({r}m) for {secs}s. Rivals inside move at {pct}% speed.
+ability.slow.desc,Slow every rival within {r}m to {pct}% speed for {secs}s.
 ability.feathertrap.desc,Throws a feather cloud ahead that lasts {secs}s - chickens in it slow to {pct}% speed.
 ability.feint.desc,A hard sidestep. Walls still stop you.
 ability.groundquake.desc,A stomp that leaves everyone within {r}m stuck in place for {secs}s.
 ability.headbutt.desc,Shoves rivals up to {r}m ahead and staggers them for {secs}s.
 ability.immovable.desc,"Plant yourself for {secs}s. You can't be stunned, slowed, stuck or shoved."
-ability.invisibility.desc,Fades you to a ghostly outline for {secs}s. Using a move breaks it.
-ability.markkill.desc,"Hunt a rival far from home. Stun them within {r}m, then press again to pounce and take all they carry."
+ability.invisibility.desc,Turn almost invisible for {secs}s. Using a move ends it.
+ability.markkill.desc,"Picks a rival to hunt for {window}s. In the last {live}s, if they are stunned and within {r}m, press again to pounce and take all their food."
 ability.peck.desc,Take a beakful of food from the pile you are standing at.
 ability.quickdrop.desc,Banks food {mult}x faster for {secs}s - cash in at your base.
 ability.rollpush.desc,"Rolls forward at {mult}x speed for {secs}s, shoving chickens out of the path."
 ability.rootegg.desc,Drops a sticky egg. The first chicken to step on it is stuck for {secs}s.
 ability.ruffle.desc,A burst of pace: {mult}x speed for {secs}s. Enough to close a gap or leave one.
 ability.scrap.desc,Grabs {n} food off the nearest rival within {r}m.
-ability.shadowstep.desc,"A quick dash forward, straight over walls."
+ability.shadowstep.desc,"Dash forward, right over walls."
 ability.smokeroost.desc,"Drops a choking cloud ({r}m, {secs}s): you fade, rivals inside slow to {pct}% speed. Using a move breaks it."
-ability.snatch.desc,Robs {n} food from every rival within {r}m.
+ability.snatch.desc,Take {n} food from every rival within {r}m.
 ability.sneakysteal.desc,Yanks {n} food from the nearest rival within {r}m. Same bird: every {secs}s.
-ability.speedburst.desc,A {secs}s sprint at {mult}x movement speed.
+ability.speedburst.desc,Run {mult}x faster for {secs}s.
 ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food to you and gets knocked away."
-ability.turtlemode.desc,"Waddle for {walk}s (slows bounce off), then be an egg for {egg}s: nothing can touch you. Press again to hatch."
+ability.turtlemode.desc,"Walk slowly for {walk}s (slows can't stop you), then turn into an egg for {egg}s: nothing can touch you. Press again to come out early."
 perk.relentless.line,Your stuns and slows last {out}% longer.
 perk.relentless.detail,"Your stuns and slows last {out}% longer. Stuns, getting stuck and timed slows on you end {in}% sooner."
 perk.bully.line,Moves recharge {pct}% faster.

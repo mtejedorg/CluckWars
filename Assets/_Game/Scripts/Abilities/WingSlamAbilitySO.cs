@@ -28,7 +28,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Stun";
             ShortLabel = "STUN";
-            Description = "Stuns every rival within 5.4m for 1.3s.";
+            Description = "Stun every rival within 5.4m for 1.3s.";
             AllowedClasses = ChickenClassFlags.All;
             StunRadius = 5.4f;
             StunDuration = 1.3f;

@@ -21,7 +21,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Speed";
             ShortLabel = "FAST";
-            Description = "A 1.5s sprint at 1.3x movement speed.";
+            Description = "Run 1.3x faster for 1.5s.";
             Category = AbilityCategory.Utility;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 1.5f;

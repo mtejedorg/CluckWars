@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.CluckShockAbilitySO
   DisplayName: Shove
   ShortLabel: PUSH
-  Description: Shoves every rival within 5.4m away.
+  Description: Push every rival within 5.4m away.
   AccentKey: 3
   CustomAccentColor: {r: 1, g: 0.9, b: 0.1, a: 1}
   Category: 1

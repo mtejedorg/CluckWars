@@ -21,7 +21,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Jump";
             ShortLabel = "JUMP";
-            Description = "A quick dash forward, straight over walls.";
+            Description = "Dash forward, right over walls.";
             Category = AbilityCategory.Utility;
             TerrainTraversal = TerrainTraversal.Blink;
             AllowedClasses = ChickenClassFlags.Warrior | ChickenClassFlags.Fatty | ChickenClassFlags.Assassin;

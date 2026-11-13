@@ -22,7 +22,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Shove";
             ShortLabel = "PUSH";
-            Description = "Shoves every rival within 5.4m away.";
+            Description = "Push every rival within 5.4m away.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.All;
             Duration = 0.5f;

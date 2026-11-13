@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.WingSlamAbilitySO
   DisplayName: Stun
   ShortLabel: STUN
-  Description: Stuns every rival within 5.4m for 1.3s.
+  Description: Stun every rival within 5.4m for 1.3s.
   AccentKey: 2
   CustomAccentColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
   Category: 1
