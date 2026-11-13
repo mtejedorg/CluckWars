@@ -82,7 +82,7 @@ namespace CluckWars.Tests
             string names = string.Join("|", Registries.Select(r => r.property));
             var bad = new Regex($@"foreach\s*\([^)]*\bin\s+[\w.]*\b({names})\b|\b({names})\s*\.\s*(Where|Select|Any|All|First\w*|Last\w*|Count\s*\(|ToList|ToArray|OrderBy\w*|Contains)\b");
             var hits = RuntimeSourceGuardTests.RuntimeFiles()
-                .Where(p => !p.Contains("/Diagnostics/") && !p.Contains("/AbilityLab/"))
+                .Where(p => !IsDevTool(p))
                 .Where(p => bad.IsMatch(RuntimeSourceGuardTests.Code(p))).ToList();
             Assert.IsEmpty(hits, "Iterate a registry by index:\n" + string.Join("\n", hits));
         }
@@ -106,7 +106,9 @@ namespace CluckWars.Tests
             ["Visuals/SurroundHazeSwap.cs"] = (1, "Sync: same one-time discovery of the baked map's SurroundHazeSet, retried once a second until the Map scene is in"),
         };
 
-        private static bool IsDevTool(string path) => path.Contains("/Diagnostics/") || path.Contains("/AbilityLab/");
+        /// <summary>The CluckWars.Diagnostics assembly. Diagnostics/Shared is Core (every layer reads it), so it obeys the rules.</summary>
+        private static bool IsDevTool(string path) =>
+            (path.Contains("/Diagnostics/") && !path.Contains("/Diagnostics/Shared/")) || path.Contains("/AbilityLab/");
 
         [Test]
         public void FindCalls_ExistOnlyInTheListedBootstrapSites_AndTheDevTools()

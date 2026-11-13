@@ -16,7 +16,8 @@ namespace CluckWars.Tests
     /// that is not listed still compiles and still spawns, but its <c>[Networked]</c> properties and RPCs do nothing:
     /// no error anywhere, a dead game at runtime. This guard reads what the weaver leaves behind (attributes, matched
     /// by type NAME so the test never depends on which Fusion assembly declares them) on every game assembly that is
-    /// loaded: <c>Assembly-CSharp</c> today, <c>CluckWars.*</c> after the split.
+    /// loaded: the five <c>CluckWars.*</c> assemblies since the split (phase B), and <c>Assembly-CSharp</c> should a
+    /// script ever fall back into it (<see cref="AssemblyLayoutTests"/> forbids that).
     /// <para>What the weaver writes (<c>Assets/Photon/Fusion/CodeGen/Fusion.CodeGen.cs</c>, <c>ILWeaver.Weave</c>):
     /// <c>NetworkBehaviourWeavedAttribute</c> on every NetworkBehaviour subclass, <c>NetworkStructWeavedAttribute</c>
     /// on every INetworkStruct value type, <c>NetworkInputWeavedAttribute</c> on every INetworkInput value type, and
