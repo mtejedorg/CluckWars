@@ -44,6 +44,30 @@ namespace CluckWars.Tests
             Assert.AreEqual(string.Empty, RpcRejectionLimiter.SuppressedNote(0));
         }
 
+        // ---- the two input-authority copies (the base's depositor, the steal's thief) -----------------------------
+        //
+        // Off the wire they compared the sender with the chicken's INPUT authority. A bot has none (PlayerRef.None), so
+        // a bot whose call arrived off the wire was refused: every steal by a bot from a remote human's chicken, and a
+        // bot's deposit whenever its authority and the base's were on different peers.
+
+        [Test]
+        public void ABotsMaster_SpeaksForTheBot_OffTheWire()
+        {
+            // The bot's facts as the victim's peer sees them: not simulated here, sender = the bot's state authority.
+            Assert.IsTrue(RpcClaim.SpeaksFor(isInvokeLocal: false, simulatedHere: false, senderIsStateAuthority: true));
+        }
+
+        [TestCase("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs", "private bool TryResolveThief(", "resolved")]
+        [TestCase("Assets/_Game/Scripts/Gameplay/PlayerBase.cs", "private bool TryResolveDepositor(", "chicken")]
+        [TestCase("Assets/_Game/Scripts/Gameplay/PlayerBase.cs", "private string DescribeRejection(", "c")]
+        public void ThiefAndDepositor_AreAttributedByTheOneRule(string path, string method, string named)
+        {
+            string body = AssassinExecuteCreditTests.MethodBody(path, method);
+            StringAssert.Contains($"RpcClaim.SenderSpeaksFor({named}, info)", body);
+            StringAssert.DoesNotContain("InputAuthority == info.Source", body,
+                "input authority is None for a bot: its steal from a remote human would be refused again");
+        }
+
         // ---- source guards: the copies must not come back ---------------------------------------------------------
 
         private const string HelperFile = "Assets/_Game/Scripts/Gameplay/RpcClaim.cs";
@@ -62,9 +86,9 @@ namespace CluckWars.Tests
         [Test]
         public void NoFile_ComparesTheSenderWithAnAuthority_OutsideTheHelper()
         {
-            // "<object>.StateAuthority == info.Source", either way round. The match
+            // "<object>.StateAuthority == info.Source" / "InputAuthority == info.Source", either way round. The match
             // authority check (ChickenController.IsFromMatchAuthority) compares with "!=" and is a different rule.
-            var copy = new Regex(@"StateAuthority\s*==\s*info\.Source|info\.Source\s*==\s*\w+(\.\w+)*\.StateAuthority");
+            var copy = new Regex(@"(State|Input)Authority\s*==\s*info\.Source|info\.Source\s*==\s*\w+(\.\w+)*\.(State|Input)Authority");
             Assert.IsEmpty(Hits(copy, HelperFile),
                 "A hand-written 'sender speaks for X' check. Use RpcClaim.SenderSpeaksFor(named, info) (docs/CONVENTIONS.md):\n" +
                 string.Join("\n", Hits(copy, HelperFile)));

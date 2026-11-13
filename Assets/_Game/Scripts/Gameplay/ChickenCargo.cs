@@ -906,16 +906,16 @@ namespace CluckWars.Gameplay
         /// steal with, and checks it was close enough to do so.
         /// </summary>
         /// <remarks>
-        /// <b>Attribution mirrors <c>PlayerBase.TryResolveDepositor</c>, and for the same
-        /// reason.</b> Bots are simulated by the master and carry <c>PlayerRef.None</c> input
-        /// authority, so their steals arrive as a <em>local</em> invocation on that peer rather
-        /// than stamped with an identity. On a local invoke, accept a thief this peer already
-        /// simulates; on a message off the wire, require the thief's input authority to be the
-        /// sender. A remote peer cannot forge <c>IsInvokeLocal</c>.
+        /// <b>Attribution is the one sender rule, <see cref="RpcClaim"/>.</b> On a local invoke, a thief this
+        /// peer already simulates (solo, the master's bots robbing the master's own chicken or each other); off
+        /// the wire, the sender must be the thief's state authority, which for a bot is the master. A remote
+        /// peer cannot forge <c>IsInvokeLocal</c>.
         /// <para>
-        /// <c>Object.StateAuthority</c> is deliberately NOT used: it reports
-        /// <c>[Player:None]</c> in <c>GameMode.Single</c>, which is precisely the wrong answer
-        /// in the mode bots live in (docs/STATE.md, "Design deviations").
+        /// Until A19 the wire branch compared the sender with the thief's <i>input</i> authority, which a bot
+        /// does not have (<c>PlayerRef.None</c>): every steal by a bot from a remote human's chicken was refused
+        /// here, while the same bot's stun on that chicken (state-authority rule, <c>ControlClaimRules</c>)
+        /// landed. <c>Object.StateAuthority</c> reads <c>[Player:None]</c> in <c>GameMode.Single</c>, but there
+        /// every invoke is local and the local branch never reads it.
         /// </para>
         /// </remarks>
         private bool TryResolveThief(NetworkBehaviourId thiefId, in RpcInfo info,
@@ -944,10 +944,7 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            bool attributable = info.IsInvokeLocal
-                ? resolved.Object.HasStateAuthority
-                : resolved.Object.InputAuthority == info.Source;
-            if (!attributable)
+            if (!RpcClaim.SenderSpeaksFor(resolved, info))
             {
                 rejection = $"{resolved.name} is not a chicken {info.Source} is entitled to act for.";
                 return false;

@@ -487,7 +487,7 @@ namespace CluckWars.Gameplay
             {
                 var c = all[i];
                 if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
-                bool attributable = info.IsInvokeLocal ? c.Object.HasStateAuthority : c.Object.InputAuthority == info.Source;
+                bool attributable = RpcClaim.SenderSpeaksFor(c, info);
                 bool allegiance = BaseDepositRules.IsAllegianceMatch(c.HomeCornerIndex, CornerIndex);
                 if (!attributable && !allegiance) continue;
                 float margin = BaseDepositRules.RangeMargin(c.Stats != null ? c.Stats.MoveSpeed : 0f, latency);
@@ -535,15 +535,19 @@ namespace CluckWars.Gameplay
         /// base, stamped to this base's corner, and attributable to the caller.
         /// </summary>
         /// <remarks>
-        /// <b>Bots are why attribution is not just an InputAuthority comparison.</b> Bot chickens
-        /// spawn with <c>PlayerRef.None</c> input authority and are simulated by the master
-        /// (<c>MatchBootstrapper.TrySpawnBots</c>), so a bot's deposit does not arrive stamped with
-        /// the bot's own identity. It arrives as a <em>local</em> invocation on the master, because
-        /// the master is both the bot's state authority and this base's. That is the signal used:
-        /// on a local invoke, accept any chicken this peer already simulates (which covers bots and
-        /// the master's own chicken alike); on a message from the wire, require the chicken's input
-        /// authority to be the sender. A remote peer can never forge <c>IsInvokeLocal</c>, so a
-        /// compromised master still cannot bank food into a base it is not standing at.
+        /// <b>Attribution is the one sender rule, <see cref="RpcClaim"/>.</b> Bot chickens spawn with
+        /// <c>PlayerRef.None</c> input authority and are simulated by the master
+        /// (<c>MatchBootstrapper.TrySpawnBots</c>), so a bot's deposit normally arrives as a <em>local</em>
+        /// invocation on the master, which is both the bot's state authority and this base's: on a local invoke,
+        /// any chicken this peer already simulates is accepted (bots and the master's own chicken alike). Off the
+        /// wire the sender must be the chicken's state authority. A remote peer can never forge
+        /// <c>IsInvokeLocal</c>, so a compromised master still cannot bank food into a base it is not standing at.
+        /// <para>
+        /// Until A19 the wire branch compared the sender with the chicken's <i>input</i> authority. Same peer for a
+        /// human's chicken; a bot has none, so a bot whose flush arrived off the wire (its authority and this base's
+        /// on different peers, as during a master change) was bounced. <c>RPC_AddFood</c> already resolved the
+        /// cargo through the state authority, so the two checks of one call disagreed.
+        /// </para>
         /// </remarks>
         private bool TryResolveDepositor(in RpcInfo info, out ChickenController depositor)
         {
@@ -563,10 +567,7 @@ namespace CluckWars.Gameplay
                 if (chicken.IsDecoy) continue; // a phantom carries no cargo and banks nothing
                 if (!BaseDepositRules.IsAllegianceMatch(chicken.HomeCornerIndex, CornerIndex)) continue;
 
-                bool attributable = info.IsInvokeLocal
-                    ? chicken.Object.HasStateAuthority
-                    : chicken.Object.InputAuthority == info.Source;
-                if (!attributable) continue;
+                if (!RpcClaim.SenderSpeaksFor(chicken, info)) continue;
 
                 float moveSpeed = chicken.Stats != null ? chicken.Stats.MoveSpeed : 0f;
                 if (!BaseDepositRules.IsWithinDepositRange(
