@@ -41,6 +41,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Utility/Peck", order = 4)]
     public sealed class PeckAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Peck;
+
         public override string DescriptionKey => UiKeys.AbilityPeckDesc;
 
         public PeckAbilitySO()

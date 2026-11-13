@@ -354,7 +354,7 @@ namespace CluckWars.Visuals
         public static bool PeckWindowOpen(AbilityController abilities)
         {
             for (int i = 0; i < AbilityController.SlotCount; i++)
-                if (abilities.IsSlotActive(i) && abilities.GetSlot(i) is PeckAbilitySO) return true;
+                if (abilities.IsSlotActive(i) && abilities.GetSlot(i).Is(AbilityJob.Peck)) return true;
             return false;
         }
 

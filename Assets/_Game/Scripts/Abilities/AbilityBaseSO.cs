@@ -1034,6 +1034,33 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual bool EndsOnNextMove => IsStealth;
 
+        // ---- Declared traits (A15) -------------------------------------------------------------------------------
+        // Code outside this folder asks an ability what it does, never which class it is: no "is XxxAbilitySO"
+        // anywhere else (AbilityTraitTests). A new ability answers these and every bot, kit rule, HUD and effect
+        // that keys on the answer picks it up with no edit.
+
+        /// <summary>
+        /// Which of the shipped jobs this ability does (<see cref="AbilityJob"/>), or None. Declared by the class.
+        /// Presentation keys its job-specific beats on it (the shell, the speed streaks, the grab lines), bots and
+        /// kits their rules (a kit needs a Peck; Death Mark needs a stun source).
+        /// </summary>
+        public virtual AbilityJob Job => AbilityJob.None;
+
+        /// <summary>True for a shell that makes the caster steal-proof while it runs (Shield, Egg Shell): a bot raises
+        /// it when a thief closes in.</summary>
+        public virtual bool GrantsStealProof => false;
+
+        /// <summary>For an ability with a timed second phase (<see cref="HasFollowUpPhase"/>): how long that phase
+        /// lasts (the Shield's egg). 0 for everything else.</summary>
+        public virtual float FollowUpPhaseSeconds => 0f;
+
+        /// <summary>
+        /// The stable id of this ability's icon: the key of <c>AbilityIconStyle</c>'s table and of its sprite file
+        /// (<c>Icon_&lt;IconId&gt;.png</c>). The class name by default; a class that is renamed overrides this with
+        /// its old id, and a variant that shares another ability's art returns that ability's id.
+        /// </summary>
+        public virtual string IconId => GetType().Name;
+
         public abstract void OnActivate(AbilityContext ctx);
 
         /// <summary>The end of the active window. Nothing by default: most abilities are a one-shot at activation.

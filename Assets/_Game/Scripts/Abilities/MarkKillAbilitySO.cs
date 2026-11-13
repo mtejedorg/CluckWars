@@ -17,6 +17,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "MarkKill", menuName = "Cluck Wars/Ability/Control/Mark Kill", order = 12)]
     public sealed class MarkKillAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.DeathMark;
+
         public override string DescriptionKey => UiKeys.AbilityMarkKillDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("r", Num(KillRange)) };

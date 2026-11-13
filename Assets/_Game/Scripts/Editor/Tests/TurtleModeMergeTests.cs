@@ -196,7 +196,7 @@ namespace CluckWars.Tests
         {
             // A second press would end it now, so the old "lock when a threat is close" press is gone.
             string bot = Src("Assets/_Game/Scripts/Gameplay/BotController.cs");
-            StringAssert.Contains("if (_abilities.GetSlot(slot) is TurtleModeAbilitySO && _abilities.IsSlotActive(slot)) return;", bot);
+            StringAssert.Contains("if (_abilities.GetSlot(slot).Is(AbilityJob.Shield) && _abilities.IsSlotActive(slot)) return;", bot);
             StringAssert.DoesNotContain("ShouldTurtleLock", bot);
         }
 

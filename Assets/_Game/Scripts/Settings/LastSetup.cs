@@ -104,7 +104,7 @@ namespace CluckWars.Settings
             { problem = $"expected {AbilityController.SlotCount} loadout slots, found {rec.Abilities?.Length ?? 0}"; return false; }
 
             AbilityBaseSO plainPeck = null;
-            foreach (var a in abilities) if (a is PeckAbilitySO) { plainPeck = a; break; }
+            foreach (var a in abilities) if (a.Is(AbilityJob.Peck)) { plainPeck = a; break; }
             PreEquippedLoadout.Resolve(cls, passive, abilities, plainPeck, out var peckSlot, out var signature);
 
             var slots = new AbilityBaseSO[AbilityController.SlotCount];
@@ -121,7 +121,7 @@ namespace CluckWars.Settings
                 // Legal = hand-pickable by this class (never a Peck: that is pre-equip-only), or the
                 // perk's own pre-equip, which is legal by design even when AllowedClasses is None.
                 bool preEquip = found == peckSlot || found == signature;
-                bool pickable = !(found is PeckAbilitySO) && AbilityRegistrySO.IsAllowedFor(found, cls);
+                bool pickable = !(found.Is(AbilityJob.Peck)) && AbilityRegistrySO.IsAllowedFor(found, cls);
                 if (!preEquip && !pickable) { problem = $"slot {i}: '{name}' is not legal for {cls}"; return false; }
                 slots[i] = found;
             }

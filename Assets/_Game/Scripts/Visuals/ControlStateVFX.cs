@@ -194,9 +194,9 @@ namespace CluckWars.Visuals
             var abilitiesObj = _abilities.Object;
             if (abilitiesObj == null || !abilitiesObj.IsValid) return;
 
-            bool speed  = ActiveSlotOf<SpeedBurstAbilitySO>() != AbilityController.InvalidSlot;
-            bool shell  = ActiveSlotOf<TurtleModeAbilitySO>() != AbilityController.InvalidSlot;
-            bool jump   = ActiveSlotOf<ShadowstepAbilitySO>() != AbilityController.InvalidSlot;
+            bool speed  = ActiveSlotOf(AbilityJob.Speed) != AbilityController.InvalidSlot;
+            bool shell  = ActiveSlotOf(AbilityJob.Shield) != AbilityController.InvalidSlot;
+            bool jump   = ActiveSlotOf(AbilityJob.Jump) != AbilityController.InvalidSlot;
             bool immune = _controller.IsControlImmune;
             bool faded  = IsFadedOpacity(_controller.VisualOpacity);
 
@@ -257,10 +257,10 @@ namespace CluckWars.Visuals
             return key;
         }
 
-        private int ActiveSlotOf<T>() where T : AbilityBaseSO
+        private int ActiveSlotOf(AbilityJob job)
         {
             for (int i = 0; i < AbilityController.SlotCount; i++)
-                if (_abilities.GetSlot(i) is T && _abilities.IsSlotActive(i)) return i;
+                if (_abilities.GetSlot(i).Is(job) && _abilities.IsSlotActive(i)) return i;
             return AbilityController.InvalidSlot;
         }
 

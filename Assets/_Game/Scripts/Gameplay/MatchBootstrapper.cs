@@ -412,7 +412,7 @@ namespace CluckWars.Gameplay
 
             int activeSlots = AbilityController.SlotCount;
 
-            var peck = _abilityRegistry.ActiveAbilities.FirstOrDefault(a => a is Abilities.PeckAbilitySO);
+            var peck = _abilityRegistry.ActiveAbilities.FirstOrDefault(a => Abilities.AbilityJobs.Is(a, Abilities.AbilityJob.Peck));
 
             // Sanitise: genuine, class-legal (AllowedClasses, so pre-equip-only None abilities are
             // dropped too), distinct picks, in the order supplied. The pre-equips are then pinned
@@ -423,7 +423,7 @@ namespace CluckWars.Gameplay
                 if (picked.Count >= activeSlots) break;
                 if (a == null || picked.Contains(a)) continue;
                 // Peck is reachable ONLY through the Peck slot, whatever its mask says.
-                if (a is Abilities.PeckAbilitySO || !AbilityRegistrySO.IsAllowedFor(a, cls)) continue;
+                if (Abilities.AbilityJobs.Is(a, Abilities.AbilityJob.Peck) || !AbilityRegistrySO.IsAllowedFor(a, cls)) continue;
                 picked.Add(a);
             }
 
@@ -449,7 +449,7 @@ namespace CluckWars.Gameplay
                         _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s {slotName}-slot ability '{claims[0].name}' " +
                             $"is not legal for {cls} (the {cls} cannot forage) — " +
                             (slotName == "Peck" && peckSlot != null ? "falling back to the plain Peck." : "ignoring it."));
-                    if (slotName == "Signature" && claims.Count > 0 && claims[0] is Abilities.PeckAbilitySO)
+                    if (slotName == "Signature" && claims.Count > 0 && Abilities.AbilityJobs.Is(claims[0], Abilities.AbilityJob.Peck))
                         _log?.Warn(Source, $"ResolveLegalLoadout: {passive.name}'s Signature slot holds Peck '{claims[0].name}' — " +
                             "Peck belongs in the Peck slot; ignoring it.");
                 }
@@ -486,7 +486,7 @@ namespace CluckWars.Gameplay
             if (picked.Count < activeSlots)
             {
                 var fillPool = _abilityRegistry.ActiveAbilities
-                    .Where(a => a != null && !(a is Abilities.PeckAbilitySO) && AbilityRegistrySO.IsAllowedFor(a, cls));
+                    .Where(a => a != null && !(Abilities.AbilityJobs.Is(a, Abilities.AbilityJob.Peck)) && AbilityRegistrySO.IsAllowedFor(a, cls));
                 foreach (var fill in fillPool)
                 {
                     if (picked.Count >= activeSlots) break;
@@ -495,7 +495,7 @@ namespace CluckWars.Gameplay
                 }
             }
 
-            if (!PreEquippedLoadout.ClassMayForage(cls) && picked.RemoveAll(a => a is Abilities.PeckAbilitySO) > 0)
+            if (!PreEquippedLoadout.ClassMayForage(cls) && picked.RemoveAll(a => Abilities.AbilityJobs.Is(a, Abilities.AbilityJob.Peck)) > 0)
             {
                 // Belt and braces: the resolver never yields a Peck for a class that cannot
                 // forage and the sanitiser/backfill skip every Peck, so reaching here means a rule

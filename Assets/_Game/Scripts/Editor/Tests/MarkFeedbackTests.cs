@@ -154,7 +154,7 @@ namespace CluckWars.Tests
         {
             string src = Read("Assets/_Game/Scripts/Input/TouchControlsController.cs");
             StringAssert.Contains("(_markKill[slot] ? MarkHexRules.KillScale(", src);
-            StringAssert.Contains("a is MarkKillAbilitySO", src);
+            StringAssert.Contains("a.Is(AbilityJob.DeathMark)", src);
             StringAssert.Contains("FixedKit.EmitsStun(a)", src);
         }
 

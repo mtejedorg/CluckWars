@@ -11,10 +11,10 @@ namespace CluckWars.Visuals
     public static class SlowAuraRules
     {
         /// <summary>
-        /// The aura radius every layer is drawn at: the asset's own <see cref="FeatherAuraAbilitySO.AuraRadius"/>, the value
+        /// The aura radius every layer is drawn at: the Slow aura's own <see cref="AbilityBaseSO.AimRadius"/> (its AuraRadius), the value
         /// <c>AreaEffectSpec.AuraSlow</c> hands to the zone (so the outline is the real trigger edge). Never a literal.
         /// </summary>
-        public static float Radius(FeatherAuraAbilitySO ability) => ability != null ? ability.AuraRadius : 0f;
+        public static float Radius(AbilityBaseSO ability) => ability != null ? ability.AimRadius : 0f;
 
         /// <summary>Feather spawn-disc radius: inside the edge band, so a feather never starts on the outline.</summary>
         public static float FeatherDiscRadius(float auraRadius) =>

@@ -6,6 +6,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "EggShell", menuName = "Cluck Wars/Ability/Egg Shell", order = 1)]
     public sealed class EggShellAbilitySO : AbilityBaseSO
     {
+        public override bool GrantsStealProof => true;
+
         public override string DescriptionKey => UiKeys.AbilityEggShellDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("secs", Num(Duration)) };

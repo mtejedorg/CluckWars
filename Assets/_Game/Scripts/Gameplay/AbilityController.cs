@@ -506,7 +506,7 @@ namespace CluckWars.Gameplay
         private int FindPeckSlot()
         {
             for (int i = 0; i < SlotCount; i++)
-                if (GetSlot(i) is PeckAbilitySO) return i;
+                if (GetSlot(i).Is(AbilityJob.Peck)) return i;
             return InvalidSlot;
         }
 
@@ -874,7 +874,7 @@ namespace CluckWars.Gameplay
             var mode = _matchConfig != null ? _matchConfig.LoadoutMode : LoadoutMode.Free;   // as MatchBootstrapper.ActiveLoadoutMode
             AbilityBaseSO plainPeck = null;
             if (registry != null && registry.All != null)
-                foreach (var a in registry.All) if (a is PeckAbilitySO) { plainPeck = a; break; }
+                foreach (var a in registry.All) if (a.Is(AbilityJob.Peck)) { plainPeck = a; break; }
 
             // The passive first: the slots are judged against it.
             for (int n = 0; n <= SlotCount; n++)
@@ -1266,7 +1266,7 @@ namespace CluckWars.Gameplay
             // or a peck, and the master heard every bot's cast sound. The animation and the sound are presentation:
             // every peer plays them from the cast event bumped below (ChickenLocalEvents.Cast, observed by
             // ChickenAnimator and HitFeedback).
-            if (!(ability is Abilities.PeckAbilitySO))
+            if (!(Abilities.AbilityJobs.Is(ability, Abilities.AbilityJob.Peck)))
             {
                 if (ability.CastMotion == Abilities.CastArchetype.None)
                 {

@@ -104,7 +104,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static bool IsLegalPreEquip(AbilityBaseSO a, ChickenClass cls) =>
             a != null && !(a is PassiveAbilitySO)
-            && (!(a is PeckAbilitySO) || ClassMayForage(cls));
+            && (!(a.Is(AbilityJob.Peck)) || ClassMayForage(cls));
 
         /// <summary>Non-passive abilities whose Peck-slot column contains <paramref name="subclass"/>, in the order given (registry order). More than one is a conflict.</summary>
         public static List<AbilityBaseSO> PeckSlotClaimants(IEnumerable<AbilityBaseSO> allAbilities, ChickenSubclass subclass) =>
@@ -140,11 +140,11 @@ namespace CluckWars.Gameplay
             var sub = passive != null ? passive.Subclass : ChickenSubclass.None;
             var authoredPeck = PeckSlotClaimants(allAbilities, sub).FirstOrDefault();
             if (IsLegalPreEquip(authoredPeck, cls)) peckSlot = authoredPeck;
-            else if (plainPeck is PeckAbilitySO && IsLegalPreEquip(plainPeck, cls)) peckSlot = plainPeck;
+            else if (plainPeck.Is(AbilityJob.Peck) && IsLegalPreEquip(plainPeck, cls)) peckSlot = plainPeck;
             else peckSlot = null;
 
             var authoredSig = SignatureClaimants(allAbilities, sub).FirstOrDefault();
-            signature = IsLegalPreEquip(authoredSig, cls) && !(authoredSig is PeckAbilitySO) && authoredSig != peckSlot
+            signature = IsLegalPreEquip(authoredSig, cls) && !(authoredSig.Is(AbilityJob.Peck)) && authoredSig != peckSlot
                 ? authoredSig : null;
         }
 
@@ -156,7 +156,7 @@ namespace CluckWars.Gameplay
         public static bool Forages(ChickenClass cls, PassiveAbilitySO passive, IEnumerable<AbilityBaseSO> allAbilities, AbilityBaseSO plainPeck)
         {
             Resolve(cls, passive, allAbilities, plainPeck, out var peckSlot, out _);
-            return peckSlot is PeckAbilitySO;
+            return peckSlot.Is(AbilityJob.Peck);
         }
 
         /// <summary>
@@ -229,13 +229,13 @@ namespace CluckWars.Gameplay
                     $"{who}: Peck slot '{peck.name}' is illegal — the {cls} cannot forage."));
             else peckOk = true;
 
-            foreach (var p in sigs.Where(a => a is PeckAbilitySO))
+            foreach (var p in sigs.Where(a => a.Is(AbilityJob.Peck)))
                 issues.Add(new PreEquipIssue(PreEquipStatus.IllegalSignature, passive, sub,
                     $"{who}: Signature '{p.name}' is a Peck — Peck belongs in the Peck slot."));
 
             if (sig == null)
                 issues.Add(new PreEquipIssue(PreEquipStatus.MissingSignature, passive, sub, $"{who}: no Signature-slot ability."));
-            else if (!(sig is PeckAbilitySO))
+            else if (!(sig.Is(AbilityJob.Peck)))
                 sigOk = true; // a Peck signature was already reported above
 
             // ---- Gameplay-consequence notes (Info; never block) ----
@@ -248,7 +248,7 @@ namespace CluckWars.Gameplay
 
             // A forager whose Peck slot was deliberately filled with something else gets no
             // forced Peck (an EMPTY slot would fall back to it, so that case is not noted).
-            if (peckOk && plainPeck is PeckAbilitySO && ClassMayForage(cls) && !(peck is PeckAbilitySO))
+            if (peckOk && plainPeck.Is(AbilityJob.Peck) && ClassMayForage(cls) && !(peck.Is(AbilityJob.Peck)))
                 issues.Add(new PreEquipIssue(PreEquipStatus.CannotForage, passive, sub,
                     $"{who}: no pre-equipped Peck — this subclass cannot gather food at all (Peck is never hand-picked)."));
 
@@ -293,7 +293,7 @@ namespace CluckWars.Gameplay
 
             if (abilities != null)
                 foreach (var a in abilities)
-                    if (a is PeckAbilitySO && a.AllowedClasses != ChickenClassFlags.None)
+                    if (a.Is(AbilityJob.Peck) && a.AllowedClasses != ChickenClassFlags.None)
                         issues.Add(new PreEquipIssue(PreEquipStatus.PeckIsPickable, null, ChickenSubclass.None,
                             $"{a.name}: a Peck must have AllowedClasses = None (never hand-picked; forced via the Peck slot) but has {a.AllowedClasses}."));
 

@@ -451,13 +451,13 @@ namespace CluckWars.Visuals
         {
             var b = template;
             b.Color = CastBurstColorFor(ability);
-            if (ability is TurtleModeAbilitySO) b.MaxRise = FeedbackTuning.ShellCastBurstMaxRise;
+            if (ability.Is(AbilityJob.Shield)) b.MaxRise = FeedbackTuning.ShellCastBurstMaxRise;
             return b;
         }
 
         /// <summary>I7: root-local emit height of the cast burst: <see cref="FeedbackTuning.ShellCastBurstHeight"/> for the Shield, else <see cref="CastBurstHeight"/>.</summary>
         public static float CastBurstHeightFor(AbilityBaseSO ability) =>
-            ability is TurtleModeAbilitySO ? FeedbackTuning.ShellCastBurstHeight : CastBurstHeight;
+            ability.Is(AbilityJob.Shield) ? FeedbackTuning.ShellCastBurstHeight : CastBurstHeight;
 
         /// <summary>
         /// H12 (E8a): the colour of the 16-particle cast burst. The Shield cast (<see cref="TurtleModeAbilitySO"/>) is drawn in
@@ -465,7 +465,7 @@ namespace CluckWars.Visuals
         /// ring and the hex read <c>AccentColor</c> directly and are untouched.
         /// </summary>
         public static Color CastBurstColorFor(AbilityBaseSO ability) =>
-            ability is TurtleModeAbilitySO ? FeedbackPalette.Current.CreamColor : ability.AccentColor();
+            ability.Is(AbilityJob.Shield) ? FeedbackPalette.Current.CreamColor : ability.AccentColor();
 
         /// <summary>
         /// H12: how many shard pieces a cast throws: <see cref="FeedbackTuning.ShellCastShardCount"/> for the Shield, else 0,
@@ -474,7 +474,7 @@ namespace CluckWars.Visuals
         /// family max even if a hatch lands on the same frame as a cast.
         /// </summary>
         public static int CastShardCount(AbilityBaseSO ability, int liveShards) =>
-            ability is TurtleModeAbilitySO
+            ability.Is(AbilityJob.Shield)
                 ? Mathf.Clamp(ShardMaxParticles - liveShards, 0, FeedbackTuning.ShellCastShardCount)
                 : 0;
 
@@ -773,10 +773,11 @@ namespace CluckWars.Visuals
             var abObj = _abilities != null ? _abilities.Object : null;
             if (abObj == null || !abObj.IsValid || _controller == null) return;
 
-            SpeedBurstAbilitySO speedSO = null;
+            AbilityBaseSO speedSO = null;
             for (int i = 0; i < AbilityController.SlotCount; i++)
             {
-                if (_abilities.GetSlot(i) is SpeedBurstAbilitySO s && _abilities.IsSlotActive(i)) { speedSO = s; break; }
+                var s = _abilities.GetSlot(i);
+                if (s.Is(AbilityJob.Speed) && _abilities.IsSlotActive(i)) { speedSO = s; break; }
             }
             bool active = speedSO != null && !removed;
 
@@ -912,7 +913,7 @@ namespace CluckWars.Visuals
         private bool JumpSlotActive()
         {
             for (int i = 0; i < AbilityController.SlotCount; i++)
-                if (_abilities.GetSlot(i) is ShadowstepAbilitySO && _abilities.IsSlotActive(i)) return true;
+                if (_abilities.GetSlot(i).Is(AbilityJob.Jump) && _abilities.IsSlotActive(i)) return true;
             return false;
         }
 
@@ -1199,7 +1200,7 @@ namespace CluckWars.Visuals
 
             // Shove (D6): the shock ring goes out BEFORE the burst, so when the sparkle family is full it is the burst that
             // loses its last sparkles (a sphere of 16), never the ring that carries the "burst out from me" read.
-            if (ability is CluckShockAbilitySO && !hidden && !ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity))
+            if (ability.Is(AbilityJob.Shove) && !hidden && !ControlStateVFX.IsFadedOpacity(_controller.VisualOpacity))
                 EmitShoveRing(ability.AccentColor());
 
             // The burst needs AccentColor, so an unresolved ability means no burst. None on a hidden bird (A1).

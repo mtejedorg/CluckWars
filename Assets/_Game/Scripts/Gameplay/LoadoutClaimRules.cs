@@ -47,7 +47,7 @@ namespace CluckWars.Gameplay
 
             PreEquippedLoadout.Resolve(cls, passive, pool, plainPeck, out var peckSlot, out var signature);
             if (ability == peckSlot || ability == signature) return true;
-            return !(ability is PeckAbilitySO) && AbilityRegistrySO.IsAllowedFor(ability, cls);
+            return !(ability.Is(AbilityJob.Peck)) && AbilityRegistrySO.IsAllowedFor(ability, cls);
         }
 
         /// <summary>

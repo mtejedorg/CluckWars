@@ -226,7 +226,7 @@ namespace CluckWars.Tests
             Assert.Greater(ring, 0, "the ring is emitted off the cast edge");
             Assert.Less(ring, burst, "the ring goes out before the cast burst so the burst, not the ring, loses sparkles when the family is full");
             string gate = body.Substring(Mathf.Max(0, ring - 200), 200);
-            StringAssert.Contains("CluckShockAbilitySO", gate);
+            StringAssert.Contains("ability.Is(AbilityJob.Shove)", gate);
             StringAssert.Contains("IsFadedOpacity", gate);
         }
     }

@@ -572,12 +572,12 @@ namespace CluckWars.Visuals
             {
                 if (!_abilities.IsSlotActive(i)) continue;
                 var ability = _abilities.GetSlot(i);
-                if (ability is SpeedBurstAbilitySO) speeding = true;
-                else if (ability is TurtleModeAbilitySO turtle)
+                if (ability.Is(AbilityJob.Speed)) speeding = true;
+                else if (ability.Is(AbilityJob.Shield))
                 {
                     shell = true;
-                    eggSeconds = turtle.EggSeconds;
-                    shellRemaining = _abilities.ActiveRemaining01For(i) * turtle.ResolveActiveDuration(_controller);
+                    eggSeconds = ability.FollowUpPhaseSeconds;
+                    shellRemaining = _abilities.ActiveRemaining01For(i) * ability.ResolveActiveDuration(_controller);
                 }
             }
         }

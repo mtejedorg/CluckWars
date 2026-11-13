@@ -38,7 +38,7 @@ namespace CluckWars.AbilityLab
         /// <summary>The lab's class-legality rule: hand-selectable, or a Peck for a class that may forage.</summary>
         private static bool IsLegalFor(AbilityBaseSO ability, ChickenClass cls) =>
             AbilityRegistrySO.IsAllowedFor(ability, cls)
-            || (ability is PeckAbilitySO && PreEquippedLoadout.ClassMayForage(cls));
+            || (ability.Is(AbilityJob.Peck) && PreEquippedLoadout.ClassMayForage(cls));
 
         /// <summary>
         /// Every active (non-passive) ability the lab will offer for <paramref name="cls"/>.

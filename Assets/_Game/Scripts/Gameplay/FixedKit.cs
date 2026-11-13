@@ -44,7 +44,7 @@ namespace CluckWars.Gameplay
                 return problems;
             }
 
-            bool hasPeck = kit.Any(a => a is PeckAbilitySO);
+            bool hasPeck = kit.Any(a => a.Is(AbilityJob.Peck));
             if (PreEquippedLoadout.ClassMayForage(cls) && !hasPeck)
                 problems.Add($"{who}: a {cls} must carry its Peck (food only enters through it).");
             if (!PreEquippedLoadout.ClassMayForage(cls) && hasPeck)
@@ -55,10 +55,10 @@ namespace CluckWars.Gameplay
                 foreach (var a in kit.Where(a => a != null && a.TerrainTraversal != TerrainTraversal.None))
                     problems.Add($"{who}: Speedy kits grant no terrain traversal, but '{a.name}' has {a.TerrainTraversal}.");
 
-            if (passive.Subclass == ChickenSubclass.Assassin_Spoiler && !kit.Any(a => a is MarkKillAbilitySO))
+            if (passive.Subclass == ChickenSubclass.Assassin_Spoiler && !kit.Any(a => a.Is(AbilityJob.DeathMark)))
                 problems.Add($"{who}: the Spoiler kit must hold Hunt (its execute is the class's income).");
             // An execute only qualifies on a stunned target, so the mark without a stun source of its own waits for luck.
-            if (kit.Any(a => a is MarkKillAbilitySO) && !kit.Any(EmitsStun))
+            if (kit.Any(a => a.Is(AbilityJob.DeathMark)) && !kit.Any(EmitsStun))
                 problems.Add($"{who}: Hunt needs a stun source in the same kit (none emits ControlKind.Stun).");
 
             return problems;

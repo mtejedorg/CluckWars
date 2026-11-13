@@ -110,7 +110,7 @@ namespace CluckWars.Tests
         public void TheWindowIsTheShippedPeckSlot()
         {
             string src = Src("FoodPileVisuals.cs");
-            StringAssert.Contains("abilities.IsSlotActive(i) && abilities.GetSlot(i) is PeckAbilitySO", src);
+            StringAssert.Contains("abilities.IsSlotActive(i) && abilities.GetSlot(i).Is(AbilityJob.Peck)", src);
             Assert.IsInstanceOf<PeckAbilitySO>(Peck());
         }
 

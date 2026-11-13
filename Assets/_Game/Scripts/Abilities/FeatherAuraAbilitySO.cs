@@ -45,6 +45,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Feather Aura", order = 10)]
     public sealed class FeatherAuraAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Slow;
+
         public override string DescriptionKey => UiKeys.AbilityFeatherAuraDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("r", Num(AuraRadius)), ("pct", Pct(AuraSlowFactor)), ("secs", Num(Duration)) };

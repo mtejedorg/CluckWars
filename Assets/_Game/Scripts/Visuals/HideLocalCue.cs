@@ -138,7 +138,7 @@ namespace CluckWars.Visuals
             for (int i = 0; i < AbilityController.SlotCount; i++)
             {
                 var a = _abilities.GetSlot(i);
-                if ((a is InvisibilityAbilitySO || a is SmokeRoostAbilitySO) && _abilities.IsSlotActive(i))
+                if (a != null && a.IsStealth && _abilities.IsSlotActive(i))
                     return _abilities.ActiveRemaining01For(i) * a.ResolveActiveDuration(_controller);
             }
             return -1f;

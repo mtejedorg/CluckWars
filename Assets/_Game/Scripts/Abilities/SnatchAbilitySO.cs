@@ -17,6 +17,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Steal/Snatch", order = 7)]
     public sealed class SnatchAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Steal;
+
         public override string DescriptionKey => UiKeys.AbilitySnatchDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("n", Num(StealAmount)), ("r", Num(SnatchRange)) };

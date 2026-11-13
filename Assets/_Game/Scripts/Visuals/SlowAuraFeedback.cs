@@ -228,10 +228,11 @@ namespace CluckWars.Visuals
                     _log?.Error("SlowAuraFeedback", "Slow aura art is not wired on Chicken.prefab (Fx_AuraEdge sprite, Fx_DashedRing texture, shared particle material): the aura will draw incomplete.");
             }
 
-            FeatherAuraAbilitySO aura = null;
+            AbilityBaseSO aura = null;
             for (int i = 0; i < AbilityController.SlotCount; i++)
             {
-                if (_abilities.GetSlot(i) is FeatherAuraAbilitySO s && _abilities.IsSlotActive(i)) { aura = s; break; }
+                var s = _abilities.GetSlot(i);
+                if (s.Is(AbilityJob.Slow) && _abilities.IsSlotActive(i)) { aura = s; break; }
             }
 
             bool removed = _combat != null && _combat.IsRemoved;

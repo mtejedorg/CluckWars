@@ -593,7 +593,7 @@ namespace CluckWars.Gameplay
                 for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
                 {
                     var ability = _abilities.GetSlot(slot);
-                    if (ability is MarkKillAbilitySO && _abilities.IsReady(slot) && ability.IsUsable(_controller) &&
+                    if (ability.Is(AbilityJob.DeathMark) && _abilities.IsReady(slot) && ability.IsUsable(_controller) &&
                         _abilities.BotTryActivate(slot))
                         _log?.Debug(Source, $"{Who} marked a rival (slot {slot}).");
                 }
@@ -628,7 +628,7 @@ namespace CluckWars.Gameplay
                 _log?.Debug(Source, $"{Who} mark {step}: cast slot {stunSlot} ({stunSeconds:0.00} s on {mark.name}, arm in {armLeft:0.00} s).");
             if (step == BotMarkStep.Kill)
                 for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
-                    if (_abilities.GetSlot(slot) is MarkKillAbilitySO && _abilities.BotTryActivate(slot))
+                    if (_abilities.GetSlot(slot).Is(AbilityJob.DeathMark) && _abilities.BotTryActivate(slot))
                     {
                         _log?.Debug(Source, $"{Who} mark Kill: cast slot {slot}.");
                         break;
@@ -663,7 +663,7 @@ namespace CluckWars.Gameplay
             // The Shield under way: its egg starts on its own after the walk, and a second press would END it, so a bot
             // leaves a running Shield alone (Maestro 2026-11-05 simplification; the old second-press lock is gone).
             for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
-                if (_abilities.GetSlot(slot) is TurtleModeAbilitySO && _abilities.IsSlotActive(slot)) return;
+                if (_abilities.GetSlot(slot).Is(AbilityJob.Shield) && _abilities.IsSlotActive(slot)) return;
             if (cargo < BotTactics.StealGuardMinCargo) return;
 
             if (!BotTactics.ShouldStealGuard(cargo, nearest, _controller.IsStealProof)) return;

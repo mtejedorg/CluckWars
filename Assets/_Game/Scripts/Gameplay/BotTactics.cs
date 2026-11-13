@@ -668,11 +668,11 @@ namespace CluckWars.Gameplay
         /// (<c>RPC_TransferAllToBountyBag</c>), which has no nominal amount.
         /// </summary>
         public static bool IsStealer(AbilityBaseSO ability) =>
-            ability != null && (ability.NominalStealAmount > 0f || ability is MarkKillAbilitySO);
+            ability != null && (ability.NominalStealAmount > 0f || ability.Is(AbilityJob.DeathMark));
 
         /// <summary>Is <paramref name="ability"/> a steal-proof shell (Egg Shell, Turtle Mode)?</summary>
         public static bool IsStealShield(AbilityBaseSO ability) =>
-            ability is EggShellAbilitySO || ability is TurtleModeAbilitySO;
+            ability != null && ability.GrantsStealProof;
 
         /// <summary>
         /// Cast a shell when a loaded bot has a stealer in reach. <paramref name="nearestStealerDist"/>

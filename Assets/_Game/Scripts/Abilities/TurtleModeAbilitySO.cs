@@ -23,6 +23,10 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "TurtleMode", menuName = "Cluck Wars/Ability/Turtle Mode", order = 2)]
     public sealed class TurtleModeAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Shield;
+        public override bool GrantsStealProof => true;
+        public override float FollowUpPhaseSeconds => EggSeconds;
+
         public override string DescriptionKey => UiKeys.AbilityTurtleModeDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("walk", Num(WalkSeconds)), ("egg", Num(EggSeconds)) };

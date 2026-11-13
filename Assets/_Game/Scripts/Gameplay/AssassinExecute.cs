@@ -50,7 +50,7 @@ namespace CluckWars.Gameplay
             {
                 if (_abilities != null)
                     for (int i = 0; i < AbilityController.SlotCount; i++)
-                        if (_abilities.GetSlot(i) is MarkKillAbilitySO) return i;
+                        if (_abilities.GetSlot(i).Is(AbilityJob.DeathMark)) return i;
                 return 0;
             }
         }

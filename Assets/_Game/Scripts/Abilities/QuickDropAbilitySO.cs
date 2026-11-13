@@ -31,6 +31,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Utility/Quick Drop", order = 7)]
     public sealed class QuickDropAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Bank;
+
         public override string DescriptionKey => UiKeys.AbilityQuickDropDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("mult", Num(DepositRateMultiplier)), ("secs", Num(Duration)) };

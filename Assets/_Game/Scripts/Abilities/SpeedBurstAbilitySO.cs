@@ -11,6 +11,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "SpeedBurst", menuName = "Cluck Wars/Ability/Speed Burst", order = 0)]
     public sealed class SpeedBurstAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Speed;
+
         public override string DescriptionKey => UiKeys.AbilitySpeedBurstDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("mult", Num(SpeedMultiplier)), ("secs", Num(Duration)) };

@@ -1178,7 +1178,7 @@ namespace CluckWars.UI
             AbilityIconPainter.Paint(view, ab, disc, a =>
             {
                 if (_reportedMissingIcons.Add(a))
-                    _log?.Warn(Source, $"Ability '{a.name}' ({a.GetType().Name}) has no AbilityIconStyle entry; showing its monogram '{AbilityIconStyle.Monogram(a)}'.");
+                    _log?.Warn(Source, $"Ability '{a.name}' ({a.IconId}) has no AbilityIconStyle entry; showing its monogram '{AbilityIconStyle.Monogram(a)}'.");
             });
 
         private static string CategoryLabel(AbilityCategory cat) =>
@@ -1977,7 +1977,7 @@ namespace CluckWars.UI
 
         /// <summary>The Peck (foraging) ability asset, or null if the registry has none.</summary>
         private AbilityBaseSO PeckAbility =>
-            _abilityRegistry?.ActiveAbilities.FirstOrDefault(a => a is PeckAbilitySO);
+            _abilityRegistry?.ActiveAbilities.FirstOrDefault(a => a.Is(AbilityJob.Peck));
 
         /// <summary>True when ANY perk of <paramref name="cls"/> forages (derived from the Peck-slot data
         /// via <see cref="PreEquippedLoadout.ClassForages"/>, so picker and spawner agree).</summary>

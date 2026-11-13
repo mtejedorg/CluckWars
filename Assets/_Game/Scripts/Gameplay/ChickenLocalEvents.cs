@@ -266,7 +266,7 @@ namespace CluckWars.Gameplay
                         var aimed = s.CastAbility != null ? s.CastAbility : _lastCharging;
                         LocalRaise.Invoke(_castListeners, nameof(Cast), Log, _controller,
                             new CastEvent(s.CastSlot, CodeOf(s.CastAbility), CodeOf(aimed), s.CastHitCount,
-                                aimed != null ? aimed.CastMotion : CastArchetype.None, aimed is PeckAbilitySO));
+                                aimed != null ? aimed.CastMotion : CastArchetype.None, aimed.Is(AbilityJob.Peck)));
                     }
                 }
 

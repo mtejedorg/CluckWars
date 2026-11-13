@@ -624,7 +624,7 @@ namespace CluckWars.Visuals
             }
             else
             {
-                if (ability is SnatchAbilitySO) PlayStealWhiff();
+                if (ability.Is(AbilityJob.Steal)) PlayStealWhiff();
                 MarkImmuneTargets(ability);
                 PlayOwnSfx(SfxId.CastWhiff, FeedbackTuning.WhiffSfxVolumeMultiplier);
             }
@@ -668,7 +668,7 @@ namespace CluckWars.Visuals
                 Vector3 casterPos = _controller.transform.position;
                 int found = ability.GatherTargets(_controller, _castTargets);
                 int sparks = Mathf.Min(found, hitCount);
-                bool stealBeat = ability is SnatchAbilitySO;
+                bool stealBeat = ability.Is(AbilityJob.Steal);
                 _grabCount = 0;
                 for (int i = 0; i < sparks; i++)
                 {
@@ -720,7 +720,7 @@ namespace CluckWars.Visuals
                 }
             }
 
-            if (ability is SnatchAbilitySO && canReDeriveTargets) BeginGrabLines(ability.AccentColor());
+            if (ability.Is(AbilityJob.Steal) && canReDeriveTargets) BeginGrabLines(ability.AccentColor());
 
             // Caster's own punch. Gated on HasInputAuthority exactly like ChickenVFX's
             // existing §3.1 every-cast shake — peers must never feel each other's camera.

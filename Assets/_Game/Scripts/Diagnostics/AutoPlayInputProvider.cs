@@ -112,7 +112,7 @@ namespace CluckWars.Diagnostics
             var view = new AutoPlayView { Piles = _piles, Rivals = _rivals };
             var abilities = self.Abilities;
             // Foraging needs a Peck slot (slot 0); the Assassin has none and hunts instead.
-            view.CanForage = abilities != null && abilities.GetSlot(0) is PeckAbilitySO;
+            view.CanForage = abilities != null && abilities.GetSlot(0).Is(AbilityJob.Peck);
 
             // Piles are solid blockers with an elliptical footprint: walk to the rim point (what the bots do) and count
             // as "at the pile" with Peck's own surface-relative reach test - never the centre (unreachable).
@@ -201,7 +201,7 @@ namespace CluckWars.Diagnostics
                 if (slot >= 0) { Press(slot, HoldSeconds); _nextCastAt = now + CastEverySeconds; return; }
             }
 
-            bool peckSlot = abilities.GetSlot(0) is PeckAbilitySO;
+            bool peckSlot = abilities.GetSlot(0).Is(AbilityJob.Peck);
             if (peckSlot && _brain.Goal == AutoPlayGoal.AtPile && _brain.State == AutoPlayState.Forage)
             {
                 if (now >= _nextPeckAt) { Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; PeckPresses++; }
@@ -218,7 +218,7 @@ namespace CluckWars.Diagnostics
                 int slot = _nextSlot;
                 _nextSlot = (_nextSlot + 1) % AbilityController.SlotCount;
                 var ab = abilities.GetSlot(slot);
-                if (ab == null || ab is PeckAbilitySO || slot == ReservedSlot) continue;
+                if (ab == null || ab.Is(AbilityJob.Peck) || slot == ReservedSlot) continue;
                 if (!AutoPlayCasting.Allowed(ab.Category, _brain.Personality.CastsOffense)) continue;
                 Press(slot, HoldSeconds);
                 return;
@@ -230,7 +230,7 @@ namespace CluckWars.Diagnostics
             for (int slot = 0; slot < AbilityController.SlotCount; slot++)
             {
                 var ab = abilities.GetSlot(slot);
-                if (ab == null || ab is PeckAbilitySO || slot == reserved) continue;
+                if (ab == null || ab.Is(AbilityJob.Peck) || slot == reserved) continue;
                 if (!offensiveOnly || AutoPlayCasting.IsOffensive(ab.Category)) return slot;
             }
             return -1;

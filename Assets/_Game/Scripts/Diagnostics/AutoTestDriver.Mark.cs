@@ -68,7 +68,7 @@ namespace CluckWars.Diagnostics
                 return;
             }
 
-            int markSlot = SlotOf<MarkKillAbilitySO>(abilities);
+            int markSlot = SlotOf(abilities, AbilityJob.DeathMark);
             if (!_goLogged && markSlot >= 0 && now - _roundGoAt > 0.1f)
             {
                 _goLogged = true;
@@ -148,7 +148,7 @@ namespace CluckWars.Diagnostics
             {
                 for (int s = 0; s < AbilityController.SlotCount; s++)
                 {
-                    if (!(target.Abilities.GetSlot(s) is TurtleModeAbilitySO)) continue;
+                    if (!(target.Abilities.GetSlot(s).Is(AbilityJob.Shield))) continue;
                     _shellHookAt = Time.realtimeSinceStartup;
                     bool ok = target.Abilities.BotTryActivate(s);
                     _log.Info(Source, $"AutoTest markshots dev-hook: Turtle Mode on bot target {target.name} via BotTryActivate -> {ok}");
@@ -298,10 +298,10 @@ namespace CluckWars.Diagnostics
             _autoPlay.Press(slot, AutoPlayInputProvider.HoldSeconds);
         }
 
-        private static int SlotOf<T>(AbilityController abilities) where T : AbilityBaseSO
+        private static int SlotOf(AbilityController abilities, AbilityJob job)
         {
             for (int s = 0; s < AbilityController.SlotCount; s++)
-                if (abilities.GetSlot(s) is T) return s;
+                if (abilities.GetSlot(s).Is(job)) return s;
             return -1;
         }
 

@@ -146,8 +146,8 @@ namespace CluckWars.Tests
             StringAssert.Contains("CasterStunCountdownRules.TryGetSeconds(", src);
             StringAssert.Contains("CasterStunCountdownRules.Format(", src);
             StringAssert.Contains("ChickenController.ActiveControllers", src);
-            StringAssert.Contains("_stunCastEvents.AbilityOf(_stunCast.AbilityCode) as WingSlamAbilitySO", src);   // the cast event of the local bird (ChickenLocalEvents)
-            StringAssert.Contains("AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken)", src);   // never the bare base stun
+            StringAssert.Contains("var cast = _stunCastEvents.AbilityOf(_stunCast.AbilityCode);", src); StringAssert.Contains("cast.Is(AbilityJob.Stun) ? cast : null", src);   // the cast event of the local bird (ChickenLocalEvents)
+            StringAssert.Contains("AbilityBaseSO.ResolveOutgoingControlSeconds(stun.EmittedControl.Seconds, _localChicken)", src);   // never the bare base stun
             StringAssert.Contains("FeedbackTuning.CanonicalStunColor", src);
 
             // The desktop / pad strip and the touch arc share RefreshCenterMark; the digit is decided before the

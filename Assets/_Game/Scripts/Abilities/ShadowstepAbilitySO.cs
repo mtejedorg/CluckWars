@@ -11,6 +11,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Shadowstep", menuName = "Cluck Wars/Ability/Utility/Shadowstep", order = 11)]
     public sealed class ShadowstepAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Jump;
+
         public override string DescriptionKey => UiKeys.AbilityShadowstepDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             System.Array.Empty<(string, object)>();   // I13: the Jump line carries no numbers (a quick dash, straight over walls)

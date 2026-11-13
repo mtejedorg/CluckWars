@@ -20,6 +20,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "WingSlam", menuName = "Cluck Wars/Ability/Control/Wing Slam", order = 10)]
     public sealed class WingSlamAbilitySO : StunBurstAbilitySO
     {
+        public override AbilityJob Job => AbilityJob.Stun;
+
         public override string DescriptionKey => UiKeys.AbilityWingSlamDesc;
 
         public WingSlamAbilitySO()

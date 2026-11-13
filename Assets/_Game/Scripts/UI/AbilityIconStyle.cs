@@ -105,6 +105,6 @@ namespace CluckWars.UI
         /// <see cref="Monogram"/>).
         /// </summary>
         public static string ClassFor(AbilityBaseSO ability) =>
-            ability != null && ByType.TryGetValue(ability.GetType().Name, out var cls) ? cls : null;
+            ability != null && ByType.TryGetValue(ability.IconId, out var cls) ? cls : null;
     }
 }

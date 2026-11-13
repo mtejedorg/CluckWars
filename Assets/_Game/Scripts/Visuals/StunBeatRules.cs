@@ -53,8 +53,8 @@ namespace CluckWars.Visuals
         /// <summary>Is the drop-off finished?</summary>
         public static bool DropDone(float elapsed, bool reducedMotion) => elapsed >= DropSeconds(reducedMotion);
 
-        /// <summary>The caster arcs are the wing-slam's own swing: only for <see cref="WingSlamAbilitySO"/>, never a Death Mark or Hunt stun.</summary>
-        public static bool WhiffArcsApply(AbilityBaseSO ability) => ability is WingSlamAbilitySO;
+        /// <summary>The caster arcs are the wing-slam's own swing: only for the Stun job (<see cref="AbilityJob.Stun"/>, Wing Slam), never a Death Mark or Hunt stun.</summary>
+        public static bool WhiffArcsApply(AbilityBaseSO ability) => ability.Is(AbilityJob.Stun);
 
         /// <summary>Bonk puff dust count: 4, or 2 under Reduced Motion.</summary>
         public static int BonkCount(bool reducedMotion) =>

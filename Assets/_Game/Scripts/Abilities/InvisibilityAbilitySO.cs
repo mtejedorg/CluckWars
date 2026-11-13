@@ -14,6 +14,8 @@ namespace CluckWars.Abilities
     [CreateAssetMenu(fileName = "Invisibility", menuName = "Cluck Wars/Ability/Invisibility", order = 4)]
     public sealed class InvisibilityAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Hide;
+
         public override string DescriptionKey => UiKeys.AbilityInvisibilityDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("secs", Num(Duration)) };

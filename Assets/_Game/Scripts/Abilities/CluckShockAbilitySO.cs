@@ -12,6 +12,8 @@ namespace CluckWars.Abilities
         menuName = "Cluck Wars/Ability/Control/Cluck Shock", order = 6)]
     public sealed class CluckShockAbilitySO : AbilityBaseSO
     {
+        public override AbilityJob Job => AbilityJob.Shove;
+
         public override string DescriptionKey => UiKeys.AbilityCluckShockDesc;
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("r", Num(ShockRadius)) };

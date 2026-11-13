@@ -986,7 +986,7 @@ namespace CluckWars.Input
             for (int slot = 0; slot < SlotCount; slot++)
             {
                 var a = abilities != null ? SlotAbility(abilities, slot) : null;
-                bool kill = mark.KillHex && a is MarkKillAbilitySO;
+                bool kill = mark.KillHex && a.Is(AbilityJob.DeathMark);
                 if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
                 _markKill[slot] = kill;
                 _markLit[slot] = mark.AmbushLit && FixedKit.EmitsStun(a);
@@ -1016,11 +1016,12 @@ namespace CluckWars.Input
                 if (_stunCastPending)
                 {
                     _stunCastPending = false;
-                    var stun = _stunCastEvents.AbilityOf(_stunCast.AbilityCode) as WingSlamAbilitySO;
+                    var cast = _stunCastEvents.AbilityOf(_stunCast.AbilityCode);
+                    var stun = cast.Is(AbilityJob.Stun) ? cast : null;
                     _stunCastIsWingSlam = stun != null;
                     _stunCastHits = _stunCast.HitCount;
                     _stunCastAt = Time.unscaledTime;   // Fusion timers ignore timeScale, so unscaled time tracks StunRemaining
-                    _stunCastSeconds = stun != null ? AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, _localChicken) : 0f;
+                    _stunCastSeconds = stun != null ? AbilityBaseSO.ResolveOutgoingControlSeconds(stun.EmittedControl.Seconds, _localChicken) : 0f;
                 }
             }
             if (!_stunCastIsWingSlam) return;
@@ -1131,7 +1132,7 @@ namespace CluckWars.Input
             }
 
             // Phase 6 (A6): the auto-chain is running on this Peck hex. Spins; static under Reduced Motion.
-            bool chainOn = abilities != null && abilities.PeckChainActive && equipped is Abilities.PeckAbilitySO;
+            bool chainOn = abilities != null && abilities.PeckChainActive && Abilities.AbilityJobs.Is(equipped, Abilities.AbilityJob.Peck);
             if (refs.Chain != null)
             {
                 if (chainOn != _chainShown[slot])
@@ -1283,11 +1284,11 @@ namespace CluckWars.Input
         {
             int tenths = 0;
             bool egg = false;
-            if (abilities != null && equipped is TurtleModeAbilitySO turtle)
+            if (abilities != null && equipped.Is(AbilityJob.Shield))
             {
                 bool active = abilities.IsSlotActive(slot);
-                float run = active ? abilities.ActiveRemaining01For(slot) * turtle.ResolveActiveDuration(_localChicken) : 0f;
-                egg = EggPhaseHexRules.Resolve(active, run, turtle.EggSeconds, out tenths);
+                float run = active ? abilities.ActiveRemaining01For(slot) * equipped.ResolveActiveDuration(_localChicken) : 0f;
+                egg = EggPhaseHexRules.Resolve(active, run, equipped.FollowUpPhaseSeconds, out tenths);
             }
             _eggTenths[slot] = tenths;
             if (egg == _eggIconShown[slot]) return;
@@ -1340,7 +1341,7 @@ namespace CluckWars.Input
         private bool RefreshCasterStunDigit(int slot, AbilityBaseSO equipped, HexCenterMark mark)
         {
             var label = _slots[slot].CdNum;
-            bool show = _casterStunShow && equipped is WingSlamAbilitySO && mark != HexCenterMark.StunnedCross;
+            bool show = _casterStunShow && equipped.Is(AbilityJob.Stun) && mark != HexCenterMark.StunnedCross;
 
             if (!show)
             {
@@ -1820,8 +1821,8 @@ namespace CluckWars.Input
                 refs.Icon.style.display = hasSprite ? DisplayStyle.Flex : DisplayStyle.None;
                 _appliedIconCls[slot] = cls;
             }
-            if (equipped != null && !hasSprite && _reportedMissingIcons.Add(equipped.GetType().Name))
-                _log?.Warn(Source, $"Ability '{equipped.name}' ({equipped.GetType().Name}) has no AbilityIconStyle entry; " +
+            if (equipped != null && !hasSprite && _reportedMissingIcons.Add(equipped.IconId))
+                _log?.Warn(Source, $"Ability '{equipped.name}' ({equipped.IconId}) has no AbilityIconStyle entry; " +
                                    "its hex shows the short label instead of an icon.");
 
             if (refs.Label != null)

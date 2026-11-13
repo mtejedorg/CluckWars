@@ -410,11 +410,12 @@ namespace CluckWars.Visuals
             for (int i = 0; i < AbilityController.SlotCount; i++)
             {
                 if (!_abilities.IsSlotActive(i)) continue;
-                if (_abilities.GetSlot(i) is TurtleModeAbilitySO turtle)
+                var shield = _abilities.GetSlot(i);
+                if (shield.Is(AbilityJob.Shield))
                 {
                     _activeNow = true;
-                    eggSeconds = turtle.EggSeconds;
-                    remaining = _abilities.ActiveRemaining01For(i) * turtle.ResolveActiveDuration(_controller);
+                    eggSeconds = shield.FollowUpPhaseSeconds;
+                    remaining = _abilities.ActiveRemaining01For(i) * shield.ResolveActiveDuration(_controller);
                     break;
                 }
             }
