@@ -67,6 +67,16 @@ namespace CluckWars.Diagnostics
         private static string F(float v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 
         /// <summary>
+        /// Whether a round start is worth checking in this scene (BL-146). Every check in <see cref="CheckRoundStart"/> -
+        /// home corner, cargo zero, the timer, the bot count - describes a match, and a live <c>PlayerBase</c> is what says
+        /// one exists: <c>GameManager</c> resets four of them before the round goes Active, while the Ability Lab
+        /// deliberately spawns none (<c>AbilityLabBootstrapper</c>: "no PlayerBase is ever spawned", which is what keeps
+        /// its held match inert). A positive condition rather than a scene-name blacklist, so any future lab or harness
+        /// without a match is covered without being named.
+        /// </summary>
+        public static bool RoundStartIsCheckable(int liveBaseCount) => liveBaseCount > 0;
+
+        /// <summary>
         /// Round start (+0.5 s): every chicken near its home corner, no cargo, no cooldowns, no control state, no running
         /// ability; every base at 0; every pile at its authored amount; the match timer at the configured duration; 3 bots
         /// in solo and none in a shared session; and nothing the last round placed is still alive (B10): no ability zone

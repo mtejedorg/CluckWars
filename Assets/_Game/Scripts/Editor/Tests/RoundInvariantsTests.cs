@@ -125,6 +125,29 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, RoundOrdinal.Next(0, false, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.Active));
         }
 
+        // ---- BL-146: the round-start check only runs where a match exists ----------------------------------------------
+
+        private const string ProbePath = "Assets/_Game/Scripts/Diagnostics/InvariantProbe.cs";
+
+        [Test]
+        public void RoundStart_IsCheckable_OnlyWhereABaseStands()
+        {
+            Assert.IsFalse(RoundInvariants.RoundStartIsCheckable(0), "the Ability Lab spawns no PlayerBase: there is no match to check");
+            Assert.IsTrue(RoundInvariants.RoundStartIsCheckable(1));
+            Assert.IsTrue(RoundInvariants.RoundStartIsCheckable(4), "a real round has four");
+        }
+
+        [Test]
+        public void TheProbe_GatesTheRoundStartCheck_OnAMatch_NotOnASceneName()
+        {
+            string probe = TestSources.ReadClass(ProbePath);
+            StringAssert.Contains("RoundInvariants.RoundStartIsCheckable(_bases.Count)", probe,
+                "CheckStart must gate on a live base, the positive condition");
+            StringAssert.DoesNotContain("AbilityLab.unity", probe);
+            StringAssert.DoesNotContain("SceneManager", probe,
+                "BL-146 is fixed by asking whether a match exists, never by naming or sniffing the scene");
+        }
+
         // ---- BL-145: the aura exclusion rule ---------------------------------------------------------------------------
 
         /// <summary>Feeds <paramref name="frames"/> settled frames at one excuse, past the settle window.</summary>

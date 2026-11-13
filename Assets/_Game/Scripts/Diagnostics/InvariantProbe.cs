@@ -187,6 +187,18 @@ namespace CluckWars.Diagnostics
 
         private void CheckStart(GameManager gm)
         {
+            // BL-146: every round-start invariant describes a match, and a live PlayerBase is what says one exists. The
+            // Ability Lab holds a GameManager Active with no base, no bots and a 3600 s clock, so all four failed there on
+            // every load and made each lab session read as broken. Skipped out loud, so a real match that somehow lost its
+            // bases still says something.
+            FillBases();
+            if (!RoundInvariants.RoundStartIsCheckable(_bases.Count))
+            {
+                _log?.Info(Source, $"Invariant round-start skipped round={_round}: no PlayerBase in this scene, so there is " +
+                    "no match to check (the Ability Lab spawns none).");
+                return;
+            }
+
             _chickens.Clear();
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
@@ -224,8 +236,7 @@ namespace CluckWars.Diagnostics
                     IsBot = c.IsBot,
                 });
             }
-            FillBases();
-            _piles.Clear();
+            _piles.Clear();                 // the bases were filled at the top, by the checkable gate
             var piles = FoodPile.ActivePiles;
             for (int i = 0; i < piles.Count; i++)
             {
