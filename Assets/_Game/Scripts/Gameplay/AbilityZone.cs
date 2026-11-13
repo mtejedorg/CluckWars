@@ -262,7 +262,7 @@ namespace CluckWars.Gameplay
             {
                 // The zone and its caster reach this peer in the same snapshot, so the caster has moved at most its
                 // drift over the zone authority's latency (0 on the authority, which spawns inside the caster's tick).
-                float latency = HasStateAuthority ? 0f : ExecuteRules.RemoteLatency((float)Runner.GetPlayerRtt(Object.StateAuthority));
+                float latency = HasStateAuthority ? 0f : ChickenCombat.PeerLatency(Runner, Object.StateAuthority);
                 _seen.HasCasterAtSpawn = true;
                 _seen.CasterAtSpawn = caster.transform.position;
                 _seen.CasterDriftSpeed = ChickenCargo.DriftSpeed(caster);

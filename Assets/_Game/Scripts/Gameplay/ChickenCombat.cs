@@ -303,7 +303,15 @@ namespace CluckWars.Gameplay
 
         /// <summary>The shared form, for receivers that are not a ChickenCombat (ChickenController's control RPCs, F4).</summary>
         internal static float SenderLatency(NetworkRunner runner, in RpcInfo info) =>
-            info.IsInvokeLocal || runner == null ? 0f : ExecuteRules.RemoteLatency((float)runner.GetPlayerRtt(info.Source));
+            info.IsInvokeLocal ? 0f : PeerLatency(runner, info.Source);
+
+        /// <summary>
+        /// A remote peer's latency for allowances: its RTT floored and capped (<see cref="ExecuteRules.RemoteLatency"/>).
+        /// The ONLY read of <c>Runner.GetPlayerRtt</c> in gameplay code: the raw value is 0 for a remote player in
+        /// Shared Mode (measured 2026-11-13), so a margin built on it is no margin at all.
+        /// </summary>
+        internal static float PeerLatency(NetworkRunner runner, PlayerRef peer) =>
+            runner == null ? 0f : ExecuteRules.RemoteLatency((float)runner.GetPlayerRtt(peer));
 
         // Victim-side, local, never replicated: when this chicken's authority first and last saw each
         // attacker's replicated MarkedTarget name it. Last lets an execute whose mark was cleared in the

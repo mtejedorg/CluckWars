@@ -941,9 +941,9 @@ namespace CluckWars.Gameplay
 
             if (_stealBoundsResolved)
             {
-                // A local invocation has no wire time; asking for a remote player's RTT would be
-                // meaningless (and Source may be None).
-                float latency = info.IsInvokeLocal ? 0f : (float)Runner.GetPlayerRtt(info.Source);
+                // A local invocation has no wire time; a remote one gets the floored and capped latency (the raw
+                // RTT reads 0 for a remote player in Shared Mode, which left an honest steal at the edge of reach no margin).
+                float latency = ChickenCombat.SenderLatency(Runner, info);
                 float margin = StealRules.RangeMargin(DriftSpeed(resolved) + DriftSpeed(_controller), latency);
 
                 if (!StealRules.IsWithinStealRange(
