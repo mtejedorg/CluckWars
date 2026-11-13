@@ -1549,6 +1549,29 @@ namespace CluckWars.Visuals
         /// <summary>Authored height of every class model (m at root scale 1: the 1.6 m capsule) and how far the comb may peek above the egg.</summary>
         public const float ShellModelHeight = 1.6f;
         public const float ShellBodyTopAllowance = 0.10f;
+
+        // ---- The bird vanishes inside the egg (Maestro 2026-11-13) --------------------------------------
+        // The egg is per-class off the size stat and capped, so the biggest classes do not fit it: their body
+        // clipped through the shell. Rather than resize anything, the body fades out along the same tuck ramp
+        // and is gone the moment the shell seals, then fades back in out of the shards. Every fraction below is
+        // OF ITS OWN PHASE (ShellCloseSeconds / ShellOpenSeconds, or their Reduced twins), so the fade can
+        // never outlast the phase that drives it, whatever the class or the motion preference.
+
+        /// <summary>Fraction of the close phase over which the body fades out. 0.60 = <see cref="ShellCloseDropSeconds"/> /
+        /// <see cref="ShellCloseSeconds"/>: the bird is fully gone exactly when the cap seats and the egg seals.</summary>
+        public const float ShellBodyFadeOutFraction = 0.60f;
+
+        /// <summary>Fraction of the open phase the body stays fully hidden for, so the hatch reads as the shell breaking
+        /// FIRST (cap pop, shards, yolk, cap feathers) and the bird appearing out of it, never before it.</summary>
+        public const float ShellBodyFadeInDelayFraction = 0.35f;
+
+        /// <summary>Fraction of the open phase the body fades back in over. Delay + this is 0.85 &lt; 1: the bird is fully
+        /// visible before the open phase hands back to <c>GoOff</c>, never after it.</summary>
+        public const float ShellBodyFadeInFraction = 0.50f;
+
+        /// <summary>At or above this conceal the bird counts as sealed in: <c>ChickenVisuals</c> disables the body renderers
+        /// outright rather than trusting a dithered ghost at alpha 0 to clip every pixel.</summary>
+        public const float ShellBodySealedConceal = 0.999f;
         /// <summary>Identity ring at alpha 1.0 for this long on the close edge.</summary>
         public const float ShellRingFlashSeconds = 0.20f;
         /// <summary>Idle: wobble about the base, breathing, last-moments jitter.</summary>

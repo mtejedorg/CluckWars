@@ -106,6 +106,36 @@ namespace CluckWars.Visuals
             Mathf.Min(FeedbackTuning.ShellBodyTuckFor(cls),
                 (EggWorldHeight(classScale) / Mathf.Max(0.01f, classScale) + FeedbackTuning.ShellBodyTopAllowance) / FeedbackTuning.ShellModelHeight);
 
+        /// <summary>
+        /// How far the body is concealed over the CLOSE phase: 0 at the start, 1 once
+        /// <see cref="FeedbackTuning.ShellBodyFadeOutFraction"/> of the phase has passed — by construction the moment the cap
+        /// seats and the egg seals. Smoothstepped so it rides the same shape as the tuck instead of reading as a cut.
+        /// </summary>
+        /// <remarks>Taken as a fraction of the phase it belongs to, so it is identical for every class and for Reduced Motion
+        /// (which only shortens the phase), and can never outlast it.</remarks>
+        public static float CloseConceal01(float stateT, float closeSeconds)
+        {
+            if (closeSeconds <= 0f) return 1f;
+            float span = closeSeconds * FeedbackTuning.ShellBodyFadeOutFraction;
+            if (span <= 0f) return 1f;
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(stateT / span));
+        }
+
+        /// <summary>
+        /// How far the body is still concealed over the OPEN phase: fully hidden for the first
+        /// <see cref="FeedbackTuning.ShellBodyFadeInDelayFraction"/> of it (the cap pops, the shards and yolk fly, the cap
+        /// feathers climb), then back to 0 over <see cref="FeedbackTuning.ShellBodyFadeInFraction"/> — finished before the
+        /// phase ends, so the bird is whole by the time the shell is gone and never appears before it has broken.
+        /// </summary>
+        public static float OpenConceal01(float stateT, float openSeconds)
+        {
+            if (openSeconds <= 0f) return 0f;
+            float delay = openSeconds * FeedbackTuning.ShellBodyFadeInDelayFraction;
+            float span = openSeconds * FeedbackTuning.ShellBodyFadeInFraction;
+            if (span <= 0f) return stateT < delay ? 1f : 0f;
+            return 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((stateT - delay) / span));
+        }
+
         /// <summary>Fraction of the egg phase already elapsed, from the slot's remaining seconds.</summary>
         public static float EggElapsed01(float remainingSeconds, float eggSeconds) =>
             eggSeconds <= 0f ? 1f : Mathf.Clamp01(1f - remainingSeconds / eggSeconds);
@@ -166,6 +196,9 @@ namespace CluckWars.Visuals
         private ChickenVFX _vfx;
         private CharacterController _cc;
         private ChickenWorldBars _bars;
+        private ChickenVisuals _visuals;      // the one body-opacity path (ghost fade + renderer toggle), shared with Invisibility
+        private bool _missingVisualsReported;
+        private float _bodyConceal;           // 0 the bird draws, 1 it is sealed inside the egg (Maestro 2026-11-13)
         private float _bodyScale = 1f;
         private float _bodySink;              // E1a: world metres the bird sinks into the egg, eased with the tuck
         private float _bodySqueezeZ = 1f;     // E1a: front-back squeeze (model local z), eased with the tuck
@@ -240,6 +273,7 @@ namespace CluckWars.Visuals
             _vfx = GetComponent<ChickenVFX>();
             _cc = GetComponent<CharacterController>();
             _bars = GetComponent<ChickenWorldBars>();   // read-only: the identity colour for the stripe
+            _visuals = GetComponent<ChickenVisuals>();  // the body's opacity / renderer owner
             BuildShell();
             BuildPresets();
         }
@@ -247,6 +281,7 @@ namespace CluckWars.Visuals
         private void OnDisable()
         {
             if (_animator != null) { _animator.ExtraRollDegrees = 0f; _animator.ExtraUniformScale = 1f; _animator.ExtraZScale = 1f; _animator.ExtraYOffset = 0f; }
+            SetBodyConceal(0f);
             _bodyScale = 1f;
             _bodySink = 0f;
             _bodySqueezeZ = 1f;
@@ -521,6 +556,9 @@ namespace CluckWars.Visuals
             _cupRise = 1f;
             _cupYScale = 1f;
             _capSeatFactor = 1f;
+            // A peer that starts observing mid-egg (the seeding pass) hides the bird on the spot: it is already sealed in,
+            // so there is no fade to replay and nothing to see fading.
+            SetBodyConceal(1f);
             _crack = Crack01(EggElapsed01(remaining, eggSeconds));
             PushBlock();
         }
@@ -563,6 +601,34 @@ namespace CluckWars.Visuals
             _audio.TryPlaySFX(open ? SfxId.ShellOpen : SfxId.ShellClose);
         }
 
+        /// <summary>The body conceal this shell currently asks for: 0 the bird draws, 1 it is sealed in (test/diagnostic seam).</summary>
+        public float BodyConceal => _bodyConceal;
+
+        /// <summary>
+        /// Hands the body conceal to <see cref="ChickenVisuals"/>, which owns every way a chicken body stops being drawn
+        /// (the shared dithered ghost for the fade, the renderers for the sealed stretch). Local presentation, derived from the
+        /// same replicated phase as the shell itself, so it is identical on the owner's screen and on every remote peer.
+        /// </summary>
+        private void SetBodyConceal(float conceal01)
+        {
+            float c = Mathf.Clamp01(conceal01);
+            if (_visuals == null)
+            {
+                // A wiring bug, not a game state: without it the bird stays visible and clips through its own egg.
+                if (!_missingVisualsReported && c > 0f)
+                {
+                    _missingVisualsReported = true;
+                    SelfInject.Ensure(this, _log != null);
+                    _log?.Error(Source, name + ": no ChickenVisuals sibling; the bird cannot be hidden inside its Egg Shell " +
+                                        "(re-add ChickenVisuals to Chicken.prefab).");
+                }
+                _bodyConceal = c;
+                return;
+            }
+            _bodyConceal = c;
+            _visuals.SetShellConcealment(c);
+        }
+
         private void ResetPose()
         {
             _cupRise = 0f; _cupYScale = 1f; _capSeatFactor = 1f; _capLift = _capDrift = _capTumble = 0f; _capScale = 1f;
@@ -576,6 +642,7 @@ namespace CluckWars.Visuals
         {
             _state = State.Off;
             ResetPose();
+            SetBodyConceal(0f);
             _crack = 0f;
             _stripeAlpha = 1f;
             PushBlock();   // F2: the renderers carry a clean block while off, so nothing re-shows a stale crack web
@@ -636,6 +703,21 @@ namespace CluckWars.Visuals
                     break;
                 default: tuck01 = 0f; break;
             }
+            // The bird itself disappears into the egg and comes back out of the hatch (Maestro 2026-11-13). The egg is capped
+            // per class, so the larger classes never fit it and used to clip through the shell; hiding the body is the fix that
+            // changes no size. The ramps ride the same phases as the tuck above, so the fade and the squash read as one move.
+            switch (_state)
+            {
+                case State.Close:
+                    SetBodyConceal(CloseConceal01(_stateT, _reduced ? FeedbackTuning.ShellCloseReducedSeconds : FeedbackTuning.ShellCloseSeconds));
+                    break;
+                case State.Idle: SetBodyConceal(1f); break;
+                case State.Open:
+                    SetBodyConceal(OpenConceal01(_stateT, _reduced ? FeedbackTuning.ShellOpenReducedSeconds : FeedbackTuning.ShellOpenSeconds));
+                    break;
+                default: SetBodyConceal(0f); break;
+            }
+
             var cls = _controller.Class;   // Tick only runs after ReadShell found the object valid
             _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x, cls), tuck01);
             _bodySink = FeedbackTuning.ShellBodySinkFor(cls) * tuck01;

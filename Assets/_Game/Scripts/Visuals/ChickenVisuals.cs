@@ -23,6 +23,11 @@ namespace CluckWars.Visuals
     /// <c>_BaseColor.a</c> of the pixels) and swapped back to the cached originals when it returns.
     /// One ghost twin per original material, shared by every chicken — never a per-chicken or
     /// per-frame instance. Below <see cref="GhostShadowOpacityThreshold"/> shadow casting is also off.</para>
+    ///
+    /// <para><b>Sealed in the egg (2026-11-13).</b> <c>ChickenShellVisuals</c> pushes a conceal ramp through
+    /// <see cref="SetShellConcealment"/>: the same ghost fade carries the bird out as the Egg Shell closes and back in as it
+    /// hatches, and for the sealed stretch between them the body renderers are switched off outright. This is the one reason a
+    /// bird is hidden from its OWN player as well — the Invisibility floor is applied first and is not weakened.</para>
     /// </summary>
     public sealed class ChickenVisuals : MonoBehaviour
     {
@@ -60,6 +65,11 @@ namespace CluckWars.Visuals
         private bool                _warmupGhost;
         private ILogService         _log;
 
+        // Egg Shell: 0 = the bird draws normally, 1 = it is sealed inside the egg and draws nothing at all.
+        private float _shellConceal;
+        private Renderer[] _hiddenRenderers;   // non-null exactly while the body renderers are forced off
+        private bool[]     _savedEnabled;
+
         private MaterialPropertyBlock _propertyBlock;
         private Color _currentTint = Color.white;
         private Color _lastPushedColor = Color.white;
@@ -86,6 +96,42 @@ namespace CluckWars.Visuals
 
         /// <summary>True while the body renders with the ghost material (test/diagnostic seam).</summary>
         public bool IsGhosted => _ghostedRenderers != null;
+
+        /// <summary>How far the Egg Shell has concealed this bird: 0 visible, 1 sealed in (test/diagnostic seam).</summary>
+        public float ShellConcealment => _shellConceal;
+
+        /// <summary>True while the body renderers are switched off because the bird is sealed inside its egg.</summary>
+        public bool IsBodyHidden => _hiddenRenderers != null;
+
+        /// <summary>
+        /// The Egg Shell's conceal ramp (<c>ChickenShellVisuals</c>): 0 draws the bird normally, 1 removes it entirely.
+        /// It multiplies whatever opacity is otherwise in effect, so the bird fades out along the shell's own close ramp,
+        /// is gone for the whole sealed stretch, and fades back in out of the hatch.
+        /// </summary>
+        /// <remarks>
+        /// <b>Why this bypasses the local floor.</b> <see cref="HiddenVisibilityRules.AlphaFor(float, bool)"/> floors your OWN
+        /// bird at <see cref="FeedbackTuning.LocalHiddenOpacityFloor"/> so an invisible player can still see where they are.
+        /// Inside the egg that floor is exactly the bug Maestro reported: a half-visible Fatty clipping out of its own shell.
+        /// The egg is its own reason to hide, not a change to that rule — the floor is applied first and unchanged (Invisibility
+        /// and Smoke Roost are untouched), and the conceal multiplies the result afterwards. Nothing is lost to the player:
+        /// the egg, its identity stripe, the cracks and the countdown are all still drawn at their position.
+        ///
+        /// <b>Why renderers, not just alpha.</b> The ghost (<c>Chicken Ghost Lit</c>) is a dithered opaque clip; at alpha 0 a
+        /// pixel surviving the dither, or a shadow, would still give the bird away inside a shell it does not fit. Alpha carries
+        /// the transitions (where the ghost is doing exactly what it already does for Invisibility), and the sealed stretch
+        /// — conceal at or above <see cref="FeedbackTuning.ShellBodySealedConceal"/> — switches the body renderers off outright.
+        ///
+        /// Local presentation only: no [Networked] value, no RPC. Applied immediately rather than at the next
+        /// <c>LateUpdate</c> so it cannot lag a frame behind the shell when the two components run in either order.
+        /// </remarks>
+        public void SetShellConcealment(float conceal01)
+        {
+            float c = Mathf.Clamp01(conceal01);
+            if (Mathf.Approximately(c, _shellConceal)) return;
+            _shellConceal = c;
+            ApplySealedState();      // first, and independent of the controller: the seal must hold even before Spawned
+            Refresh(force: true);
+        }
 
         /// <summary>
         /// Arena warm-up override (<c>ArenaReadinessDriver</c>): forces the ghost twin materials on while the overview renders, so the
@@ -135,7 +181,10 @@ namespace CluckWars.Visuals
             // Hand the old renderers their own materials back before the set changes; PushColor below
             // re-applies the ghost to the new set if the bird is still faded.
             RestoreOriginalMaterials();
+            // Hand the old set its own enabled flags back too, then re-seal the new set below if the bird is still in its egg.
+            ShowBodyRenderers();
             _renderers = modelRoot.GetComponentsInChildren<Renderer>(includeInactive: true);
+            ApplySealedState();
             // Re-apply whatever colour was last in effect so a model attached after a tint /
             // opacity / dead-state change does not spawn in default white.
             PushColor(_lastPushedColor);
@@ -169,28 +218,21 @@ namespace CluckWars.Visuals
             PushColor(effective);
         }
 
-        private void LateUpdate()
+        private void LateUpdate() => Refresh(force: false);
+
+        private void Refresh(bool force)
         {
             if (_controller == null) return;
 
-            // VisualOpacity is [Networked] (defaults to 0). Treat 0 as "not yet
-            // replicated" → fall back to fully visible. The Invisibility ability
-            // uses 0.2 (ghostly outline) rather than full 0, so this is safe in
-            // practice and prevents a 1-frame flicker on proxies between Spawned
-            // and the first snapshot.
-            float raw = _controller.VisualOpacity;
-            float effective = raw > 0f ? raw : 1f;
-            // A1: your own hidden bird never fades below FeedbackTuning.LocalHiddenOpacityFloor; remote peers see the
-            // real VisualOpacity. Only the floor is taken from the rule: a remote bird's tells hide, its body does not.
-            if (ControlStateVFX.IsFadedOpacity(raw) && IsLocalBird())
-                effective = HiddenVisibilityRules.AlphaFor(raw, isLocal: true);
+            float conceal = _shellConceal;
+            float effective = BodyAlpha(_controller.VisualOpacity, IsLocalBird(), conceal);
 
             bool isStunned  = _combat != null && _combat.IsRemoved;
             bool stunChanged = isStunned != _isDeadState;
 
             // Repaint when opacity changes (Invisibility ability) OR stun state flips.
             // Cheap: only writes the property block when something actually changed.
-            if (!Mathf.Approximately(effective, _lastAppliedOpacity) || stunChanged)
+            if (force || !Mathf.Approximately(effective, _lastAppliedOpacity) || stunChanged)
             {
                 _lastAppliedOpacity = Mathf.Clamp01(effective);
                 _isDeadState        = isStunned;
@@ -201,7 +243,7 @@ namespace CluckWars.Visuals
                     // Grey-out + semi-transparent ghost so dead chickens read as
                     // clearly non-interactive without disappearing entirely.
                     c   = Color.Lerp(_currentTint, new Color(0.4f, 0.4f, 0.4f, 1f), 0.75f);
-                    c.a = FeedbackTuning.ExecutedOutAlpha;   // executed: gone until it respawns at its base
+                    c.a = FeedbackTuning.ExecutedOutAlpha * (1f - conceal);   // executed: gone until it respawns at its base
                 }
                 else
                 {
@@ -210,6 +252,68 @@ namespace CluckWars.Visuals
                 }
                 PushColor(c);
             }
+
+            ApplySealedState();
+        }
+
+        /// <summary>
+        /// Switches the body renderers off for the sealed stretch of the egg and back on when it ends. Transition-only:
+        /// the state bool means nothing is touched on a frame that did not cross the threshold. Each renderer's own
+        /// <c>enabled</c> is saved and handed back, so a renderer that was already off for its own reasons stays off.
+        /// </summary>
+        private void ApplySealedState()
+        {
+            bool sealIn = _shellConceal >= FeedbackTuning.ShellBodySealedConceal;
+            if (sealIn == (_hiddenRenderers != null)) return;
+            if (sealIn) HideBodyRenderers();
+            else        ShowBodyRenderers();
+        }
+
+        private void HideBodyRenderers()
+        {
+            var renderers = _renderers;
+            if (renderers == null) return;
+            _savedEnabled = new bool[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var r = renderers[i];
+                if (r == null) continue;
+                _savedEnabled[i] = r.enabled;
+                r.enabled = false;
+            }
+            _hiddenRenderers = renderers;
+        }
+
+        private void ShowBodyRenderers()
+        {
+            if (_hiddenRenderers == null) return;
+            for (int i = 0; i < _hiddenRenderers.Length; i++)
+            {
+                var r = _hiddenRenderers[i];
+                if (r == null) continue;
+                r.enabled = _savedEnabled[i];
+            }
+            _hiddenRenderers = null;
+            _savedEnabled    = null;
+        }
+
+        /// <summary>
+        /// The alpha the body draws at. One place, pure, so the three rules that meet here are checkable:
+        /// <list type="bullet">
+        /// <item><paramref name="raw"/> is <c>VisualOpacity</c>, [Networked] and defaulting to 0, so 0 means "not yet replicated" and draws fully
+        /// visible, never invisible (Invisibility uses 0.2, so this is safe and kills a 1-frame proxy flicker).</item>
+        /// <item>A1: your OWN faded bird never drops below <see cref="FeedbackTuning.LocalHiddenOpacityFloor"/>; a remote
+        /// peer sees the real opacity (only the floor comes from the rule — a remote bird's tells hide, its body does not).</item>
+        /// <item>The Egg Shell conceal multiplies whatever the first two produced, which is how the egg hides the bird from
+        /// every peer INCLUDING its owner without touching that floor. See <see cref="SetShellConcealment"/>.</item>
+        /// </list>
+        /// </summary>
+        public static float BodyAlpha(float raw, bool isLocal, float shellConceal01)
+        {
+            float effective = raw > 0f ? raw : 1f;
+            if (ControlStateVFX.IsFadedOpacity(raw) && isLocal)
+                effective = HiddenVisibilityRules.AlphaFor(raw, isLocal: true);
+            return effective * (1f - Mathf.Clamp01(shellConceal01));
         }
 
         private bool IsLocalBird()
