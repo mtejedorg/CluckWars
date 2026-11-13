@@ -1,0 +1,24 @@
+{
+    "name": "CluckWars.App",
+    "rootNamespace": "",
+    "references": [
+        "GUID:45df57eb56cfbd14dad5a77bea7617b7",
+        "GUID:87b21cf353d40f14b8561d39f6c4d950",
+        "GUID:31cabc847855ab147b9b118496d831c6",
+        "GUID:9d721cf44c339e74393ec4c768321187",
+        "GUID:1baf1ffff1031e948b3b228ab3453251",
+        "GUID:0d8beb7f090555447a6cf5ce9e54dbb4",
+        "GUID:fe25561d224ed4743af4c60938a59d0b",
+        "GUID:5540e30183c82e84b954c033c388e06c",
+        "GUID:37e17ffe38d86ae48bc3207e83ffef88"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

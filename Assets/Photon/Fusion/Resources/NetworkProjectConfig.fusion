@@ -70,7 +70,8 @@
         "Fusion.Addons.FSM",
         "CluckWars.Gameplay",
         "CluckWars.Presentation",
-        "CluckWars.Diagnostics"
+        "CluckWars.Diagnostics",
+        "CluckWars.App"
     ],
     "UseSerializableDictionary": true,
     "NullChecksForNetworkedProperties": true,
