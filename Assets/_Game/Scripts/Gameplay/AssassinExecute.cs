@@ -363,8 +363,7 @@ namespace CluckWars.Gameplay
                 _log?.Warn(Source, $"{name}: rejected RPC_RefundShelledKill - no live chicken resolves from {victimId}.");
                 return;
             }
-            bool attributable = victim != _controller &&
-                (info.IsInvokeLocal ? victim.Object.HasStateAuthority : victim.Object.StateAuthority == info.Source);
+            bool attributable = victim != _controller && RpcClaim.SenderSpeaksFor(victim, info);
             if (!attributable || _stats == null || !_stats.TryCancelKillCredit(victimId))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_RefundShelledKill from {info.Source} - " +

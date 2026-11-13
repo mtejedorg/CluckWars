@@ -1652,8 +1652,7 @@ namespace CluckWars.Gameplay
         }
 
         // One rejection line per sender per 2 s, shared by every chicken (as ChickenCombat's execute rejections).
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter ControlRejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter ControlRejectionLimiter = new RpcRejectionLimiter();
 
         /// <summary>
         /// Judges a control claim and logs a refusal. True only for an accepted claim.
@@ -1674,14 +1673,14 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            if (ControlRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+            if (ControlRejectionLimiter.Allow(info.Source, out string held))
                 _log?.Warn(Source, $"{name}: rejected {rpc}(" + (knockback ? string.Empty : $"seconds={seconds:0.00}, ") +
                     (kind == ControlKind.Slow ? $"factor={factor:0.00}, " : string.Empty) +
                     $"caster={(caster != null ? caster.name : casterId.ToString())}) from {info.Source} ({verdict}) - " +
                     (knockback && verdict == ControlClaimRules.Verdict.OutOfRange
                         ? $"the caster is further than any ability in the pool reaches ({ceiling.MaxReach:0.00} m + slack)."
                         : ControlClaimRules.Describe(verdict, kind, ceiling)) +
-                    (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                    held);
             return false;
         }
 
@@ -1720,11 +1719,7 @@ namespace CluckWars.Gameplay
                 claim.CasterResolved = true;
                 claim.CasterIsVictim = caster == this;
                 claim.CasterIsDecoy = caster.IsDecoy;
-                // Local invoke: the caster is simulated here (solo, bots, the master's own chicken).
-                // Off the wire: the sender must be the caster's state authority (a bot's is the master).
-                claim.SenderSpeaksForCaster = info.IsInvokeLocal
-                    ? caster.Object.HasStateAuthority
-                    : caster.Object.StateAuthority == info.Source;
+                claim.SenderSpeaksForCaster = RpcClaim.SenderSpeaksFor(caster, info);
 
                 // A local invoke has no wire time; a remote one is floored and capped (ExecuteRules).
                 // Two ticks cover the cast resolving a tick before the RPC is applied.

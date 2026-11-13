@@ -582,15 +582,6 @@ namespace CluckWars.Gameplay
                 "ability is listed in its All array.");
         }
 
-        /// <summary>
-        /// True when the sender of an RPC may speak for <paramref name="owner"/>: on a local invoke the owner is
-        /// simulated here (solo, bots, the master's own objects); off the wire the sender is its state authority.
-        /// A remote peer cannot forge <c>IsInvokeLocal</c>.
-        /// </summary>
-        private static bool SpeaksFor(NetworkBehaviour owner, in RpcInfo info) =>
-            owner != null && owner.Object != null && owner.Object.IsValid &&
-            (info.IsInvokeLocal ? owner.Object.HasStateAuthority : owner.Object.StateAuthority == info.Source);
-
         /// <summary>Puts arriving food into the hold: the cargo up to its free room, the rest into the bounty bag.</summary>
         private void AddToHold(float amount)
         {
@@ -603,17 +594,15 @@ namespace CluckWars.Gameplay
         public float MaxPeck => Abilities.PeckAbilitySO.AmountFor(_controller);
 
         // One "settled without an open request" line per owner per 2 s (a stall produces a burst of them).
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter LateSettleLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter ResetRejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter LateSettleLimiter = new RpcRejectionLimiter();
+        private static readonly RpcRejectionLimiter ResetRejectionLimiter = new RpcRejectionLimiter();
 
         private void WarnLateSettle(string rpc, in RpcInfo info, string owner, ushort requestId, float credited)
         {
-            if (!LateSettleLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held)) return;
+            if (!LateSettleLimiter.Allow(info.Source, out string held)) return;
             _log?.Warn(Source, $"{name}: {rpc} #{requestId} from {owner} matched no open request (expired or overwritten); " +
                 $"the sender is its state authority, so {credited:0.00} was honoured, capped at one request's worth." +
-                (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                held);
         }
 
         /// <summary>
@@ -639,7 +628,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_SettlePeck(float amount, NetworkBehaviourId pileId, ushort requestId, RpcInfo info = default)
         {
-            if (Runner == null || !Runner.TryFindBehaviour(pileId, out FoodPile pile) || !SpeaksFor(pile, info))
+            if (Runner == null || !Runner.TryFindBehaviour(pileId, out FoodPile pile) || !RpcClaim.SenderSpeaksFor(pile, info))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_SettlePeck({amount:0.00}) from {info.Source} - {pileId} is not a pile it speaks for.");
                 return;
@@ -795,7 +784,7 @@ namespace CluckWars.Gameplay
         private void ReportRefusalToSender(NetworkBehaviourId thiefId, ushort requestId, in RpcInfo info)
         {
             if (Runner == null || !Runner.TryFindBehaviour(thiefId, out ChickenController named)) return;
-            if (named == _controller || !SpeaksFor(named, info)) return;
+            if (named == _controller || !RpcClaim.SenderSpeaksFor(named, info)) return;
             ReportSteal(named, 0f, requestId);
         }
 
@@ -804,7 +793,7 @@ namespace CluckWars.Gameplay
         /// actually drained for request <paramref name="requestId"/> (0 when the steal was refused or the load was gone).
         /// </summary>
         /// <remarks>
-        /// Honoured only when the sender is entitled to speak for the named victim (<see cref="SpeaksFor"/>: a bot
+        /// Honoured only when the sender is entitled to speak for the named victim (<see cref="RpcClaim"/>: a bot
         /// victim is owned by the master) and only against the open request it names, which is closed: a report
         /// cannot be sent without a steal having been asked for, and it is worth at most what was asked. Strict on
         /// purpose, unlike the pile and base reports: the sender is any client that owns a chicken.
@@ -813,7 +802,7 @@ namespace CluckWars.Gameplay
         public void RPC_SettleSteal(float amount, NetworkBehaviourId victimId, ushort requestId, RpcInfo info = default)
         {
             if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) ||
-                victim == _controller || !SpeaksFor(victim, info))
+                victim == _controller || !RpcClaim.SenderSpeaksFor(victim, info))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_SettleSteal({amount:0.00}) from {info.Source} - {victimId} is not a victim it speaks for.");
                 return;
@@ -850,7 +839,7 @@ namespace CluckWars.Gameplay
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_SettleDeposit(float amount, bool banked, NetworkBehaviourId baseId, ushort requestId, RpcInfo info = default)
         {
-            if (Runner == null || !Runner.TryFindBehaviour(baseId, out PlayerBase playerBase) || !SpeaksFor(playerBase, info))
+            if (Runner == null || !Runner.TryFindBehaviour(baseId, out PlayerBase playerBase) || !RpcClaim.SenderSpeaksFor(playerBase, info))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_SettleDeposit({amount:0.00}, banked={banked}) from {info.Source} - {baseId} is not a base it speaks for.");
                 return;
@@ -1131,8 +1120,7 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            bool attributable = victim != _controller &&
-                (info.IsInvokeLocal ? victim.Object.HasStateAuthority : victim.Object.StateAuthority == info.Source);
+            bool attributable = victim != _controller && RpcClaim.SenderSpeaksFor(victim, info);
             if (!attributable)
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_CreditExecuteLoot({amount:0.00}) from {info.Source} - {victim.name} is not a victim it speaks for.");
@@ -1172,9 +1160,7 @@ namespace CluckWars.Gameplay
                 return false;
             }
 
-            bool attributable = info.IsInvokeLocal
-                ? execute.Object.HasStateAuthority
-                : execute.Object.StateAuthority == info.Source;
+            bool attributable = RpcClaim.SenderSpeaksFor(execute, info);
             if (!attributable)
             {
                 rejection = $"{execute.name} is not a chicken {info.Source} is entitled to act for.";
@@ -1252,9 +1238,9 @@ namespace CluckWars.Gameplay
         {
             if (!ChickenController.IsFromMatchAuthority(info, out string rejection))
             {
-                if (ResetRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                if (ResetRejectionLimiter.Allow(info.Source, out string held))
                     _log?.Warn(Source, $"{name}: rejected RPC_ResetForNewMatch from {info.Source} — {rejection}" +
-                        (held > 0 ? $" (+{held} more held back)" : string.Empty));
+                        held);
                 return;
             }
 

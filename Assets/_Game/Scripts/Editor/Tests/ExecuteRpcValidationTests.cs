@@ -388,8 +388,8 @@ namespace CluckWars.Tests
             Assert.Greater(remove, reject);
 
             string judgeBody = AssassinExecuteCreditTests.MethodBody(ChickenCombatPath, "private ExecuteRules.RemovalVerdict JudgeRemoval(");
-            StringAssert.Contains("attacker.Object.StateAuthority == info.Source", judgeBody, "off the wire: the attacker's state authority");
-            StringAssert.Contains("attacker.Object.HasStateAuthority", judgeBody, "local invoke (solo, bots, master): simulated here");
+            StringAssert.Contains("claim.SenderSpeaksForAttacker = RpcClaim.SenderSpeaksFor(attacker, info);", judgeBody,
+                "the one sender rule (A19): local invoke = simulated here, off the wire = the attacker's state authority");
             StringAssert.Contains("execute.MarkedTarget == _controller.Id", judgeBody);
             StringAssert.Contains("_controller.IsStunned", judgeBody);
             StringAssert.Contains("ExecuteRules.EvaluateRemoval(claim)", judgeBody);
@@ -407,8 +407,9 @@ namespace CluckWars.Tests
                 "RPC_CreditKill is RpcSources.All; without RpcInfo it cannot tell who is reporting.");
 
             string body = AssassinExecuteCreditTests.MethodBody(MatchStatsPath, "public void RPC_CreditKill(");
-            int sender = body.IndexOf("victim.Object.StateAuthority == info.Source", StringComparison.Ordinal);
-            int local  = body.IndexOf("victim.Object.HasStateAuthority", StringComparison.Ordinal);
+            // One rule for both branches (A19): local invoke = simulated here, off the wire = the state authority.
+            int sender = body.IndexOf("RpcClaim.SenderSpeaksFor(victim, info)", StringComparison.Ordinal);
+            int local  = sender;
             int judge  = body.IndexOf("ExecuteRules.EvaluateKillCredit(_pendingKills", StringComparison.Ordinal);
             int count  = body.IndexOf("Kills++", StringComparison.Ordinal);
             Assert.Greater(sender, 0);

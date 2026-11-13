@@ -231,10 +231,10 @@ namespace CluckWars.Gameplay
             }
             if (verdict != ExecuteRules.RemovalVerdict.Accepted)
             {
-                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                if (RejectionLimiter.Allow(info.Source, out string held))
                     _log?.Warn(Source, $"{name}: rejected RPC_ExecuteRemoval(attacker={attackerName}, " +
                         $"duration={duration:0.00}) from {info.Source} ({verdict}) - {ExecuteRules.Describe(verdict)}" +
-                        (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                        held);
                 return;
             }
 
@@ -247,8 +247,7 @@ namespace CluckWars.Gameplay
         }
 
         // One rejection line per sender per 2 s, shared by every chicken (as PlayerBase's deposit rejections).
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter RejectionLimiter = new RpcRejectionLimiter();
 
         /// <summary>Gathers what this (the victim's) authority can see about a removal claim and judges it.</summary>
         private ExecuteRules.RemovalVerdict JudgeRemoval(NetworkBehaviourId attackerId, float duration, in RpcInfo info,
@@ -267,9 +266,7 @@ namespace CluckWars.Gameplay
                 claim.AttackerResolved = true;
                 claim.AttackerIsVictim = attacker == this;
                 claim.AttackerIsDecoy = attackerController != null && attackerController.IsDecoy;
-                claim.SenderSpeaksForAttacker = info.IsInvokeLocal
-                    ? attacker.Object.HasStateAuthority
-                    : attacker.Object.StateAuthority == info.Source;
+                claim.SenderSpeaksForAttacker = RpcClaim.SenderSpeaksFor(attacker, info);
                 claim.AttackerHasExecute = execute != null;
                 if (execute != null)
                 {
@@ -425,9 +422,9 @@ namespace CluckWars.Gameplay
         {
             if (!ChickenController.IsFromMatchAuthority(info, out string rejection))
             {
-                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                if (RejectionLimiter.Allow(info.Source, out string held))
                     _log?.Warn(Source, $"{name}: rejected RPC_ResetForNewMatch from {info.Source} — {rejection}" +
-                        (held > 0 ? $" (+{held} more held back)" : string.Empty));
+                        held);
                 return;
             }
 

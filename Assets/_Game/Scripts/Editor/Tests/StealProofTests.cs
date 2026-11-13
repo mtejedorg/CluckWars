@@ -116,9 +116,10 @@ namespace CluckWars.Tests
             StringAssert.Contains("SpeaksFor(victim, info)", body);
             StringAssert.Contains("_requests.SettleSteal(victimId, requestId, amount", body);
 
-            string speaks = Body(Src("Gameplay/ChickenCargo.cs"), "private static bool SpeaksFor(", 600);
-            StringAssert.Contains("owner.Object.StateAuthority == info.Source", speaks, "off the wire: the owner's state authority");
-            StringAssert.Contains("owner.Object.HasStateAuthority", speaks, "local invoke: simulated here");
+            // The rule itself is RpcClaim's (A19): local invoke = simulated here, off the wire = the state authority.
+            Assert.IsTrue(RpcClaim.SpeaksFor(isInvokeLocal: true, simulatedHere: true, senderIsStateAuthority: false));
+            Assert.IsTrue(RpcClaim.SpeaksFor(isInvokeLocal: false, simulatedHere: false, senderIsStateAuthority: true));
+            Assert.IsFalse(RpcClaim.SpeaksFor(isInvokeLocal: false, simulatedHere: true, senderIsStateAuthority: false));
             Assert.IsNull(typeof(ChickenCargo).GetMethod("RPC_RefundRefusedSteal"), "the optimistic credit and its refund are back");
         }
 

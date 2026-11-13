@@ -930,17 +930,16 @@ namespace CluckWars.Gameplay
         }
 
         // One refusal line per owning peer per 2 s, shared by every chicken (as the control-claim rejections).
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter LoadoutRejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter LoadoutRejectionLimiter = new RpcRejectionLimiter();
 
         private void WarnRefusedLoadout(int index, AbilityBaseSO claimed, ChickenClass cls, LoadoutMode mode, AbilityBaseSO fallback)
         {
             var owner = Object.StateAuthority;
-            if (!LoadoutRejectionLimiter.Allow(owner.RawEncoded, Time.realtimeSinceStartup, out int held)) return;
+            if (!LoadoutRejectionLimiter.Allow(owner, out string held)) return;
             _log?.Warn(Source, $"{name}: rejected replicated loadout from {owner} - '{claimed.name}' is not legal in " +
                 $"{LoadoutEntryName(index)} for a {cls} (mode {mode}); this peer uses " +
                 $"{(fallback != null ? $"'{fallback.name}'" : "what it already had")} instead." +
-                (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                held);
         }
 
         private static string LoadoutEntryName(int index) => index == PassiveCodeIndex ? "the passive" : $"slot {index}";

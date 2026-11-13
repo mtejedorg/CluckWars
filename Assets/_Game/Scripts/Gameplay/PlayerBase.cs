@@ -445,13 +445,13 @@ namespace CluckWars.Gameplay
             {
                 // Rate-limited per caller (a parked chicken flushes 4x a second) and detailed: the HOST's view of the base
                 // and of every chicken that could have been the depositor, so one line tells which check failed.
-                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                if (RejectionLimiter.Allow(info.Source, out string held))
                     _log?.Warn(Source, $"{name}: rejected RPC_AddFood({amount:0.00}) from {info.Source} — " +
                         $"no chicken that caller is entitled to speak for is standing at corner " +
                         $"{CornerIndex} with a matching HomeCornerIndex" +
                         (cargo == null ? $" (and {depositorCargoId} is not a cargo that caller owns, so nothing is sent back)" : string.Empty) +
                         $". {DescribeRejection(info)}" +
-                        (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                        held);
                 cargo?.RPC_SettleDeposit(amount, banked: false, Id, requestId);
                 return;
             }
@@ -464,14 +464,12 @@ namespace CluckWars.Gameplay
         /// <summary>The cargo a flush names, if the sender may speak for it (local invoke: simulated here; off the wire: its state authority). Null otherwise.</summary>
         private ChickenCargo ResolveSenderCargo(NetworkBehaviourId cargoId, in RpcInfo info)
         {
-            if (Runner == null || !Runner.TryFindBehaviour(cargoId, out ChickenCargo cargo) ||
-                cargo == null || cargo.Object == null || !cargo.Object.IsValid) return null;
-            bool speaksFor = info.IsInvokeLocal ? cargo.Object.HasStateAuthority : cargo.Object.StateAuthority == info.Source;
-            return speaksFor ? cargo : null;
+            if (Runner == null || !Runner.TryFindBehaviour(cargoId, out ChickenCargo cargo)) return null;
+            return RpcClaim.SenderSpeaksFor(cargo, info) ? cargo : null;
         }
 
         // One detailed rejection line per caller per 2 s (shared by all bases: a caller rejected at one base is the story).
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter = new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter RejectionLimiter = new RpcRejectionLimiter();
 
         /// <summary>
         /// The host's side of a rejection, read-only: this base's position / radius and, for every non-decoy chicken that is

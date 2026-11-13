@@ -62,8 +62,7 @@ namespace CluckWars.Gameplay
             ExecuteRules.NewKillCreditLedger<NetworkBehaviourId>();
 
         // One rejection line per sender per 2 s, shared by every chicken.
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter RejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter RejectionLimiter = new RpcRejectionLimiter();
 
         private ILogService _log;
 
@@ -135,18 +134,16 @@ namespace CluckWars.Gameplay
                 claim.VictimResolved = true;
                 claim.VictimIsSelf = victim.Object == Object;
                 claim.VictimIsDecoy = victim.IsDecoy;
-                claim.SenderSpeaksForVictim = info.IsInvokeLocal
-                    ? victim.Object.HasStateAuthority
-                    : victim.Object.StateAuthority == info.Source;
+                claim.SenderSpeaksForVictim = RpcClaim.SenderSpeaksFor(victim, info);
             }
 
             var verdict = ExecuteRules.EvaluateKillCredit(_pendingKills, claim, victimId, Time.unscaledTime);
             if (verdict != ExecuteRules.KillCreditVerdict.Accepted)
             {
-                if (RejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+                if (RejectionLimiter.Allow(info.Source, out string held))
                     _log?.Warn(Source, $"{name}: rejected RPC_CreditKill(victim={victimName}) from {info.Source} " +
                         $"({verdict}) - {ExecuteRules.Describe(verdict)}" +
-                        (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                        held);
                 return;
             }
 

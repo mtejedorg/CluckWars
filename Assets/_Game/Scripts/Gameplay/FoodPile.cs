@@ -473,8 +473,7 @@ namespace CluckWars.Gameplay
         public void RPC_Drain(float amount, NetworkBehaviourId peckerCargoId, ushort requestId, RpcInfo info = default)
         {
             if (Runner == null || !Runner.TryFindBehaviour(peckerCargoId, out ChickenCargo pecker) ||
-                pecker == null || pecker.Object == null || !pecker.Object.IsValid ||
-                !(info.IsInvokeLocal ? pecker.Object.HasStateAuthority : pecker.Object.StateAuthority == info.Source))
+                !RpcClaim.SenderSpeaksFor(pecker, info))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_Drain({amount:0.00}) from {info.Source} - {peckerCargoId} is not a chicken it speaks for.");
                 return;
@@ -495,17 +494,16 @@ namespace CluckWars.Gameplay
                     _log.Verbose(Source, $"{name}: drained {actual:0.00} → {Amount:0.0}/{MaxAmount} (floor {DrainFloor:0.0}).");
                 }
             }
-            else if (!inReach && DrainRejectionLimiter.Allow(info.Source.RawEncoded, Time.realtimeSinceStartup, out int held))
+            else if (!inReach && DrainRejectionLimiter.Allow(info.Source, out string held))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_Drain({amount:0.00}) from {info.Source} - {pecker.name} is {distance:0.0} m from the pile, " +
-                    $"past its {_collectReach:0.0} m reach plus drift." + (held > 0 ? $" (+{held} similar suppressed)" : string.Empty));
+                    $"past its {_collectReach:0.0} m reach plus drift." + held);
             }
 
             pecker.RPC_SettlePeck(actual, Id, requestId);
         }
 
         // One out-of-reach line per sender per 2 s, shared by every pile.
-        private static readonly CluckWars.Diagnostics.PerKeyRateLimiter DrainRejectionLimiter =
-            new CluckWars.Diagnostics.PerKeyRateLimiter(2f);
+        private static readonly RpcRejectionLimiter DrainRejectionLimiter = new RpcRejectionLimiter();
     }
 }

@@ -116,8 +116,9 @@ namespace CluckWars.Tests
                 "RPC_CreditExecuteLoot must stay an RPC targeted at the assassin's StateAuthority.");
 
             string body = MethodBody(ChickenCargoPath, "public void RPC_CreditExecuteLoot(");
-            int sender  = body.IndexOf("victim.Object.StateAuthority == info.Source", StringComparison.Ordinal);
-            int local   = body.IndexOf("victim.Object.HasStateAuthority", StringComparison.Ordinal);
+            // One rule for both branches (A19): local invoke = simulated here, off the wire = the state authority.
+            int sender  = body.IndexOf("RpcClaim.SenderSpeaksFor(victim, info)", StringComparison.Ordinal);
+            int local   = sender;
             int consume = body.IndexOf("StealRules.TryResolveExecuteLoot(_pendingExecutes, victimId", StringComparison.Ordinal);
             int bank    = body.IndexOf("BountyBag += allowed", StringComparison.Ordinal);
 

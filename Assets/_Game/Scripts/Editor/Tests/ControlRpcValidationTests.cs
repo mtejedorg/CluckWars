@@ -628,8 +628,8 @@ namespace CluckWars.Tests
             }
 
             string judgeBody = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.Verdict JudgeControl(");
-            StringAssert.Contains("caster.Object.StateAuthority == info.Source", judgeBody, "off the wire: the caster's state authority");
-            StringAssert.Contains("caster.Object.HasStateAuthority", judgeBody, "local invoke (solo, bots, master): simulated here");
+            StringAssert.Contains("claim.SenderSpeaksForCaster = RpcClaim.SenderSpeaksFor(caster, info);", judgeBody,
+                "the one sender rule (A19): local invoke = simulated here, off the wire = the caster's state authority");
             StringAssert.Contains("ScanRootZones(caster, v,", judgeBody, "a root from a far caster is judged against its own zones");
             StringAssert.Contains("ControlClaimRules.Evaluate(claim, ceiling)", judgeBody);
 

@@ -222,8 +222,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("_log?.Warn", rpc.Substring(resolve, zero - resolve));
 
             string guard = Body(cargo, "private bool TryResolveExecutor(", 1800);
-            StringAssert.Contains("execute.Object.HasStateAuthority", guard);
-            StringAssert.Contains("execute.Object.StateAuthority == info.Source", guard);
+            StringAssert.Contains("RpcClaim.SenderSpeaksFor(execute, info)", guard, "the one sender rule (A19)");
             // Mark AND stun, each current or recorded recently by the victim (CW-230: KillReady outlives the stun).
             StringAssert.Contains("ExecuteRules.HasMarkEvidence(execute.MarkedTarget == _controller.Id, markSeen, sinceMark, latency)",
                 AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs", "private bool TryResolveExecutor("));
