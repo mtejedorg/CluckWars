@@ -401,8 +401,7 @@ namespace CluckWars.Diagnostics
                     if (c == null || c.Object == null || !c.Object.IsValid || c.IsDecoy || c.Id == z.OwnerChicken) continue;
                     if (c.Combat != null && c.Combat.IsRemoved) continue;
                     var p = c.transform.position;
-                    float dx = p.x - center.x, dz = p.z - center.z;
-                    bool deep = RoundInvariants.IsDeepInsideAura(Mathf.Sqrt(dx * dx + dz * dz), radius);
+                    bool deep = RoundInvariants.IsDeepInsideAura(Planar.Distance(p, center), radius);
                     var key = (id, c.Object.Id.Raw);
                     bool known = _auraVictims.TryGetValue(key, out var v);
                     if (!known && !deep) continue;   // never deep inside: no record

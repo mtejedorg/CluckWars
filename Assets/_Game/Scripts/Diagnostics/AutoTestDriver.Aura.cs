@@ -78,7 +78,7 @@ namespace CluckWars.Diagnostics
                         return;
                     }
                     if (rival == null) return;
-                    float d = PlanarDistance(self.transform.position, rival.transform.position);
+                    float d = Planar.Distance(self.transform.position, rival.transform.position);
                     var aura = abilities.GetSlot(_auraSlot);
                     if (aura == null || !AutoAuraRules.ShouldCast(d, aura.AimRadius, abilities.IsReady(_auraSlot))) return;
                     _autoPlay.Press(_auraSlot, AutoPlayInputProvider.HoldSeconds);
@@ -94,7 +94,7 @@ namespace CluckWars.Diagnostics
                     {
                         // merge.ps1 keys on this line: once it is logged, some peer must prove a remote victim snared.
                         _log.Info(Source, Inv($"AutoTest autoaura: cast {_auraAbility} (slot {_auraSlot}) into {VictimLabel()} at ") +
-                            Inv($"d={PlanarDistance(self.transform.position, _auraVictim != null ? _auraVictim.transform.position : self.transform.position):0.0} m, ") +
+                            Inv($"d={Planar.Distance(self.transform.position, _auraVictim != null ? _auraVictim.transform.position : self.transform.position):0.0} m, ") +
                             Inv($"{gm.TimeRemaining:0.0} s left."));
                         _auraPhase = AutoAuraPhase.Casting;
                         _auraPhaseSince = now;
@@ -164,16 +164,10 @@ namespace CluckWars.Diagnostics
                 var c = all[i];
                 if (c == null || c == self || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
-                float d = PlanarDistance(self.transform.position, c.transform.position);
+                float d = Planar.Distance(self.transform.position, c.transform.position);
                 if (d < bestD) { bestD = d; best = c; }
             }
             return best;
-        }
-
-        private static float PlanarDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x, dz = a.z - b.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
         private static Vector2 Xz(Vector3 p) => new Vector2(p.x, p.z);

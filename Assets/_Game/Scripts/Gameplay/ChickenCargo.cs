@@ -481,22 +481,11 @@ namespace CluckWars.Gameplay
             }
         }
 
-        /// <summary>
-        /// Squared horizontal (XZ) distance. Pickup/deposit proximity is a ground-plane
-        /// test: a chicken's pivot floats ~1 unit above pickup/base pivots (capsule
-        /// centre), so a full 3D distance pushes an in-range chicken outside the tuned
-        /// radius and the interaction silently never fires. Playtest evidence: bots parked
-        /// ~1.45 horizontal from a 1.6-radius pile, but 3D distance was ~1.8 → no pile ever
-        /// drained, no one could score. Comparing XZ only fixes it robustly. Pile
-        /// collection no longer comes through here at all — <c>FoodPile.DistanceToSurface</c>
-        /// is XZ by construction.
-        /// </summary>
-        private static float HorizontalSqr(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return dx * dx + dz * dz;
-        }
+        // Deposit proximity is a ground-plane test (Planar.SqrDistance): a chicken's pivot floats ~1 unit above the
+        // base pivot (capsule centre), so a full 3D distance pushes an in-range chicken outside the tuned radius and
+        // the interaction silently never fires. Playtest evidence: bots parked ~1.45 horizontal from a 1.6-radius
+        // pile, but 3D distance was ~1.8 → no pile ever drained, no one could score. Pile collection does not come
+        // through here at all: FoodPile.DistanceToSurface is XZ by construction.
 
         /// <summary>
         /// Nearest pile whose SURFACE this chicken is close enough to drain. Ranking is by
@@ -545,7 +534,7 @@ namespace CluckWars.Gameplay
                 var b = bases[i];
                 if (b == null || b.Object == null || !b.Object.IsValid) continue;
                 if (b.CornerIndex != homeCorner) continue;
-                float sqr = HorizontalSqr(b.transform.position, transform.position);
+                float sqr = Planar.SqrDistance(b.transform.position, transform.position);
                 float r   = b.DepositRadius;
                 if (sqr > r * r) continue;
                 if (sqr < bestSqr) { bestSqr = sqr; best = b; }
@@ -960,7 +949,7 @@ namespace CluckWars.Gameplay
                 if (!StealRules.IsWithinStealRange(
                         resolved.transform.position, transform.position, _maxStealReach, margin))
                 {
-                    float distance = Mathf.Sqrt(HorizontalSqr(resolved.transform.position, transform.position));
+                    float distance = Mathf.Sqrt(Planar.SqrDistance(resolved.transform.position, transform.position));
                     rejection = $"{resolved.name} is {distance:0.0} m away, past the longest steal reach in " +
                                 $"the pool ({_maxStealReach:0.00} m) plus {margin:0.00} m of drift.";
                     return false;

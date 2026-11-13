@@ -223,7 +223,7 @@ namespace CluckWars.Tests
             var src = Execute;
             int pick = src.IndexOf("private int PickWeighted()", StringComparison.Ordinal);
             string body = src.Substring(pick, src.IndexOf("\n        }", pick, StringComparison.Ordinal) - pick);
-            StringAssert.Contains("MarkPickRules.AssassinFraction(PlanarDistance(me, at), span)", body);
+            StringAssert.Contains("MarkPickRules.AssassinFraction(Planar.Distance(me, at), span)", body);
             StringAssert.Contains("MarkPickRules.PickWeighted(_weights, _nears, _rolls, Random.value)", body);
             StringAssert.Contains("n={_nears[i]:0.00}", body, "the Debug line shows w, n and the score");
         }

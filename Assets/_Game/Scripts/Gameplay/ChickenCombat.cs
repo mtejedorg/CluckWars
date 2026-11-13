@@ -287,7 +287,7 @@ namespace CluckWars.Gameplay
                 Vector3 a = attacker.transform.position, v = transform.position;
                 claim.WallBetweenThem = PlayerBase.WallBetween(a, v);
                 claim.VictimShelled = _controller != null && _controller.IsStealProof;
-                claim.PlanarDistance = Mathf.Sqrt((a.x - v.x) * (a.x - v.x) + (a.z - v.z) * (a.z - v.z));
+                claim.PlanarDistance = Planar.Distance(a, v);
             }
 
             return ExecuteRules.EvaluateRemoval(claim);

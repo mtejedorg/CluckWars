@@ -130,7 +130,7 @@ namespace CluckWars.Visuals
         {
             if (buf == null) return;
 
-            Vector3 fwd    = PlanarForward(casterForward);
+            Vector3 fwd    = Planar.Forward(casterForward);
             Vector3 center = AbilityAim.ShapeCenter(shape, casterPos, casterForward, forwardOffset);
             center.y = GroundY;
 
@@ -349,12 +349,6 @@ namespace CluckWars.Visuals
             float rad = deg * Mathf.Deg2Rad;
             float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
             return new Vector3(v.x * c + v.z * s, 0f, -v.x * s + v.z * c);
-        }
-
-        private static Vector3 PlanarForward(Vector3 forward)
-        {
-            var flat = new Vector3(forward.x, 0f, forward.z);
-            return flat.sqrMagnitude < 0.0001f ? Vector3.forward : flat.normalized;
         }
     }
 

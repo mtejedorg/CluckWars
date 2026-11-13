@@ -35,7 +35,7 @@ namespace CluckWars.Tests
         private static readonly Dictionary<string, string> FolderAssembly = new Dictionary<string, string>
         {
             ["Logging"] = Core, ["Localization"] = Core, ["Injection"] = Core, ["Services"] = Core, ["Bootstrap"] = Core,
-            ["Diagnostics/Shared"] = Core,
+            ["Diagnostics/Shared"] = Core, ["Geometry"] = Core,
             ["Gameplay"] = Gameplay, ["Abilities"] = Gameplay, ["Networking"] = Gameplay, ["Settings"] = Gameplay,
             ["Audio"] = Gameplay, ["Balance"] = Gameplay,
             ["Visuals"] = Presentation, ["UI"] = Presentation, ["Input"] = Presentation,

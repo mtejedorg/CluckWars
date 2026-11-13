@@ -112,11 +112,7 @@ namespace CluckWars.Visuals
             centre + Direction(bearingDeg) * radius;
 
         /// <summary>Planar (XZ) distance, the same measure abilities and zones use.</summary>
-        public static float PlanarDistance(Vector3 a, Vector3 b)
-        {
-            float dx = b.x - a.x, dz = b.z - a.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
-        }
+        public static float PlanarDistance(Vector3 a, Vector3 b) => Planar.Distance(a, b);
 
         // ── Visibility ─────────────────────────────────────────────────────────────────────────
 

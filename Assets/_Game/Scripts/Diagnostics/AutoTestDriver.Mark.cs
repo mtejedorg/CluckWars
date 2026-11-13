@@ -132,7 +132,7 @@ namespace CluckWars.Diagnostics
             if (state != _lastMarkState)
             {
                 _lastMarkState = state;
-                _log.Info(Source, Inv($"AutoTest markshots state d={PlanarDistance(self.transform.position, target.transform.position):0.0} ") + state);
+                _log.Info(Source, Inv($"AutoTest markshots state d={Planar.Distance(self.transform.position, target.transform.position):0.0} ") + state);
             }
 
             if (o.Role == MarkRole.Assassin && o.DrawAlpha > 0f && !o.DrawLocked && o.DrawStep >= 2 && o.DrawStep < o.DrawSteps - 1)
@@ -143,7 +143,7 @@ namespace CluckWars.Diagnostics
             if (o.MarkerMode == MarkMarkerMode.Shelled && Settled("shelled")) Capture(ref _shotShelled, "mark-shelled");
             // Dev hook (logged): a bot target that owns Turtle Mode raises it once the Assassin is close, through the bot API.
             if (!_shotShelled && _shotKill && target.IsBot && target.HasStateAuthority && target.Abilities != null &&
-                PlanarDistance(self.transform.position, target.transform.position) <= 6f &&
+                Planar.Distance(self.transform.position, target.transform.position) <= 6f &&
                 Time.realtimeSinceStartup - _shellHookAt >= 1f)
             {
                 for (int s = 0; s < AbilityController.SlotCount; s++)

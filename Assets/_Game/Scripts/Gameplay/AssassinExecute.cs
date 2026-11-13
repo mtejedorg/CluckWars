@@ -324,7 +324,7 @@ namespace CluckWars.Gameplay
                 if (!ExecuteRules.KillQualifies(ArmTimer.Expired(Runner), target.CurrentControlState == ControlState.Stunned,
                         target.IsStealProof)) return false;
                 Vector3 me = transform.position, it = target.transform.position;
-                return PlanarDistance(me, it) <= KillRange && !PlayerBase.WallBetween(me, it);
+                return Planar.Distance(me, it) <= KillRange && !PlayerBase.WallBetween(me, it);
             }
         }
 
@@ -344,7 +344,7 @@ namespace CluckWars.Gameplay
             Vector3 me = transform.position, it = target.transform.position;
             return $"{target.name} at {MarkAgeSeconds:0.00} s into the mark (arm {ArmSeconds:0.0}, window {WindowSeconds:0.0}, " +
                    $"armed={ArmTimer.Expired(Runner)}), target {target.CurrentControlState} ({target.StunRemaining:0.00} s of stun left), " +
-                   $"shelled={!ExecuteRules.CanBeExecuted(target.IsStealProof)}, {PlanarDistance(me, it):0.0} m (range {KillRange:0.0}), " +
+                   $"shelled={!ExecuteRules.CanBeExecuted(target.IsStealProof)}, {Planar.Distance(me, it):0.0} m (range {KillRange:0.0}), " +
                    $"walled={PlayerBase.WallBetween(me, it)}, self can cast={_controller != null && ControlRules.CanCast(_controller.CurrentControlState)}";
         }
 
@@ -418,7 +418,7 @@ namespace CluckWars.Gameplay
                 if (span > 0f && Runner.TryFindBehaviour(_candidates[i], out ChickenController c))
                 {
                     Vector3 at = c.transform.position;
-                    a = MarkPickRules.AssassinFraction(PlanarDistance(me, at), span);
+                    a = MarkPickRules.AssassinFraction(Planar.Distance(me, at), span);
                     if (PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
                         w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
                 }
@@ -458,15 +458,6 @@ namespace CluckWars.Gameplay
                 _candidates.Add(c.Id);
             }
             MarkPickRules.Filter(_candidates, _hasLastMark, _lastMark, rivals);
-        }
-
-        private static float PlanarDistance(Vector3 a, Vector3 b) => Mathf.Sqrt(PlanarSqrDistance(a, b));
-
-        private static float PlanarSqrDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return dx * dx + dz * dz;
         }
 
         /// <summary>

@@ -862,11 +862,11 @@ namespace CluckWars.Abilities
                 var candidate = all[i];
                 if (candidate == null || !WouldAffect(caster, candidate, forward)) continue;
 
-                float distSqr = PlanarSqrDistance(center, candidate.transform.position);
+                float distSqr = Planar.SqrDistance(center, candidate.transform.position);
                 int insertAt = buffer.Count;
                 for (int j = 0; j < buffer.Count; j++)
                 {
-                    if (PlanarSqrDistance(center, buffer[j].transform.position) > distSqr) { insertAt = j; break; }
+                    if (Planar.SqrDistance(center, buffer[j].transform.position) > distSqr) { insertAt = j; break; }
                 }
                 buffer.Insert(insertAt, candidate);
             }
@@ -919,13 +919,6 @@ namespace CluckWars.Abilities
             }
             int best = CluckWars.Input.AimSoftLock.PickClosestAngle(new Vector2(aim.x, aim.z), _angleScratch, n, 180f);
             return best < 0 ? 0 : best;
-        }
-
-        private static float PlanarSqrDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return dx * dx + dz * dz;
         }
 
         /// <summary>

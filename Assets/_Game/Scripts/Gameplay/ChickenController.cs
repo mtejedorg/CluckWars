@@ -1732,7 +1732,7 @@ namespace CluckWars.Gameplay
                 claim.RangeMargin = StealRules.RangeMargin(
                     ChickenCargo.DriftSpeed(caster) + ChickenCargo.DriftSpeed(this), latency + 2f * Runner.DeltaTime);
                 Vector3 c = caster.transform.position, v = transform.position;
-                claim.PlanarDistance = Mathf.Sqrt((c.x - v.x) * (c.x - v.x) + (c.z - v.z) * (c.z - v.z));
+                claim.PlanarDistance = Planar.Distance(c, v);
                 // Now, or anywhere this chicken stood within the window the RPC could have been in flight: the zone's
                 // authority judged a lagged copy of us, and a jump right after stepping in (Doppelganger blink, session
                 // 20261023-173009) moved us out before its RPC landed. The zone itself must still vouch either way.

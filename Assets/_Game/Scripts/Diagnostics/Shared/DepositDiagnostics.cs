@@ -13,11 +13,7 @@ namespace CluckWars.Diagnostics
     {
         private static string Xz(Vector3 p) => FormattableString.Invariant($"{p.x:0.0},{p.z:0.0}");
 
-        public static float PlanarDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x, dz = a.z - b.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
-        }
+        public static float PlanarDistance(Vector3 a, Vector3 b) => Planar.Distance(a, b);
 
         /// <summary><c>Base corner=3 owner=[Player:2] pos=21.8,-21.8 radius=2.5 stamped=1</c></summary>
         public static string BaseLine(int corner, string owner, Vector3 pos, float radius, bool stamped) =>

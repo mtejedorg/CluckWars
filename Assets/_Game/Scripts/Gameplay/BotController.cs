@@ -224,7 +224,7 @@ namespace CluckWars.Gameplay
 
             float cargo         = _cargo != null ? _cargo.Cargo : 0f;
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
-            float distHome      = PlanarDistance(_controller.transform.position, homePos);
+            float distHome      = Planar.Distance(_controller.transform.position, homePos);
 
             // Priority 0: BANK OR LOSE IT. Cargo in the beak scores nothing when the timer
             // expires, and on a 45 s match the window to walk home is small. This outranks
@@ -302,7 +302,7 @@ namespace CluckWars.Gameplay
             // for every other strategy the base is just a drop-off.
             if (_profile.Strategy == BotStrategy.Bunker && _profile.GuardRadius > 0f &&
                 _nearestRival != null &&
-                PlanarDistance(_nearestRival.transform.position, homePos) <= _profile.GuardRadius)
+                Planar.Distance(_nearestRival.transform.position, homePos) <= _profile.GuardRadius)
             {
                 _state      = BotState.Guard;
                 _moveTarget = homePos;
@@ -520,7 +520,7 @@ namespace CluckWars.Gameplay
             var  forward    = _controller.transform.forward;
             bool haveTarget = target != null;
             var  toTarget   = haveTarget ? target.transform.position - selfPos : Vector3.zero;
-            float targetDist = haveTarget ? PlanarDistance(selfPos, target.transform.position) : 0f;
+            float targetDist = haveTarget ? Planar.Distance(selfPos, target.transform.position) : 0f;
 
             int   bestSlot  = AbilityController.InvalidSlot;
             float bestScore = float.MaxValue;
@@ -655,7 +655,7 @@ namespace CluckWars.Gameplay
                 var c = all[i];
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && (c.Combat.IsRemoved || c.Combat.IsDead)) continue;
-                float dist = PlanarDistance(selfPos, c.transform.position);
+                float dist = Planar.Distance(selfPos, c.transform.position);
                 if (dist >= nearest || dist > BotTactics.StealGuardRadius) continue;
                 if (HasStealAbility(c)) nearest = dist;
             }
@@ -894,7 +894,7 @@ namespace CluckWars.Gameplay
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
 
-                float dist = PlanarDistance(selfPos, c.transform.position);
+                float dist = Planar.Distance(selfPos, c.transform.position);
 
                 if (dist < _nearestRivalDist)
                 {
@@ -987,7 +987,7 @@ namespace CluckWars.Gameplay
                 if (!p.HasCollectableFood) continue;
 
                 float toPile = p.DistanceToSurface(selfPos);
-                float toHome = PlanarDistance(p.transform.position, homePos);
+                float toHome = Planar.Distance(p.transform.position, homePos);
                 float cost   = BotTactics.PileCost(toPile, toHome, p.Available, _profile.RoundTripBias);
 
                 if (cost < bestCost)
@@ -1072,13 +1072,6 @@ namespace CluckWars.Gameplay
             var config = gm != null ? gm.Config : null;
             float rate = config != null ? Mathf.Max(0.5f, config.DepositRatePerSecond) : 9f;
             return cargo / rate;
-        }
-
-        private static float PlanarDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
         }
     }
 }

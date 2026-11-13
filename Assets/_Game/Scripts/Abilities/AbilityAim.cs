@@ -46,20 +46,20 @@ namespace CluckWars.Abilities
             if (shape == AbilityAimShape.None) return false;
             if (radius < 0f) return false;
 
-            Vector3 forwardXZ = PlanarForward(casterForward);
+            Vector3 forwardXZ = Planar.Forward(casterForward);
 
             switch (shape)
             {
                 case AbilityAimShape.SelfCircle:
                 case AbilityAimShape.Aura:
                 case AbilityAimShape.SingleTarget:
-                    return PlanarDistance(casterPos, candidatePos) <= radius;
+                    return Planar.Distance(casterPos, candidatePos) <= radius;
 
                 case AbilityAimShape.ForwardCircle:
                 case AbilityAimShape.Jump:
                 {
                     Vector3 center = casterPos + forwardXZ * forwardOffset;
-                    return PlanarDistance(center, candidatePos) <= radius;
+                    return Planar.Distance(center, candidatePos) <= radius;
                 }
 
                 case AbilityAimShape.Capsule:
@@ -79,19 +79,19 @@ namespace CluckWars.Abilities
                     // length == 0 collapses the segment to the caster's own position, so
                     // this degenerates EXACTLY to SelfCircle — the direct analogue of the
                     // Cone-at-360° safety net above, and locked by the same style of test.
-                    float t = Mathf.Clamp(Vector3.Dot(FlattenXZ(candidatePos - casterPos), forwardXZ), 0f, length);
+                    float t = Mathf.Clamp(Vector3.Dot(Planar.Flat(candidatePos - casterPos), forwardXZ), 0f, length);
                     Vector3 closestOnAxis = casterPos + forwardXZ * t;
-                    return PlanarDistance(closestOnAxis, candidatePos) <= radius;
+                    return Planar.Distance(closestOnAxis, candidatePos) <= radius;
                 }
 
                 case AbilityAimShape.Cone:
                 {
-                    if (PlanarDistance(casterPos, candidatePos) > radius) return false;
+                    if (Planar.Distance(casterPos, candidatePos) > radius) return false;
                     // >= 360 degenerates exactly to SelfCircle (Ambush relies on this:
                     // it inherits Cone from StunBurstAbilitySO but never narrows the angle).
                     if (coneAngleDeg >= 360f) return true;
 
-                    Vector3 toCandidate = FlattenXZ(candidatePos - casterPos);
+                    Vector3 toCandidate = Planar.Flat(candidatePos - casterPos);
                     // Candidate exactly at the caster's position has no direction to
                     // measure an angle against — treat it as inside rather than NaN-ing
                     // out of Vector3.Angle.
@@ -118,33 +118,17 @@ namespace CluckWars.Abilities
             {
                 case AbilityAimShape.ForwardCircle:
                 case AbilityAimShape.Jump:
-                    return casterPos + PlanarForward(casterForward) * forwardOffset;
+                    return casterPos + Planar.Forward(casterForward) * forwardOffset;
 
                 // The capsule's axis runs from the caster to forwardOffset ahead, so its
                 // centre is the axis midpoint — not the far end. Clamped identically to
                 // InShape so the drawn centre and the tested shape can never disagree.
                 case AbilityAimShape.Capsule:
-                    return casterPos + PlanarForward(casterForward) * (Mathf.Max(0f, forwardOffset) * 0.5f);
+                    return casterPos + Planar.Forward(casterForward) * (Mathf.Max(0f, forwardOffset) * 0.5f);
 
                 default:
                     return casterPos;
             }
-        }
-
-        /// <summary>XZ-flattened, normalised forward. Falls back to world forward for a zero-length input so callers never divide by zero.</summary>
-        private static Vector3 PlanarForward(Vector3 forward)
-        {
-            Vector3 flat = FlattenXZ(forward);
-            return flat.sqrMagnitude < 0.0001f ? Vector3.forward : flat.normalized;
-        }
-
-        private static Vector3 FlattenXZ(Vector3 v) => new Vector3(v.x, 0f, v.z);
-
-        private static float PlanarDistance(Vector3 a, Vector3 b)
-        {
-            float dx = a.x - b.x;
-            float dz = a.z - b.z;
-            return Mathf.Sqrt(dx * dx + dz * dz);
         }
     }
 }
