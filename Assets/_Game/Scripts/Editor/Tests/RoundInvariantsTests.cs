@@ -125,6 +125,73 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, RoundOrdinal.Next(0, false, CluckWars.Gameplay.MatchState.WaitingForPlayers, CluckWars.Gameplay.MatchState.Active));
         }
 
+        // ---- BL-145: the aura exclusion rule ---------------------------------------------------------------------------
+
+        /// <summary>Feeds <paramref name="frames"/> settled frames at one excuse, past the settle window.</summary>
+        private static RoundInvariants.AuraVictimTally Samples(int frames, bool snared, RoundInvariants.AuraExcuse excuse)
+        {
+            var t = new RoundInvariants.AuraVictimTally();
+            t = RoundInvariants.SampleAuraVictim(t, true, snared, excuse, 0f);          // opens the run
+            float settled = RoundInvariants.AuraSettleSeconds + 0.01f;
+            for (int i = 0; i < frames; i++) t = RoundInvariants.SampleAuraVictim(t, true, snared, excuse, settled);
+            return t;
+        }
+
+        [Test]
+        public void AuraExcuse_IsOnlyAnOutrightRefusal_NotAResistance()
+        {
+            Assert.AreEqual(RoundInvariants.AuraExcuse.None, RoundInvariants.ExcuseAuraSlow(false, false),
+                "a plain victim deep inside is evidence");
+            Assert.AreEqual(RoundInvariants.AuraExcuse.SlowImmune, RoundInvariants.ExcuseAuraSlow(true, false),
+                "Egg Shell / the Shield: the slow does not land, so not-snared is correct");
+            Assert.AreEqual(RoundInvariants.AuraExcuse.BaseWall, RoundInvariants.ExcuseAuraSlow(false, true),
+                "a claimed base's wall between the centre and the victim refuses the zone slow");
+            Assert.AreEqual(RoundInvariants.AuraExcuse.SlowImmune, RoundInvariants.ExcuseAuraSlow(true, true),
+                "immunity is reported ahead of the wall when both hold");
+        }
+
+        [Test]
+        public void AnImmuneVictim_IsExcused_NotFailed()
+        {
+            // BL-145's live case: the victim cast Egg Shell 0.13 s after the aura landed and stood in it, unslowed.
+            var t = Samples(40, snared: false, RoundInvariants.AuraExcuse.SlowImmune);
+            Assert.AreEqual(0, t.Deep, "an excused frame is not judged");
+            Assert.AreEqual(40, t.ImmuneSamples);
+            Assert.AreEqual(40, t.Excused);
+            Assert.AreEqual(RoundInvariants.AuraVerdict.TooFew, RoundInvariants.JudgeAuraVictim(t),
+                "no evidence either way is too-few, never not-snared");
+        }
+
+        [Test]
+        public void AWalledVictim_IsExcused_AndTheCountIsPrinted()
+        {
+            var t = Samples(30, snared: false, RoundInvariants.AuraExcuse.BaseWall);
+            Assert.AreEqual(0, t.Deep);
+            Assert.AreEqual(30, t.WalledSamples);
+            StringAssert.Contains("excused=30 immune=0 wall=30", RoundInvariants.AuraVictimLine("P2", "P1", true, t, 3),
+                "an excluded sample is reported, not dropped");
+        }
+
+        [Test]
+        public void AnUnexcusedVictimThatIsNotSnared_StillFails()
+        {
+            var t = Samples(40, snared: false, RoundInvariants.AuraExcuse.None);
+            Assert.AreEqual(40, t.Deep);
+            Assert.AreEqual(0, t.Snared);
+            Assert.AreEqual(0, t.Excused);
+            Assert.AreEqual(RoundInvariants.AuraVerdict.NotSnared, RoundInvariants.JudgeAuraVictim(t),
+                "the exclusion must not weaken the invariant for a victim nothing protected");
+        }
+
+        [Test]
+        public void TheVerdictLine_KeepsTheShapeMergeReads()
+        {
+            var t = Samples(12, snared: true, RoundInvariants.AuraExcuse.None);
+            string line = RoundInvariants.AuraVictimLine("P2", "P1", true, t, 2);
+            StringAssert.StartsWith("Invariant aura owner=P2 victim=P1 remote=1 deep=12 snared=12 verdict=ok round=2", line,
+                "merge.ps1 matches deep/snared/verdict in this order; the excused counts go after round=");
+        }
+
         [Test]
         public void WorldHash_IsOrderIndependent_AndSeesAMovedBase()
         {

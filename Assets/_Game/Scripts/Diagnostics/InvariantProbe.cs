@@ -23,7 +23,8 @@ namespace CluckWars.Diagnostics
     /// Round-start lines (ok and FAIL) end with <c> zn=.. au=.. dc=..</c>: live placed (World) zones, live auras
     /// (Caster-anchored zones, WP4) and Doppelganger decoys, all of which must be 0 (B10, <see cref="RoundInvariants.StartCounts"/>).
     /// While a Slow aura lives, every peer also samples each rival inside it (<see cref="AuraVictimSampler"/>): the
-    /// victim's replicated <c>ControlVfx.Snared</c> must be on (WP4, the CW-217 lesson - state on a REMOTE peer, not logs).
+    /// victim's replicated <c>ControlVfx.Snared</c> must be on (WP4, the CW-217 lesson - state on a REMOTE peer, not logs),
+    /// unless the game itself refused the slow on that frame (<see cref="RoundInvariants.ExcuseAuraSlow"/>, BL-145).
     /// Read-only; it never changes gameplay and never throws (an exception inside a check is logged as an Error).
     /// </remarks>
     public sealed class InvariantProbe : MonoBehaviour
@@ -415,7 +416,15 @@ namespace CluckWars.Diagnostics
                     // evidence in a mixed situation; not-snared is strong (deep inside, no enemy slow at all). The merge
                     // rule therefore asks for a remote=1 ok from a session where a cw_autoaura peer cast into a rival on
                     // purpose, not from any aura line.
-                    v.Tally = RoundInvariants.SampleAuraVictim(v.Tally, deep, (c.ControlFlags & ControlVfx.Snared) != 0, now);
+                    //
+                    // BL-145: a frame the game itself refuses the slow on is no evidence. CheckAbilityZoneSlow refuses on
+                    // exactly two conditions this peer can also read - a slow-immunity window (Egg Shell, the Shield) and a
+                    // base wall across the line from the aura's centre - so they are excused rather than counted as
+                    // not-snared. Both still appear on the aura line; nothing is dropped silently.
+                    var excuse = deep
+                        ? RoundInvariants.ExcuseAuraSlow(c.IsSlowImmune, PlayerBase.WallBetween(center, p))
+                        : RoundInvariants.AuraExcuse.None;
+                    v.Tally = RoundInvariants.SampleAuraVictim(v.Tally, deep, (c.ControlFlags & ControlVfx.Snared) != 0, excuse, now);
                     _auraVictims[key] = v;
                 }
             }
@@ -441,7 +450,8 @@ namespace CluckWars.Diagnostics
                     _log?.Error(Source, new InvariantFailure("aura-victim-snared",
                         ">=" + Mathf.RoundToInt(RoundInvariants.AuraMinSnaredShare * 100f) + "%",
                         v.Tally.Snared + "/" + v.Tally.Deep, v.Victim).Line() +
-                        " owner=" + owner + " remote=" + (v.Remote ? 1 : 0) + " round=" + _round);
+                        " owner=" + owner + " remote=" + (v.Remote ? 1 : 0) + " round=" + _round +
+                        " excused=" + v.Tally.Excused + " immune=" + v.Tally.ImmuneSamples + " wall=" + v.Tally.WalledSamples);
             }
         }
     }

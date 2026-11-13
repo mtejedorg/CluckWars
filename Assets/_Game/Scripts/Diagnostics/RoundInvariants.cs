@@ -249,7 +249,43 @@ namespace CluckWars.Diagnostics
             /// <summary>The victim is deep inside right now, since <see cref="RunStart"/> (local seconds).</summary>
             public bool InRun;
             public float RunStart;
+            /// <summary>Settled frames excused as <see cref="AuraExcuse.SlowImmune"/>: counted, never judged.</summary>
+            public int ImmuneSamples;
+            /// <summary>Settled frames excused as <see cref="AuraExcuse.BaseWall"/>: counted, never judged.</summary>
+            public int WalledSamples;
+
+            /// <summary>Settled frames the slow was legitimately refused on, so they are no evidence either way.</summary>
+            public int Excused => ImmuneSamples + WalledSamples;
         }
+
+        /// <summary>
+        /// Why a settled frame proves nothing about the aura. Each case mirrors a refusal that
+        /// <c>ChickenController.CheckAbilityZoneSlow</c> actually makes, so the probe excuses exactly what the game
+        /// refuses — never more (BL-145).
+        /// </summary>
+        public enum AuraExcuse
+        {
+            /// <summary>Nothing stopped the slow: this frame is evidence.</summary>
+            None,
+            /// <summary>The victim's slow-immunity window was open (Egg Shell's egg, the Shield's walk): the slow does not land.</summary>
+            SlowImmune,
+            /// <summary>A claimed base's wall stands between the aura's centre and the victim: the slow does not reach.</summary>
+            BaseWall,
+        }
+
+        /// <summary>
+        /// The exclusion rule (BL-145), pure. <paramref name="slowImmune"/> is the victim's <c>IsSlowImmune</c> — which
+        /// already covers a full control-immunity window — and <paramref name="baseWallBetween"/> is
+        /// <c>PlayerBase.WallBetween(auraCentre, victim)</c>. Both are read on the sampling peer from replicated state.
+        /// </summary>
+        /// <remarks>
+        /// Resistances are deliberately NOT excused. Slippery weakens an ability slow to 1-(1-0.55)x0.6 = 0.73, still far
+        /// below <c>ChickenController.SlowVfxFlagThreshold</c> (0.92), so a resisted victim must still read Snared;
+        /// Featherfoot ignores only the pile and bump slows and never an aura. A probe that under-reports is worse than one
+        /// that over-reports, so only an outright refusal in the production path belongs here.
+        /// </remarks>
+        public static AuraExcuse ExcuseAuraSlow(bool slowImmune, bool baseWallBetween) =>
+            slowImmune ? AuraExcuse.SlowImmune : baseWallBetween ? AuraExcuse.BaseWall : AuraExcuse.None;
 
         /// <summary>
         /// "Deep inside": within this fraction of the radius. The observer sees the caster and the victim where IT
@@ -289,12 +325,19 @@ namespace CluckWars.Diagnostics
 
         public static bool IsDeepInsideAura(float planarDistance, float radius) => planarDistance <= radius * AuraDeepFraction;
 
-        /// <summary>One frame of one victim: leaving the deep core ends the run; a frame counts once the run has settled.</summary>
-        public static AuraVictimTally SampleAuraVictim(AuraVictimTally t, bool deep, bool snared, float now)
+        /// <summary>
+        /// One frame of one victim: leaving the deep core ends the run; a frame counts once the run has settled. A settled
+        /// frame the game itself refused the slow on (<paramref name="excuse"/>) is counted under that excuse and kept out
+        /// of <see cref="AuraVictimTally.Deep"/>, so it neither passes nor fails the invariant — but it is still printed.
+        /// </summary>
+        public static AuraVictimTally SampleAuraVictim(AuraVictimTally t, bool deep, bool snared, AuraExcuse excuse, float now)
         {
             if (!deep) { t.InRun = false; return t; }
             if (!t.InRun) { t.InRun = true; t.RunStart = now; return t; }
             if (now - t.RunStart < AuraSettleSeconds) return t;
+            // Still deep inside, so the run continues; only the evidence is set aside.
+            if (excuse == AuraExcuse.SlowImmune) { t.ImmuneSamples++; return t; }
+            if (excuse == AuraExcuse.BaseWall) { t.WalledSamples++; return t; }
             t.Deep++;
             if (snared) t.Snared++;
             return t;
@@ -314,9 +357,14 @@ namespace CluckWars.Diagnostics
         /// <c>Invariant FAIL aura-victim-snared</c>, Error). <paramref name="remote"/>: the victim's state authority is not
         /// the aura's, i.e. the victim's own peer had to see a zone another peer spawned (CW-217).
         /// </summary>
+        /// <remarks>
+        /// The excused counts are appended AFTER <c>round=</c> so merge.ps1's existing
+        /// <c>deep= snared= verdict=</c> pattern keeps matching unchanged.
+        /// </remarks>
         public static string AuraVictimLine(string owner, string victim, bool remote, in AuraVictimTally t, int round) =>
             "Invariant aura owner=" + owner + " victim=" + victim + " remote=" + (remote ? 1 : 0) + " deep=" + t.Deep +
-            " snared=" + t.Snared + " verdict=" + VerdictName(JudgeAuraVictim(t)) + " round=" + round;
+            " snared=" + t.Snared + " verdict=" + VerdictName(JudgeAuraVictim(t)) + " round=" + round +
+            " excused=" + t.Excused + " immune=" + t.ImmuneSamples + " wall=" + t.WalledSamples;
 
         private static uint Fnv(uint h, string s)
         {

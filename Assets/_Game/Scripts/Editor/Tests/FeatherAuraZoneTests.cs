@@ -263,7 +263,8 @@ namespace CluckWars.Tests
 
         private static RoundInvariants.AuraVictimTally Run(RoundInvariants.AuraVictimTally t, float from, float to, bool deep, bool snared)
         {
-            for (float now = from; now < to; now += 1f / 60f) t = RoundInvariants.SampleAuraVictim(t, deep, snared, now);
+            for (float now = from; now < to; now += 1f / 60f)
+                t = RoundInvariants.SampleAuraVictim(t, deep, snared, RoundInvariants.AuraExcuse.None, now);
             return t;
         }
 
