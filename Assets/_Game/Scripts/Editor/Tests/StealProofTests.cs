@@ -67,8 +67,8 @@ namespace CluckWars.Tests
             StringAssert.Contains("[Networked] private TickTimer StealProofTimer", src);
             StringAssert.Contains("public bool IsStealProof", src);
             string grant = Body(src, "public void GrantStealProof(", 700);
-            StringAssert.Contains("ControlImmunityRules.ShouldReplace", grant);
-            StringAssert.Contains("StealProofTimer = TickTimer.CreateFromSeconds", grant);
+            StringAssert.Contains("EffectWindow.TryGrant(StealProofTimer, Runner, seconds, out var granted)", grant);   // the later-end-wins rule lives in EffectWindow.TryGrant (ControlImmunityRules.ShouldReplace)
+            StringAssert.Contains("StealProofTimer = granted;", grant);
             StringAssert.DoesNotContain("ControlImmuneTimer", grant, "steal-proof is its own effect kind");
         }
 

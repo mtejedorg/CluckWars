@@ -40,9 +40,9 @@ namespace CluckWars.Tests
 
         [TestCase("StunRemaining", "EffectWindow.Remaining(StunTimer, Runner)")]
         [TestCase("RootRemaining", "EffectWindow.Remaining(RootTimer, Runner)")]
-        [TestCase("IsControlImmune", "EffectWindow.IsOpen(ControlImmuneTimer, Runner)")]
-        [TestCase("IsSlowImmune", "IsControlImmune || EffectWindow.IsOpen(SlowImmuneTimer, Runner)")]
-        [TestCase("IsStealProof", "EffectWindow.IsOpen(StealProofTimer, Runner)")]
+        [TestCase("IsControlImmune", "Runner != null && EffectWindow.IsOpen(ControlImmuneTimer, Runner)")]
+        [TestCase("IsSlowImmune", "IsControlImmune || (Runner != null && EffectWindow.IsOpen(SlowImmuneTimer, Runner))")]
+        [TestCase("IsStealProof", "Runner != null && EffectWindow.IsOpen(StealProofTimer, Runner)")]
         public void EveryWindowRead_IsOneCall(string property, string body)
         {
             string code = RuntimeSourceGuardTests.Code(Controller);
@@ -55,7 +55,9 @@ namespace CluckWars.Tests
         public void EveryGrant_IsOneCall(string method, string timer)
         {
             string body = AssassinExecuteCreditTests.MethodBody(Controller, $"public void {method}(float seconds)");
-            StringAssert.Contains($"if (EffectWindow.TryGrant({timer}, Runner, seconds, out var granted)) {timer} = granted;", body);
+            // "Runner != null" comes first: a [Networked] property throws when read before Spawned (an unspawned chicken
+            // must answer "not immune", not throw: AbilityPreviewRulesTests, StealProofTests).
+            StringAssert.Contains($"if (Runner != null && EffectWindow.TryGrant({timer}, Runner, seconds, out var granted)) {timer} = granted;", body);
         }
 
         [Test]

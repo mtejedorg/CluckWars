@@ -466,7 +466,7 @@ namespace CluckWars.Gameplay
         /// <summary>Seconds of stun remaining, for the Aftermath countdown (FEEDBACK.md
         /// §5.1, case 18). 0 when not stunned/expired — every peer can read this, not
         /// just the StateAuthority, since <see cref="StunTimer"/> is <c>[Networked]</c>.</summary>
-        public float StunRemaining => StunTimer.ExpiredOrNotRunning(Runner) ? 0f : (StunTimer.RemainingTime(Runner) ?? 0f);
+        public float StunRemaining => EffectWindow.Remaining(StunTimer, Runner);
 
         /// <summary>
         /// Timer-based root, set by <see cref="RPC_ApplyRoot"/>. Promoted from a plain
@@ -499,8 +499,7 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer ControlImmuneTimer { get; set; }
 
         /// <summary>True while a control-immunity window is open. Readable on every peer.</summary>
-        public bool IsControlImmune =>
-            Runner != null && !ControlImmuneTimer.ExpiredOrNotRunning(Runner);
+        public bool IsControlImmune => Runner != null && EffectWindow.IsOpen(ControlImmuneTimer, Runner);
 
         /// <summary>Closes the steal-proof, control-immunity and slow-immunity windows now (the Shield ended early). Caster's
         /// own StateAuthority only.</summary>
@@ -521,26 +520,21 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer SlowImmuneTimer { get; set; }
 
         /// <summary>True while slows do not land: a slow-immunity window or a full control-immunity window. Readable on every peer.</summary>
-        public bool IsSlowImmune =>
-            IsControlImmune || (Runner != null && !SlowImmuneTimer.ExpiredOrNotRunning(Runner));
+        public bool IsSlowImmune => IsControlImmune || (Runner != null && EffectWindow.IsOpen(SlowImmuneTimer, Runner));
 
         /// <summary>Opens a slow-immunity window of <paramref name="seconds"/>. Never shortens one already open.</summary>
         public void GrantSlowImmunity(float seconds)
         {
-            if (Runner == null || seconds <= 0f) return;
-            float open = SlowImmuneTimer.ExpiredOrNotRunning(Runner) ? 0f : (SlowImmuneTimer.RemainingTime(Runner) ?? 0f);
-            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
-            SlowImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+            // Runner first: a [Networked] property cannot be read before Spawned.
+            if (Runner != null && EffectWindow.TryGrant(SlowImmuneTimer, Runner, seconds, out var granted)) SlowImmuneTimer = granted;
         }
 
         /// <summary>Opens a control-immunity window of <paramref name="seconds"/>.</summary>
         /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
         public void GrantControlImmunity(float seconds)
         {
-            if (Runner == null || seconds <= 0f) return;
-            float open = ControlImmuneTimer.ExpiredOrNotRunning(Runner) ? 0f : (ControlImmuneTimer.RemainingTime(Runner) ?? 0f);
-            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
-            ControlImmuneTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+            // Runner first: a [Networked] property cannot be read before Spawned.
+            if (Runner != null && EffectWindow.TryGrant(ControlImmuneTimer, Runner, seconds, out var granted)) ControlImmuneTimer = granted;
         }
 
         /// <summary>
@@ -557,22 +551,19 @@ namespace CluckWars.Gameplay
         [Networked] private TickTimer StealProofTimer { get; set; }
 
         /// <summary>True while a steal-proof window is open. Readable on every peer.</summary>
-        public bool IsStealProof =>
-            Runner != null && !StealProofTimer.ExpiredOrNotRunning(Runner);
+        public bool IsStealProof => Runner != null && EffectWindow.IsOpen(StealProofTimer, Runner);
 
         /// <summary>Opens a steal-proof window of <paramref name="seconds"/>. Caster's own StateAuthority only.</summary>
         /// <remarks>Never shortens a window already open: a re-grant keeps whichever expiry is LATER.</remarks>
         public void GrantStealProof(float seconds)
         {
-            if (Runner == null || seconds <= 0f) return;
-            float open = StealProofTimer.ExpiredOrNotRunning(Runner) ? 0f : (StealProofTimer.RemainingTime(Runner) ?? 0f);
-            if (!ControlImmunityRules.ShouldReplace(open, seconds)) return;
-            StealProofTimer = TickTimer.CreateFromSeconds(Runner, seconds);
+            // Runner first: a [Networked] property cannot be read before Spawned.
+            if (Runner != null && EffectWindow.TryGrant(StealProofTimer, Runner, seconds, out var granted)) StealProofTimer = granted;
         }
 
         /// <summary>Seconds of root remaining, for the Aftermath countdown (FEEDBACK.md
         /// §5.1, case 18). 0 when not rooted/expired.</summary>
-        public float RootRemaining => RootTimer.ExpiredOrNotRunning(Runner) ? 0f : (RootTimer.RemainingTime(Runner) ?? 0f);
+        public float RootRemaining => EffectWindow.Remaining(RootTimer, Runner);
 
         /// <summary>
         /// Resolved control state following the severity ladder (Stunned > Rooted > Slowed > Free).

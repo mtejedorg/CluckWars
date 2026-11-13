@@ -96,7 +96,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("=> victim != null && !victim.IsStealProof", Src("Assets/_Game/Scripts/Gameplay/StealRules.cs"));
             Assert.IsTrue(ExecuteRules.CanBeExecuted(stealProof: false), "the walk is killable");
             // The egg's full immunity implies slow immunity.
-            StringAssert.Contains("IsControlImmune || (Runner != null && !SlowImmuneTimer.ExpiredOrNotRunning(Runner))", cc);
+            StringAssert.Contains("IsControlImmune || (Runner != null && EffectWindow.IsOpen(SlowImmuneTimer, Runner))", cc);
         }
 
         // ---- Phase 2: the egg blocks everything -------------------------------------------------------------------
