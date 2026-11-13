@@ -159,13 +159,6 @@ namespace CluckWars.Abilities
                  "own fields, read through TryGetAreaEffect.")]
         public AreaEffectKind AreaKind = AreaEffectKind.None;
 
-        [Header("Physics Scans")]
-        [Tooltip("Legacy layer mask from the Stage G Physics.OverlapSphere scans. No longer used to find " +
-                 "chicken targets — every ability's OnActivate now scans ChickenController.ActiveControllers " +
-                 "via GatherTargets (see AbilityAimTests' 'no stray scans' regression lock). Kept in case a " +
-                 "future ability needs a real physics query (e.g. line-of-sight); not currently read.")]
-        public LayerMask SearchMask = 256; // 1 << 8 (Chickens layer)
-
         // ---- Player-facing description (templated from this ability's own fields) ----
         // Every move that is shown to a player carries a UiText template and supplies the named
         // numbers it uses FROM ITS OWN FIELDS, exactly like PassiveAbilitySO's perk lines. Nothing
@@ -895,7 +888,7 @@ namespace CluckWars.Abilities
             buffer.Clear();
             if (caster == null) return 0;
 
-            aimDirection.y = 0f;
+            aimDirection = Planar.Flat(aimDirection);
             bool aimed = UsesAim && aimDirection.sqrMagnitude > 1e-6f;
             Vector3 forward = aimed && RotatesToAim ? aimDirection.normalized : caster.transform.forward;
 

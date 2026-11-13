@@ -250,47 +250,6 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void PhysicsScanningAbilities_SearchTheChickensLayer()
-        {
-            // As of the AbilityAim descriptor (FEEDBACK.md §4/§8), these eight no
-            // longer call Physics.OverlapSphere — every OnActivate target scan routes
-            // through AbilityBaseSO.GatherTargets against the ActiveControllers
-            // registry instead, so SearchMask no longer gates chicken targeting.
-            // The field is kept (it may still be read elsewhere / re-wired later) and
-            // this test keeps guarding it so a stale mask doesn't quietly resurface
-            // if a future change routes anything through it again.
-            const int chickensLayer = 8;
-            var scanners = new HashSet<string>
-            {
-                nameof(SnatchAbilitySO),
-                nameof(CluckShockAbilitySO),
-                nameof(RollPushAbilitySO),
-                nameof(RollTrampleAbilitySO),
-                nameof(SneakyStealAbilitySO),
-                nameof(AmbushAbilitySO),
-                nameof(WingSlamAbilitySO),
-                nameof(MarkKillAbilitySO),
-            };
-
-            var checkedAny = false;
-            foreach (var a in AllAssets())
-            {
-                if (!scanners.Contains(a.GetType().Name)) continue;
-                checkedAny = true;
-
-                int mask = a.SearchMask.value;
-                Assert.AreNotEqual(0, mask,
-                    $"{a.name}: SearchMask is 0 — its Physics.OverlapSphere can never hit anything.");
-                Assert.AreNotEqual(0, mask & (1 << chickensLayer),
-                    $"{a.name}: SearchMask {mask} excludes layer {chickensLayer} (Chickens), which is the " +
-                    "layer Chicken.prefab lives on. The ability scans and finds no targets, every time.");
-            }
-
-            Assert.IsTrue(checkedAny,
-                "No physics-scanning ability assets were found — the scanner type list is stale.");
-        }
-
-        [Test]
         public void EveryActiveAbility_IsPickableBySomeClass_OrIsAReferencedPreEquip()
         {
             // AllowedClasses alone decides picker eligibility (the Common/Character slot kind is

@@ -159,11 +159,12 @@ namespace CluckWars.Tests
         [Test]
         public void PhysicsLayers_MatchTheMasksBakedIntoCode()
         {
-            // AbilityBaseSO.SearchMask defaults to 1 << 8 and the ability assets store
-            // raw bitmasks. Renaming or renumbering these layers turns every ability
-            // physics scan into a silent no-op.
+            // Chicken.prefab is authored onto layer 8 and the pile / base colliders onto
+            // layer 9; the collision matrix and ChickenCargo's own _searchMask are set against
+            // those numbers. Renaming or renumbering them turns the cargo scan into a silent
+            // no-op and lets chickens fall through the arena.
             Assert.AreEqual("Chickens", LayerMask.LayerToName(8),
-                "Layer 8 must be 'Chickens' — ability SearchMasks are authored as raw bit 8.");
+                "Layer 8 must be 'Chickens' — Chicken.prefab is authored onto it.");
             Assert.AreEqual("Interactables", LayerMask.LayerToName(9),
                 "Layer 9 must be 'Interactables' — piles, pickups and bases are authored onto it.");
         }
@@ -225,13 +226,13 @@ namespace CluckWars.Tests
         [Test]
         public void ChickenPrefab_IsOnTheChickensLayer()
         {
-            // Ability SearchMasks scan layer 8; a chicken off that layer is
-            // untargetable by every damage, push and steal ability in the game.
+            // The collision matrix and ChickenCargo's pickup scan are set against layer 8;
+            // a chicken off that layer stops colliding and stops being found by them.
             var go = ChickenPrefab();
 
             Assert.AreEqual(8, go.layer,
                 $"Chicken.prefab root is on layer {go.layer} ('{LayerMask.LayerToName(go.layer)}'), " +
-                "not 8 (Chickens). Every ability's OverlapSphere would miss it.");
+                "not 8 (Chickens). The collision matrix and the cargo pickup scan are authored against it.");
         }
 
         [Test]
