@@ -264,6 +264,13 @@ namespace CluckWars.Gameplay
             PileFootprintShape.DistanceToSurfaceXZ(worldPos, transform.position, transform.eulerAngles.y, CurrentFootprint);
 
         /// <summary>
+        /// <see cref="DistanceToSurface"/> against the FULL footprint: the largest surface any peer's replica of this pile
+        /// can show, so never further than the distance a requester measured on its own (possibly staler) replica.
+        /// </summary>
+        private float DistanceToFullSurface(Vector3 worldPos) =>
+            PileFootprintShape.DistanceToSurfaceXZ(worldPos, transform.position, transform.eulerAngles.y, FullFootprint);
+
+        /// <summary>
         /// True when a chicken standing at <paramref name="worldPos"/> is close enough to
         /// the pile's SURFACE to drain it. Replaces the old centre-distance test, which
         /// silently stopped firing as soon as a pile grew wider than its collect radius.
@@ -479,11 +486,14 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // A local invocation has no wire time (and Source may be None).
-            float latency = info.IsInvokeLocal ? 0f : (float)Runner.GetPlayerRtt(info.Source);
-            float distance = DistanceToSurface(pecker.transform.position);
-            bool inReach = FoodTransferRules.IsWithinPeckReach(distance, _collectReach,
-                ChickenCargo.DriftSpeed(pecker.GetComponent<ChickenController>()), latency);
+            // The pecker passed PeckAbilitySO.FindPile on its own peer, on its own position and its own replica of this
+            // pile. This peer may be looking at an older position (a remote chicken's proxy is still arriving) and at a
+            // footprint that has shrunk since, so the bound is never tighter than that check: the floored latency for a
+            // remote sender (its measured RTT reads 0 in Shared Mode), none for a local one, and the full footprint.
+            float latency = ChickenCombat.SenderLatency(Runner, info);
+            float driftSpeed = ChickenCargo.DriftSpeed(pecker.GetComponent<ChickenController>());
+            float distance = DistanceToFullSurface(pecker.transform.position);
+            bool inReach = FoodTransferRules.IsWithinPeckReach(distance, _collectReach, driftSpeed, latency);
 
             float actual = FoodTransferRules.ServePeck(amount, pecker.MaxPeck, inReach, Amount, MaxAmount, FloorFraction, out float next);
             if (actual > 0f)
@@ -497,7 +507,7 @@ namespace CluckWars.Gameplay
             else if (!inReach && DrainRejectionLimiter.Allow(info.Source, out string held))
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_Drain({amount:0.00}) from {info.Source} - {pecker.name} is {distance:0.0} m from the pile, " +
-                    $"past its {_collectReach:0.0} m reach plus drift." + held);
+                    $"past its {_collectReach:0.0} m reach plus {StealRules.RangeMargin(driftSpeed, latency):0.00} m of drift." + held);
             }
 
             pecker.RPC_SettlePeck(actual, Id, requestId);

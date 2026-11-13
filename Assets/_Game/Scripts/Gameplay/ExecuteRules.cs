@@ -37,9 +37,9 @@ namespace CluckWars.Gameplay
         public const float KillCreditWindowSeconds = StealRules.ExecuteLootWindowSeconds;
 
         /// <summary>
-        /// Floor on a remote sender's latency. Whether <c>Runner.GetPlayerRtt</c> reports a real
-        /// value for remote players in Shared Mode is unconfirmed, so no allowance may rely on it
-        /// being non-zero.
+        /// Floor on a remote sender's latency. <c>Runner.GetPlayerRtt</c> reads 0 for a remote player
+        /// in Shared Mode (measured 2026-11-13, two players at a 116 ms relay RTT), so no allowance
+        /// may rely on it being non-zero.
         /// </summary>
         public const float MinRemoteLatencySeconds = 0.15f;
 

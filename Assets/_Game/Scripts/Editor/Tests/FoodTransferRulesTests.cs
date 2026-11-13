@@ -276,6 +276,70 @@ namespace CluckWars.Tests
         public void PeckReach_IsTheCollectReach_PlusDriftOverTheLatency(float distance, float reach, float speed, float latency, bool expected) =>
             Assert.AreEqual(expected, FoodTransferRules.IsWithinPeckReach(distance, reach, speed, latency));
 
+        // ---- Playtest 2026-11-13: an honest remote peck refused at 1.0 - 1.1 m ---------------------------------
+        // Measured in a 2-client Shared Mode player session: Runner.GetPlayerRtt(info.Source) read 0.0000 for the remote
+        // pecker on every request, so the drift margin was 0 and the pile judged a proxy that was still arriving
+        // (1.033 m, 1.1 m) against the bare 1.0 m reach the pecker itself had passed on its own, newer position.
+
+        private const float SpeedyWalk = 12.15f;   // the drift speed logged for the refused pecker
+
+        [TestCase(1.033f)]   // session-20261113-095528
+        [TestCase(1.1f)]     // session-20261113-094129, twice
+        [TestCase(1f + SpeedyWalk * ExecuteRules.MinRemoteLatencySeconds)]   // the whole floor allowance
+        public void ARemotePeck_FromASenderWhoseRttReadsZero_IsServedAtTheEdgeOfReach(float distance) =>
+            Assert.IsTrue(FoodTransferRules.IsWithinPeckReach(distance, 1f, SpeedyWalk, ExecuteRules.RemoteLatency(0f)),
+                "a remote request always gets the latency floor: the measured RTT cannot be relied on in Shared Mode");
+
+        [Test]
+        public void ALocalPeck_HasNoAllowance_TheBoundIsTheRequestersOwnCheck()
+        {
+            // Same peer, same tick, same position as PeckAbilitySO.FindPile: exactly the collect reach.
+            Assert.IsTrue(FoodTransferRules.IsWithinPeckReach(1f, 1f, SpeedyWalk, 0f));
+            Assert.IsFalse(FoodTransferRules.IsWithinPeckReach(1.1f, 1f, SpeedyWalk, 0f));
+        }
+
+        [TestCase(0f)]
+        [TestCase(0.116f)]
+        [TestCase(60f)]            // a sender causing a huge RTT cannot widen the bound past the cap
+        [TestCase(float.NaN)]
+        public void APeckFromAcrossTheArena_IsRefused_WhateverTheSendersRtt(float measuredRtt)
+        {
+            float latency = ExecuteRules.RemoteLatency(measuredRtt);
+            Assert.IsFalse(FoodTransferRules.IsWithinPeckReach(30f, 1f, SpeedyWalk, latency), "across the arena");
+            Assert.IsFalse(FoodTransferRules.IsWithinPeckReach(1f + SpeedyWalk * ExecuteRules.MaxLatencySeconds + 0.01f, 1f, SpeedyWalk, latency),
+                "just past the largest allowance there is");
+        }
+
+        [Test]
+        public void ThePilesFullFootprint_IsNeverFurtherThanItsShrunkenOne()
+        {
+            // The requester judged its reach on its replica of the pile, which can still be a fill step larger than the
+            // authority's (session-20261113-095528: same spot, 0.670 m at 7.80x6.50, 0.983 m one step later at 7.16x5.96).
+            var full = new UnityEngine.Vector2(7.8f, 6.5f);
+            var shrunk = new UnityEngine.Vector2(7.16f, 5.96f);
+            var centre = new UnityEngine.Vector3(2f, 0f, -3f);
+            for (int deg = 0; deg < 360; deg += 15)
+            {
+                float rad = deg * UnityEngine.Mathf.Deg2Rad;
+                foreach (float r in new[] { 1f, 3.5f, 4.6f, 9f })
+                {
+                    var pos = centre + new UnityEngine.Vector3(UnityEngine.Mathf.Cos(rad), 0f, UnityEngine.Mathf.Sin(rad)) * r;
+                    float dFull = PileFootprintShape.DistanceToSurfaceXZ(pos, centre, 30f, full);
+                    float dShrunk = PileFootprintShape.DistanceToSurfaceXZ(pos, centre, 30f, shrunk);
+                    Assert.LessOrEqual(dFull, dShrunk + 1e-4f, $"deg={deg} r={r}");
+                }
+            }
+        }
+
+        [Test]
+        public void TheDrainRpc_AllowsARemoteSenderTheFlooredLatency_AndMeasuresToTheFullFootprint()
+        {
+            string drain = AssassinExecuteCreditTests.MethodBody(PilePath, "public void RPC_Drain(");
+            StringAssert.Contains("ChickenCombat.SenderLatency(Runner, info)", drain, "0 for a local invoke, else the floored and capped RTT");
+            StringAssert.DoesNotContain("GetPlayerRtt", drain, "the raw RTT reads 0 for a remote player in Shared Mode");
+            StringAssert.Contains("DistanceToFullSurface(pecker.transform.position)", drain);
+        }
+
         [Test]
         public void ARefusedPeck_ReportsZero_AndFreesTheReservedRoom()
         {
