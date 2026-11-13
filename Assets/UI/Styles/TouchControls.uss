@@ -465,6 +465,7 @@
 .cw-hex-icon--roll         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RollPushAbilitySO.png"); }
 .cw-hex-icon--trap         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherTrapAbilitySO.png"); }
 .cw-hex-icon--aura         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_FeatherAuraAbilitySO.png"); }
+.cw-hex-icon--slow         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SlowAbilitySO.png"); }
 .cw-hex-icon--root         { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RootEggAbilitySO.png"); }
 .cw-hex-icon--shell        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EggShellAbilitySO.png"); }
 .cw-hex-icon--turtle       { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_TurtleModeAbilitySO.png"); }

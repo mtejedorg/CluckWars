@@ -20,5 +20,6 @@ namespace CluckWars.Abilities
         Hide,
         Peck,
         Hunt,
+        SlowBurst,   // the instant Slow (2026-11-13); Slow stays the Slow Area accent. Appended: the enum is serialized by number.
     }
 }

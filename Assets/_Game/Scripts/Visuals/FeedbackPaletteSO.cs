@@ -44,6 +44,8 @@ namespace CluckWars.Visuals
         public Color HideTextColor = new Color(0.75f, 0.65f, 1.00f, 1f);
         public Color PeckAccent = new Color(0.96f, 0.8f, 0.3f, 1f);
         public Color HuntAccent = new Color(0.9f, 0.1f, 0.2f, 1f);
+        [Tooltip("The instant Slow's accent; Slow Area keeps SlowAccent.")]
+        public Color SlowBurstAccent = new Color(0.35f, 0.82f, 0.45f, 1f);
 
         /// <summary>The accent for <paramref name="key"/>. <see cref="AccentKey.Custom"/> has no palette colour
         /// (the ability's own literal applies), so asking for it is a caller bug and throws.</summary>
@@ -59,6 +61,7 @@ namespace CluckWars.Visuals
             AccentKey.Hide => HideAccent,
             AccentKey.Peck => PeckAccent,
             AccentKey.Hunt => HuntAccent,
+            AccentKey.SlowBurst => SlowBurstAccent,
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, "AccentKey.Custom has no palette colour"),
         };
 

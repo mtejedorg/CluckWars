@@ -33,6 +33,7 @@ namespace CluckWars.UI
             { "RollPushAbilitySO",    "cw-hex-icon--roll" },
             { "FeatherTrapAbilitySO", "cw-hex-icon--trap" },
             { "FeatherAuraAbilitySO", "cw-hex-icon--aura" },
+            { "SlowAbilitySO", "cw-hex-icon--slow" },
             { "RootEggAbilitySO",     "cw-hex-icon--root" },
             { "EggShellAbilitySO",    "cw-hex-icon--shell" },
             { "TurtleModeAbilitySO",  "cw-hex-icon--turtle" },

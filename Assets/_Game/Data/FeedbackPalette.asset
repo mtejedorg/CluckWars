@@ -30,3 +30,4 @@ MonoBehaviour:
   HideTextColor: {r: 0.75, g: 0.65, b: 1, a: 1}
   PeckAccent: {r: 0.92, g: 0.66, b: 0.2, a: 1}
   HuntAccent: {r: 0.9, g: 0.1, b: 0.2, a: 1}
+  SlowBurstAccent: {r: 0.35, g: 0.82, b: 0.45, a: 1}

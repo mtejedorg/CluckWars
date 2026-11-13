@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0, type: 3}
   m_Name: FeatherAura
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.FeatherAuraAbilitySO
-  DisplayName: Slow
-  ShortLabel: SLOW
-  Description: Slows every rival within 6.5m to 55% speed for 3s.
+  DisplayName: Slow Area
+  ShortLabel: AREA
+  Description: "For 5s, rivals within 6.5m of you move at 55% speed."
   AccentKey: 4
   CustomAccentColor: {r: 0.6, g: 0.3, b: 0.9, a: 1}
   Category: 1
@@ -24,8 +24,8 @@ MonoBehaviour:
   PeckSlotPreEquippedBy: 0
   SignaturePreEquippedBy: 0
   BotRole: 0
-  Duration: 3
-  Cooldown: 6
+  Duration: 5
+  Cooldown: 7
   CastMotion: 2
   AreaKind: 2
   SearchMask:

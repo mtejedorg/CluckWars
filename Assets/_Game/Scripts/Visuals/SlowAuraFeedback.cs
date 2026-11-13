@@ -232,7 +232,8 @@ namespace CluckWars.Visuals
             for (int i = 0; i < AbilityController.SlotCount; i++)
             {
                 var s = _abilities.GetSlot(i);
-                if (s.Is(AbilityJob.Slow) && _abilities.IsSlotActive(i)) { aura = s; break; }
+                // The ring is the caster-following aura only: a placed Slow Area zone is drawn by its own zone visuals.
+                if (s.Is(AbilityJob.SlowArea) && s.AreaKind == AreaEffectKind.Aura && _abilities.IsSlotActive(i)) { aura = s; break; }
             }
 
             bool removed = _combat != null && _combat.IsRemoved;

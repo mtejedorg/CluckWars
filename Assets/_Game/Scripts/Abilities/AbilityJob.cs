@@ -16,13 +16,14 @@ namespace CluckWars.Abilities
         Steal     = 2,
         Stun      = 3,
         Shove     = 4,
-        Slow      = 5,   // the slow aura
+        Slow      = 5,   // the instant timed slow (Slow)
         Speed     = 6,
         Jump      = 7,
         Shield    = 8,   // walk, then the egg
         Hide      = 9,
         Bank      = 10,
         DeathMark = 11,  // mark, then the Kill
+        SlowArea  = 12,  // the lasting slow area (Slow Area: an aura or a placed zone). Appended: the instant Slow keeps Slow.
     }
 
     public static class AbilityJobs
