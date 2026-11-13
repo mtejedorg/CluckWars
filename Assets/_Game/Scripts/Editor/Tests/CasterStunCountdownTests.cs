@@ -142,7 +142,7 @@ namespace CluckWars.Tests
         [Test]
         public void Hud_TouchArcAndDesktopStrip_BothRouteThroughTheHelper_SourceGuard()
         {
-            string src = File.ReadAllText(HudPath);
+            string src = TestSources.ReadClass(HudPath);
             StringAssert.Contains("CasterStunCountdownRules.TryGetSeconds(", src);
             StringAssert.Contains("CasterStunCountdownRules.Format(", src);
             StringAssert.Contains("ChickenController.ActiveControllers", src);

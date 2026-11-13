@@ -16,7 +16,7 @@ namespace CluckWars.Tests
     public sealed class AbilityPreviewRulesTests
     {
         private static string Root => Path.GetDirectoryName(Application.dataPath);
-        private static string Read(string rel) => File.ReadAllText(Path.Combine(Root, rel));
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         // ---- NoTarget is not illegal ---------------------------------------
 

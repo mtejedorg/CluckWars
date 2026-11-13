@@ -18,7 +18,8 @@ namespace CluckWars.Tests
     {
         private static AbilityRegistrySO Registry => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
         private static T Asset<T>(string file) where T : AbilityBaseSO => TestAssets.Load<T>(TestAssets.AbilitiesDir + "/" + file);
-        private static string Src(string rel) => File.ReadAllText("Assets/_Game/Scripts/" + rel).Replace("\r\n", "\n");
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Src(string rel) => TestSources.ReadClass("Assets/_Game/Scripts/" + rel).Replace("\r\n", "\n");
 
         private static string Between(string src, string from, string to)
         {

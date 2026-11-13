@@ -32,8 +32,8 @@ namespace CluckWars.Tests
             AbilityHoldStateMachine.Decide(charging, pending, pendingSeconds, Threshold,
                 canCast: true, cancelPressed: cancel, hold, press, canBegin);
 
-        private static string Read(string rel) =>
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), rel));
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         // ---- Fizzle classification -------------------------------------------------------------
 

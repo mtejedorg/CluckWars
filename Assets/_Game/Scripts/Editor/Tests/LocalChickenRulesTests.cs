@@ -58,7 +58,7 @@ namespace CluckWars.Tests
                          "Diagnostics/AutoTestDriver.cs", "Diagnostics/PerfProbe.cs",
                      })
             {
-                string src = File.ReadAllText($"Assets/_Game/Scripts/{file}");
+                string src = TestSources.ReadClass($"Assets/_Game/Scripts/{file}");
                 StringAssert.DoesNotContain("FindObjectsByType<ChickenController>", src, file);
                 StringAssert.Contains("ChickenController.Local", src, file);
             }

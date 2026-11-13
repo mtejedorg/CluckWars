@@ -18,7 +18,7 @@ namespace CluckWars.Tests
     public sealed class PlayerPaletteTests
     {
         private static string ProjectRoot => Path.GetDirectoryName(Application.dataPath);
-        private static string Read(string rel) => File.ReadAllText(Path.Combine(ProjectRoot, rel));
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         // ---- One palette ----------------------------------------------------------------------------
 

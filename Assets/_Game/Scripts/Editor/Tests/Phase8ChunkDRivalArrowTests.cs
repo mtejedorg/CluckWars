@@ -547,7 +547,7 @@ namespace CluckWars.Tests
         {
             string src = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/RivalIndicator.cs"));
             StringAssert.Contains("if (!chevron) _wasUnderHud = false;", src, "never a ring with neither nameplate nor arrow");
-            string touch = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Input/TouchControlsController.cs"));
+            string touch = TestSources.ReadClass("Assets/_Game/Scripts/Input/TouchControlsController.cs");
             StringAssert.IsMatch(@"private void OnDisable\(\)\s*\{\s*StatusRowCount = 0;", touch);
             StringAssert.Contains("if (!_bound) { StatusRowCount = 0; return; }", touch);
             string zones = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/HudControlZones.cs"));
@@ -560,7 +560,7 @@ namespace CluckWars.Tests
             string src = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/ChickenNameplate.cs"));
             StringAssert.Contains("_rivalIndicator.HidesNameplate", src);
             StringAssert.Contains("public bool TryGetPlateViewport(Camera cam, out Rect viewport)", src);
-            string touch = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Input/TouchControlsController.cs"));
+            string touch = TestSources.ReadClass("Assets/_Game/Scripts/Input/TouchControlsController.cs");
             StringAssert.Contains("StatusRowCount = count;", touch);
             string zones = File.ReadAllText(Path.Combine(ProjectRoot(), "Assets/_Game/Scripts/Visuals/HudControlZones.cs"));
             StringAssert.Contains("statusRows == _cacheStatusRows", zones, "the zone cache is keyed on the strip's rows");

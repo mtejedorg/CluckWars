@@ -39,8 +39,8 @@ namespace CluckWars.Tests
             public void SetSfxVolume(float volume01) { }
         }
 
-        private static string Src(string relative) =>
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), relative));
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Src(string relative) => TestSources.ReadClass(relative);
 
         // ---- Fields --------------------------------------------------------------------------------------------------
 

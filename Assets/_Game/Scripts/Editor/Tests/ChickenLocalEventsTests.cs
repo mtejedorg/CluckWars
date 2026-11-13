@@ -440,7 +440,7 @@ namespace CluckWars.Tests
 
         private static string Code(string relative)
         {
-            string src = File.ReadAllText($"{ScriptsRoot}/{relative}");
+            string src = TestSources.ReadClass($"{ScriptsRoot}/{relative}");
             src = Regex.Replace(src, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
             return Regex.Replace(src, @"//[^\n]*", string.Empty);
         }

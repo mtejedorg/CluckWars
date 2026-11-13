@@ -16,7 +16,7 @@ namespace CluckWars.Tests
     /// </summary>
     public class MarkFeedbackTests
     {
-        private static string Read(string path) => File.ReadAllText(path);
+        private static string Read(string path) => TestSources.ReadClass(path);
 
         [Test]
         public void AmbushReach_IsTheAssetsOwnShape()
