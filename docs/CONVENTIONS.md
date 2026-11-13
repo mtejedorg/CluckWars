@@ -368,6 +368,23 @@ Level's `QualitySettings.renderPipeline` is null or not a real `RenderPipelineAs
 the EditMode suite after any change that touches the files above, not just after
 gameplay-code changes.
 
+### `Object.Destroy` on an asset: refused in the Editor, real in a player
+
+`Destroy` / `DestroyImmediate` on an asset (a material, texture, mesh or ScriptableObject loaded from the project)
+is refused by the Editor with one log line, `Destroying assets is not permitted to avoid data loss`, and the game
+carries on. A player has no such guard: the asset is unloaded and every user of it draws or reads nothing for the
+rest of the session. `ArenaWarmupProxies` destroyed the wired `Fx_Particles.mat` this way; the Editor looked
+fine and every chicken particle in a build had a null material (fixed in `0fd115ef`, 2026-11-13).
+
+- **Destroy only what you created.** A helper that can return either a shared asset or a fresh instance says
+  which through its signature (`ChickenVFX.BuildMaterial(out bool ownedByCaller)`), and the caller destroys only
+  when it owns the object.
+- **Read `Editor.log` for that line** after any change to cleanup code: in the Editor it is the only symptom.
+- **A static that caches an object is cleared on `SubsystemRegistration`**, like the registries and singletons,
+  so a session never inherits a reference the previous one destroyed.
+- Verify a cleanup change in a player build, not only in the Editor (`tools/test-session/scenario-pc.ps1`,
+  `nullMat=0` in the merged report).
+
 ---
 
 ## Asset / prefab GUID stability
