@@ -6,8 +6,6 @@ using CluckWars.Networking;
 using CluckWars.Services;
 using CluckWars.Audio;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using Zenject;
 
@@ -90,15 +88,10 @@ namespace CluckWars.UI
         {
             SelfInject.Ensure(this, _log != null);
 
-            EnsureEventSystem();
+            UiElements.EnsureEventSystem();
             BuildCanvas();
         }
 
-        private static void EnsureEventSystem()
-        {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
-            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-        }
 
         // ---- Lifecycle tick ----------------------------------------------------
 

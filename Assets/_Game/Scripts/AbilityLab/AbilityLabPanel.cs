@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Logging;
+using CluckWars.UI;
 using CluckWars.Networking;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -114,29 +115,7 @@ namespace CluckWars.AbilityLab
                     "empty. Assign it on ProjectInstaller.");
             }
 
-            EnsureEventSystem();
-        }
-
-        /// <summary>
-        /// UI Toolkit runtime panels need an EventSystem (+ Input System UI module) to receive
-        /// pointer clicks. Same helper as <c>MenuUiController</c>, <c>MatchHud</c> and
-        /// <c>MatchOverlaysController</c>, for the same reason.
-        /// </summary>
-        /// <remarks>
-        /// Not optional here, and not inherited from anywhere. No scene in the project
-        /// contains an EventSystem object — every scene that has UI Toolkit creates one at
-        /// runtime through a copy of this helper, and the one <c>MenuUiController</c> creates
-        /// in Bootstrap is a plain <c>new GameObject</c> that dies with the scene load. Without
-        /// this call the lab's controls AND the touch joystick under it would both be inert:
-        /// the exact failure this whole change exists to avoid, and one that only shows up in
-        /// a build.
-        /// </remarks>
-        private static void EnsureEventSystem()
-        {
-            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() != null) return;
-            new GameObject("EventSystem",
-                typeof(UnityEngine.EventSystems.EventSystem),
-                typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
+            UiElements.EnsureEventSystem();
         }
 
         private void OnEnable()

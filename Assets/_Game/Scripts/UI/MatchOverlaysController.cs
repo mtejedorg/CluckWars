@@ -216,7 +216,7 @@ namespace CluckWars.UI
             if (_network != null) _network.OnShutdown += HandleShutdown;
             if (_input == null)
                 _log?.Warn(Source, "IInputProvider not injected; Esc / Android back / pad Start will not leave the match (the on-screen buttons still work).");
-            EnsureEventSystem();
+            UiElements.EnsureEventSystem();
         }
 
         private void OnDisable()
@@ -233,19 +233,6 @@ namespace CluckWars.UI
             // The stage owns cameras, lights, models and RenderTextures in this scene plus render-
             // pipeline callbacks that would outlive it: always hand them back when the scene goes.
             DisposeStage();
-        }
-
-        /// <summary>
-        /// UI Toolkit runtime panels need an EventSystem (+ Input System UI module)
-        /// for the Lobby's Start/Copy buttons. MatchHud ensures one too; both guard
-        /// on "none exists" so only a single EventSystem is ever created.
-        /// </summary>
-        private static void EnsureEventSystem()
-        {
-            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() != null) return;
-            new GameObject("EventSystem",
-                typeof(UnityEngine.EventSystems.EventSystem),
-                typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
         }
 
         private void HandleShutdown(ShutdownReason reason)
@@ -460,25 +447,19 @@ namespace CluckWars.UI
             else _log?.Error(Source, "MatchOverlays.uxml has no #EventBanner or #OverlayRoot: the event banner keeps the landscape spot in portrait, over the ability hexes.");
 
             // Start hidden; state polls flip them on.
-            SetShown(_matchEndOverlay, false);
-            SetShown(_lobbyOverlay, false);
-            SetShown(_sessionEndOverlay, false);
+            UiElements.SetShown(_matchEndOverlay, false);
+            UiElements.SetShown(_lobbyOverlay, false);
+            UiElements.SetShown(_sessionEndOverlay, false);
             // #IntroOverlay / #ArenaCover / #IntroGetReady stay visible (UXML default): the first RefreshIntro below decides, in
             // this same Update, before anything renders. Hiding them here would flash the bare world for a frame.
-            SetShown(_introWaiting, false);
-            SetShown(_hostLeftNotice, false);
-            SetShown(_leaveSheet, false);
+            UiElements.SetShown(_introWaiting, false);
+            UiElements.SetShown(_hostLeftNotice, false);
+            UiElements.SetShown(_leaveSheet, false);
 
             _bound = true;
             _log?.Debug(Source, "Overlays bound.");
         }
 
-        private static void SetShown(VisualElement ve, bool shown)
-        {
-            if (ve == null) return;
-            var target = shown ? DisplayStyle.Flex : DisplayStyle.None;
-            if (ve.style.display != target) ve.style.display = target;
-        }
 
         // ========================================================================
         //  BACK  (Esc / Android back / pad Start) + the "Leave match?" sheet
@@ -529,7 +510,7 @@ namespace CluckWars.UI
             LeaveSheetState.IsOpen = true;
             bool solo = IsSolo();
             if (_leaveBody != null) _leaveBody.text = UiText.Get(solo ? UiKeys.LeaveBodySolo : UiKeys.LeaveBodyMp);
-            SetShown(_leaveSheet, true);
+            UiElements.SetShown(_leaveSheet, true);
             _audio.Tap();
             _leaveKeepBtn?.Focus();   // the default focus: a pad / keyboard confirm keeps playing
             _log?.Info(Source, $"Leave sheet opened ({(solo ? "solo: the round pauses" : "multiplayer: the match keeps going")}).");
@@ -541,7 +522,7 @@ namespace CluckWars.UI
             bool wasOpen = _leaveSheetOpen;
             _leaveSheetOpen = false;
             LeaveSheetState.IsOpen = false;
-            SetShown(_leaveSheet, false);
+            UiElements.SetShown(_leaveSheet, false);
             ApplySoloPause(GameManager.Instance != null ? GameManager.Instance.State : (MatchState?)null);
             if (wasOpen) _log?.Info(Source, "Leave sheet closed.");
         }
@@ -583,7 +564,7 @@ namespace CluckWars.UI
         private void RefreshMatchEnd(GameManager gm)
         {
             bool show = gm != null && gm.State == MatchState.Ended;
-            SetShown(_matchEndOverlay, show);
+            UiElements.SetShown(_matchEndOverlay, show);
             if (!show)
             {
                 if (_matchEndPopulated) DisposeStage();
@@ -613,7 +594,7 @@ namespace CluckWars.UI
             if (_leavingToLobby) return; // buttons stay disabled while the session shuts down
             bool canPlayAgain = gm.CanRequestPlayAgain;
             if (_mePlayAgainBtn != null) _mePlayAgainBtn.SetEnabled(canPlayAgain);
-            SetShown(_meHostNote, !canPlayAgain);
+            UiElements.SetShown(_meHostNote, !canPlayAgain);
         }
 
         /// <summary>
@@ -1074,7 +1055,7 @@ namespace CluckWars.UI
             // Fill on the frame it opens, not on the next poll: its TIME / GOAL / status labels are
             // authored blank (bound from MatchConfig here), so a late fill would flash empty rows.
             bool opening = show && !IsShown(_lobbyOverlay);
-            SetShown(_lobbyOverlay, show);
+            UiElements.SetShown(_lobbyOverlay, show);
             if (!show) return;
 
             if (!(poll || opening)) return;
@@ -1086,7 +1067,7 @@ namespace CluckWars.UI
 
             // Invite code: only a hosted session has anyone to invite, so never in solo.
             bool showInvite = isHost && !solo;
-            SetShown(_lobbyInviteCard, showInvite);
+            UiElements.SetShown(_lobbyInviteCard, showInvite);
             if (showInvite) SetCodeTiles(_selection?.SessionName);
 
             // House rules.
@@ -1112,7 +1093,7 @@ namespace CluckWars.UI
             if (_lobbyStatusDot != null) _lobbyStatusDot.style.backgroundColor = full ? StatusLampReady : StatusLampWaiting;
 
             // START (host only) + the host / guest line.
-            SetShown(_lobbyStartBtn, isHost);
+            UiElements.SetShown(_lobbyStartBtn, isHost);
             if (_lobbyHint != null)
                 _lobbyHint.text = UiText.Get(solo ? UiKeys.LobbyHintSolo : isHost ? UiKeys.LobbyHintHost : UiKeys.LobbyHintGuest);
         }
@@ -1237,18 +1218,18 @@ namespace CluckWars.UI
                     v.ChickenCss = css;
                 }
 
-                SetShown(v.NameRow, filled);
-                SetShown(v.ClassLine, filled);
-                SetShown(v.Hexes, filled);
-                SetShown(v.State, filled);
-                SetShown(v.Waiting, !filled);
+                UiElements.SetShown(v.NameRow, filled);
+                UiElements.SetShown(v.ClassLine, filled);
+                UiElements.SetShown(v.Hexes, filled);
+                UiElements.SetShown(v.State, filled);
+                UiElements.SetShown(v.Waiting, !filled);
                 if (!filled) continue;
 
                 var cls = chicken.Class;
                 v.Name.text = MatchStandings.DisplayName(corner == localCorner, chicken.IsBot, cls, corner);
                 bool host = WaitingRoomRules.ShowHostTag(solo, master != PlayerRef.None && chicken.Object.InputAuthority == master, chicken.IsBot);
                 v.Tag.text = host ? UiText.Get(UiKeys.TagHost) : chicken.IsBot ? UiText.Get(UiKeys.TagCpu) : string.Empty;
-                SetShown(v.Tag, host || chicken.IsBot);
+                UiElements.SetShown(v.Tag, host || chicken.IsBot);
                 v.ClassLine.text = MatchStandings.ClassRoleLine(cls);
                 PaintSeatLoadout(v, chicken);
             }
@@ -1301,16 +1282,16 @@ namespace CluckWars.UI
                 if (_eventBannerHeader != null && _eventBannerHeader.text != EventBannerFeed.Header) _eventBannerHeader.text = EventBannerFeed.Header;
                 if (_eventBannerText != null && _eventBannerText.text != EventBannerFeed.Text) _eventBannerText.text = EventBannerFeed.Text;
             }
-            SetShown(_eventBanner, show);
+            UiElements.SetShown(_eventBanner, show);
         }
 
         private void TickSessionEnd()
         {
-            SetShown(_sessionEndOverlay, true);
-            SetShown(_matchEndOverlay, false);
-            SetShown(_lobbyOverlay, false);
-            SetShown(_introOverlay, false);
-            SetShown(_hostLeftNotice, false);   // the session-end screen owns a host that left with the session
+            UiElements.SetShown(_sessionEndOverlay, true);
+            UiElements.SetShown(_matchEndOverlay, false);
+            UiElements.SetShown(_lobbyOverlay, false);
+            UiElements.SetShown(_introOverlay, false);
+            UiElements.SetShown(_hostLeftNotice, false);   // the session-end screen owns a host that left with the session
             DisposeStage();
 
             float elapsed   = Time.unscaledTime - _shutdownAtUnscaledTime;
@@ -1387,12 +1368,12 @@ namespace CluckWars.UI
             {
                 // Fade out, then drop the element (and let the intro overlay follow its own rules again).
                 bool fading = Time.unscaledTime < _arenaCoverFadeEndsAt;
-                SetShown(_arenaCover, fading);
-                if (fading) SetShown(_introOverlay, true);
+                UiElements.SetShown(_arenaCover, fading);
+                if (fading) UiElements.SetShown(_introOverlay, true);
                 return;
             }
 
-            SetShown(_arenaCover, d.CoverShown);
+            UiElements.SetShown(_arenaCover, d.CoverShown);
             if (d.CoverShown != RevealState.CoverShown)
             {
                 // Breadcrumb (item 5): every cover transition before the reveal (the waiting room hides it, Starting shows it).
@@ -1403,7 +1384,7 @@ namespace CluckWars.UI
             if (d.CoverShown)
             {
                 _arenaCover.RemoveFromClassList("cw-arena-cover--hidden");
-                SetShown(_introOverlay, true);
+                UiElements.SetShown(_introOverlay, true);
             }
         }
 
@@ -1432,17 +1413,17 @@ namespace CluckWars.UI
             bool getReady = hold == IntroOverlayRule.PreIntro.GetReady && !_shutdownReason.HasValue;
             TrackGetReadyHold(getReady, gm);
             // GET READY is only the pre-intro card (finding 11): gone on the first digit, never under GO!.
-            SetShown(_introGetReady, getReady);
+            UiElements.SetShown(_introGetReady, getReady);
             RefreshWaitingLine(getReady ? gm : null);
             if (hold != IntroOverlayRule.PreIntro.None)
             {
                 _introCues.Reset();
                 if (_introNumber != null && _introNumber.text.Length > 0) _introNumber.text = string.Empty;
                 SetIntroScrim(MatchPresentationRules.IntroScrimVisible(getReady, introActive: false));
-                SetShown(_introOverlay, getReady);
+                UiElements.SetShown(_introOverlay, getReady);
                 return;
             }
-            if (gm == null) { _introCues.Reset(); SetShown(_introOverlay, false); return; }
+            if (gm == null) { _introCues.Reset(); UiElements.SetShown(_introOverlay, false); return; }
 
             // The timer is networked and untouched; the cues below are this client's own presentation of it.
             var cue = _introCues.Observe(gm.IsIntroActive, gm.IsIntroActive ? gm.IntroRemaining : 0f, out int number);
@@ -1453,7 +1434,7 @@ namespace CluckWars.UI
             if (gm.IsIntroActive)
             {
                 if (_introNumber != null && cue == IntroCueTracker.Cue.Tick) _introNumber.text = number.ToString();
-                SetShown(_introOverlay, true);
+                UiElements.SetShown(_introOverlay, true);
                 _goExpiresAtUnscaledTime = Time.unscaledTime + IntroCueTracker.GoHoldSeconds;
                 if (cue == IntroCueTracker.Cue.Tick) { _audio.CountdownTick(number); _introJuice?.Slam(_introNumber); }
                 return;
@@ -1470,11 +1451,11 @@ namespace CluckWars.UI
             {
                 if (_introNumber != null && cue != IntroCueTracker.Cue.Go && _introNumber.text != UiText.Get(UiKeys.CountdownGo))
                     _introNumber.text = UiText.Get(UiKeys.CountdownGo);
-                SetShown(_introOverlay, true);
+                UiElements.SetShown(_introOverlay, true);
             }
             else
             {
-                SetShown(_introOverlay, false);
+                UiElements.SetShown(_introOverlay, false);
             }
         }
 
@@ -1531,7 +1512,7 @@ namespace CluckWars.UI
             var runner = _network != null ? _network.Runner : null;
             bool isThisPeer = (chicken != null && chicken.HasInputAuthority) || (runner != null && waitingFor == runner.LocalPlayer);
             bool show = WaitingLineRule.Shows(waitingFor != PlayerRef.None, isThisPeer);
-            SetShown(_introWaiting, show);
+            UiElements.SetShown(_introWaiting, show);
             if (!show) return;
 
             string text = chicken != null
@@ -1566,7 +1547,7 @@ namespace CluckWars.UI
             if (authority != PlayerRef.None || !ReferenceEquals(gm, _watchedManager)) _watchedAuthority = authority;
             _watchedManager = gm;
             _watchedState = gm != null ? gm.State : MatchState.WaitingForPlayers;
-            SetShown(_hostLeftNotice, !sessionEnding && Time.unscaledTime < _hostLeftUntilUnscaledTime);
+            UiElements.SetShown(_hostLeftNotice, !sessionEnding && Time.unscaledTime < _hostLeftUntilUnscaledTime);
         }
 
         /// <summary>

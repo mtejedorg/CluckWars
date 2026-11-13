@@ -241,7 +241,7 @@ namespace CluckWars.UI
                 var skull = _lbRows[rank].Skull;
                 if (skull == null) continue;
                 bool on = o.SkullAlpha > 0f && _rowCorner[rank] >= 0 && _rowCorner[rank] == o.SkullCorner && _rowVisible[rank];
-                SetShown(skull, on);
+                UiElements.SetShown(skull, on);
                 if (on)
                 {
                     // Every role sees the kill go live here: the skull turns red and pulses from the arm to the end.
@@ -260,7 +260,7 @@ namespace CluckWars.UI
                 float alpha = o.ToastAlpha, scale = o.ToastScale;
                 bool backIn = alpha <= 0f && BackInToast(LocalRespawnCue.SecondsSince, out alpha, out scale);
                 bool toast = alpha > 0f;
-                SetShown(_markToast, toast);
+                UiElements.SetShown(_markToast, toast);
                 if (toast)
                 {
                     if (backIn != _toastShowsBackIn && _markToastText != null)
@@ -277,7 +277,7 @@ namespace CluckWars.UI
             if (_markClock != null)
             {
                 bool clock = o.ClockAlpha > 0f;
-                SetShown(_markClock, clock);
+                UiElements.SetShown(_markClock, clock);
                 if (clock)
                 {
                     _markClock.style.opacity = o.ClockAlpha;
@@ -314,7 +314,7 @@ namespace CluckWars.UI
             }
             if (n == 0 || targetAt < 0)
             {
-                SetShown(_drawHighlight, false);
+                UiElements.SetShown(_drawHighlight, false);
                 return;
             }
 
@@ -323,10 +323,10 @@ namespace CluckWars.UI
             var row = _lbRows[_drawRows[at]].Root;
             if (row == null || float.IsNaN(row.layout.y))
             {
-                SetShown(_drawHighlight, false);
+                UiElements.SetShown(_drawHighlight, false);
                 return;
             }
-            SetShown(_drawHighlight, true);
+            UiElements.SetShown(_drawHighlight, true);
             _drawHighlight.style.translate = new Translate(0f, row.layout.y);
             _drawHighlight.style.opacity = o.DrawAlpha;
             _drawHighlight.style.scale = new Scale(new Vector3(o.DrawScale, o.DrawScale, 1f));
@@ -346,11 +346,6 @@ namespace CluckWars.UI
             return alpha > 0f;
         }
 
-        private static void SetShown(VisualElement e, bool shown)
-        {
-            var d = shown ? DisplayStyle.Flex : DisplayStyle.None;
-            if (e.style.display != d) e.style.display = d;
-        }
 
 
         private void RefreshSceneRefs()

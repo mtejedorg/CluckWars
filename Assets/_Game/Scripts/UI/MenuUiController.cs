@@ -224,20 +224,7 @@ namespace CluckWars.UI
             if (_sceneLoader == null) _sceneLoader = FindFirstObjectByType<SceneLoader>();
             _sceneLoader?.SetAutoLoad(false);
 
-            EnsureEventSystem();
-        }
-
-        /// <summary>
-        /// UI Toolkit runtime panels need an EventSystem (+ Input System UI module)
-        /// to receive pointer clicks. The old UGUI flow created one; replicate that
-        /// here so the menu is interactive even if the scene has none.
-        /// </summary>
-        private static void EnsureEventSystem()
-        {
-            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() != null) return;
-            new GameObject("EventSystem",
-                typeof(UnityEngine.EventSystems.EventSystem),
-                typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
+            UiElements.EnsureEventSystem();
         }
 
         private void OnEnable()
@@ -369,7 +356,7 @@ namespace CluckWars.UI
             var ve = vta.Instantiate();
             UiText.ResolveTree(ve);
             ve.style.flexGrow = 1;
-            ve.style.display = DisplayStyle.None;
+            UiElements.SetShown(ve, false);
             ve.AddToClassList(PageWrapClass);
             _pageHost.Add(ve);
             return ve;
@@ -537,14 +524,14 @@ namespace CluckWars.UI
 
             if (!animate)
             {
-                foreach (var p in Pages()) p.style.display = p == page ? DisplayStyle.Flex : DisplayStyle.None;
+                foreach (var p in Pages()) UiElements.SetShown(p, p == page);
                 // One frame later, so the Show* caller's Refresh has painted the page first.
                 page.schedule.Execute(() => OnPageShown(page, id)).ExecuteLater(0);
                 return;
             }
 
             bool forward = PageOrder(page) >= PageOrder(previous);
-            foreach (var p in Pages()) if (p != previous) p.style.display = DisplayStyle.None;
+            foreach (var p in Pages()) if (p != previous) UiElements.SetShown(p, false);
             previous.AddToClassList("cw-pagewrap--out");
             previous.AddToClassList(forward ? "cw-pagewrap--out-fwd" : "cw-pagewrap--out-back");
 
@@ -552,9 +539,9 @@ namespace CluckWars.UI
             {
                 if (id != _pageTransitionId) return; // superseded; the newer SetPage settled it
                 ClearPageAnim(previous);
-                previous.style.display = DisplayStyle.None;
+                UiElements.SetShown(previous, false);
                 page.AddToClassList(forward ? "cw-pagewrap--in-fwd" : "cw-pagewrap--in-back");
-                page.style.display = DisplayStyle.Flex;
+                UiElements.SetShown(page, true);
                 OnPageShown(page, id);
                 // One frame at the offset with no transition, then release: the page animates to rest.
                 page.schedule.Execute(() =>
@@ -679,11 +666,11 @@ namespace CluckWars.UI
 
             // BuildAll has just shown the main menu (the post-match landing flags are never set alongside this one).
             SetDisconnectStatus(null);
-            _disconnectBody.style.display = DisplayStyle.Flex;
+            UiElements.SetShown(_disconnectBody, true);
             _disconnectRejoinBtn.SetEnabled(true);
             _disconnectBackBtn.SetEnabled(true);
-            _disconnectRejoinBtn.style.display = offered ? DisplayStyle.Flex : DisplayStyle.None;
-            _disconnectSheet.style.display = DisplayStyle.Flex;
+            UiElements.SetShown(_disconnectRejoinBtn, offered);
+            UiElements.SetShown(_disconnectSheet, true);
             if (offered) CheckRejoinLobby(_rejoinCode);
         }
 
@@ -698,8 +685,8 @@ namespace CluckWars.UI
                 // A lobby that is gone means the match ended (possibly the host-left case a transport reason of Unknown
                 // was read as a lost connection, see DisconnectRules.Classify): no "Lost the signal" claim, only the outcome.
                 _log?.Info(Source, $"Disconnect notice: lobby '{code}' is gone; REJOIN hidden.");
-                _disconnectBody.style.display = DisplayStyle.None;
-                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                UiElements.SetShown(_disconnectBody, false);
+                UiElements.SetShown(_disconnectRejoinBtn, false);
                 SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
             }
             catch (Exception e)
@@ -739,8 +726,8 @@ namespace CluckWars.UI
                 // The lobby service logged its Reason / ErrorCode just before (UGS line); the type tells the rest apart.
                 _log?.Warn(Source, $"REJOIN '{_rejoinCode}' failed: {e.GetType().Name}: {e.Message}" +
                     (e.InnerException != null ? $" (inner {e.InnerException.GetType().Name}: {e.InnerException.Message})" : string.Empty));
-                _disconnectBody.style.display = DisplayStyle.None;
-                _disconnectRejoinBtn.style.display = DisplayStyle.None;
+                UiElements.SetShown(_disconnectBody, false);
+                UiElements.SetShown(_disconnectRejoinBtn, false);
                 _disconnectBackBtn.SetEnabled(true);
                 SetDisconnectStatus(UiText.Get(UiKeys.DisconnectRejoinFailed));
                 _isBusy = false;
@@ -751,13 +738,13 @@ namespace CluckWars.UI
         {
             if (_disconnectStatus == null) return;
             _disconnectStatus.text = text ?? string.Empty;
-            _disconnectStatus.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
+            UiElements.SetShown(_disconnectStatus, !(string.IsNullOrEmpty(text)));
         }
 
         private void CloseDisconnectSheet()
         {
             if (!IsDisconnectSheetOpen) return;
-            _disconnectSheet.style.display = DisplayStyle.None;
+            UiElements.SetShown(_disconnectSheet, false);
         }
 
         // ======================================================================
@@ -820,13 +807,13 @@ namespace CluckWars.UI
             // Buzz When Hit only means something on a phone: desktop and the Editor have no vibrator, so the row
             // is hidden there rather than offering a switch that can never do anything.
             if (!Application.isMobilePlatform)
-                Bind<VisualElement>(_settingsSheet, "BuzzWhenHitRow", r => r.style.display = DisplayStyle.None);
+                Bind<VisualElement>(_settingsSheet, "BuzzWhenHitRow", r => UiElements.SetShown(r, false));
 
             // Release builds have no Dev Mode at all (re-audit item 17): the row goes, and the
             // Performance row becomes the last one (no divider under it).
             if (!DevToolsAvailable)
             {
-                Bind<VisualElement>(_settingsSheet, "DeveloperModeRow", r => r.style.display = DisplayStyle.None);
+                Bind<VisualElement>(_settingsSheet, "DeveloperModeRow", r => UiElements.SetShown(r, false));
                 Bind<VisualElement>(_settingsSheet, "PerformanceModeRow", r => r.AddToClassList("cw-setting-toggle-row--last"));
             }
         }
@@ -969,13 +956,13 @@ namespace CluckWars.UI
                 slider.SetValueWithoutNotify(get());
                 if (percent != null) percent.text = SliderRowRules.Percent(get());
             }
-            _settingsSheet.style.display = DisplayStyle.Flex;
+            UiElements.SetShown(_settingsSheet, true);
         }
 
         private void CloseSettings()
         {
             if (_settingsSheet == null || _settingsSheet.style.display == DisplayStyle.None) return;
-            _settingsSheet.style.display = DisplayStyle.None;
+            UiElements.SetShown(_settingsSheet, false);
             PlayerPreferences.FlushVolumes();
             RefreshDevRow();
         }
@@ -1001,9 +988,7 @@ namespace CluckWars.UI
         private void RefreshDevRow()
         {
             Bind<VisualElement>(_mainMenu, "DevRow", r =>
-                r.style.display = DevToolsAvailable && PlayerPreferences.DeveloperModeEnabled
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None);
+                UiElements.SetShown(r, DevToolsAvailable && PlayerPreferences.DeveloperModeEnabled));
         }
 
         /// <summary>
@@ -1078,8 +1063,7 @@ namespace CluckWars.UI
         private void RefreshPlayAgain()
         {
             bool valid = TryGetLastSetup(out var setup);
-            Bind<VisualElement>(_mainMenu, "PlayAgainRow", r =>
-                r.style.display = valid ? DisplayStyle.Flex : DisplayStyle.None);
+            Bind<VisualElement>(_mainMenu, "PlayAgainRow", r => UiElements.SetShown(r, valid));
             // One green CTA per screen: PLAY AGAIN while it is offered, else PLAY SOLO.
             Bind<Button>(_mainMenu, "PlayAgainBtn", b =>
             {
@@ -1389,7 +1373,7 @@ namespace CluckWars.UI
                     _previewQuote.text = UiText.Format(UiKeys.ClassQuote, ("quote", entry.LoreQuote));
                 else
                     _previewQuote.text = "";
-                _previewQuote.style.display = string.IsNullOrEmpty(_previewQuote.text) ? DisplayStyle.None : DisplayStyle.Flex;
+                UiElements.SetShown(_previewQuote, !(string.IsNullOrEmpty(_previewQuote.text)));
             }
 
             RefreshRoleCallouts(cls);
@@ -1413,7 +1397,7 @@ namespace CluckWars.UI
                 if (b == null) continue;
                 var p = i < perks.Count ? perks[i] : null;
                 b.Passive = p;
-                b.Root.style.display = p != null ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(b.Root, p != null);
                 if (p == null) continue;
                 if (b.Name != null) b.Name.text = p.DisplayName.ToUpperInvariant();
                 PaintIcon(b.Icon, p);
@@ -1429,7 +1413,7 @@ namespace CluckWars.UI
                 // already shows: hide the repeat rather than print it twice.
                 string detail = sel != null ? sel.PerkDetail(_matchConfig) : string.Empty;
                 _perkDetail.text = sel != null && detail == sel.PerkLine(_matchConfig) ? string.Empty : detail;
-                _perkDetail.style.display = string.IsNullOrEmpty(_perkDetail.text) ? DisplayStyle.None : DisplayStyle.Flex;
+                UiElements.SetShown(_perkDetail, !(string.IsNullOrEmpty(_perkDetail.text)));
             }
         }
 
@@ -1443,13 +1427,13 @@ namespace CluckWars.UI
                 var chip = _starterChips[i];
                 if (chip == null) continue;
                 var ab = i < starters.Count ? starters[i] : null;
-                chip.Root.style.display = ab != null ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(chip.Root, ab != null);
                 if (ab == null) continue;
                 PaintIcon(chip.Icon, ab);
                 if (chip.Name != null) chip.Name.text = AbilityLabel(ab);
             }
             if (_starterRow != null)
-                _starterRow.style.display = starters.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(_starterRow, starters.Count > 0);
         }
 
         /// <summary>
@@ -1469,7 +1453,7 @@ namespace CluckWars.UI
             bool show = !string.IsNullOrWhiteSpace(text);
             callout.text = show ? text : string.Empty;
             var row = callout.parent ?? callout;
-            row.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            UiElements.SetShown(row, show);
         }
 
         // ======================================================================
@@ -1621,7 +1605,7 @@ namespace CluckWars.UI
             _gearBody?.EnableInClassList("cw-gear-body--fixed", isFixed);
             if (_kitTitle != null)
             {
-                _kitTitle.style.display = isFixed ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(_kitTitle, isFixed);
                 if (isFixed) _kitTitle.text = UiText.Format(UiKeys.LoadoutKitTitle, ("perk", _selection.Passive.DisplayName.ToUpperInvariant()));
             }
             if (!isFixed) return;
@@ -1790,11 +1774,11 @@ namespace CluckWars.UI
                 v.Root.EnableInClassList("cw-slot-box--filled", ab != null);
 
                 PaintIcon(v.Icon, ab);
-                v.IconHost.style.display = ab != null ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(v.IconHost, ab != null);
                 v.Name.text = ab != null ? AbilityLabel(ab) : string.Empty;
-                v.Name.style.display = ab != null ? DisplayStyle.Flex : DisplayStyle.None;
-                v.Empty.style.display = ab == null ? DisplayStyle.Flex : DisplayStyle.None;
-                v.StarterTag.style.display = locked && ab != null ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(v.Name, ab != null);
+                UiElements.SetShown(v.Empty, ab == null);
+                UiElements.SetShown(v.StarterTag, locked && ab != null);
                 // The caret says what the next card tap does to this slot (LoadoutSlotModel.TapCard):
                 // an empty armed slot is filled (NEXT); a filled one - always the case once the rail
                 // is full - has its move replaced or swapped with the tapped card (TAP TO SWAP).
@@ -1914,8 +1898,8 @@ namespace CluckWars.UI
                 // card's content never moves when the focus does.
                 SetBorder(v.Root, focused ? Ink : AbilityPalette.CategoryColor(v.Ability.Category));
                 v.Badge.text = slot >= 0 ? (slot + 1).ToString() : string.Empty;
-                v.Badge.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                v.StarterTag.style.display = starter ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(v.Badge, slot >= 0);
+                UiElements.SetShown(v.StarterTag, starter);
             }
         }
 
@@ -1930,11 +1914,11 @@ namespace CluckWars.UI
             if (_abilityDetailName != null)
             {
                 _abilityDetailName.text = has ? AbilityLabel(ab) : string.Empty;
-                _abilityDetailName.style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(_abilityDetailName, has);
             }
             if (_abilityDetailCat != null)
             {
-                _abilityDetailCat.style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(_abilityDetailCat, has);
                 if (has)
                 {
                     var catColor = AbilityPalette.CategoryColor(ab.Category);
@@ -1945,7 +1929,7 @@ namespace CluckWars.UI
             }
             if (_abilityDetailCd != null)
             {
-                _abilityDetailCd.style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                UiElements.SetShown(_abilityDetailCd, has);
                 if (has)
                 {
                     bool shortCd = ab.Cooldown <= 6f;
@@ -2248,7 +2232,7 @@ namespace CluckWars.UI
             v.Plate.style.borderTopColor = color;
             v.Pn.text = tag;
             v.Pn.style.borderLeftColor = color;   // player colour as the tag's stripe: text stays cream-on-ink (~15:1)
-            v.Pn.style.display = known ? DisplayStyle.Flex : DisplayStyle.None;
+            UiElements.SetShown(v.Pn, known);
             v.Waiting.text = known
                 ? UiText.Format(UiKeys.LobbyWaitingFor, ("n", corner + 1))
                 : UiText.Get(UiKeys.LobbyWaitingForPlayer);
@@ -2273,18 +2257,18 @@ namespace CluckWars.UI
             _seatClasses[idx] = empty ? null : cls;
             ShowSeatOnStage(idx);
 
-            v.NameRow.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
-            v.ClassLine.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
-            v.Hexes.style.display = empty ? DisplayStyle.None : DisplayStyle.Flex;
-            v.Waiting.style.display = empty ? DisplayStyle.Flex : DisplayStyle.None;
+            UiElements.SetShown(v.NameRow, !(empty));
+            UiElements.SetShown(v.ClassLine, !(empty));
+            UiElements.SetShown(v.Hexes, !(empty));
+            UiElements.SetShown(v.Waiting, empty);
             // No READY / PICKING pill until the seat is really taken: an open seat, and a guest's own seat
             // before they have joined the host (WaitingRoomRules.ShowsStatePill).
-            v.State.style.display = empty || !showState ? DisplayStyle.None : DisplayStyle.Flex;
+            UiElements.SetShown(v.State, !(empty || !showState));
             if (empty) return;
 
             v.Name.text = name;
             v.Tag.text = isHost ? UiText.Get(UiKeys.TagHost) : cpu ? UiText.Get(UiKeys.TagCpu) : string.Empty;
-            v.Tag.style.display = isHost || cpu ? DisplayStyle.Flex : DisplayStyle.None;
+            UiElements.SetShown(v.Tag, isHost || cpu);
             v.ClassLine.text = UiText.Format(UiKeys.LobbyClassLine, ("cls", ClassShortName(cls)), ("role", RoleName(cls)));
 
             for (int i = 0; i < v.HexViews.Count; i++)
@@ -2310,8 +2294,8 @@ namespace CluckWars.UI
             var inviteCard = _lobby.Q<VisualElement>("InviteCard");
             var joinCard   = _lobby.Q<VisualElement>("JoinCard");
             var status     = _lobby.Q<Label>("LobbyStatus");
-            if (inviteCard != null) inviteCard.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
-            if (joinCard   != null) { joinCard.RemoveFromClassList("cw-hidden"); joinCard.style.display = isJoin ? DisplayStyle.Flex : DisplayStyle.None; }
+            if (inviteCard != null) UiElements.SetShown(inviteCard, isHost);
+            if (joinCard   != null) { joinCard.RemoveFromClassList("cw-hidden"); UiElements.SetShown(joinCard, isJoin); }
             if (status != null) status.text = string.Empty;
 
             // The corners this lineup will spawn on (CornerAssignment): solo rolls a fresh layout each time
@@ -2424,10 +2408,10 @@ namespace CluckWars.UI
             _readyBanner.style.opacity = StyleKeyword.Null;   // a hold-then-fade stamp may have left it at 0
             if (!show)
             {
-                _readyBanner.style.display = DisplayStyle.None;
+                UiElements.SetShown(_readyBanner, false);
                 return;
             }
-            _readyBanner.style.display = DisplayStyle.Flex;
+            UiElements.SetShown(_readyBanner, true);
             if (PlayerPreferences.ReducedMotionEnabled)
             {
                 _readyBanner.RemoveFromClassList("cw-ready-banner--hidden");
@@ -2452,7 +2436,7 @@ namespace CluckWars.UI
         {
             if (_readyBanner == null || _juice == null) { _audio.Ready(); return; }
             var previousDisplay = _readyBanner.style.display;
-            _readyBanner.style.display = DisplayStyle.Flex;
+            UiElements.SetShown(_readyBanner, true);
             _readyBanner.RemoveFromClassList("cw-ready-banner--hidden");
             if (!_juice.Stamp(_readyBanner, MenuJuicePolicy.StampStartDelaySeconds, OnStampHit))
             {
@@ -2471,7 +2455,7 @@ namespace CluckWars.UI
                 _readyBanner.schedule.Execute(() =>
                 {
                     if (id != _stampHideId) return;
-                    _readyBanner.style.display = DisplayStyle.None;
+                    UiElements.SetShown(_readyBanner, false);
                     _readyBanner.style.opacity = StyleKeyword.Null;
                 }).ExecuteLater(400);
             }).ExecuteLater(holdMs);
@@ -2529,7 +2513,7 @@ namespace CluckWars.UI
             if (count != null)
             {
                 count.text = c;
-                count.style.display = string.IsNullOrEmpty(c) ? DisplayStyle.None : DisplayStyle.Flex;
+                UiElements.SetShown(count, !(string.IsNullOrEmpty(c)));
             }
             // Dark green / dark amber clear 4.5:1 on the cream inset; the dot is a lamp, not text.
             if (text  != null) { text.text = t; text.style.color = readyish ? UiGfx.Hex32("1e6a1e") : UiGfx.Hex32("6e4800"); }
@@ -2613,7 +2597,7 @@ namespace CluckWars.UI
                 // Shown this frame at opacity 0, faded in from the next: a class change in the same
                 // frame as display:flex would not transition (Reduced Motion zeroes the fade anyway).
                 _getReadyCard.AddToClassList(GetReadyHiddenClass);
-                _getReadyCard.style.display = DisplayStyle.Flex;
+                UiElements.SetShown(_getReadyCard, true);
                 yield return null;
                 _getReadyCard.RemoveFromClassList(GetReadyHiddenClass);
             }
@@ -2624,7 +2608,7 @@ namespace CluckWars.UI
             if (_sceneLoader.LoadNextAsync() != null) yield break;
 
             // LoadNextAsync already logged why; give the player the menu back with a visible reason.
-            if (_getReadyCard != null) _getReadyCard.style.display = DisplayStyle.None;
+            if (_getReadyCard != null) UiElements.SetShown(_getReadyCard, false);
             var status = _lobby?.Q<Label>("LobbyStatus");
             if (status != null) status.text = UiText.Get(UiKeys.LobbyErrLoad);
             _audio.StartMenuMusic();
@@ -2706,11 +2690,11 @@ namespace CluckWars.UI
                     ShowMainMenu();
                     if (_disconnectSheet == null) return false;   // BuildDisconnectSheet already reported the wiring gap
                     SetDisconnectStatus(null);
-                    _disconnectBody.style.display = DisplayStyle.Flex;
-                    _disconnectRejoinBtn.style.display = DisplayStyle.Flex;
+                    UiElements.SetShown(_disconnectBody, true);
+                    UiElements.SetShown(_disconnectRejoinBtn, true);
                     _disconnectRejoinBtn.SetEnabled(false);   // ConsumeDisconnectNotice re-enables it for a real notice
                     _disconnectBackBtn.SetEnabled(true);
-                    _disconnectSheet.style.display = DisplayStyle.Flex;
+                    UiElements.SetShown(_disconnectSheet, true);
                     return true;
                 case "class": ShowClassSelect(); return true;
                 case "gear":  ShowLoadout(); return true;
@@ -2977,10 +2961,12 @@ namespace CluckWars.UI
             ve.style.borderLeftColor = c; ve.style.borderRightColor = c;
         }
 
-        private static void Bind<T>(VisualElement root, string name, Action<T> act) where T : VisualElement
-        {
-            var e = root?.Q<T>(name);
-            if (e != null) act(e);
-        }
+        /// <summary>
+        /// Runs <paramref name="act"/> on the named element. It used to skip a missing one in silence, so a
+        /// UXML rename left a control dead with nothing in the log; <see cref="UiElements.Bind{T}"/> reports
+        /// the miss once per name (A22).
+        /// </summary>
+        private void Bind<T>(VisualElement root, string name, Action<T> act) where T : VisualElement =>
+            UiElements.Bind(root, name, act, _log, Source);
     }
 }

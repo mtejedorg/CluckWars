@@ -137,7 +137,7 @@ namespace CluckWars.UI
         {
             if (o.Role != MarkRole.Assassin || o.MarkerAlpha <= 0f)
             {
-                SetShown(_marker, false);
+                UiElements.SetShown(_marker, false);
                 _markerPlaced = false;
                 return;
             }
@@ -156,11 +156,11 @@ namespace CluckWars.UI
             Vector2 bearing = _markerBearing;
             if (!_markerPlaced)
             {
-                SetShown(_marker, false);
+                UiElements.SetShown(_marker, false);
                 return;
             }
 
-            SetShown(_marker, true);
+            UiElements.SetShown(_marker, true);
             float boxHalf = _marker.resolvedStyle.width > 0f ? _marker.resolvedStyle.width * 0.5f : 48f;
             _marker.style.translate = new Translate(_markerPanel.x - boxHalf, _markerPanel.y - boxHalf);
             _marker.style.opacity = o.MarkerAlpha;
@@ -184,8 +184,8 @@ namespace CluckWars.UI
             }
             _skull.style.unityBackgroundImageTintColor = c;
             // Arming: the countdown to the arm sits where the skull will be; the skull (and with it the KILL look) only once live.
-            SetShown(_skull, o.Armed);
-            SetShown(_arm, !o.Armed);
+            UiElements.SetShown(_skull, o.Armed);
+            UiElements.SetShown(_arm, !o.Armed);
             if (!o.Armed)
             {
                 _arm.style.color = c;
@@ -195,8 +195,8 @@ namespace CluckWars.UI
                     _arm.text = _shownArm.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 }
             }
-            SetShown(_lock, o.MarkerMode == MarkMarkerMode.Walled);
-            SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
+            UiElements.SetShown(_lock, o.MarkerMode == MarkMarkerMode.Walled);
+            UiElements.SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
 
             // Pointer: down over the target, toward it at the edge. UITK rotates clockwise; the art points down (+y).
             // The bearing is the pointer's in every placement (down above, up below, sideways beside, at the target off screen).
@@ -204,7 +204,7 @@ namespace CluckWars.UI
             _pointer.style.rotate = new Rotate(new Angle(angle, AngleUnit.Degree));
 
             // Distance: off screen only, on the inward vertical side of the disc.
-            SetShown(_distance, offScreen);
+            UiElements.SetShown(_distance, offScreen);
             if (offScreen)
             {
                 _distance.EnableInClassList("cw-mark-distance--above", MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing));
@@ -273,7 +273,7 @@ namespace CluckWars.UI
             var hunter = MarkFeedback.Hunter;
             if (o.Role != MarkRole.Victim || o.HunterBadgeAlpha <= 0f || hunter == null)
             {
-                SetShown(_hunterSkull, false);
+                UiElements.SetShown(_hunterSkull, false);
                 return;
             }
             var indicator = hunter.Indicator();
@@ -284,10 +284,10 @@ namespace CluckWars.UI
             }
             if (indicator == null || !HunterBadgeViewport(cam, indicator, out Vector2 vp, out Vector2 outward))
             {
-                SetShown(_hunterSkull, false);
+                UiElements.SetShown(_hunterSkull, false);
                 return;
             }
-            SetShown(_hunterSkull, true);
+            UiElements.SetShown(_hunterSkull, true);
             var colour = PlayerPalette.ForCorner(o.HunterCorner);
             _hunterSkull.style.borderLeftColor = _hunterSkull.style.borderRightColor =
                 _hunterSkull.style.borderTopColor = _hunterSkull.style.borderBottomColor = colour;
@@ -332,16 +332,10 @@ namespace CluckWars.UI
         private void HideAll()
         {
             MarkerShownNow = MarkerOffScreenNow = HunterBadgeShownNow = false;
-            SetShown(_marker, false);
-            SetShown(_hunterSkull, false);
+            UiElements.SetShown(_marker, false);
+            UiElements.SetShown(_hunterSkull, false);
             _markerPlaced = false;
         }
 
-        private static void SetShown(VisualElement e, bool shown)
-        {
-            if (e == null) return;
-            var d = shown ? DisplayStyle.Flex : DisplayStyle.None;
-            if (e.style.display != d) e.style.display = d;
-        }
     }
 }

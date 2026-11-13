@@ -298,7 +298,7 @@ namespace CluckWars.Tests
             // even started, the press must not wait on it, and a timeout (Unknown) must leave REJOIN where it is.
             string src = Read("Assets/_Game/Scripts/UI/MenuUiController.cs");
             int consume = src.IndexOf("private void ConsumeDisconnectNotice()", StringComparison.Ordinal);
-            int shown = src.IndexOf("_disconnectSheet.style.display = DisplayStyle.Flex;", consume, StringComparison.Ordinal);
+            int shown = src.IndexOf("UiElements.SetShown(_disconnectSheet, true);", consume, StringComparison.Ordinal);
             int check = src.IndexOf("CheckRejoinLobby(_rejoinCode)", consume, StringComparison.Ordinal);
             Assert.Greater(shown, consume);
             Assert.Less(shown, check, "the sheet is on screen before the lobby check starts");

@@ -97,9 +97,8 @@ namespace CluckWars.Tests
         {
             ["Gameplay/MapGenerator.cs"] = (2, "ReArmForMasterPromotion: once per master promotion, must also see objects that are instantiated but not spawned yet"),
             ["Gameplay/MatchBootstrapper.cs"] = (1, "DropDeadManagersAndFindLive: start-up / promotion sweep over every GameManager, dead ones included"),
-            ["UI/MatchHud.cs"] = (1, "EnsureEventSystem: once in Awake"),
-            ["UI/MatchOverlaysController.cs"] = (1, "EnsureEventSystem: once in Awake"),
-            ["UI/MenuUiController.cs"] = (2, "Awake: the SceneLoader fallback and EnsureEventSystem"),
+            ["UI/MenuUiController.cs"] = (1, "Awake: the SceneLoader fallback"),
+            ["UI/UiElements.cs"] = (1, "EnsureEventSystem: the one copy, called once in Awake by the menu, the match HUD, the overlays and the Ability Lab"),
             ["UI/MenuChickenStage.cs"] = (1, "KNOWN EXCEPTION, menu only: every scene Light, once per frame while a stage camera renders; a cached list could miss a light added at runtime (left by A13, not proven safe to change)"),
             ["Visuals/FenceFadeDriver.cs"] = (1, "EnsureFence: discovers the baked map's fence renderers, retried once a second until the Map scene is in, then never again"),
             ["Visuals/FencePerformanceSwap.cs"] = (1, "BuildTwins: same one-time discovery of the fence meshes"),
