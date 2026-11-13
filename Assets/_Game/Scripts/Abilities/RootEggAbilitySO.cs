@@ -26,7 +26,6 @@ namespace CluckWars.Abilities
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("secs", Num(RootDuration)) };
 
-        private const string Source = "RootEgg";
 
         [Tooltip("Seconds before the egg despawns if no chicken triggers it.")]
         [Min(0.5f)] public float EggLifetime = 8.0f;
@@ -66,15 +65,11 @@ namespace CluckWars.Abilities
         // lands before the cast and its cooldown are committed. The logger reaches an ability
         // through AbilityContext because SOs are assets Zenject cannot inject; read
         // AbilityContext.Log before reaching for anything shorter.
-        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Root Egg");
+        // CanActivate: the base default (it declares an area, so the zone prefab chain is checked before the cast).
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var caster = ctx.Controller.transform;
-            TryGetAreaEffect(out var spec);   // offset 0: at the caster's feet
-            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), Source, "Root Egg");
+            SpawnArea(ctx);   // offset 0: at the caster's feet
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

@@ -69,7 +69,7 @@ namespace CluckWars.Tests
         public void CheckCollisionSlow_SlowsOnTheHysteresisState_StealBackKeepsThePlainTest()
         {
             string body = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private void CheckCollisionSlow(");
-            int steal    = body.IndexOf("RequestSteal(", StringComparison.Ordinal);
+            int steal    = body.IndexOf("Cargo.StealFrom(other, StealBackAmount)", StringComparison.Ordinal);
             int plain    = body.IndexOf("sqr > CollisionSlowRadius * CollisionSlowRadius", StringComparison.Ordinal);
             int band     = body.IndexOf("_inContact = ContactHysteresis.Update(_inContact,", StringComparison.Ordinal);
             int hook     = body.IndexOf("IgnoresCollisionSlow(this)", StringComparison.Ordinal);

@@ -39,7 +39,6 @@ namespace CluckWars.Abilities
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("r", Num(ZoneRadius)), ("secs", Num(ZoneDuration)), ("pct", Pct(SlowFactor)) };
 
-        private const string Source = "SmokeRoost";
 
         public SmokeRoostAbilitySO()
         {
@@ -84,7 +83,7 @@ namespace CluckWars.Abilities
         // Unassigned wiring, not a gameplay state — CanSpawnZone logs which reference is
         // missing. Sits in CanActivate rather than at the top of OnActivate so the refusal
         // lands before the cast and its cooldown are committed.
-        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Smoke Roost");
+        // CanActivate: the base default (it declares an area, so the zone prefab chain is checked before the fade).
 
         public override bool IsStealth => true;
 
@@ -105,9 +104,7 @@ namespace CluckWars.Abilities
             caster.Effects.SetOpacity(ctx.Slot, Opacity);
 
             // Half two: the cloud, at his feet.
-            TryGetAreaEffect(out var spec);
-            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.transform.position, caster.transform.forward, spec),
-                Source, "Smoke Roost");
+            SpawnArea(ctx);
         }
 
         public override void OnDeactivate(AbilityContext ctx)

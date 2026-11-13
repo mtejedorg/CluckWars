@@ -166,7 +166,7 @@ namespace CluckWars.Tests
                 if (ability.AreaKind == AreaEffectKind.None) continue;
                 string src = System.IO.File.ReadAllText($"Assets/_Game/Scripts/Abilities/{ability.GetType().Name}.cs");
                 checkedCount++;
-                StringAssert.Contains("AreaEffectSpawner.Spawn(", src, $"{ability.name} declares an area but never spawns it");
+                StringAssert.Contains("SpawnArea(ctx", src, $"{ability.name} declares an area but never spawns it");
                 Assert.IsFalse(ability.CanActivate(unwired),
                     $"{ability.name} (AreaKind {ability.AreaKind}) must refuse before the cast when PrefabRegistrySO.AbilityZone is unassigned.");
                 Assert.IsTrue(ability.CanActivate(wired), $"{ability.name} must allow the cast once fully wired.");
@@ -345,6 +345,10 @@ namespace CluckWars.Tests
                 if (!SpawnsNetworkObject(ability)) continue;
                 spawnerCount++;
 
+                // A20: an ability that declares an area is gated by the base default (CanSpawnZone); the tests above
+                // exercise it on the real assets. Only a spawner with its own prefab field still needs an override.
+                if (ability.PlacesZone) continue;
+
                 var declaring = ability.GetType().GetMethod(nameof(AbilityBaseSO.CanActivate)).DeclaringType;
                 Assert.AreNotEqual(typeof(AbilityBaseSO), declaring,
                     $"{ability.name} ({ability.GetType().Name}) spawns a NetworkObject but does not " +
@@ -396,7 +400,14 @@ namespace CluckWars.Tests
                     Assert.IsFalse(typeof(AbilityBaseSO).IsAssignableFrom(typeof(AreaEffectSpawner)));
                     continue;
                 }
-                if (!text.Contains("onBeforeSpawned") && !text.Contains("AreaEffectSpawner.Spawn(")) continue;
+                // A20: the base holds the one SpawnArea helper (and the gate that goes with it: its CanActivate default
+                // refuses an area ability whose zone prefab chain is missing). Its callers are the abilities to cover.
+                if (typeName == nameof(AbilityBaseSO))
+                {
+                    StringAssert.Contains("=> !PlacesZone || ctx.CanSpawnZone(LogSource, LogName);", text);
+                    continue;
+                }
+                if (!text.Contains("onBeforeSpawned") && !text.Contains("AreaEffectSpawner.Spawn(") && !text.Contains("SpawnArea(ctx")) continue;
 
                 Assert.IsTrue(covered.Contains(typeName),
                     $"{typeName} calls runner.Spawn(onBeforeSpawned: …) but is invisible to " +

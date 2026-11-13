@@ -380,8 +380,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(1.3f, stun.EmittedControl.Seconds, 1e-4f);
 
             // The stun goes out through the one stun RPC, whose authority sets the networked IsStunned that ExecuteRules reads.
-            StringAssert.Contains("float stun = ResolveOutgoingControlSeconds(StunDuration, caster);", Src("Abilities/StunBurstAbilitySO.cs"));
-            StringAssert.Contains("RPC_ApplyStun(stun, caster.Id)", Src("Abilities/StunBurstAbilitySO.cs"));
+            StringAssert.Contains("SendControl(caster, _scratch[i]);", Src("Abilities/StunBurstAbilitySO.cs"));
+            StringAssert.Contains("case ControlKind.Stun: victim.RPC_ApplyStun(seconds, caster); break;", Src("Gameplay/ChickenController.cs"));
             StringAssert.Contains("IsStunned = true;", Src("Gameplay/ChickenController.cs"));
             Assert.IsTrue(ExecuteRules.HasStunAtKill(stunnedNow: true, stunEverSeen: true, secondsSinceStunned: 0f, latency: 0.1f));
 

@@ -69,24 +69,14 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
-            var origin = caster.transform.position;
-            float stagger = ResolveOutgoingControlSeconds(StaggerSeconds, caster);
 
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
-                var victim = _scratch[i];
-
-                var dir = victim.transform.position - origin;
-                dir.y = 0f;
-                if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
-
                 // Both halves name the caster and are judged alike on the victim's side: across a base wall neither lands.
-                victim.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackForce, caster.Id);
-                victim.RPC_ApplyStun(stagger, caster.Id);
+                caster.KnockAway(_scratch[i], KnockbackForce);
+                SendControl(caster, _scratch[i]);
             }
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

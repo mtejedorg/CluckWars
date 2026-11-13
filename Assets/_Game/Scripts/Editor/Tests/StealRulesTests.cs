@@ -423,7 +423,8 @@ namespace CluckWars.Tests
                 {
                     string trimmed = line.TrimStart();
                     if (trimmed.StartsWith("//")) return false;
-                    return trimmed.Contains("RequestSteal(");
+                    // A20: a steal is a call of the one entry point (the ability wrapper or ChickenCargo.StealFrom).
+                    return System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"(?<!Can)StealFrom\(");
                 });
                 if (calls) yield return path;
             }

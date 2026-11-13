@@ -169,13 +169,40 @@ namespace CluckWars.Tests
                 // Code only: doc comments name the RPCs too.
                 string src = string.Join("\n", File.ReadAllText(path).Replace("\r\n", "\n").Split('\n')
                     .Where(l => !l.TrimStart().StartsWith("//")));
-                int rpc = Mathf.Max(src.IndexOf(".RPC_ApplyStun(", System.StringComparison.Ordinal),
-                                    src.IndexOf(".RPC_ApplyAbilitySlow(", System.StringComparison.Ordinal));
-                if (rpc < 0) continue;
-                int resolve = src.IndexOf("ResolveOutgoingControlSeconds(", System.StringComparison.Ordinal);
-                Assert.Greater(resolve, 0, $"{Path.GetFileName(path)} sends a stun or slow without the caster's outgoing-control factor");
-                Assert.Less(resolve, rpc, $"{Path.GetFileName(path)}: the factor must be resolved before the RPC");
+                // A20: no ability sends a control RPC itself, so none can forget the factor.
+                StringAssert.DoesNotContain(".RPC_ApplyStun(", src, Path.GetFileName(path));
+                StringAssert.DoesNotContain(".RPC_ApplyAbilitySlow(", src, Path.GetFileName(path));
+                StringAssert.DoesNotContain(".RPC_ApplyRoot(", src, Path.GetFileName(path));
             }
+
+            // The one sender resolves the seconds before any RPC.
+            string send = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public static void SendControlFrom(");
+            int resolve = send.IndexOf("ControlClaimRules.OutgoingSeconds(emission, casterPassive)", System.StringComparison.Ordinal);
+            Assert.Greater(resolve, 0, "the sender applies the caster's outgoing-control factor");
+            Assert.Less(resolve, send.IndexOf("victim.RPC_ApplyStun(", System.StringComparison.Ordinal));
+            Assert.Less(resolve, send.IndexOf("victim.RPC_ApplyAbilitySlow(", System.StringComparison.Ordinal));
+        }
+
+        [Test]
+        public void OutgoingSeconds_LengthensStunsAndSlows_NeverRoots_ExactlyAsTheOldSendersDid()
+        {
+            var relentless = Shipped<RelentlessPassiveSO>();
+            Assert.Greater(relentless.OutgoingControlMultiplier, 1f);
+            foreach (var passive in new PassiveAbilitySO[] { null, relentless, Shipped<BullyPassiveSO>() })
+            foreach (float seconds in new[] { 0.35f, 1f, 1.3f, 1.4f, 1.8f, 2.5f })
+            {
+                // What Wing Slam / Ambush / Headbutt / Belly Flop and Dust Kick computed before the RPC.
+                float old = AbilityBaseSO.ResolveOutgoingControlSeconds(seconds, passive);
+                Assert.AreEqual(old, ControlClaimRules.OutgoingSeconds(ControlEmission.Stun(seconds), passive), 0f);
+                Assert.AreEqual(old, ControlClaimRules.OutgoingSeconds(ControlEmission.Slow(seconds, 0.55f), passive), 0f);
+                // What Ground Quake and the Root Egg zone sent: the authored seconds.
+                Assert.AreEqual(seconds, ControlClaimRules.OutgoingSeconds(ControlEmission.Root(seconds), passive), 0f);
+            }
+            // The receiver's ceiling follows the same predicate.
+            Assert.IsTrue(ControlClaimRules.IsLengthenedByCasterPassive(ControlKind.Stun));
+            Assert.IsTrue(ControlClaimRules.IsLengthenedByCasterPassive(ControlKind.Slow));
+            Assert.IsFalse(ControlClaimRules.IsLengthenedByCasterPassive(ControlKind.Root));
+            Assert.IsFalse(ControlClaimRules.IsLengthenedByCasterPassive(ControlKind.None));
         }
 
         // ---- The Slow aura -----------------------------------------------------------------------

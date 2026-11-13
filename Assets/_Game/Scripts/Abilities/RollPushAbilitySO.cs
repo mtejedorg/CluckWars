@@ -80,13 +80,7 @@ namespace CluckWars.Abilities
             // Push everyone in the forward sweep.
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
-            {
-                var targetCtrl = _scratch[i];
-                var dir = (targetCtrl.transform.position - caster.transform.position);
-                dir.y = 0f;
-                if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
-                targetCtrl.RPC_ApplyKnockbackFrom(dir.normalized * PushStrength, caster.Id);
-            }
+                caster.KnockAway(_scratch[i], PushStrength);
         }
 
         public override void OnDeactivate(AbilityContext ctx)

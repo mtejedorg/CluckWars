@@ -147,7 +147,7 @@ namespace CluckWars.Gameplay
                 }
             }
             if (kind == ControlKind.Slow && maxReach > 0f) maxReach += SlowReachHeadroomMeters;
-            if (kind == ControlKind.Stun || kind == ControlKind.Slow) maxSeconds *= MaxOutgoingControlMultiplier(pool);
+            if (IsLengthenedByCasterPassive(kind)) maxSeconds *= MaxOutgoingControlMultiplier(pool);
             return new Ceiling(true, maxSeconds, minFactor, maxReach, zoneRadius, zonePlacement, zoneLifetime);
         }
 
@@ -198,6 +198,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static float MaxOutgoingControlMultiplier(IEnumerable<AbilityBaseSO> pool)
         {
+            // (the per-caster form is OutgoingSeconds below)
             float max = 1f;
             if (pool == null) return max;
             foreach (var ability in pool)
@@ -205,6 +206,24 @@ namespace CluckWars.Gameplay
                     max = Mathf.Max(max, passive.OutgoingControlMultiplier);
             return max;
         }
+
+        /// <summary>
+        /// Does the CASTER's passive lengthen this kind of control (<see cref="PassiveAbilitySO.OutgoingControlMultiplier"/>)?
+        /// Stuns and slows, never roots. One predicate for the sender (<see cref="OutgoingSeconds"/>) and for the
+        /// receiver's ceiling (<see cref="CeilingFor"/>), so the two cannot disagree.
+        /// </summary>
+        public static bool IsLengthenedByCasterPassive(ControlKind kind) => kind == ControlKind.Stun || kind == ControlKind.Slow;
+
+        /// <summary>
+        /// The seconds a caster with <paramref name="casterPassive"/> actually sends for <paramref name="emission"/>:
+        /// the authored duration, times the caster's outgoing-control factor for a stun or a slow (Relentless), as
+        /// authored for a root. The only place the factor is applied to a sent effect
+        /// (<c>ChickenController.SendControl</c>), so a new ability cannot forget it.
+        /// </summary>
+        public static float OutgoingSeconds(in ControlEmission emission, PassiveAbilitySO casterPassive) =>
+            IsLengthenedByCasterPassive(emission.Kind)
+                ? AbilityBaseSO.ResolveOutgoingControlSeconds(emission.Seconds, casterPassive)
+                : emission.Seconds;
 
         // ---- Root-zone evidence (security review 2026-10-22, hardened in WP3) ---------------
         //

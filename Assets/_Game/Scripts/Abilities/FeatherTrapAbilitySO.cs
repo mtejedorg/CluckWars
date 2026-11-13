@@ -28,7 +28,6 @@ namespace CluckWars.Abilities
         public override (string name, object value)[] DescriptionArgs() =>
             new (string, object)[] { ("secs", Num(ZoneDuration)), ("pct", Pct(SlowFactor)) };
 
-        private const string Source = "FeatherTrap";
 
         [Tooltip("Distance in front of the caster where the zone center is placed.")]
         [Min(0f)] public float ForwardOffset = 4.5f;
@@ -67,15 +66,11 @@ namespace CluckWars.Abilities
         // lands before the cast and its cooldown are committed. The logger reaches an ability
         // through AbilityContext because SOs are assets Zenject cannot inject; read
         // AbilityContext.Log before reaching for anything shorter.
-        public override bool CanActivate(AbilityContext ctx) => ctx.CanSpawnZone(Source, "Feather Trap");
+        // CanActivate: the base default (it declares an area, so the zone prefab chain is checked before the cast).
 
         public override void OnActivate(AbilityContext ctx)
         {
-            var caster = ctx.Controller.transform;
-            TryGetAreaEffect(out var spec);   // ForwardOffset ahead, on the caster's ground plane
-            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), Source, "Feather Trap");
+            SpawnArea(ctx);   // ForwardOffset ahead, on the caster's ground plane
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

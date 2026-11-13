@@ -556,7 +556,7 @@ namespace CluckWars.Gameplay
                 // Names the caster, not this zone: the victim's authority checks the sender against the
                 // caster's state authority (the zone's own), and may never have seen this zone at all
                 // when it is consumed in its first ticks (F4, see ContainsRootOf).
-                chicken.RPC_ApplyRoot(RootDuration, OwnerChicken);
+                ChickenController.SendControlFrom(OwnerChicken, null, chicken, ControlEmission.Root(RootDuration));
                 _log?.Debug(Source, $"Root applied to {chicken.name}.");
 
                 // No hit-attribution push here, deliberately: this method is behind

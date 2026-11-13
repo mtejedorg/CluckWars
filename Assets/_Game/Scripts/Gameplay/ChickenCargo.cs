@@ -634,17 +634,39 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// The ONE thief-side entry point for a steal: asks <paramref name="victim"/>'s authority to drain up to
-        /// <paramref name="amount"/> and records the request. Nothing is credited here; the victim answers with what
-        /// it really drained (<see cref="RPC_SettleSteal"/>). Callers keep their own
-        /// <see cref="StealRules.CanStealFrom"/> gate and call this only after it passes, so a shelled victim is not
-        /// even asked.
+        /// The ONE thief-side steal (A20): this chicken tries to take up to <paramref name="amount"/> from
+        /// <paramref name="victim"/>. Gate (<see cref="StealRules.CanStealFrom"/>: a shelled victim is not even
+        /// asked), clamp (<see cref="StealMath.Clamp"/>: the amount, this chicken's free room, what the victim
+        /// holds), request (<see cref="RequestSteal"/>). Returns what was asked for; 0 when nothing was.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="amount"/> is what the thief is entitled to after its own passive: an ability passes
+        /// <c>AbilityBaseSO.StealFrom</c>, which applies it. Every steal in the game comes through here, so the
+        /// "loaded thief cannot steal" and "a shell gives nothing" rules cannot differ between abilities.
+        /// </remarks>
+        public float StealFrom(ChickenController victim, float amount)
+        {
+            if (!StealRules.CanStealFrom(victim)) return 0f;
+            var victimCargo = victim.Cargo;
+            if (victimCargo == null) return 0f;
+
+            float take = StealMath.Clamp(amount, Capacity - Cargo, victimCargo.Stealable);
+            if (take <= 0f) return 0f;
+
+            RequestSteal(victimCargo, take);
+            return take;
+        }
+
+        /// <summary>
+        /// The request half of <see cref="StealFrom"/>, which is its only caller: asks <paramref name="victim"/>'s
+        /// authority to drain up to <paramref name="amount"/> and records the request. Nothing is credited here; the
+        /// victim answers with what it really drained (<see cref="RPC_SettleSteal"/>).
         /// </summary>
         /// <remarks>
         /// The open request is what lets <see cref="RPC_SettleSteal"/> refuse a report no steal asked for. It is opened
         /// before the RPC because a local invoke (bot or solo victim) settles synchronously inside the call.
         /// </remarks>
-        public void RequestSteal(ChickenCargo victim, float amount)
+        private void RequestSteal(ChickenCargo victim, float amount)
         {
             if (amount <= 0f || victim == null) return;
             if (_controller == null || victim._controller == null)

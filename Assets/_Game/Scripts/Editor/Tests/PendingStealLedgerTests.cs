@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.IO;
 using System.Text;
@@ -179,7 +180,7 @@ namespace CluckWars.Tests
         public void HelperRecordsBeforeItSendsTheDrain_AndEveryDrainGoesThroughIt()
         {
             string cargo = Src("Gameplay/ChickenCargo.cs");
-            string helper = Body(cargo, "public void RequestSteal(", 1100);
+            string helper = Body(cargo, "private void RequestSteal(", 1100);
             int record = helper.IndexOf("_requests.AskSteal(", StringComparison.Ordinal);
             int rpc = helper.IndexOf("RPC_DrainStolen(asked", StringComparison.Ordinal);
             Assert.Greater(record, 0);
@@ -204,7 +205,9 @@ namespace CluckWars.Tests
         public void DrainSite_UsesTheHelper_AndNoLongerSelfCreditsByHand(string file)
         {
             string src = Src(file);
-            StringAssert.Contains(".RequestSteal(", src);
+            // A20: every site goes through the one entry point, which calls the (now private) request helper.
+            StringAssert.IsMatch(@"(?<!Can)StealFrom\(", src);
+            StringAssert.DoesNotContain("RequestSteal(", string.Join("\n", src.Split('\n').Where(l => !l.TrimStart().StartsWith("//"))));
             Assert.IsFalse(Regex.IsMatch(src, @"Cargo\s*\+=\s*(stolen|take)\b"),
                 $"{file} still credits itself by hand; the pending record would be missing.");
         }

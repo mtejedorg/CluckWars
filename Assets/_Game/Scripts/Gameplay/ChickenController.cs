@@ -1572,6 +1572,49 @@ namespace CluckWars.Gameplay
             return false;
         }
 
+        // ---- The one sender of each effect (A20) --------------------------------
+        //
+        // An ability never calls RPC_ApplyKnockbackFrom / RPC_ApplyStun / RPC_ApplyRoot / RPC_ApplyAbilitySlow itself:
+        // it calls KnockAway or SendControl on the CASTER, on the caster's state authority. That is what names the
+        // caster in every claim, pushes away from the caster and applies the caster's passive to the duration.
+
+        /// <summary>
+        /// Shoves <paramref name="victim"/> directly away from this chicken with <paramref name="strength"/>
+        /// (world-units/sec). Nothing is sent for a strength of 0 or less (Snatch ships 0). When the two stand on the
+        /// same spot the push goes along this chicken's forward.
+        /// </summary>
+        public void KnockAway(ChickenController victim, float strength)
+        {
+            if (victim == null || !(strength > 0f)) return;
+            Vector3 away = Planar.DirectionOr(transform.position, victim.transform.position, transform.forward);
+            victim.RPC_ApplyKnockbackFrom(away * strength, Id);
+        }
+
+        /// <summary>
+        /// Sends <paramref name="emission"/> (a stun, a root or a timed slow) from this chicken to
+        /// <paramref name="victim"/>, lengthened by this chicken's passive where the rules say so
+        /// (<see cref="ControlClaimRules.OutgoingSeconds"/>: stuns and slows, not roots).
+        /// </summary>
+        public void SendControl(ChickenController victim, in ControlEmission emission) =>
+            SendControlFrom(Id, Passive, victim, emission);
+
+        /// <summary>
+        /// <see cref="SendControl"/> for a sender that is not the chicken itself: a zone acting for its owner
+        /// (<c>AbilityZone</c>'s Root Egg), which names the owner as the caster.
+        /// </summary>
+        public static void SendControlFrom(NetworkBehaviourId caster, PassiveAbilitySO casterPassive,
+            ChickenController victim, in ControlEmission emission)
+        {
+            if (victim == null) return;
+            float seconds = ControlClaimRules.OutgoingSeconds(emission, casterPassive);
+            switch (emission.Kind)
+            {
+                case ControlKind.Stun: victim.RPC_ApplyStun(seconds, caster); break;
+                case ControlKind.Root: victim.RPC_ApplyRoot(seconds, caster); break;
+                case ControlKind.Slow: victim.RPC_ApplyAbilitySlow(seconds, emission.SlowFactor, caster); break;
+            }
+        }
+
         // ---- Control RPCs (F4 sender validation + A1 re-application) -----------
         //
         // PROTOCOL CHANGE (WP1): all three take the casting chicken's ChickenController id and an
@@ -1963,26 +2006,13 @@ namespace CluckWars.Gameplay
                     {
                         _stealBackCooldowns[other.Id] = TickTimer.CreateFromSeconds(Runner, 1.0f);
 
-                        float attackerFreeSpace = Cargo.Capacity - Cargo.Cargo;
-                        float defenderCargo = other.Cargo.Stealable;
-                        // Steal-proof victim (Egg Shell / Turtle Mode): no steal, no self-credit.
-                        // The knockback below is unchanged (its own immunity check lives in ApplyKnockback).
-                        float stolen = StealRules.CanStealFrom(other)
-                            ? StealMath.Clamp(StealBackAmount, attackerFreeSpace, defenderCargo)
-                            : 0f;
-                        if (stolen > 0f)
-                        {
-                            // Spine Coat is a steal too, so it names its thief like every other
-                            // caller — see ChickenCargo.RequestSteal. This one is trivially
-                            // in range (CollisionSlowRadius) and the receiver's bound comes off
-                            // SpineCoatAbilitySO.NominalStealAmount, which is the same authored
-                            // number StealBackAmount was set from.
-                            Cargo.RequestSteal(other.Cargo, stolen);
-                        }
-                        var dir = (other.transform.position - transform.position);
-                        dir.y = 0f;
-                        if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
-                        other.RPC_ApplyKnockbackFrom(dir.normalized * StealBackKnockback, Id);
+                        // Spine Coat is a steal too, so it goes through the one steal entry point (gate, clamp,
+                        // request: ChickenCargo.StealFrom). A steal-proof victim (Egg Shell / Turtle Mode) gives
+                        // nothing; the knockback below is unchanged (its own immunity check lives in
+                        // ApplyKnockback). StealBackAmount is the coat's authored number, not scaled by a passive;
+                        // the receiver's bound comes off SpineCoatAbilitySO.NominalStealAmount, the same number.
+                        Cargo.StealFrom(other, StealBackAmount);
+                        KnockAway(other, StealBackKnockback);
                     }
                 }
             }

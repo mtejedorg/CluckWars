@@ -84,24 +84,13 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
-            var landing = caster.transform.position;
 
-            float stun = ResolveOutgoingControlSeconds(StunSeconds, caster);
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
-                var victim = _scratch[i];
-                victim.RPC_ApplyStun(stun, caster.Id);
-
-                if (KnockbackForce <= 0f) continue;
-
-                var dir = victim.transform.position - landing;
-                dir.y = 0f;
-                if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
-                victim.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackForce, caster.Id);   // judged as the stun above is
+                SendControl(caster, _scratch[i]);
+                caster.KnockAway(_scratch[i], KnockbackForce);   // away from where he landed; judged as the stun above is
             }
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

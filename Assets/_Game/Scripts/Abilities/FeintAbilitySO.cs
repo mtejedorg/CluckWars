@@ -63,7 +63,5 @@ namespace CluckWars.Abilities
             // direction is exactly how the game says "you were hit from off-screen".
             caster.RPC_ApplySelfImpulse(right.normalized * SidestepImpulse);
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

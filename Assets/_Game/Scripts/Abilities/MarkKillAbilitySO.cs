@@ -91,7 +91,5 @@ namespace CluckWars.Abilities
 
             exec.Press();
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

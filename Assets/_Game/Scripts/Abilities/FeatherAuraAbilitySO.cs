@@ -89,7 +89,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public override bool CanActivate(AbilityContext ctx)
         {
-            if (!ctx.CanSpawnZone(Source, "Feather Aura")) return false;
+            if (!base.CanActivate(ctx)) return false;   // the zone prefab chain
             TryGetAreaEffect(out var spec);
             string refusal = AreaEffectSpawner.Refusal(spec, ctx.Slot);
             if (refusal != null)
@@ -112,11 +112,9 @@ namespace CluckWars.Abilities
             // Same run time AbilityController gave the slot (ResolveActiveDuration), so the zone and the slot end together.
             var spec = AreaEffectSpec.AuraSlow(AuraRadius, ResolveActiveDuration(caster), AuraSlowFactor);
             // An Aura's position only seeds its transform; its centre is the caster (AbilityZone.TryGetCenter).
-            AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.transform.position, caster.transform.forward, spec),
-                Source, "Feather Aura");
+            SpawnArea(ctx, spec);
         }
 
-        // Nothing to undo: the zone despawns itself on its first authority tick after this slot stops being active.
-        public override void OnDeactivate(AbilityContext ctx) { }
+        // OnDeactivate: the base's (nothing to undo). The zone despawns itself on its first authority tick after this slot stops being active.
     }
 }

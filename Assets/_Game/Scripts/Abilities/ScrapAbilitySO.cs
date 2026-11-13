@@ -65,24 +65,12 @@ namespace CluckWars.Abilities
             var thiefCargo = thief.Cargo;
             if (thiefCargo == null) return;
 
-            float spaceLeft = thiefCargo.Capacity - thiefCargo.Cargo;
-            if (spaceLeft <= 0f) return;
-
             // GatherTargets sorts ascending by distance, so index 0 is the nearest carrier.
             GatherTargets(thief, _scratch);
             if (_scratch.Count == 0) return;
 
             // Nearest target stays the telegraphed target: steal-proof means no steal, no fallback.
-            if (!StealRules.CanStealFrom(_scratch[0])) return;
-            var victim = _scratch[0].Cargo;
-            if (victim == null) return;
-
-            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), victim.Stealable, spaceLeft);
-            if (take <= 0f) return;
-
-            thiefCargo.RequestSteal(victim, take);
+            StealFrom(thief, _scratch[0], StealAmount);
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

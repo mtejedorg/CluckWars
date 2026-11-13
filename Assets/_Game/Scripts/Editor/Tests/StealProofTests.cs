@@ -135,30 +135,66 @@ namespace CluckWars.Tests
 
         // ---- 3. The six thief sites: gate BEFORE the self-credit ---------------
 
-        [TestCase("Abilities/SnatchAbilitySO.cs",      "RequestSteal(")]
-        [TestCase("Abilities/SneakyStealAbilitySO.cs", "RequestSteal(")]
-        [TestCase("Abilities/ScrapAbilitySO.cs",       "RequestSteal(")]
-        [TestCase("Abilities/RollTrampleAbilitySO.cs", "RequestSteal(")]
-        [TestCase("Gameplay/ChickenController.cs",     "RequestSteal(")]
-        public void ThiefSite_ChecksStealProof_BeforeCreditingItself(string file, string credit)
+        [TestCase("Abilities/SnatchAbilitySO.cs",      "StealFrom(thief, _scratch[i], StealAmount)")]
+        [TestCase("Abilities/SneakyStealAbilitySO.cs", "StealFrom(thief, _scratch[0], StealAmount)")]
+        [TestCase("Abilities/ScrapAbilitySO.cs",       "StealFrom(thief, _scratch[0], StealAmount)")]
+        [TestCase("Abilities/RollTrampleAbilitySO.cs", "StealFrom(thief, _scratch[0], StealAmount)")]
+        [TestCase("Gameplay/ChickenController.cs",     "Cargo.StealFrom(other, StealBackAmount)")]
+        public void ThiefSite_ChecksStealProof_BeforeCreditingItself(string file, string steal)
         {
+            // A20: the gate is no longer written at each site; every site calls the one entry point that carries it.
             string src = Src(file);
-            int gate = src.IndexOf("StealRules.CanStealFrom(", StringComparison.Ordinal);
-            int cred = src.IndexOf(credit, StringComparison.Ordinal);
-            Assert.Greater(gate, 0, $"{file}: no StealRules.CanStealFrom gate - the thief would credit itself against a shell and duplicate food.");
-            Assert.Greater(cred, 0, $"{file}: anchor '{credit}' moved.");
-            Assert.Less(gate, cred, $"{file}: the gate must come BEFORE '{credit}'.");
+            StringAssert.Contains(steal, src, $"{file}: anchor '{steal}' moved.");
+            StringAssert.DoesNotContain("RequestSteal(", StripLineComments(src), $"{file} asks the victim without the steal-proof gate.");
+            StringAssert.DoesNotContain("StealMath.Clamp(", src, $"{file} clamps by hand; ChickenCargo.StealFrom does.");
+        }
+
+        private static string StripLineComments(string src) =>
+            string.Join("\n", src.Split('\n').Where(l => !l.TrimStart().StartsWith("//")));
+
+        [Test]
+        public void TheOneStealEntryPoint_Gates_Clamps_ThenAsks()
+        {
+            string body = AssassinExecuteCreditTests.MethodBody(Dir + "Gameplay/ChickenCargo.cs", "public float StealFrom(");
+            int gate = body.IndexOf("if (!StealRules.CanStealFrom(victim)) return 0f;", StringComparison.Ordinal);
+            int clamp = body.IndexOf("StealMath.Clamp(amount, Capacity - Cargo, victimCargo.Stealable)", StringComparison.Ordinal);
+            int ask = body.IndexOf("RequestSteal(victimCargo, take);", StringComparison.Ordinal);
+            Assert.Greater(gate, 0, "no steal-proof gate: the thief would ask a shelled victim");
+            Assert.Greater(clamp, gate);
+            Assert.Greater(ask, clamp);
+            StringAssert.Contains("if (take <= 0f) return 0f;", body, "nothing is asked for an empty victim or a full thief");
+
+            // The ability wrapper applies the thief's passive, then calls it.
+            string wrapper = AssassinExecuteCreditTests.MethodBody(Dir + "Abilities/AbilityBaseSO.cs", "protected static float StealFrom(");
+            StringAssert.Contains("cargo.StealFrom(victim, ResolveStealAmount(nominalAmount, thief))", wrapper);
+
+            // RequestSteal is private: nothing outside ChickenCargo can ask without the gate.
+            Assert.IsNull(typeof(ChickenCargo).GetMethod("RequestSteal"), "RequestSteal must not be public again");
+        }
+
+        [Test]
+        public void TheTwoOldClamps_AreTheSameNumber()
+        {
+            // Snatch, Roll Trample and the Spine Coat used StealMath.Clamp; Sneaky Steal and Scrap used
+            // Mathf.Min(amount, stealable, space) followed by "<= 0 -> nothing". Same answer for every finite input.
+            foreach (float amount in new[] { 0f, 3f, 4.2f, 5f, 6f, 9.6f })
+            foreach (float space in new[] { -2f, 0f, 0.5f, 3f, 12f })
+            foreach (float stealable in new[] { 0f, 0.25f, 4f, 20f })
+            {
+                float viaMin = Mathf.Min(amount, stealable, space);
+                float old = viaMin <= 0f ? 0f : viaMin;
+                Assert.AreEqual(old, StealMath.Clamp(amount, space, stealable), 0f, $"{amount} {space} {stealable}");
+            }
         }
 
         [Test]
         public void SnatchAndSpineCoat_SkipOnlyTheSteal_TheKnockbackIsUntouched()
         {
             string snatch = Src("Abilities/SnatchAbilitySO.cs");
-            Assert.Less(snatch.IndexOf("StealRules.CanStealFrom(", StringComparison.Ordinal),
-                        snatch.IndexOf("RPC_ApplyKnockback", StringComparison.Ordinal));
-            StringAssert.DoesNotContain("continue", Body(snatch, "StealRules.CanStealFrom(", 200), "Snatch must keep the knockback");
-            string spine = Body(Src("Gameplay/ChickenController.cs"), "StealRules.CanStealFrom(other)", 1400);
-            StringAssert.Contains("other.RPC_ApplyKnockback", spine);
+            // The steal (gated inside StealFrom) and the shove are two unconditional statements: a shell stops only the first.
+            StringAssert.IsMatch(@"StealFrom\(thief, _scratch\[i\], StealAmount\);\s*thief\.KnockAway\(_scratch\[i\], KnockbackStrength\);", snatch);
+            string spine = Src("Gameplay/ChickenController.cs");
+            StringAssert.IsMatch(@"Cargo\.StealFrom\(other, StealBackAmount\);\s*KnockAway\(other, StealBackKnockback\);", spine);
         }
 
         [Test]
@@ -167,7 +203,7 @@ namespace CluckWars.Tests
             foreach (var f in new[] { "SneakyStealAbilitySO", "ScrapAbilitySO", "RollTrampleAbilitySO" })
             {
                 string src = Src($"Abilities/{f}.cs");
-                StringAssert.Contains("if (!StealRules.CanStealFrom(_scratch[0])) return;", src, f);
+                StringAssert.Contains("StealFrom(thief, _scratch[0], StealAmount)", src, f);
                 StringAssert.DoesNotContain("_scratch[1]", src, f);
             }
         }

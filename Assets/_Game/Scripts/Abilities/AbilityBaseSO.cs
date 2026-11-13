@@ -67,6 +67,30 @@ namespace CluckWars.Abilities
     /// <c>ChickenController</c> hooks (<c>MoveSpeedMultiplier</c>, <c>MovementLocked</c>,
     /// <c>DamageImmune</c>, …) which the StateAuthority reads each tick.
     /// </remarks>
+    /// <summary>How an ability's class name reads in a log line. Pure.</summary>
+    public static class AbilityLogNames
+    {
+        private const string Suffix = "AbilitySO";
+
+        /// <summary><c>FeatherTrapAbilitySO</c> becomes <c>FeatherTrap</c>.</summary>
+        public static string Source(string typeName) =>
+            typeName != null && typeName.EndsWith(Suffix, StringComparison.Ordinal) ? typeName.Substring(0, typeName.Length - Suffix.Length) : typeName;
+
+        /// <summary><c>FeatherTrapAbilitySO</c> becomes <c>Feather Trap</c>.</summary>
+        public static string Words(string typeName)
+        {
+            string source = Source(typeName);
+            if (string.IsNullOrEmpty(source)) return source;
+            var sb = new System.Text.StringBuilder(source.Length + 4);
+            for (int i = 0; i < source.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(source[i])) sb.Append(' ');
+                sb.Append(source[i]);
+            }
+            return sb.ToString();
+        }
+    }
+
     public abstract class AbilityBaseSO : ScriptableObject
     {
         [Header("Identity")]
@@ -316,11 +340,32 @@ namespace CluckWars.Abilities
         }
 
         /// <summary>
+        /// The one steal an ability makes (A20): <paramref name="thief"/> tries to take <paramref name="nominalAmount"/>
+        /// (scaled by its passive, <see cref="ResolveStealAmount"/>) from <paramref name="victim"/> through
+        /// <c>ChickenCargo.StealFrom</c>, which gates on a shell, clamps to the thief's free room and the victim's
+        /// load, and sends the request. Returns what was asked for; 0 when nothing was.
+        /// </summary>
+        protected static float StealFrom(Gameplay.ChickenController thief, Gameplay.ChickenController victim, float nominalAmount)
+        {
+            var cargo = thief != null ? thief.Cargo : null;
+            return cargo != null ? cargo.StealFrom(victim, ResolveStealAmount(nominalAmount, thief)) : 0f;
+        }
+
+        /// <summary>
+        /// Sends this ability's declared control effect (<see cref="EmittedControl"/>) from <paramref name="caster"/>
+        /// to <paramref name="victim"/> (A20). The caster's passive is applied by the sender itself
+        /// (<c>ChickenController.SendControl</c>), and what is sent is what the receiver's ceiling was derived from.
+        /// </summary>
+        protected void SendControl(Gameplay.ChickenController caster, Gameplay.ChickenController victim) =>
+            caster.SendControl(victim, EmittedControl);
+
+        /// <summary>
         /// How long a stun or slow <paramref name="caster"/> sends actually lasts before the victim's passive has its
         /// say: the authored <paramref name="baseSeconds"/> times the caster's
-        /// <see cref="PassiveAbilitySO.OutgoingControlMultiplier"/> (Relentless). The single chokepoint every stun /
-        /// slow sender calls on the CASTER's state authority, before the RPC (or, for the Slow aura, before the zone
-        /// and the slot's run time are set; see <see cref="ResolveActiveDuration"/>).
+        /// <see cref="PassiveAbilitySO.OutgoingControlMultiplier"/> (Relentless). Applied to a sent effect by
+        /// <c>ChickenController.SendControl</c> (<c>ControlClaimRules.OutgoingSeconds</c>), never by an ability; read
+        /// directly only where a duration is predicted or where the run time IS the control (the Slow aura: before
+        /// the zone and the slot's run time are set; see <see cref="ResolveActiveDuration"/>).
         /// </summary>
         public static float ResolveOutgoingControlSeconds(float baseSeconds, Gameplay.ChickenController caster) =>
             ResolveOutgoingControlSeconds(baseSeconds, caster != null ? caster.Passive : null);
@@ -945,7 +990,35 @@ namespace CluckWars.Abilities
         /// caller only has to return. Returning false silently would reintroduce exactly the
         /// failure this gate exists to surface.
         /// </remarks>
-        public virtual bool CanActivate(AbilityContext ctx) => true;
+        /// <para>
+        /// <b>Default (A20):</b> an ability that declares a lasting area (<see cref="PlacesZone"/>) needs the zone
+        /// prefab chain, so the base asks <see cref="AbilityContext.CanSpawnZone"/> for it; everything else is always
+        /// wired. An override adds its own checks on top of <c>base.CanActivate(ctx)</c>.
+        /// </para>
+        public virtual bool CanActivate(AbilityContext ctx) => !PlacesZone || ctx.CanSpawnZone(LogSource, LogName);
+
+        /// <summary>Log source tag of this ability: its class name without the suffix (<c>FeatherTrap</c>).</summary>
+        protected string LogSource => AbilityLogNames.Source(GetType().Name);
+
+        /// <summary>The ability's name as a log line spells it: the class name in words (<c>Feather Trap</c>).</summary>
+        protected string LogName => AbilityLogNames.Words(GetType().Name);
+
+        /// <summary>
+        /// Spawns the lasting area this ability declares (<see cref="TryGetAreaEffect"/>) where the caster stands and
+        /// faces. The one spawn call of every zone ability (A20); false when nothing was spawned (logged).
+        /// </summary>
+        protected bool SpawnArea(AbilityContext ctx)
+        {
+            TryGetAreaEffect(out var spec);
+            return SpawnArea(ctx, spec);
+        }
+
+        /// <summary><see cref="SpawnArea(AbilityContext)"/> with a spec the ability adjusted for this cast (the Slow aura's run time).</summary>
+        protected bool SpawnArea(AbilityContext ctx, in AreaEffectSpec spec)
+        {
+            var caster = ctx.Controller.transform;
+            return AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), LogSource, LogName);
+        }
 
         /// <summary>
         /// True for stealth effects (Invisibility, Smoke Roost's fade): they fade the caster through
@@ -962,6 +1035,9 @@ namespace CluckWars.Abilities
         public virtual bool EndsOnNextMove => IsStealth;
 
         public abstract void OnActivate(AbilityContext ctx);
-        public abstract void OnDeactivate(AbilityContext ctx);
+
+        /// <summary>The end of the active window. Nothing by default: most abilities are a one-shot at activation.
+        /// Override to undo what <see cref="OnActivate"/> switched on (a speed modifier, a shell, a fade).</summary>
+        public virtual void OnDeactivate(AbilityContext ctx) { }
     }
 }

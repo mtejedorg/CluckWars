@@ -262,9 +262,11 @@ namespace CluckWars.Tests
             Assert.IsTrue(egg.TryGetAreaEffect(out var e));
             Assert.AreEqual(at, AreaEffectSpawner.Placement(at, fwd, e), "Root Egg: exactly the caster's feet");
 
+            // A20: every zone ability places through the base's SpawnArea, which uses the spec's own offset.
             foreach (var file in new[] { "FeatherTrapAbilitySO.cs", "RootEggAbilitySO.cs", "SmokeRoostAbilitySO.cs", "FeatherAuraAbilitySO.cs" })
-                StringAssert.Contains("AreaEffectSpawner.Placement(", Src(Path.Combine(AbilityDir, file)),
+                StringAssert.Contains("SpawnArea(ctx", Src(Path.Combine(AbilityDir, file)),
                     $"{file}: the spec's ForwardOffset is the one placement (it cannot disagree with the cast)");
+            StringAssert.Contains("AreaEffectSpawner.Placement(caster.position, caster.forward, spec)", Src(Path.Combine(AbilityDir, "AbilityBaseSO.cs")));
         }
 
         [Test]
@@ -275,9 +277,22 @@ namespace CluckWars.Tests
                 string src = Src(Path.Combine(AbilityDir, file));
                 StringAssert.DoesNotContain("Runner.Spawn(", src, $"{file}: the spawn block lives in AreaEffectSpawner now");
                 StringAssert.DoesNotContain("onBeforeSpawned", src, file);
-                StringAssert.Contains("AreaEffectSpawner.Spawn(ctx, spec,", src, file);
-                StringAssert.Contains("ctx.CanSpawnZone(", src, $"{file}: the pre-commitment wiring gate stays");
+                StringAssert.Contains("SpawnArea(ctx", src, $"{file}: the one spawn call of every zone ability (A20)");
+                StringAssert.DoesNotContain("AreaEffectSpawner.Spawn(", src, $"{file}: placement and log names are the base's job");
             }
+            // The pre-commitment wiring gate is the base default for every ability that declares an area, and the spawn
+            // goes through the spawner with the caster's placement.
+            string baseSrc = Src(Path.Combine(AbilityDir, "AbilityBaseSO.cs"));
+            StringAssert.Contains("public virtual bool CanActivate(AbilityContext ctx) => !PlacesZone || ctx.CanSpawnZone(LogSource, LogName);", baseSrc);
+            StringAssert.Contains("AreaEffectSpawner.Spawn(ctx, spec, AreaEffectSpawner.Placement(caster.position, caster.forward, spec), LogSource, LogName)", baseSrc);
+
+            // The log names the four abilities used to spell by hand.
+            Assert.AreEqual("FeatherTrap", AbilityLogNames.Source("FeatherTrapAbilitySO"));
+            Assert.AreEqual("Feather Trap", AbilityLogNames.Words("FeatherTrapAbilitySO"));
+            Assert.AreEqual("Root Egg", AbilityLogNames.Words("RootEggAbilitySO"));
+            Assert.AreEqual("Smoke Roost", AbilityLogNames.Words("SmokeRoostAbilitySO"));
+            Assert.AreEqual("Feather Aura", AbilityLogNames.Words("FeatherAuraAbilitySO"));
+            Assert.AreEqual("FeatherAura", AbilityLogNames.Source("FeatherAuraAbilitySO"));
         }
 
         // ---- 4. The anchored centre --------------------------------------------------------------------------------
@@ -341,7 +356,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("_entered.Clear();", AssassinExecuteCreditTests.MethodBody(ZonePath, "public override void Spawned()"));
             string scan = AssassinExecuteCreditTests.MethodBody(ZonePath, "private void ScanOnEnter()");
             int add = scan.IndexOf("if (!_entered.Add(chicken.Id)) continue;", StringComparison.Ordinal);
-            int rpc = scan.IndexOf("chicken.RPC_ApplyRoot(RootDuration, OwnerChicken);", StringComparison.Ordinal);
+            int rpc = scan.IndexOf("ChickenController.SendControlFrom(OwnerChicken, null, chicken, ControlEmission.Root(RootDuration));", StringComparison.Ordinal);
             Assert.GreaterOrEqual(add, 0);
             Assert.Greater(rpc, add);
             StringAssert.Contains("Consumed = true;", scan, "Root Egg is still spent on its first catch");

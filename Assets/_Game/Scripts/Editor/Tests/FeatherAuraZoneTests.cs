@@ -115,13 +115,12 @@ namespace CluckWars.Tests
             Assert.IsNull(AreaEffectSpawner.Refusal(spec, 1), "the spawner accepts the shipped aura");
 
             string activate = Body(AuraPath, "public override void OnActivate(AbilityContext ctx)");
-            StringAssert.Contains("AreaEffectSpawner.Spawn(ctx, spec,", activate);
+            StringAssert.Contains("SpawnArea(ctx, spec);", activate);
             StringAssert.DoesNotContain("Effects.", activate, "no effect-stack channel any more");
-            string deactivate = Body(AuraPath, "public override void OnDeactivate(AbilityContext ctx)");
-            StringAssert.DoesNotContain("Effects.", deactivate);
-            StringAssert.DoesNotContain("Despawn", deactivate, "the zone despawns itself (slot-inactive rule)");
+            Assert.AreEqual(typeof(AbilityBaseSO), typeof(FeatherAuraAbilitySO).GetMethod(nameof(AbilityBaseSO.OnDeactivate)).DeclaringType,
+                "nothing to undo at the end of the run: the zone despawns itself (slot-inactive rule)");
             string gate = Body(AuraPath, "public override bool CanActivate(AbilityContext ctx)");
-            StringAssert.Contains("if (!ctx.CanSpawnZone(Source, \"Feather Aura\")) return false;", gate,
+            StringAssert.Contains("if (!base.CanActivate(ctx)) return false;", gate,
                 "refuses before the cast and its cooldown when PrefabRegistrySO.AbilityZone is unassigned");
             StringAssert.Contains("AreaEffectSpawner.Refusal(spec, ctx.Slot)", gate,
                 "the spawner's one failure (a refused spec) is checked BEFORE the cooldown is charged, so OnActivate's spawn cannot fail");

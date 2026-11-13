@@ -195,7 +195,7 @@ namespace CluckWars.Tests
             var so = AssetDatabase.LoadAssetAtPath<CluckShockAbilitySO>(ShovePath);
             Assert.IsNotNull(so, "the shipped Shove is a CluckShockAbilitySO");
             var shoveSrc = System.IO.File.ReadAllText("Assets/_Game/Scripts/Abilities/CluckShockAbilitySO.cs");
-            StringAssert.Contains("RPC_ApplyKnockback", shoveSrc, "the Shove lands through the Hit-origin knockback RPC");
+            StringAssert.Contains("caster.KnockAway(_scratch[i], KnockbackForce)", shoveSrc, "the Shove lands through the Hit-origin knockback RPC (ChickenController.KnockAway)");
             StringAssert.DoesNotContain("SelfApplied", shoveSrc);
             var ctrlSrc = System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenController.cs");
             int a = ctrlSrc.IndexOf("public void RPC_ApplyKnockback", System.StringComparison.Ordinal);

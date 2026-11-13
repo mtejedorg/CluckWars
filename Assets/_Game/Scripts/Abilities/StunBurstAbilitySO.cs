@@ -48,16 +48,11 @@ namespace CluckWars.Abilities
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
-            // The caster's Relentless lengthens the stun here, on its own authority; the victim's ceiling allows for it.
-            float stun = ResolveOutgoingControlSeconds(StunDuration, caster);
 
+            // The caster's Relentless lengthens the stun in SendControl, on its own authority; the victim's ceiling allows for it.
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
-            {
-                _scratch[i].RPC_ApplyStun(stun, caster.Id);
-            }
+                SendControl(caster, _scratch[i]);
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

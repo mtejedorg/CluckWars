@@ -76,32 +76,12 @@ namespace CluckWars.Abilities
             GatherTargets(thief, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
-                var targetCtrl = _scratch[i];
-                var targetCargo = targetCtrl.Cargo; // ExtraTargetFilter already guaranteed Stealable > 0
-
-                // Steal-proof victim (Egg Shell / Turtle Mode): skip the steal BEFORE crediting
-                // ourselves — the knockback below is unaffected (ApplyKnockback has its own
-                // control-immunity check).
-                float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-                float stolen = StealRules.CanStealFrom(targetCtrl)
-                    ? StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Stealable)
-                    : 0f;
-                if (stolen > 0f)
-                {
-                    thiefCargo.RequestSteal(targetCargo, stolen);
-                }
-
-                if (KnockbackStrength > 0f)
-                {
-                    var dir = (targetCtrl.transform.position - thief.transform.position);
-                    dir.y = 0f;
-                    if (dir.sqrMagnitude < 0.001f) dir = thief.transform.forward;
-                    // Names the thief, so a base wall refuses the shove exactly where it refuses the steal.
-                    targetCtrl.RPC_ApplyKnockbackFrom(dir.normalized * KnockbackStrength, thief.Id);
-                }
+                // A steal-proof victim (Egg Shell / Turtle Mode) gives nothing (StealFrom's gate); the shove below
+                // is unaffected (ApplyKnockback has its own control-immunity check) and names the thief, so a base
+                // wall refuses it exactly where it refuses the steal. Nothing is sent for a strength of 0 (shipped).
+                StealFrom(thief, _scratch[i], StealAmount);
+                thief.KnockAway(_scratch[i], KnockbackStrength);
             }
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

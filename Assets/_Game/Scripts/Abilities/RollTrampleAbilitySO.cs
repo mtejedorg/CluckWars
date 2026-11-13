@@ -105,22 +105,11 @@ namespace CluckWars.Abilities
             if (_scratch.Count == 0) return;
 
             // Nearest target stays the telegraphed target: steal-proof means no steal, no fallback.
-            if (!StealRules.CanStealFrom(_scratch[0])) return;
-            var targetCargo = _scratch[0].Cargo;
-            if (targetCargo == null) return;
-
-            float freeSpace = thiefCargo.Capacity - thiefCargo.Cargo;
-            float stolen = StealMath.Clamp(ResolveStealAmount(StealAmount, thief), freeSpace, targetCargo.Stealable);
-            if (stolen > 0f)
-            {
-                // The jump has NOT happened yet — AbilityController.TryActivate defers it until
-                // after OnActivate for a Capsule shape. By the time the victim's authority
-                // applies this the thief will be a jump further on, which is what
-                // StealRules.Reach's CastPoseIsUnreconstructable allowance pays for.
-                thiefCargo.RequestSteal(targetCargo, stolen);
-            }
+            // The jump has NOT happened yet — AbilityController.TryActivate defers it until
+            // after OnActivate for a Capsule shape. By the time the victim's authority
+            // applies this the thief will be a jump further on, which is what
+            // StealRules.Reach's CastPoseIsUnreconstructable allowance pays for.
+            StealFrom(thief, _scratch[0], StealAmount);
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

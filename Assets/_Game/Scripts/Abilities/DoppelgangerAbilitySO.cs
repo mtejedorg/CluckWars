@@ -142,11 +142,5 @@ namespace CluckWars.Abilities
                     }
                 });
         }
-
-        public override void OnDeactivate(AbilityContext ctx)
-        {
-            // No persistent state to clear — the decoy is independent and self-despawns
-            // (lifetime expiry or OnDeath, whichever comes first).
-        }
     }
 }

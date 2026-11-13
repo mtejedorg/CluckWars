@@ -166,7 +166,7 @@ namespace CluckWars.Tests
         public void EveryAbilityThatSendsAKnockback_DeclaresItsStrength_FromItsOwnField()
         {
             var senders = Directory.GetFiles(AbilityDir, "*AbilitySO.cs")
-                .Where(p => Code(p).Contains(".RPC_ApplyKnockbackFrom("))
+                .Where(p => Code(p).Contains(".KnockAway("))
                 .Select(Path.GetFileNameWithoutExtension)
                 .OrderBy(n => n).ToArray();
             CollectionAssert.AreEquivalent(
@@ -215,7 +215,8 @@ namespace CluckWars.Tests
         public void PairedKnockback_NamesItsCaster(string file)
         {
             string src = Code(Path.Combine(AbilityDir, file));
-            StringAssert.Contains(".RPC_ApplyKnockbackFrom(", src, $"{file}: its knockback rides another effect and must be judged with it");
+            StringAssert.Contains(".KnockAway(", src, $"{file}: its knockback goes through the caster's one sender (A20), which names the caster");
+            StringAssert.DoesNotContain(".RPC_ApplyKnockbackFrom(", src, $"{file}: the direction and the caster id are the sender's job");
             StringAssert.DoesNotContain(".RPC_ApplyKnockback(", src, $"{file}: the unvalidated knockback lands across a base wall its other half is refused at");
         }
 
@@ -223,8 +224,16 @@ namespace CluckWars.Tests
         public void SpineCoatContact_NamesItsWearer()
         {
             string body = AssassinExecuteCreditTests.MethodBody(ControllerPath, "private void CheckCollisionSlow()");
-            StringAssert.Contains("other.RPC_ApplyKnockbackFrom(", body);
-            StringAssert.DoesNotContain("other.RPC_ApplyKnockback(", body);
+            StringAssert.Contains("KnockAway(other, StealBackKnockback);", body);
+            StringAssert.DoesNotContain("other.RPC_ApplyKnockback", body);
+
+            // The one sender: away from this chicken, named with its own id; nothing for a strength of 0.
+            string knock = AssassinExecuteCreditTests.MethodBody(ControllerPath, "public void KnockAway(");
+            StringAssert.Contains("if (victim == null || !(strength > 0f)) return;", knock);
+            StringAssert.Contains("Planar.DirectionOr(transform.position, victim.transform.position, transform.forward)", knock);
+            StringAssert.Contains("victim.RPC_ApplyKnockbackFrom(away * strength, Id);", knock);
+            int senders = RuntimeSourceGuardTests.RuntimeFiles().Count(p => RuntimeSourceGuardTests.Code(p).Contains(".RPC_ApplyKnockbackFrom("));
+            Assert.AreEqual(1, senders, "only ChickenController.KnockAway sends a knockback");
         }
     }
 }

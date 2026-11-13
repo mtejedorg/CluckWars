@@ -645,6 +645,8 @@ namespace CluckWars.Tests
         [Test]
         public void EveryCallSite_PassesTheCastingChicken()
         {
+            // A20: the three RPCs are sent from one place, ChickenController.SendControlFrom, which passes the caster id
+            // it was given: a chicken's own Id (SendControl) or a zone's OwnerChicken.
             var rx = new Regex(@"\.(RPC_ApplyStun|RPC_ApplyRoot|RPC_ApplyAbilitySlow)\((.*)\);");
             int found = 0;
             foreach (var (path, line) in ProductionCodeLines())
@@ -652,20 +654,27 @@ namespace CluckWars.Tests
                 var m = rx.Match(line);
                 if (!m.Success) continue;
                 found++;
+                Assert.AreEqual("ChickenController.cs", Path.GetFileName(path),
+                    $"{Path.GetFileName(path)} sends {m.Groups[1].Value} itself. Use caster.SendControl / ChickenController.SendControlFrom.");
                 string lastArg = m.Groups[2].Value.Split(',').Last().Trim();
-                Assert.IsTrue(lastArg == "caster.Id" || lastArg == "OwnerChicken",
-                    $"{Path.GetFileName(path)}: {m.Groups[1].Value} is sent with '{lastArg}' as its caster. It must be the " +
-                    "casting chicken's ChickenController id (an ability's caster.Id, a zone's OwnerChicken), or the victim refuses it.");
+                Assert.AreEqual("caster", lastArg, $"{m.Groups[1].Value} must name the casting chicken, or the victim refuses it.");
             }
-            Assert.GreaterOrEqual(found, 6, "the call-site scan found fewer control RPC calls than ship today - the regex went blind");
+            Assert.AreEqual(3, found, "one send per control kind, in SendControlFrom");
+
+            string send = AssassinExecuteCreditTests.MethodBody(ControllerPath, "public void SendControl(");
+            StringAssert.Contains("SendControlFrom(Id, Passive, victim, emission)", send, "a chicken names itself and brings its own passive");
+            var zoneCalls = ProductionCodeLines().Where(t => t.Line.Contains("SendControlFrom(") && Path.GetFileName(t.Path) != "ChickenController.cs").ToList();
+            Assert.AreEqual(1, zoneCalls.Count);
+            StringAssert.Contains("SendControlFrom(OwnerChicken, null, chicken, ControlEmission.Root(RootDuration))", zoneCalls[0].Line);
         }
 
         [Test]
         public void TheOnlyNonAbilityCaller_IsTheRootZone()
         {
             var callers = ProductionCodeLines()
-                .Where(t => Rpcs.Any(r => t.Line.Contains("." + r.Rpc + "(")))
+                .Where(t => t.Line.Contains("SendControlFrom(") || t.Line.Contains(".SendControl("))
                 .Select(t => t.Path.Replace('\\', '/'))
+                .Where(p => !p.EndsWith("/ChickenController.cs"))   // declares both
                 .Where(p => !p.Contains(AbilityDir + "/"))
                 .Select(Path.GetFileName)
                 .Distinct()
@@ -685,17 +694,22 @@ namespace CluckWars.Tests
             foreach (var path in Directory.GetFiles(AbilityDir, "*.cs", SearchOption.AllDirectories))
             {
                 var code = CodeLines(path);
-                foreach (var (rpc, kind) in Rpcs)
+                foreach (var (rpc, _) in Rpcs)
+                    Assert.IsFalse(code.Any(l => l.Contains("." + rpc + "(")),
+                        $"{path} calls {rpc} itself. An ability sends its declared effect with SendControl(caster, victim) (A20).");
+
+                // A20: SendControl(caster, victim) sends the ability's own EmittedControl, so the effect that is sent and
+                // the effect the bound is derived from are one declaration. What is left to pin is that there is one.
+                if (Path.GetFileName(path) == "AbilityBaseSO.cs" || !code.Any(l => l.Contains("SendControl(caster, "))) continue;
                 {
-                    if (!code.Any(l => l.Contains("." + rpc + "("))) continue;
                     var type = asm.GetType($"{typeof(AbilityBaseSO).Namespace}.{Path.GetFileNameWithoutExtension(path)}");
-                    Assert.IsNotNull(type, $"{path} calls {rpc} but its file and class names have drifted apart");
+                    Assert.IsNotNull(type, $"{path} sends control but its file and class names have drifted apart");
                     var instances = assets.Where(a => type.IsAssignableFrom(a.GetType())).ToList();
-                    Assert.IsNotEmpty(instances, $"{type.Name} calls {rpc} but no asset of it ships");
+                    Assert.IsNotEmpty(instances, $"{type.Name} sends control but no asset of it ships");
                     foreach (var a in instances)
                     {
-                        Assert.AreEqual(kind, a.EmittedControl.Kind,
-                            $"{a.name} calls {rpc} but declares EmittedControl={a.EmittedControl.Kind}; its casts would be refused.");
+                        Assert.AreNotEqual(ControlKind.None, a.EmittedControl.Kind,
+                            $"{a.name} calls SendControl but declares no EmittedControl; nothing would be sent.");
                         Assert.Greater(a.EmittedControl.Seconds, 0f, a.name);
                     }
                     checkedTypes++;

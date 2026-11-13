@@ -67,7 +67,9 @@ namespace CluckWars.Tests
             StringAssert.Contains("StealRules.SplitDrain", body);
             StringAssert.DoesNotContain("Cargo <= 0f", body, "an Assassin holding only a bounty bag is not an empty load");
             StringAssert.Contains("StealableFraction", Src("Gameplay/BotController.cs"));
-            StringAssert.Contains("Stealable", Src("Gameplay/ChickenController.cs"));
+            // A20: the Spine Coat contact steals through the one entry point, which clamps to what is stealable.
+            StringAssert.Contains("Cargo.StealFrom(other, StealBackAmount)", Src("Gameplay/ChickenController.cs"));
+            StringAssert.Contains("victimCargo.Stealable", AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenCargo.cs", "public float StealFrom("));
         }
     }
 }

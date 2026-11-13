@@ -60,9 +60,7 @@ namespace CluckWars.Abilities
 
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
-                _scratch[i].RPC_ApplyRoot(RootSeconds, caster.Id);
+                SendControl(caster, _scratch[i]);   // a root: as authored, no passive lengthens it
         }
-
-        public override void OnDeactivate(AbilityContext ctx) { }
     }
 }

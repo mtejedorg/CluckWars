@@ -481,7 +481,7 @@ namespace CluckWars.Tests
         [Test]
         public void Steal_AsksTheVictim_EveryExitThatKnowsTheThiefReports()
         {
-            string request = Body(CargoPath, "public void RequestSteal(");
+            string request = Body(CargoPath, "private void RequestSteal(");
             Assert.Less(request.IndexOf("_requests.AskSteal(", System.StringComparison.Ordinal),
                         request.IndexOf("RPC_DrainStolen(asked, _controller.Id, requestId)", System.StringComparison.Ordinal));
 

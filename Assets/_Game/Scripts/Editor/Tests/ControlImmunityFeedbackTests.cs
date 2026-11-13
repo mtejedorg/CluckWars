@@ -124,6 +124,8 @@ namespace CluckWars.Tests
         private static readonly string[] ControlDelivery =
         {
             "RPC_ApplyStun", "RPC_ApplyRoot", "RPC_ApplyAbilitySlow", "RPC_ApplyKnockback",
+            // A20: abilities reach those four through the caster's two senders.
+            "SendControl(", "KnockAway(",
         };
 
         /// <summary>Anything a target receives that immunity does <i>not</i> stop. Cargo is
@@ -132,6 +134,8 @@ namespace CluckWars.Tests
         private static readonly string[] NonControlDelivery =
         {
             "RPC_DrainStolen", "RequestSteal", "AssassinExecute",
+            // A20: the one steal entry point.
+            "StealFrom(",
         };
 
         // ---- 1. The split itself: eligibility must not have moved ------------

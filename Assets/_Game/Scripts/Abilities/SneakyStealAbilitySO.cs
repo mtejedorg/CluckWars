@@ -54,30 +54,16 @@ namespace CluckWars.Abilities
             var thiefCargo = thief.Cargo;
             if (thiefCargo == null) return;
 
-            float spaceLeft = thiefCargo.Capacity - thiefCargo.Cargo;
-            if (spaceLeft <= 0f) return;
-
             // Nearest enemy chicken with cargo on board — GatherTargets sorts ascending
             // by distance, so index 0 is always "nearest valid target".
             GatherTargets(thief, _scratch);
             if (_scratch.Count == 0) return;
-            // Nearest target stays the telegraphed target: if it is steal-proof there is no
-            // steal (and no fallback to the next rival).
-            if (!StealRules.CanStealFrom(_scratch[0])) return;
-            var target = _scratch[0].Cargo;
-            if (target == null) return;
 
-            // Ask for the smaller of (StealAmount, victim's cargo, our free space); the victim reports what it really gave.
-            float take = Mathf.Min(ResolveStealAmount(StealAmount, thief), target.Stealable, spaceLeft);
-            if (take <= 0f) return;
-
-            thiefCargo.RequestSteal(target, take);
+            // Nearest target stays the telegraphed target: if it is steal-proof there is no steal (and no fallback
+            // to the next rival). Asks for the smaller of (StealAmount, victim's cargo, our free space); the victim
+            // reports what it really gave. The lock is set only when something was asked for.
+            if (StealFrom(thief, _scratch[0], StealAmount) <= 0f) return;
             thief.LockStealOn(_scratch[0], SameVictimCooldownSeconds);
-        }
-
-        public override void OnDeactivate(AbilityContext ctx)
-        {
-            // No persistent state to clear — the steal was a one-shot at activation.
         }
     }
 }
