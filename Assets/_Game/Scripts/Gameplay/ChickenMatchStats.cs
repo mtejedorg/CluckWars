@@ -186,9 +186,20 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Reset stats for a new round. Called by <see cref="GameManager.ResetWorldForNewRound"/>.
         /// </summary>
+        /// <remarks>
+        /// Sender-restricted like <c>ChickenController.RPC_ResetControlStates</c> (A19): it zeroes the kills and the
+        /// banked food the match-end bonuses and the summary read, so any peer could otherwise wipe a rival's.
+        /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ResetStats()
+        public void RPC_ResetStats(RpcInfo info = default)
         {
+            if (!ChickenController.IsFromMatchAuthority(info, out string rejection))
+            {
+                if (RejectionLimiter.Allow(info.Source, out string held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_ResetStats from {info.Source} — {rejection}" + held);
+                return;
+            }
+
             Kills         = 0;
             FoodDeposited = 0f;
             StunsTaken    = 0;

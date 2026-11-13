@@ -98,10 +98,14 @@ namespace CluckWars.Gameplay
             public readonly float MaxZonePlacement;
             /// <summary>Root only: the longest such a zone lives (Root Egg's EggLifetime). 0 = no zone can vouch.</summary>
             public readonly float MaxZoneLifetime;
+            /// <summary>Knockback only: the strongest impulse any ability in the pool declares
+            /// (<see cref="AbilityBaseSO.EmittedKnockback"/>). 0 when nothing in the pool shoves: every knockback is then refused.</summary>
+            public readonly float MaxImpulse;
 
             public Ceiling(bool known, float maxSeconds, float minSlowFactor, float maxReach,
-                float maxZoneRadius = 0f, float maxZonePlacement = 0f, float maxZoneLifetime = 0f)
+                float maxZoneRadius = 0f, float maxZonePlacement = 0f, float maxZoneLifetime = 0f, float maxImpulse = 0f)
             {
+                MaxImpulse = maxImpulse;
                 Known = known;
                 MaxSeconds = maxSeconds;
                 MinSlowFactor = minSlowFactor;
@@ -148,17 +152,40 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// The bound for a knockback that rides another effect (<see cref="EvaluateSource"/>): the furthest ANY ability in
-        /// <paramref name="pool"/> reaches, since no ability declares that it shoves and the paired effect can be a stun
-        /// or a steal. Never tighter than the stun or steal bound, so an honest pair is never split by range; it carries
-        /// no duration. <see cref="Ceiling.Unknown"/> for a null pool (sender check only).
+        /// The bound for a knockback (<see cref="EvaluateKnockback"/>): the furthest ANY ability in
+        /// <paramref name="pool"/> reaches, since the effect a knockback rides can be a stun or a steal, and the
+        /// strongest impulse any ability declares (<see cref="AbilityBaseSO.EmittedKnockback"/>). The reach is never
+        /// tighter than the stun or steal bound, so an honest pair is never split by range; a knockback carries no
+        /// duration. <see cref="Ceiling.Unknown"/> for a null pool (sender check only).
         /// </summary>
         public static Ceiling KnockbackCeiling(IEnumerable<AbilityBaseSO> pool)
         {
             if (pool == null) return Ceiling.Unknown;
-            float maxReach = 0f;
-            foreach (var ability in pool) maxReach = Mathf.Max(maxReach, Reach(ability));
-            return new Ceiling(true, 0f, 1f, maxReach);
+            float maxReach = 0f, maxImpulse = 0f;
+            foreach (var ability in pool)
+            {
+                maxReach = Mathf.Max(maxReach, Reach(ability));
+                if (ability != null) maxImpulse = Mathf.Max(maxImpulse, ability.EmittedKnockback);
+            }
+            return new Ceiling(true, 0f, 1f, maxReach, maxImpulse: maxImpulse);
+        }
+
+        /// <summary>Relative tolerance on the impulse ceiling: the sender multiplies a normalized direction by the
+        /// authored strength, so the magnitude that arrives is the strength to within float rounding.</summary>
+        public const float ImpulseTolerance = 1e-3f;
+
+        /// <summary>
+        /// True for a finite impulse no stronger than the pool's strongest declared knockback. With an unknown
+        /// ceiling only finiteness is required. Passive scaling happens on the victim after this check
+        /// (<c>ChickenController.ApplyKnockback</c>), so the wire value is always the authored strength.
+        /// </summary>
+        public static bool IsPlausibleImpulse(Vector3 impulse, in Ceiling ceiling)
+        {
+            float sqr = impulse.sqrMagnitude;
+            if (float.IsNaN(sqr) || float.IsInfinity(sqr)) return false;
+            if (!ceiling.Known) return true;
+            float max = ceiling.MaxImpulse * (1f + ImpulseTolerance) + Epsilon;
+            return sqr <= max * max;
         }
 
         /// <summary>
@@ -420,6 +447,8 @@ namespace CluckWars.Gameplay
             DecoyCaster,
             NotAttributable,
             OutOfRange,
+            /// <summary>Knockback only: stronger than any ability in the pool shoves, or not a finite vector.</summary>
+            ImplausibleImpulse,
         }
 
         /// <summary>The facts the victim's authority can establish about a control claim.</summary>
@@ -469,10 +498,24 @@ namespace CluckWars.Gameplay
             return Verdict.Accepted;
         }
 
+        /// <summary>
+        /// Decides a knockback claim (<c>ChickenController.RPC_ApplyKnockbackFrom</c>): the impulse is inside the
+        /// pool's bound, then <see cref="EvaluateSource"/>. Magnitude first, as <see cref="Evaluate"/> does.
+        /// </summary>
+        public static Verdict EvaluateKnockback(in Claim c, Vector3 impulse, in Ceiling ceiling)
+        {
+            if (!IsPlausibleImpulse(impulse, ceiling)) return Verdict.ImplausibleImpulse;
+            return EvaluateSource(c, ceiling);
+        }
+
         public static string Describe(Verdict v, ControlKind kind, in Ceiling ceiling)
         {
             switch (v)
             {
+                case Verdict.ImplausibleImpulse:
+                    return ceiling.Known
+                        ? $"the impulse is stronger than any ability in the pool shoves ({ceiling.MaxImpulse:0.00}), or is not a finite vector."
+                        : "the impulse is not a finite vector.";
                 case Verdict.ImplausibleDuration:
                     return ceiling.Known
                         ? $"the duration is not in (0, {ceiling.MaxSeconds:0.00}] s, the longest {kind} any ability in the pool applies (with the strongest outgoing-control passive)."

@@ -379,6 +379,19 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual Gameplay.ControlEmission EmittedControl => Gameplay.ControlEmission.None;
 
+        /// <summary>
+        /// The strength of the knockback this ability sends its victims through
+        /// <c>ChickenController.RPC_ApplyKnockbackFrom</c>, as authored. 0 for every ability that shoves nobody.
+        /// </summary>
+        /// <remarks>
+        /// Declared for the same reason as <see cref="EmittedControl"/>: the receiver-side bound on that RPC is the
+        /// maximum of this across the shipped registry (<c>ControlClaimRules.KnockbackCeiling</c>, A19), so an
+        /// ability that shoves without declaring it contributes nothing and a shove stronger than the rest of the
+        /// pool is refused at the victim. <c>KnockbackClaimTests</c> pins every ability whose source sends a
+        /// knockback against this override.
+        /// </remarks>
+        public virtual float EmittedKnockback => 0f;
+
         // ---- Aim descriptor (FEEDBACK.md §4 / §8) ------------------------------
         // One declarative shape per ability, used by every consumer that needs to
         // agree on "what does this ability cover": the hold-to-aim preview, the

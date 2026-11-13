@@ -55,6 +55,8 @@ namespace CluckWars.Abilities
 
         public override float NominalStealAmount => StealAmount;
 
+        public override float EmittedKnockback => KnockbackStrength;
+
         public override bool TargetEffectIncludesSteal => true;
         public override bool TargetEffectIncludesControl => KnockbackStrength > 0f; // the shove, when there is one
 

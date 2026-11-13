@@ -1512,39 +1512,31 @@ namespace CluckWars.Gameplay
         // ---- v0.3 Interaction primitive RPCs (B1) — all route to StateAuthority ----
 
         /// <summary>
-        /// Applies an external displacement (knockback) impulse. Routes to the
-        /// chicken's StateAuthority; integrated + decayed by <see cref="ChickenMovement"/>.
-        /// Knockback is scaled by the specialization (Bulwark).
-        /// </summary>
-        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplyKnockback(Vector3 impulse)
-        {
-            ApplyKnockback(impulse); // already scales by Immovable passive
-            _log?.Debug(Source, $"RPC_ApplyKnockback: impulse={impulse:F2}.");
-        }
-
-        /// <summary>
-        /// A knockback that rides another effect of the same cast: a stun (Headbutt, Belly Flop) or a steal (Snatch,
-        /// the Spine Coat contact). It names the casting chicken and is judged as that effect is (the sender owns the
-        /// caster, the caster is in reach, no base wall in between), so the pair lands or is refused together.
+        /// Applies an external displacement (knockback) impulse from <paramref name="caster"/>: the Shove, Roll &amp;
+        /// Push, or the shove that rides a stun (Headbutt, Belly Flop) or a steal (Snatch, the Spine Coat contact).
+        /// Routes to the chicken's StateAuthority; integrated + decayed by <see cref="ChickenMovement"/> and scaled
+        /// by the specialization (Bulwark).
         /// </summary>
         /// <remarks>
-        /// <see cref="RPC_ApplyKnockback"/> took no caster, so the shove of a Headbutt landed across a base wall its
-        /// stun was refused at. Same physics and same one-shot as the unvalidated RPC; a shove-only ability (Shove,
-        /// Roll &amp; Push) has no second half to agree with and still uses that one.
+        /// The only knockback RPC (A19). It names the casting chicken and is judged like a stun: the sender owns the
+        /// caster, the caster is within the longest reach in the pool, no base wall stands in between, and the impulse
+        /// is no stronger than the strongest shove any registered ability declares
+        /// (<c>ControlClaimRules.EvaluateKnockback</c>). A knockback that rides another effect is therefore accepted
+        /// or refused together with it. The old <c>RPC_ApplyKnockback(impulse)</c> took neither a caster nor a
+        /// sender, so any peer could send any chicken any impulse.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         public void RPC_ApplyKnockbackFrom(Vector3 impulse, NetworkBehaviourId caster, RpcInfo info = default)
         {
-            if (!AcceptControlClaim(nameof(RPC_ApplyKnockbackFrom), ControlKind.None, 0f, 1f, caster, info, knockback: true)) return;
+            if (!AcceptControlClaim(nameof(RPC_ApplyKnockbackFrom), ControlKind.None, 0f, 1f, caster, info, knockback: true, impulse: impulse)) return;
 
-            ApplyKnockback(impulse);
+            ApplyKnockback(impulse); // already scales by Immovable passive
             _log?.Debug(Source, $"RPC_ApplyKnockbackFrom: impulse={impulse:F2}.");
         }
 
         /// <summary>
         /// Applies a displacement impulse this chicken is inflicting on <b>itself</b> — a
-        /// dodge, not a shove. Physically identical to <see cref="RPC_ApplyKnockback"/> in
+        /// dodge, not a shove. Physically identical to <see cref="RPC_ApplyKnockbackFrom"/> in
         /// every respect; the difference is that peers observe it on
         /// <see cref="SelfImpulseEventId"/>, which the victim-impact systems do not read.
         /// </summary>
@@ -1561,10 +1553,23 @@ namespace CluckWars.Gameplay
         /// their victim it was self-inflicted.
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_ApplySelfImpulse(Vector3 impulse)
+        public void RPC_ApplySelfImpulse(Vector3 impulse, RpcInfo info = default)
         {
+            if (!AcceptOwnAuthority(nameof(RPC_ApplySelfImpulse), info)) return;
             ApplyKnockback(impulse, ImpulseOrigin.SelfApplied);
             _log?.Debug(Source, $"RPC_ApplySelfImpulse: impulse={impulse:F2}.");
+        }
+
+        /// <summary>
+        /// The gate of an RPC a chicken only ever sends to itself (A19): honoured from this chicken's own state
+        /// authority, which is where its abilities run, and from nobody else. A refusal is a rate-limited Warn.
+        /// </summary>
+        private bool AcceptOwnAuthority(string rpc, in RpcInfo info)
+        {
+            if (RpcClaim.SenderSpeaksFor(Object, info)) return true;
+            if (ControlRejectionLimiter.Allow(info.Source, out string held))
+                _log?.Warn(Source, $"{name}: rejected {rpc} from {info.Source} - only this chicken's own state authority may send it." + held);
+            return false;
         }
 
         // ---- Control RPCs (F4 sender validation + A1 re-application) -----------
@@ -1657,13 +1662,13 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Judges a control claim and logs a refusal. True only for an accepted claim.
         /// </summary>
-        /// <param name="knockback">A knockback riding another effect (<see cref="RPC_ApplyKnockbackFrom"/>): no duration,
-        /// judged on its source alone against the knockback bound.</param>
+        /// <param name="knockback">A knockback (<see cref="RPC_ApplyKnockbackFrom"/>): no duration, judged on its
+        /// source and on <paramref name="impulse"/> against the knockback bound.</param>
         private bool AcceptControlClaim(string rpc, ControlKind kind, float seconds, float factor,
-            NetworkBehaviourId casterId, in RpcInfo info, bool knockback = false)
+            NetworkBehaviourId casterId, in RpcInfo info, bool knockback = false, Vector3 impulse = default)
         {
             var ceiling = knockback ? _knockbackCeiling : CeilingFor(kind);
-            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster, sourceOnly: knockback);
+            var verdict = JudgeControl(kind, seconds, factor, casterId, info, ceiling, out var caster, knockback, impulse);
             if (verdict == ControlClaimRules.Verdict.Accepted)
             {
                 if (!CrossedBaseWall(kind, caster)) return true;
@@ -1707,7 +1712,7 @@ namespace CluckWars.Gameplay
         /// <summary>Gathers what this (the victim's) authority can see about a control claim and judges it.</summary>
         private ControlClaimRules.Verdict JudgeControl(ControlKind kind, float seconds, float factor,
             NetworkBehaviourId casterId, in RpcInfo info, in ControlClaimRules.Ceiling ceiling, out ChickenController caster,
-            bool sourceOnly = false)
+            bool knockback = false, Vector3 impulse = default)
         {
             caster = null;
             var claim = new ControlClaimRules.Claim { Kind = kind, Seconds = seconds, SlowFactor = factor };
@@ -1736,7 +1741,7 @@ namespace CluckWars.Gameplay
                 claim.InsideCastersRootZone = _lastRootScan.Vouched;
             }
 
-            if (sourceOnly) return ControlClaimRules.EvaluateSource(claim, ceiling);
+            if (knockback) return ControlClaimRules.EvaluateKnockback(claim, impulse, ceiling);
             return ControlClaimRules.Evaluate(claim, ceiling);
         }
 

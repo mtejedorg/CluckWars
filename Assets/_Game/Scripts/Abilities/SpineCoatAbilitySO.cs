@@ -36,6 +36,9 @@ namespace CluckWars.Abilities
         /// </remarks>
         public override float NominalStealAmount => StealBackAmount;
 
+        // The contact shove of the coat (ChickenController.CheckCollisionSlow sends it for the wearer).
+        public override float EmittedKnockback => Gameplay.ChickenController.StealBackKnockback;
+
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

@@ -68,6 +68,8 @@ namespace CluckWars.Abilities
         // rather than inferred from Category, and why a mixed ability stays false.
         public override bool TargetEffectIsPurelyControl => true;
 
+        public override float EmittedKnockback => PushStrength;
+
         public override void OnActivate(AbilityContext ctx)
         {
             var caster = ctx.Controller;
@@ -83,7 +85,7 @@ namespace CluckWars.Abilities
                 var dir = (targetCtrl.transform.position - caster.transform.position);
                 dir.y = 0f;
                 if (dir.sqrMagnitude < 0.001f) dir = caster.transform.forward;
-                targetCtrl.RPC_ApplyKnockback(dir.normalized * PushStrength);
+                targetCtrl.RPC_ApplyKnockbackFrom(dir.normalized * PushStrength, caster.Id);
             }
         }
 

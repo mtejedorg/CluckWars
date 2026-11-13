@@ -99,9 +99,119 @@ namespace CluckWars.Tests
             StringAssert.Contains("CrossedBaseWall(kind, caster)", accept, "the same wall answer the stun gets");
         }
 
+        // ---- A19: the impulse is bounded, and no knockback is sent without a caster --------------------------------
+
+        private static ControlClaimRules.Ceiling Knock(float maxImpulse, bool known = true) =>
+            new ControlClaimRules.Ceiling(known, 0f, 1f, 6f, maxImpulse: maxImpulse);
+
+        [Test]
+        public void Impulse_UpToTheStrongestShoveInThePool_IsPlausible_AnythingStrongerIsNot()
+        {
+            var c = Knock(16.2f);
+            Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(new Vector3(16.2f, 0f, 0f), c), "exactly the authored strength");
+            Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(new Vector3(1f, 0f, 1f).normalized * 16.2f, c), "a normalized direction times the strength");
+            Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(new Vector3(0f, 0f, -7.5f), c), "a weaker shove of the same pool");
+            Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(Vector3.zero, c));
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(16.3f, 0f, 0f), c), "0.6% over is outside the float tolerance");
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(0f, 500f, 0f), c), "a launch into the sky");
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(float.NaN, 0f, 0f), c));
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(float.PositiveInfinity, 0f, 0f), c));
+        }
+
+        [Test]
+        public void Impulse_WithNoShoveInThePool_IsAlwaysRefused_AndWithNoPool_OnlyFinitenessIsChecked()
+        {
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(1f, 0f, 0f), Knock(0f)), "nothing in the pool shoves");
+            Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(new Vector3(900f, 0f, 0f), Knock(0f, known: false)), "no honest bound");
+            Assert.IsFalse(ControlClaimRules.IsPlausibleImpulse(new Vector3(float.NaN, 0f, 0f), Knock(0f, known: false)));
+        }
+
+        [Test]
+        public void EvaluateKnockback_ChecksTheImpulseFirst_ThenTheSource()
+        {
+            var c = Knock(16.2f);
+            var honest = new Vector3(16.2f, 0f, 0f);
+            Assert.AreEqual(ControlClaimRules.Verdict.Accepted, ControlClaimRules.EvaluateKnockback(Source(), honest, c));
+            Assert.AreEqual(ControlClaimRules.Verdict.ImplausibleImpulse,
+                ControlClaimRules.EvaluateKnockback(Source(), honest * 2f, c));
+            Assert.AreEqual(ControlClaimRules.Verdict.ImplausibleImpulse,
+                ControlClaimRules.EvaluateKnockback(Source(speaksFor: false), honest * 2f, c), "magnitude first, as Evaluate does");
+            // With a plausible impulse the verdict is the source's, fact for fact.
+            foreach (bool resolved in new[] { true, false })
+            foreach (bool self in new[] { true, false })
+            foreach (bool decoy in new[] { true, false })
+            foreach (bool speaksFor in new[] { true, false })
+            foreach (float distance in new[] { 0f, 5.9f, 40f })
+            {
+                var claim = Source(resolved, self, decoy, speaksFor, distance);
+                Assert.AreEqual(ControlClaimRules.EvaluateSource(claim, c), ControlClaimRules.EvaluateKnockback(claim, honest, c));
+            }
+            StringAssert.Contains(16.2f.ToString("0.00"), ControlClaimRules.Describe(ControlClaimRules.Verdict.ImplausibleImpulse, ControlKind.None, c));
+        }
+
+        [Test]
+        public void KnockbackCeiling_IsTheStrongestDeclaredShove_OfTheShippedPool()
+        {
+            var pool = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All;
+            var knockback = ControlClaimRules.KnockbackCeiling(pool);
+            float strongest = pool.Where(a => a != null).Max(a => a.EmittedKnockback);
+            Assert.AreEqual(strongest, knockback.MaxImpulse, 0f, "derived from the registry, no tunable of its own");
+            Assert.Greater(knockback.MaxImpulse, 0f, "the shipped pool has a Shove; a zero bound would refuse it");
+            // Every shove a registered ability can send passes its own pool's bound.
+            foreach (var ability in pool.Where(a => a != null && a.EmittedKnockback > 0f))
+                Assert.IsTrue(ControlClaimRules.IsPlausibleImpulse(new Vector3(0.6f, 0f, 0.8f) * ability.EmittedKnockback, knockback), ability.name);
+        }
+
+        [Test]
+        public void EveryAbilityThatSendsAKnockback_DeclaresItsStrength_FromItsOwnField()
+        {
+            var senders = Directory.GetFiles(AbilityDir, "*AbilitySO.cs")
+                .Where(p => Code(p).Contains(".RPC_ApplyKnockbackFrom("))
+                .Select(Path.GetFileNameWithoutExtension)
+                .OrderBy(n => n).ToArray();
+            CollectionAssert.AreEquivalent(
+                new[] { "BellyFlopAbilitySO", "CluckShockAbilitySO", "HeadbuttAbilitySO", "RollPushAbilitySO", "SnatchAbilitySO" }, senders,
+                "a new knockback sender: add its EmittedKnockback override and list it here");
+
+            // The contact shove is sent by the controller for the Spine Coat's wearer.
+            var declared = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
+                .Where(a => a.GetType().GetProperty(nameof(AbilityBaseSO.EmittedKnockback)).DeclaringType == a.GetType())
+                .Select(a => a.GetType().Name).Distinct().OrderBy(n => n).ToArray();
+            CollectionAssert.AreEquivalent(senders.Concat(new[] { "SpineCoatAbilitySO" }), declared);
+
+            foreach (var a in TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir))
+            {
+                float expected = a switch
+                {
+                    CluckShockAbilitySO s => s.KnockbackForce,
+                    RollPushAbilitySO s   => s.PushStrength,
+                    HeadbuttAbilitySO s   => s.KnockbackForce,
+                    BellyFlopAbilitySO s  => s.KnockbackForce,
+                    SnatchAbilitySO s     => s.KnockbackStrength,
+                    SpineCoatAbilitySO _  => ChickenController.StealBackKnockback,
+                    _                     => 0f,
+                };
+                Assert.AreEqual(expected, a.EmittedKnockback, 0f, a.name);
+            }
+        }
+
+        [Test]
+        public void TheUnvalidatedKnockbackRpc_IsGone()
+        {
+            Assert.IsNull(typeof(ChickenController).GetMethod("RPC_ApplyKnockback"), "any peer could send any chicken any impulse through it");
+            foreach (var path in RuntimeSourceGuardTests.RuntimeFiles())
+                StringAssert.DoesNotContain(".RPC_ApplyKnockback(", RuntimeSourceGuardTests.Code(path), path);
+            string body = AssassinExecuteCreditTests.MethodBody(ControllerPath, "public void RPC_ApplyKnockbackFrom(");
+            StringAssert.Contains("impulse: impulse", body, "the impulse reaches the bound check");
+            StringAssert.Contains("ControlClaimRules.EvaluateKnockback(claim, impulse, ceiling)",
+                AssassinExecuteCreditTests.MethodBody(ControllerPath, "private ControlClaimRules.Verdict JudgeControl("));
+        }
+
         [TestCase("HeadbuttAbilitySO.cs")]
         [TestCase("BellyFlopAbilitySO.cs")]
         [TestCase("SnatchAbilitySO.cs")]
+        [TestCase("CluckShockAbilitySO.cs")]
+        [TestCase("RollPushAbilitySO.cs")]
         public void PairedKnockback_NamesItsCaster(string file)
         {
             string src = Code(Path.Combine(AbilityDir, file));

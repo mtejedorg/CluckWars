@@ -62,6 +62,8 @@ namespace CluckWars.Abilities
         // rather than inferred from Category, and why a mixed ability stays false.
         public override bool TargetEffectIsPurelyControl => true;
 
+        public override float EmittedKnockback => KnockbackForce;
+
         public override ControlEmission EmittedControl => ControlEmission.Stun(StaggerSeconds);
 
         public override void OnActivate(AbilityContext ctx)

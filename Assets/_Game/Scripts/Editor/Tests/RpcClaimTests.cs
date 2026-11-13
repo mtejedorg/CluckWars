@@ -68,6 +68,56 @@ namespace CluckWars.Tests
                 "input authority is None for a bot: its steal from a remote human would be refused again");
         }
 
+        // ---- A19b: no RPC without a sender check -----------------------------------------------------------------
+
+        private static IEnumerable<System.Reflection.MethodInfo> RpcMethods()
+        {
+            const System.Reflection.BindingFlags all = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static |
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly;
+            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.GetName().Name.StartsWith("CluckWars.")) continue;
+                foreach (var type in assembly.GetTypes())
+                foreach (var method in type.GetMethods(all))
+                    if (method.GetCustomAttributes(typeof(Fusion.RpcAttribute), false).Length > 0) yield return method;
+            }
+        }
+
+        [Test]
+        public void EveryRpc_TakesTheSender()
+        {
+            var rpcs = RpcMethods().ToList();
+            Assert.GreaterOrEqual(rpcs.Count, 20, "the scan found too few RPCs to mean anything");
+            var blind = rpcs.Where(m => m.GetParameters().All(p => p.ParameterType != typeof(Fusion.RpcInfo)))
+                .Select(m => $"{m.DeclaringType.Name}.{m.Name}").ToList();
+            Assert.IsEmpty(blind,
+                "An RpcSources.All RPC with no RpcInfo cannot tell who sent it, so it cannot refuse anybody " +
+                "(docs/CONVENTIONS.md, 'Cross-authority writes via RPC'):\n" + string.Join("\n", blind));
+        }
+
+        [Test]
+        public void SelfImpulse_IsHonouredOnlyFromTheChickensOwnAuthority()
+        {
+            const string controller = "Assets/_Game/Scripts/Gameplay/ChickenController.cs";
+            string rpc = AssassinExecuteCreditTests.MethodBody(controller, "public void RPC_ApplySelfImpulse(");
+            int gate = rpc.IndexOf("if (!AcceptOwnAuthority(nameof(RPC_ApplySelfImpulse), info)) return;", System.StringComparison.Ordinal);
+            int write = rpc.IndexOf("ApplyKnockback(impulse, ImpulseOrigin.SelfApplied)", System.StringComparison.Ordinal);
+            Assert.Greater(gate, 0);
+            Assert.Greater(write, gate, "the sender is checked before the impulse is applied");
+            StringAssert.Contains("RpcClaim.SenderSpeaksFor(Object, info)",
+                AssassinExecuteCreditTests.MethodBody(controller, "private bool AcceptOwnAuthority("));
+        }
+
+        [Test]
+        public void ResetStats_IsMatchAuthorityOnly()
+        {
+            string rpc = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs", "public void RPC_ResetStats(");
+            int gate = rpc.IndexOf("ChickenController.IsFromMatchAuthority(info, out string rejection)", System.StringComparison.Ordinal);
+            int write = rpc.IndexOf("Kills         = 0;", System.StringComparison.Ordinal);
+            Assert.Greater(gate, 0);
+            Assert.Greater(write, gate, "the sender is checked before anything is zeroed");
+        }
+
         // ---- source guards: the copies must not come back ---------------------------------------------------------
 
         private const string HelperFile = "Assets/_Game/Scripts/Gameplay/RpcClaim.cs";
