@@ -68,7 +68,8 @@
         "Assembly-CSharp-firstpass",
         "Fusion.Addons.Physics",
         "Fusion.Addons.FSM",
-        "CluckWars.Gameplay"
+        "CluckWars.Gameplay",
+        "CluckWars.Presentation"
     ],
     "UseSerializableDictionary": true,
     "NullChecksForNetworkedProperties": true,
