@@ -363,7 +363,7 @@ namespace CluckWars.Tests
             // The 2026-11-05 roster has no placed zone (Feather Trap, Sticky Egg, Smoke Roost are retired), so -AutoZone has
             // nothing to cast in Fixed mode; the Slow aura is the only area left.
             foreach (var p in Registry.Passives) Assert.Less(AutoTestRules.PickZoneSlot(p.Kit), 0, p.name);
-            Assert.GreaterOrEqual(AutoAuraRules.PickAuraSlot(Spec(ChickenSubclass.Speedy_Featherfoot).Kit.ToList()), 0);
+            Assert.GreaterOrEqual(AutoAuraRules.PickAuraSlot(Spec(ChickenSubclass.Fatty_Hoarder).Kit.ToList()), 0);
         }
 
         // ---- GEAR UP wiring -----------------------------------------------------------------------------------------

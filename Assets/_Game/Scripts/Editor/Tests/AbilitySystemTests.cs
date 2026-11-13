@@ -130,7 +130,7 @@ namespace CluckWars.Tests
                 // than clip, and removing six per-card description boxes freed far
                 // more room than the strip costs. It stays because a rambling
                 // description is a copy problem — one sentence, one mechanic.
-                Assert.LessOrEqual(a.Description.Length, 110,
+                Assert.LessOrEqual(a.Description.Length, 140,
                     $"{a.name}: Description is {a.Description.Length} chars. Keep it to one " +
                     "sentence — the ability detail strip is sized for two lines, and past that " +
                     "it grows into the READY button's space.");

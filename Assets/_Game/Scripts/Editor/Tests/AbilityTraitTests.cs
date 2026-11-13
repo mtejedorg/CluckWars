@@ -49,7 +49,8 @@ namespace CluckWars.Tests
             (AbilityJob.Steal, typeof(SnatchAbilitySO)),
             (AbilityJob.Stun, typeof(WingSlamAbilitySO)),
             (AbilityJob.Shove, typeof(CluckShockAbilitySO)),
-            (AbilityJob.Slow, typeof(FeatherAuraAbilitySO)),
+            (AbilityJob.Slow, typeof(SlowAbilitySO)),
+            (AbilityJob.SlowArea, typeof(FeatherAuraAbilitySO)),
             (AbilityJob.Speed, typeof(SpeedBurstAbilitySO)),
             (AbilityJob.Jump, typeof(ShadowstepAbilitySO)),
             (AbilityJob.Shield, typeof(TurtleModeAbilitySO)),
@@ -121,7 +122,7 @@ namespace CluckWars.Tests
             {
                 (AbilityJob.None, 0), (AbilityJob.Peck, 1), (AbilityJob.Steal, 2), (AbilityJob.Stun, 3), (AbilityJob.Shove, 4),
                 (AbilityJob.Slow, 5), (AbilityJob.Speed, 6), (AbilityJob.Jump, 7), (AbilityJob.Shield, 8), (AbilityJob.Hide, 9),
-                (AbilityJob.Bank, 10), (AbilityJob.DeathMark, 11),
+                (AbilityJob.Bank, 10), (AbilityJob.DeathMark, 11), (AbilityJob.SlowArea, 12),
             };
             foreach (var (job, value) in expected) Assert.AreEqual(value, (int)job, job.ToString());
             Assert.AreEqual(expected.Length, Enum.GetValues(typeof(AbilityJob)).Length, "append only: pin the new value here");

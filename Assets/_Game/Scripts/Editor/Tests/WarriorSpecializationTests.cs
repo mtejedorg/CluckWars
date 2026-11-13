@@ -148,8 +148,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(ControlClaimRules.Verdict.ImplausibleDuration,
                 ControlClaimRules.Evaluate(Honest(ControlKind.Slow, boosted + 0.01f, kick.SlowFactor), ceiling));
 
-            // The registry itself still refuses every RPC slow: 0 x 1.3 is 0.
-            Assert.AreEqual(0f, ControlClaimRules.CeilingFor(Registry.All, ControlKind.Slow).MaxSeconds);
+            // The registry's only RPC slow is the instant Slow (2026-11-13): its ceiling is its seconds x Relentless 1.3.
+            Assert.AreEqual(Asset<SlowAbilitySO>().SlowSeconds * 1.3f, ControlClaimRules.CeilingFor(Registry.All, ControlKind.Slow).MaxSeconds, 1e-4f);
         }
 
         [Test]
@@ -217,7 +217,7 @@ namespace CluckWars.Tests
                 Assert.IsFalse(a.ActiveDurationIsOutgoingControl, $"{a.name}: only the aura's run time is its crowd control");
 
             float run = AbilityBaseSO.ResolveOutgoingControlSeconds(aura.Duration, relentless);
-            Assert.AreEqual(3.9f, run, 1e-4f);
+            Assert.AreEqual(aura.Duration * 1.3f, run, 1e-4f);
             Assert.AreEqual(aura.Cooldown, relentless.ModifyCooldown(aura.Cooldown, aura, null), "Relentless no longer touches cooldowns");
             Assert.Less(run, aura.Cooldown, "the boosted aura still ends before the slot is ready again");
             Assert.AreEqual(aura.Duration, aura.ResolveActiveDuration(null), "no caster: the authored run time");
@@ -226,8 +226,8 @@ namespace CluckWars.Tests
             string ctl = File.ReadAllText("Assets/_Game/Scripts/Gameplay/AbilityController.cs").Replace("\r\n", "\n");
             StringAssert.Contains("float activeSeconds = ability.ResolveActiveDuration(_controller);", ctl);
             StringAssert.Contains("SetActiveTimer(slot, TickTimer.CreateFromSeconds(Runner, activeSeconds));", ctl);
-            StringAssert.Contains("var spec = AreaEffectSpec.AuraSlow(AuraRadius, ResolveActiveDuration(caster), AuraSlowFactor);",
-                Src("FeatherAuraAbilitySO.cs"));
+            StringAssert.Contains("SpawnArea(ctx, Spec(ResolveActiveDuration(ctx.Controller)));", Src("FeatherAuraAbilitySO.cs"));
+            StringAssert.Contains("AreaEffectSpec.AuraSlow(AuraRadius, lifetime, AuraSlowFactor)", Src("FeatherAuraAbilitySO.cs"));
         }
     }
 }

@@ -43,7 +43,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(4f, Asset<SpeedBurstAbilitySO>().Cooldown, "Speed");
             Assert.AreEqual(4.5f, Asset<InvisibilityAbilitySO>().Cooldown, 1e-5f, "Hide");
             Assert.AreEqual(5f, Asset<CluckShockAbilitySO>().Cooldown, "Shove");
-            Assert.AreEqual(6f, Asset<FeatherAuraAbilitySO>().Cooldown, "Slow");
+            Assert.AreEqual(6f, Asset<SlowAbilitySO>().Cooldown, "Slow");
+            Assert.AreEqual(7f, Asset<FeatherAuraAbilitySO>().Cooldown, "Slow Area");
             Assert.AreEqual(7f, Asset<WingSlamAbilitySO>().Cooldown, "Stun");
             Assert.AreEqual(8f, Asset<TurtleModeAbilitySO>().Cooldown, "Shield");
         }
@@ -129,7 +130,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(1f, slippery.ModifyIncomingSlowFactor(1f, null), 1e-6f, "no slow stays no slow");
             Assert.AreEqual(0.4f, slippery.ModifyIncomingSlowFactor(0f, null), 1e-6f, "even a full stop keeps 40% speed");
             // The resisted aura slow is still a visible slow (below the replicated VFX threshold).
-            Assert.Less(slippery.ModifyIncomingSlowFactor(Asset<FeatherAuraAbilitySO>().AuraSlowFactor, null), ChickenController.SlowVfxFlagThreshold);
+            Assert.Less(slippery.ModifyIncomingSlowFactor(Asset<SlowAbilitySO>().SlowFactor, null), ChickenController.SlowVfxFlagThreshold);
         }
 
         [Test]

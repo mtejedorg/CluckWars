@@ -6,6 +6,16 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-13 - Slow split in two (instant Slow + Slow Area) and every ability text read from its SO (`simplify-abilities`, not pushed)
+
+Maestro's 2026-11-13 rulings. Batch EditMode: **3653/3653**, 0 compile errors. In-game visuals not verified.
+
+- **Slow** (`SlowAbilitySO`, `Slow.asset`, job Slow): instant timed slow through `SendControl` / `RPC_ApplyAbilitySlow` (Slippery, Relentless, Bulwark, Shield walk/egg, base wall all inherited). Placeholders: radius 6.48, factor 0.55, 3 s, cooldown 6 s. Gated like the stun bursts (`RequiresEnemyInRange`). Own icon (`Icon_SlowAbilitySO.png`, a copy of Slow Area's art) and own accent (`AccentKey.SlowBurst = 11`, `FeedbackPalette.SlowBurstAccent`).
+- **Slow Area** (`FeatherAura.asset`, display only renamed, job `AbilityJob.SlowArea = 12`): AreaKind selects the shape on the asset - Aura (shipped) or StaticAoE (placed zone at the caster, no forward offset, aim shape SelfCircle). Placeholders: 6.48 m, 0.55, 5 s, cooldown 7 s. The aura ring draws only for an aura.
+- **Kits**: Relentless, Featherfoot, Slippery carry Slow (slot 3); Hoarder, Thief keep Slow Area. Registry has both.
+- **Text**: all active ability descriptions use the new wording; placeholders `{window}` / `{live}` (Hunt, live = window - arm) added; digit guard test covers registered abilities and passives' perk lines. Description cap raised 110 -> 140 (Hunt and Egg Shell are 126-129 chars): **check the ability detail strip fits in a screenshot**. Passive raw `Description` fields still quote numbers (not shown to players; PerkTextTests pins them); Spoiler's goal comes from MatchConfig.
+- **Left for Maestro**: balance of both slows; `docs/site/index.html` not republished; Slow and Slow Area share art.
+
 ## 🔍 2026-11-13 - Playtest loose ends: the aura invariant, the Lab's round-start FAILs, and a silent HitConfirm (`simplify-abilities`, not pushed)
 
 Three BL items from the 2026-11-13 live runs. Diagnostics only: no gameplay number, networked layout, enum value, prefab, scene or `.asset` changed. Validated in batch mode (`unity test --mode EditMode`); baseline 3630/3630, branch ends at **3637/3637** (7 new fixtures).

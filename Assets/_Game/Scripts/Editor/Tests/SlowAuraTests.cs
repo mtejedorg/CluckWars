@@ -125,15 +125,15 @@ namespace CluckWars.Tests
         {
             // The aura system is counted outside the five ChickenVFX families, so the per-chicken live peak is proven from the
             // caps and the shipped data instead of the sum of caps (which no real moment reaches). Two realistic coincidences
-            // for a caster whose kit pairs Slow with Speed (the Speedy kits do), the worst a Slow caster can have:
+            // for a caster who pairs Slow Area with Speed (no fixed kit does since 2026-11-13; Free mode can), the worst a Slow caster can have:
             //  1. sustained: Slow running, then Speed running: aura steady state + foot puffs + the streak cap + stride dust at
             //     the fastest boosted class speed, plus one hit burst on top;
             //  2. the Speed cast landing inside the Slow window: aura + puffs + the whole Sparkle family (cast burst and the Speed
             //     edge sparkles, capped), with the streaks still ramping from zero.
             var registry = AssetDatabase.LoadAssetAtPath<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
             Assert.IsNotNull(registry);
-            bool kitHoldsBoth = registry.Passives.Any(p => p.Kit != null && p.Kit.Any(k => k is FeatherAuraAbilitySO) && p.Kit.Any(k => k is SpeedBurstAbilitySO));
-            Assert.IsTrue(kitHoldsBoth, "no shipped kit pairs Slow with Speed any more: this test can drop the Speed coincidence");
+            bool bothInThePool = registry.All.Any(k => k is FeatherAuraAbilitySO) && registry.All.Any(k => k is SpeedBurstAbilitySO);
+            Assert.IsTrue(bothInThePool, "Slow Area and Speed are no longer both in the pool: the Speed coincidence is unreachable");
 
             float fastest = AssetDatabase.FindAssets("t:ChickenStatsSO", new[] { "Assets/_Game/Data/Classes" })
                 .Select(g => AssetDatabase.LoadAssetAtPath<ChickenStatsSO>(AssetDatabase.GUIDToAssetPath(g))).Where(c => c != null).Max(c => c.MoveSpeed) * 1.3f;

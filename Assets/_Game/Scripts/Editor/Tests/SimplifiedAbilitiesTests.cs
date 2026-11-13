@@ -240,7 +240,8 @@ namespace CluckWars.Tests
             { "Steal", typeof(SnatchAbilitySO) },
             { "Stun", typeof(WingSlamAbilitySO) },
             { "Shove", typeof(CluckShockAbilitySO) },
-            { "Slow", typeof(FeatherAuraAbilitySO) },
+            { "Slow", typeof(SlowAbilitySO) },
+            { "Slow Area", typeof(FeatherAuraAbilitySO) },
             { "Speed", typeof(SpeedBurstAbilitySO) },
             { "Jump", typeof(ShadowstepAbilitySO) },
             { "Egg Shell", typeof(TurtleModeAbilitySO) },
@@ -249,11 +250,11 @@ namespace CluckWars.Tests
         };
 
         [Test]
-        public void TheRegistry_HoldsExactlyTheTenJobs()
+        public void TheRegistry_HoldsExactlyTheElevenAbilities()
         {
-            // 11 on 2026-11-05, then Quick Drop became Featherfoot's passive the same day.
+            // 11 on 2026-11-05 (Quick Drop became Featherfoot's passive the same day), then Slow split in two on 2026-11-13.
             var actives = Registry.ActiveAbilities.ToList();
-            Assert.AreEqual(10, actives.Count, string.Join(", ", actives.Select(a => a.name)));
+            Assert.AreEqual(11, actives.Count, string.Join(", ", actives.Select(a => a.name)));
             foreach (var job in Jobs)
             {
                 var a = actives.SingleOrDefault(x => x.GetType() == job.Value);
@@ -281,9 +282,9 @@ namespace CluckWars.Tests
         [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Shove")]   // Maestro 2026-11-05: Speedys do not steal
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Egg Shell")]
-        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Egg Shell", "Slow", "Steal")]
+        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Egg Shell", "Slow Area", "Steal")]
         [TestCase(ChickenSubclass.Assassin_Spoiler, "Hunt", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
-        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow")]        // Slow replaced Shove, 2026-11-05
+        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow Area")]   // Slow replaced Shove, 2026-11-05; split 2026-11-13
         public void TheKit_ResolvesExactlyAsRuled(ChickenSubclass subclass, string s0, string s1, string s2, string s3)
         {
             var passive = Registry.Passives.Single(p => p.Subclass == subclass);
@@ -325,8 +326,8 @@ namespace CluckWars.Tests
             var slow = Asset<FeatherAuraAbilitySO>("FeatherAura.asset");
             Assert.AreEqual(6.48f, slow.AuraRadius, 1e-4f);
             Assert.AreEqual(0.55f, slow.AuraSlowFactor, 1e-4f);
-            Assert.AreEqual(3f, slow.Duration);
-            Assert.AreEqual(6f, slow.Cooldown);
+            Assert.AreEqual(5f, slow.Duration);   // Slow Area placeholder (Maestro 2026-11-13)
+            Assert.AreEqual(7f, slow.Cooldown);
             var speed = Asset<SpeedBurstAbilitySO>("SpeedBurst.asset");
             Assert.AreEqual(1.3f, speed.SpeedMultiplier, 1e-4f);
             Assert.AreEqual(1.5f, speed.Duration, 1e-4f);

@@ -769,6 +769,7 @@ namespace CluckWars.Tests
                 // traversal. Both subclasses inherit the gate from the shared base.
                 nameof(AmbushAbilitySO),
                 nameof(WingSlamAbilitySO),
+                nameof(SlowAbilitySO),          // the instant slow (2026-11-13): an AoE burst around self, like the stun bursts
                 // Warrior/Fatty additions, gated for the same reason as their stronger
                 // counterparts: a shove, a grab or a stomp with nobody in reach spends the
                 // cooldown and produces literally nothing. None of them relocates the caster,

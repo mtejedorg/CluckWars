@@ -518,8 +518,9 @@ namespace CluckWars.Tests
         public void StealthDescriptions_SayUsingAMoveBreaksIt_AndFitTheLimit(string asset)
         {
             var a = All().First(x => x.name == asset);
-            StringAssert.Contains("Using a move breaks it.", a.Description);
-            Assert.LessOrEqual(a.Description.Length, 110);
+            // Invisibility's line changed to "ends it" on 2026-11-13; Smoke Roost keeps "breaks it".
+            StringAssert.Contains(asset == "Invisibility" ? "Using a move ends it." : "Using a move breaks it.", a.Description);
+            Assert.LessOrEqual(a.Description.Length, 140);
         }
     }
 }

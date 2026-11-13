@@ -223,7 +223,7 @@ namespace CluckWars.Tests
         {
             var slowOnly = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir)
                 .Where(a => a.TargetEffectIsOnlySlow).Select(a => a.name).OrderBy(n => n).ToArray();
-            CollectionAssert.AreEqual(new[] { "DustKick", "FeatherAura", "FeatherTrap", "SmokeRoost" }, slowOnly,
+            CollectionAssert.AreEqual(new[] { "DustKick", "FeatherAura", "FeatherTrap", "Slow", "SmokeRoost" }, slowOnly,
                 "the slow aura, the slow zones and the timed slow are every effect IsSlowImmune refuses");
 
             Assert.IsFalse(ShippedAbility("WingSlam").TargetEffectIsOnlySlow, "a stun is not a slow: the walker is still stunned");

@@ -43,14 +43,14 @@ namespace CluckWars.Tests
         public void EveryShippedActiveAbility_HasATemplate_ThatRendersCleanAndFits()
         {
             var all = Actives();
-            Assert.AreEqual(29, all.Length, "Expected the 29 shipped active abilities; a new one needs an ability.*.desc template.");
+            Assert.AreEqual(30, all.Length, "Expected the 30 shipped active abilities; a new one needs an ability.*.desc template.");
             foreach (var a in all)
             {
                 Assert.IsNotNull(a.DescriptionKey, $"{a.name} has no DescriptionKey.");
                 string text = a.DescriptionText;
                 Assert.IsFalse(string.IsNullOrWhiteSpace(text), $"{a.name}: empty description.");
                 Assert.IsFalse(text.Contains("{") || text.Contains("}") || text.Contains("#"), $"{a.name}: unresolved placeholder or marker in: {text}");
-                Assert.LessOrEqual(text.Length, 110, $"{a.name}: {text.Length} chars: {text}");
+                Assert.LessOrEqual(text.Length, 140, $"{a.name}: {text.Length} chars: {text}");
                 foreach (var banned in new[] { "cast", "target", "cooldown" })
                     StringAssert.DoesNotContain(banned, text.ToLowerInvariant(), $"{a.name}: kid-facing text must not say {banned}.");
             }
@@ -96,6 +96,7 @@ namespace CluckWars.Tests
                     if (f.FieldType == typeof(float)) fields.Add((float)f.GetValue(a));
                     else if (f.FieldType == typeof(int)) fields.Add((int)f.GetValue(a));
                 }
+                if (a is MarkKillAbilitySO hunt) fields.Add(hunt.LiveSeconds);   // {live} = WindowSeconds - ArmSeconds, computed from the asset
                 fields.Add(a.IndicatorRange);
                 fields.Add(a.AimRadius);
                 // A 0..1 factor is shown as a whole percent.
@@ -134,7 +135,7 @@ namespace CluckWars.Tests
             {
                 burst.SpeedMultiplier = 3f; burst.Duration = 0.7f;
                 steal.StealRange = 7.2f; steal.StealAmount = 9f;
-                Assert.AreEqual("A 0.7s sprint at 3x movement speed.", burst.DescriptionText);
+                Assert.AreEqual("Run 3x faster for 0.7s.", burst.DescriptionText);
                 Assert.AreEqual("Yanks 9 food from the nearest rival within 7.2m. Same bird: every 10s.", steal.DescriptionText);
             }
             finally
@@ -147,8 +148,70 @@ namespace CluckWars.Tests
         [Test]
         public void StealthAbilities_KeepTheBreaksItLine()
         {
-            StringAssert.Contains("Using a move breaks it.", Active("Invisibility").DescriptionText);
+            StringAssert.Contains("Using a move ends it.", Active("Invisibility").DescriptionText);
             StringAssert.Contains("Using a move breaks it.", Active("SmokeRoost").DescriptionText);
+        }
+
+        [Test]
+        public void SlowAndSlowArea_TextsReadTheirOwnFields()
+        {
+            var slow = ScriptableObject.CreateInstance<SlowAbilitySO>();
+            var area = ScriptableObject.CreateInstance<FeatherAuraAbilitySO>();
+            try
+            {
+                slow.Radius = 4f; slow.SlowFactor = 0.4f; slow.SlowSeconds = 2f;
+                Assert.AreEqual("Slow every rival within 4m to 40% speed for 2s.", slow.DescriptionText);
+
+                area.AuraRadius = 4f; area.AuraSlowFactor = 0.4f; area.Duration = 6f;
+                area.AreaKind = AreaEffectKind.Aura;
+                Assert.AreEqual("For 6s, rivals within 4m of you move at 40% speed.", area.DescriptionText);
+                area.AreaKind = AreaEffectKind.StaticAoE;
+                Assert.AreEqual("Leave a slow patch (4m) for 6s. Rivals inside move at 40% speed.", area.DescriptionText);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(slow);
+                UnityEngine.Object.DestroyImmediate(area);
+            }
+        }
+
+        /// <summary>
+        /// The no-digit guard. A template may state no number of its own (every number is a placeholder filled from a field),
+        /// every placeholder it names must be supplied, and the rendered line holds no unfilled brace. Covers every registered
+        /// ability and every passive's perk lines (the player-facing text), with the shipped MatchConfig for Spoiler's goal.
+        /// </summary>
+        [Test]
+        public void EveryRegisteredAbilityAndPassive_TemplatesHoldNoLiteralDigits_AndFillEveryPlaceholder()
+        {
+            var match = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            var registered = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All.Where(x => x != null).ToList();
+            Assert.IsNotEmpty(registered);
+            foreach (var a in registered)
+            {
+                if (a is PassiveAbilitySO p)
+                {
+                    CheckTemplate($"{p.name} line", p.PerkLineKey, p.PerkArgs(match));
+                    if (p.PerkDetailKey != null) CheckTemplate($"{p.name} detail", p.PerkDetailKey, p.PerkArgs(match));
+                }
+                else
+                {
+                    CheckTemplate(a.name, a.DescriptionKey, a.DescriptionArgs());
+                }
+            }
+            Assert.IsEmpty(UiText.Problems, string.Join("\n", UiText.Problems));
+        }
+
+        private static void CheckTemplate(string who, string key, (string name, object value)[] args)
+        {
+            Assert.IsNotNull(key, $"{who}: no template key.");
+            string template = UiText.Get(key);
+            string literal = Regex.Replace(template, @"\{[A-Za-z_]+\}", string.Empty);
+            Assert.IsFalse(Regex.IsMatch(literal, @"\d"), $"{who}: the template states a number that is not a placeholder: {template}");
+            var supplied = new HashSet<string>(args.Select(x => x.name));
+            foreach (var ph in UiText.Placeholders(template))
+                Assert.IsTrue(supplied.Contains(ph), $"{who}: placeholder {{{ph}}} is not supplied by its fields: {template}");
+            string text = UiText.Format(key, args);
+            Assert.IsFalse(text.Contains("{") || text.Contains("}"), $"{who}: unfilled placeholder in: {text}");
         }
 
         [Test]

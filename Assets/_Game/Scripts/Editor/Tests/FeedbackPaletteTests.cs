@@ -38,7 +38,7 @@ namespace CluckWars.Tests
             {
                 (AccentKey.Custom, 0), (AccentKey.Steal, 1), (AccentKey.Stun, 2), (AccentKey.Shove, 3), (AccentKey.Slow, 4),
                 (AccentKey.Speed, 5), (AccentKey.Jump, 6), (AccentKey.EggShell, 7), (AccentKey.Hide, 8), (AccentKey.Peck, 9),
-                (AccentKey.Hunt, 10),
+                (AccentKey.Hunt, 10), (AccentKey.SlowBurst, 11),
             };
             foreach (var (key, value) in expected) Assert.AreEqual(value, (int)key, key.ToString());
             Assert.AreEqual(expected.Length, System.Enum.GetValues(typeof(AccentKey)).Length, "a new key is appended here with its number");

@@ -245,9 +245,9 @@ namespace CluckWars.Tests
         // ---- 2b. Dust Kick headroom (qa W3) -------------------------------------------------
 
         [Test]
-        public void DustKick_AtItsEdge_WithASpeedBurstCaster_IsAccepted_ButNotMuchFurther()
+        public void Slow_AtItsEdge_IsAccepted_ButNotMuchFurther()
         {
-            var kick = AllAbilityAssets().OfType<DustKickAbilitySO>().Single();
+            var kick = AllAbilityAssets().OfType<SlowAbilitySO>().Single();   // the largest-reach slow in the pool since 2026-11-13
             var c = Shipped(ControlKind.Slow);
             float edge = ControlClaimRules.Reach(kick) + ControlClaimRules.RangeSlackMeters;
             // A buffed fleeing Speedy outruns the DriftSpeed margin by ~1.3 m (see SlowReachHeadroomMeters).

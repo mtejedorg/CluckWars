@@ -94,7 +94,7 @@ namespace CluckWars.Tests
             var a = Shipped();
             Assert.AreEqual(0.55f, a.AuraSlowFactor, 1e-6f, "slow factor (WP4 moves no number)");
             Assert.AreEqual(6.48f, a.AuraRadius, 1e-6f, "radius (5.4 x1.2, Maestro 2026-11-05)");
-            Assert.AreEqual(3f, a.Duration, 1e-6f, "duration");
+            Assert.AreEqual(5f, a.Duration, 1e-6f, "duration (Slow Area placeholder, Maestro 2026-11-13)");
             Assert.AreEqual(AreaEffectKind.Aura, a.AreaKind);
         }
 
@@ -115,7 +115,7 @@ namespace CluckWars.Tests
             Assert.IsNull(AreaEffectSpawner.Refusal(spec, 1), "the spawner accepts the shipped aura");
 
             string activate = Body(AuraPath, "public override void OnActivate(AbilityContext ctx)");
-            StringAssert.Contains("SpawnArea(ctx, spec);", activate);
+            StringAssert.Contains("SpawnArea(ctx, Spec(ResolveActiveDuration(ctx.Controller)));", activate);
             StringAssert.DoesNotContain("Effects.", activate, "no effect-stack channel any more");
             Assert.AreEqual(typeof(AbilityBaseSO), typeof(FeatherAuraAbilitySO).GetMethod(nameof(AbilityBaseSO.OnDeactivate)).DeclaringType,
                 "nothing to undo at the end of the run: the zone despawns itself (slot-inactive rule)");
@@ -225,14 +225,14 @@ namespace CluckWars.Tests
         [Test]
         public void ASecondAura_IsRefusedWhileTheFirstLives_EvenAtAQuarterCooldown()
         {
-            // The shipped numbers alone (6 s cooldown > 3 s aura) are not the guarantee: a cooldown passive can go to x0.25.
+            // The shipped numbers alone (7 s cooldown > 5 s aura) are not the guarantee: a cooldown passive can go to x0.25.
             var a = Shipped();
             var bully = ScriptableObject.CreateInstance<BullyPassiveSO>();   // the cooldown passive since 2026-11-05
             try
             {
                 bully.CooldownMultiplier = 0.25f;
                 float cd = bully.ModifyCooldown(a.Cooldown, a, null);
-                Assert.AreEqual(1.5f, cd, 1e-4f);   // 6 s x 0.25 (7 s until 2026-11-05)
+                Assert.AreEqual(1.75f, cd, 1e-4f);   // 7 s x 0.25 (Slow Area cooldown, 2026-11-13)
                 Assert.Less(cd, a.Duration, "fixture: at x0.25 the cooldown is up while the aura still lives");
             }
             finally { UnityEngine.Object.DestroyImmediate(bully); }
