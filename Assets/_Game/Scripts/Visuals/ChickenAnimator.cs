@@ -515,7 +515,7 @@ namespace CluckWars.Visuals
             // any vertical difference measured here is this component's own idle bob or hop from
             // last frame — folding that in would double-count it against the arc, which owns
             // vertical outright. See CurrentTravelOffset.
-            residual.y = 0f;
+            residual = Planar.Flat(residual);
 
             float distance = residual.magnitude;
             if (distance <= Mathf.Epsilon) return;
@@ -717,7 +717,7 @@ namespace CluckWars.Visuals
         private void UpdateSpeed(float dt)
         {
             var delta = transform.position - _previousPosition;
-            delta.y = 0f;
+            delta = Planar.Flat(delta);
             _previousPosition = transform.position;
 
             float instantSpeed = delta.magnitude / dt;

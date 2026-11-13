@@ -1130,7 +1130,7 @@ namespace CluckWars.Gameplay
         public void FaceNow(Vector3 worldDirection)
         {
             if (!HasStateAuthority) return;
-            worldDirection.y = 0f;
+            worldDirection = Planar.Flat(worldDirection);
             if (worldDirection.sqrMagnitude < 1e-6f) return;
             transform.rotation = Quaternion.LookRotation(worldDirection.normalized, Vector3.up);
             _facingLockTick = Runner.Tick.Raw;
@@ -1926,7 +1926,7 @@ namespace CluckWars.Gameplay
         public void BotFace(Vector3 worldDir, float deltaTime)
         {
             if (!HasStateAuthority || _movement == null) return;
-            worldDir.y = 0f;
+            worldDir = Planar.Flat(worldDir);
             if (worldDir.sqrMagnitude < 0.0001f) { BotTick(Vector2.zero, deltaTime); return; }
             worldDir.Normalize();
             _movement.Tick(new Vector2(worldDir.x, worldDir.z), deltaTime, aimRotateOnly: true);

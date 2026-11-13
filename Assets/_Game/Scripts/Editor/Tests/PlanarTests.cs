@@ -86,5 +86,19 @@ namespace CluckWars.Tests
                 .ToList();
             Assert.IsEmpty(hits, "A private planar helper. Use CluckWars.Planar (docs/CONVENTIONS.md):\n" + string.Join("\n", hits));
         }
+
+        [Test]
+        public void NoRuntimeFile_FlattensAVectorInline()
+        {
+            // `v.y = 0f;` is Planar.Flat(v) written out. 26 of them were replaced in batch 6; the
+            // expression is identical, so this guard costs nothing and stops the 27th.
+            var inlineFlatten = new Regex(@"\.y\s*=\s*0f?\s*;");
+            var hits = RuntimeSourceGuardTests.RuntimeFiles()
+                .Where(p => !p.EndsWith("/Geometry/Planar.cs"))
+                .Where(p => inlineFlatten.IsMatch(RuntimeSourceGuardTests.Code(p)))
+                .ToList();
+            Assert.IsEmpty(hits, "An inline height flatten. Use Planar.Flat (docs/CONVENTIONS.md):\n" + string.Join("\n", hits));
+        }
+
     }
 }

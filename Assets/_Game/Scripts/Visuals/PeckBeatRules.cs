@@ -45,7 +45,7 @@ namespace CluckWars.Visuals
         /// above the grass under it (the chicken root is the capsule mid-height, so the height is measured from <paramref name="groundY"/>).</summary>
         public static Vector3 BeakPoint(Vector3 peckerPosition, Vector3 peckerForward, float groundY)
         {
-            peckerForward.y = 0f;
+            peckerForward = Planar.Flat(peckerForward);
             if (peckerForward.sqrMagnitude < 1e-6f) peckerForward = Vector3.forward;
             Vector3 p = peckerPosition + peckerForward.normalized * FeedbackTuning.PeckBeakDistance;
             p.y = groundY + FeedbackTuning.PeckBeakHeight;

@@ -95,7 +95,7 @@ namespace CluckWars.Visuals
             Vector3 victimGround = victim.transform.position;
             Vector3 start = victimGround + Vector3.up * FeedbackTuning.StealChunkHeight;
             Vector3 end = StealBeatRules.ChunkEnd(route, victimGround, thief.transform.position);
-            Vector3 flat = end - start; flat.y = 0f;
+            Vector3 flat = Planar.Flat(end - start);
             Vector3 side = flat.sqrMagnitude > 1e-4f ? Vector3.Cross(Vector3.up, flat.normalized) : Vector3.right;
             var gold = FeedbackPalette.Current.YolkColor;
             var thiefVfx = route == StealBeatRules.ChunkRoute.ToThief ? thief.GetComponent<ChickenVFX>() : null;
@@ -138,7 +138,7 @@ namespace CluckWars.Visuals
             if (pool == null) return;
 
             bool reduced = PlayerPreferences_Reduced();
-            Vector3 flat = forward; flat.y = 0f;
+            Vector3 flat = Planar.Flat(forward);
             if (flat.sqrMagnitude < 1e-4f) flat = Vector3.forward;
             flat.Normalize();
             int n = FeedbackTuning.StealWhiffCount;
@@ -184,7 +184,7 @@ namespace CluckWars.Visuals
 
             bool reduced = PlayerPreferences_Reduced();
             Transform t = caster.transform;
-            Vector3 right = t.right; right.y = 0f;
+            Vector3 right = Planar.Flat(t.right);
             right = right.sqrMagnitude > 1e-4f ? right.normalized : Vector3.right;
             int n = FeedbackTuning.StunArcCount;
             for (int i = 0; i < n; i++)

@@ -12,6 +12,16 @@ namespace CluckWars
     /// planar distance, flatten and "direction away from" in gameplay and presentation code goes through here; do not
     /// write another private <c>PlanarDistance</c>. The expressions are the ones the copies used
     /// (<c>dx * dx + dz * dz</c>), so replacing a copy with a call does not change a result.
+    ///
+    /// <b>One exception, measured (batch 6, 2026-11-13): a range VERDICT keeps its own inline expression.</b>
+    /// A pure rule that asks <c>dx * dx + dz * dz &lt;= limit * limit</c> computes both sides in one method, and
+    /// under the Editor's Mono that is not bit-for-bit the same as comparing this method's returned float against
+    /// <c>limit * limit</c>. Routing the five rule files (<c>StealRules</c>, <c>BaseDepositRules</c>,
+    /// <c>ControlClaimRules</c>, <c>AreaEffectRules</c>, <c>BaseWallRules</c>) through
+    /// <see cref="SqrDistance"/> flipped <c>SenderLatencyTests.ALocalSteal_HasNoAllowance</c>: a thief standing at
+    /// exactly the reach was refused. Those comparisons were put back. Use this class for a flatten, a direction or
+    /// a distance you are going to READ; leave an exact-boundary verdict alone. It is the same hazard
+    /// <c>HitAttribution.TryBearing</c>'s remarks describe.
     /// </remarks>
     public static class Planar
     {

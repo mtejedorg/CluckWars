@@ -624,7 +624,7 @@ namespace CluckWars.Visuals
             Vector3 prev = _shovePrevPos;
             Vector3 delta = pos - prev;
             _shovePrevPos = pos;
-            delta.y = 0f;
+            delta = Planar.Flat(delta);
 
             var obj = _controller.Object;
             if (obj == null || !obj.IsValid) return;
@@ -768,7 +768,7 @@ namespace CluckWars.Visuals
             Vector3 delta = pos - _speedPrevPos;
             Vector3 prev = _speedPrevPos;
             _speedPrevPos = pos;
-            delta.y = 0f;
+            delta = Planar.Flat(delta);
 
             var abObj = _abilities != null ? _abilities.Object : null;
             if (abObj == null || !abObj.IsValid || _controller == null) return;
@@ -946,7 +946,7 @@ namespace CluckWars.Visuals
         private void EmitJumpArc(Vector3 launch, Vector3 landing, bool reduced)
         {
             int dots = JumpBeatRules.ArcDotCount(reduced);
-            Vector3 chord = landing - launch; chord.y = 0f;
+            Vector3 chord = Planar.Flat(landing - launch);
             if (dots <= 0 || !JumpBeatRules.DrawsArc(chord.magnitude) || _sparklePS == null) return;
             dots = Mathf.Min(dots, EmitRoom());
             if (dots <= 0) return;

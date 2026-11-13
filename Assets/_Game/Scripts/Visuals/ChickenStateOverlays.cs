@@ -393,7 +393,7 @@ namespace CluckWars.Visuals
             Vector3 pos   = transform.position;
             Vector3 delta = pos - _lastPos;
             _lastPos = pos;
-            delta.y  = 0f;
+            delta = Planar.Flat(delta);
 
             float dt = Time.deltaTime;
             float speed = dt > 0f ? delta.magnitude / dt : 0f;

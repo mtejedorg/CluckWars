@@ -408,8 +408,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         public static float FacingErrorDeg(Vector3 forward, Vector3 toTarget)
         {
-            forward.y  = 0f;
-            toTarget.y = 0f;
+            forward = Planar.Flat(forward);
+            toTarget = Planar.Flat(toTarget);
             if (forward.sqrMagnitude < 1e-6f || toTarget.sqrMagnitude < 1e-6f) return 0f;
             return Vector3.Angle(forward, toTarget);
         }

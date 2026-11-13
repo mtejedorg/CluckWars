@@ -15,10 +15,10 @@ namespace CluckWars.Gameplay
     /// Two alternatives were rejected:</para>
     /// <list type="number">
     ///   <item>Moving the caster to a non-colliding layer. The chicken's layer
-    ///   (<c>Chickens</c>, 8) is what every ability's <c>SearchMask</c>, and
-    ///   <c>ChickenController.CheckCollisionSlow</c>, scan for. A caster that
-    ///   changed layer would become untargetable by Peck / Sneaky Steal / Cluck
-    ///   Shock for the duration — an invisible combat bug for a movement feature.
+    ///   (<c>Chickens</c>, 8) is what the collision matrix and <c>ChickenCargo</c>'s
+    ///   pickup scan are authored against. A caster that changed layer would stop
+    ///   colliding with the other birds and stop being found by that scan for the
+    ///   duration — an invisible bug for a movement feature.
     ///   It would also need a 3×3 block of new layers plus collision-matrix rows,
     ///   because boundary walls and interior obstacles currently share one layer.</item>
     ///   <item>Disabling the obstacle's collider. That is global — it would let
@@ -340,7 +340,7 @@ namespace CluckWars.Gameplay
                 if (depth <= 0f) continue;
 
                 overlapping = true;
-                dir.y = 0f; // never eject a chicken upward out of a rock
+                dir = Planar.Flat(dir); // never eject a chicken upward out of a rock
                 if (dir.sqrMagnitude < 0.0001f) continue;
 
                 dir.Normalize();
@@ -354,7 +354,7 @@ namespace CluckWars.Gameplay
             // then to facing, so the push is never a zero vector.
             if (exit.sqrMagnitude < 0.0001f) exit = deepest;
             if (exit.sqrMagnitude < 0.0001f) exit = _transform.forward;
-            exit.y = 0f;
+            exit = Planar.Flat(exit);
             exit = exit.sqrMagnitude > 0.0001f ? exit.normalized : Vector3.forward;
             return true;
         }

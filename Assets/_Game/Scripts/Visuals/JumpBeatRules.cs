@@ -59,7 +59,7 @@ namespace CluckWars.Visuals
         /// <summary>World position of dot <paramref name="index"/>: along the launch to landing chord, at the body-centre height plus the arc lift.</summary>
         public static Vector3 ArcDotPoint(Vector3 launch, Vector3 landing, int index, int count)
         {
-            Vector3 flat = landing - launch; flat.y = 0f;
+            Vector3 flat = Planar.Flat(landing - launch);
             float t = ArcSampleT(index, count);
             Vector3 p = launch + flat * t;
             p.y = launch.y + FeedbackTuning.JumpArcDotBaseHeight + ArcDotLift(index, count, flat.magnitude);

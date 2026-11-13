@@ -51,7 +51,7 @@ namespace CluckWars.Abilities
             var caster = ctx.Controller;
 
             var right = caster.transform.right;
-            right.y = 0f;
+            right = Planar.Flat(right);
             if (right.sqrMagnitude < 0.0001f) return;
 
             // RPC_ApplySelfImpulse, not RPC_ApplyKnockback — same impulse, same physics, same

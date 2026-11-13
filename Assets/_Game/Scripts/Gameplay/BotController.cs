@@ -431,7 +431,7 @@ namespace CluckWars.Gameplay
             if (standoff > 0f && _preyDist > 0.01f)
             {
                 var away = (_controller.transform.position - preyPos);
-                away.y = 0f;
+                away = Planar.Flat(away);
                 _moveTarget = preyPos + away.normalized * standoff;
             }
             else
@@ -745,7 +745,7 @@ namespace CluckWars.Gameplay
             RefreshRivalWalls();
 
             var toTarget = _moveTarget - selfPos;
-            toTarget.y = 0f;
+            toTarget = Planar.Flat(toTarget);
 
             if (HasArrived(selfPos, toTarget))
             {
@@ -764,7 +764,7 @@ namespace CluckWars.Gameplay
             var steer = BaseKeepOutRules.SteerAround(selfPos, ResolveSteerPoint(selfPos), _keepOut, _keepOutCount,
                 _controller.HomeCornerIndex, PinwheelLayout.ArenaClampLimit(MapGenerator.ArenaHalfSize));
             var dir   = steer - selfPos;
-            dir.y = 0f;
+            dir = Planar.Flat(dir);
             if (dir.sqrMagnitude < 0.0001f) dir = toTarget;
             dir.Normalize();
             _controller.BotTick(new Vector2(dir.x, dir.z), Runner.DeltaTime);

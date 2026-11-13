@@ -69,11 +69,11 @@ namespace CluckWars.Abilities
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var toTarget = candidate.transform.position - caster.transform.position;
-            toTarget.y = 0f;
+            toTarget = Planar.Flat(toTarget);
             if (toTarget.sqrMagnitude < 0.0001f) return false;
 
             var back = -caster.transform.forward;
-            back.y = 0f;
+            back = Planar.Flat(back);
 
             float angle = Vector3.Angle(back, toTarget.normalized);
             return angle <= RearArcAngle;

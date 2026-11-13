@@ -56,7 +56,7 @@ namespace CluckWars.Gameplay
                 if (rival == null || rival == caster) continue;
 
                 Vector3 to = rival.transform.position - origin;
-                to.y = 0f;
+                to = Planar.Flat(to);
                 if (to.sqrMagnitude < 1e-4f) continue;
                 if (!ability.WouldAffect(caster, rival, to.normalized)) continue;
 

@@ -811,7 +811,7 @@ namespace CluckWars.Visuals
             Vector3 p = transform.position;
             Vector3 d = p - _lastPos;
             _lastPos = p;
-            d.y = 0f;
+            d = Planar.Flat(d);
             float step = d.magnitude;
             if (step > 1.5f) return;                            // a teleport, not a walk
             _dustDist += step;
