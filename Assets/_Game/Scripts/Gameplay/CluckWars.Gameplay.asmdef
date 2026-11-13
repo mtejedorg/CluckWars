@@ -1,0 +1,19 @@
+{
+    "name": "CluckWars.Gameplay",
+    "rootNamespace": "",
+    "references": [
+        "GUID:45df57eb56cfbd14dad5a77bea7617b7",
+        "GUID:1baf1ffff1031e948b3b228ab3453251",
+        "GUID:0d8beb7f090555447a6cf5ce9e54dbb4",
+        "GUID:8c4dd21966739024fbd72155091d199e"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
