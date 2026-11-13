@@ -107,6 +107,18 @@ Damage, drain, deposit, steal — caller is any client, executed on the target's
 public void RPC_ApplyDamage(float amount, PlayerRef attacker) { ... }
 ```
 
+An `RpcSources.All` RPC is a claim from an arbitrary peer, so every one takes `RpcInfo info = default` and checks its sender before it changes anything (`RpcClaimTests.EveryRpc_TakesTheSender` fails on one that does not). Three rules cover every RPC in the game (A19, 2026-11-13):
+
+| The RPC names... | Check | Example |
+|---|---|---|
+| another network object the sender acts for (a caster, a thief, a pile, a base, a victim reporting back) | `RpcClaim.SenderSpeaksFor(named, info)`: a local invoke must be simulated here, a remote one must come from the object's **state** authority (a bot's is the master). Never compare with input authority: a bot has none. | `RPC_ApplyStun`, `RPC_DrainStolen`, `RPC_SettlePeck` |
+| nothing, and only the match authority may send it (round reset, teleport, comeback) | `ChickenController.IsFromMatchAuthority(info, out reason)` | `RPC_ResetStats`, `RPC_TeleportTo` |
+| nothing, and a chicken only ever sends it to itself | `AcceptOwnAuthority` (the sender speaks for this object) | `RPC_ApplySelfImpulse` |
+
+- **A magnitude is bounded by what the registered abilities declare**, never by a new tunable: a duration by `EmittedControl` (`ControlClaimRules.CeilingFor`), a steal by `NominalStealAmount`, a knockback by `EmittedKnockback` (`ControlClaimRules.KnockbackCeiling`). An ability that sends an effect it does not declare is refused at the victim.
+- **A sender's latency is `ChickenCombat.SenderLatency(Runner, info)`** (0 for a local invoke, else floored at 0.15 s and capped at 0.5 s). `Runner.GetPlayerRtt` reads 0 for a remote player in Shared Mode; `ChickenCombat.PeerLatency` is its only caller in gameplay code (guard test).
+- **A rejection is one rate-limited Warn** through an `RpcRejectionLimiter` (one line per sender per 2 s, one instance per RPC family), with the stable prefix `rejected RPC_` that `tools/test-session/merge.ps1` counts (0 with honest clients).
+
 ### Replicated moments: one rule (D2a, 2026-11-12)
 
 How presentation (visuals, animation, audio, HUD) learns about a replicated gameplay moment. One pattern, no exceptions:
@@ -197,6 +209,40 @@ runner.Spawn(prefab, pos, rot, player,
         if (c != null) c.Class = chosenClass;
     });
 ```
+
+---
+
+## Abilities, effects and classes: data, not type checks (audit batch 5, 2026-11-13)
+
+### Abilities declare traits
+
+Code outside `Scripts/Abilities` asks an ability **what it does**, never which class it is. No `is` / `as` / `typeof` on a concrete `XxxAbilitySO` and no `GetType().Name` (`AbilityTraitTests` fails on a new one; its allow-list has two justified entries). The traits are virtual properties on `AbilityBaseSO`, overridden by the class (code, not a serialized field, so they cannot drift from the behaviour):
+
+| Question | Trait |
+|---|---|
+| Which job is it (Peck, Steal, Stun, Shove, Slow, Speed, Jump, Shield, Hide, Bank, Death Mark)? | `Job` (`AbilityJob`), asked as `ability.Is(AbilityJob.Shield)` (false for null) |
+| Does it make the caster steal-proof? Is it stealth? | `GrantsStealProof`, `IsStealth` |
+| What does it send a victim? | `EmittedControl` (kind, seconds, factor), `EmittedKnockback`, `NominalStealAmount` |
+| Its second phase, its area, its icon | `HasFollowUpPhase` / `FollowUpPhaseSeconds`, `TryGetAreaEffect`, `IconId` (the key of `AbilityIconStyle` and of `Icon_<IconId>.png`; the class name by default) |
+
+A new consumer that needs a new question adds a trait to the base, with a row in `AbilityTraitTests`. `PassiveAbilitySO` is an abstract family with its own API and may be tested for.
+
+### One path per gameplay primitive
+
+An ability's `OnActivate` composes these; it does not re-implement them (each has a source guard):
+
+- **Shove:** `caster.KnockAway(victim, strength)`: away from the caster (`Planar.DirectionOr`), names the caster, sends nothing for a strength of 0. Declare the strength in `EmittedKnockback`.
+- **Steal:** `StealFrom(thief, victim, nominalAmount)` (ability base; applies the thief's passive) -> `ChickenCargo.StealFrom` (steal-proof gate, `StealMath.Clamp` to the thief's free room and the victim's load, request). `RequestSteal` is private. Declare the amount in `NominalStealAmount`.
+- **Stun / root / slow:** `SendControl(caster, victim)` sends the ability's own `EmittedControl` through `ChickenController.SendControl`, which applies the caster's passive (`ControlClaimRules.OutgoingSeconds`: stuns and slows are lengthened, roots never; the receiver's ceiling uses the same predicate). A zone acting for its owner uses `ChickenController.SendControlFrom`. Nothing else calls `RPC_ApplyStun` / `RPC_ApplyRoot` / `RPC_ApplyAbilitySlow` / `RPC_ApplyKnockbackFrom`.
+- **Lasting area:** set `AreaKind`, override `TryGetAreaEffect`, call `SpawnArea(ctx)`. The base `CanActivate` already refuses the press when the zone prefab chain is missing; an override adds its checks after `base.CanActivate(ctx)`.
+- **Ground-plane maths:** `Planar.Distance` / `SqrDistance` / `Flat` / `Forward` / `DirectionOr` (Core, root namespace `CluckWars`). Do not write another private planar helper.
+- **A timed window on a chicken** (stun, root, the immunities, steal-proof): a `[Networked] TickTimer` read and granted through `EffectWindow.Remaining` / `IsOpen` / `TryGrant`.
+
+`OnDeactivate` is virtual and empty by default: override it only to undo what `OnActivate` switched on.
+
+### One definition per class
+
+`ChickenClasses` (`Gameplay/ChickenClassInfo.cs`) holds, per class, the ability-mask flag (`1 << class`), the forage rule, the wording keys and the bot profile, and the solo bot roster. Tuned numbers stay on the class's `ChickenStatsSO` (through `ChickenClassRegistrySO`). Do not switch on `ChickenClass` for any of these. Per-class presentation data that still lives beside its consumer (the deliberate menu tints and class tiles in `MenuUiController`, `PodiumLayout.StaticHeadAnchor`, `UiAudioSO.CluckFor`) must answer for every class: `ChickenClassTableTests` fails, naming the place, when one does not. Adding a class = the enum value (append only), its flag bit, a `ChickenClasses` entry, a stats asset, and whatever that test then lists.
 
 ---
 
