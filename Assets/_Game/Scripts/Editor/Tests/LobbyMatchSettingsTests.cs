@@ -99,9 +99,8 @@ namespace CluckWars.Tests
                     "MatchConfig; an authored value is a number that can drift from the real rules.");
             }
 
-            string src = System.IO.File.ReadAllText(System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath),
-                "Assets/_Game/Scripts/UI/MatchOverlaysController.cs"));
+            // A21: a class split across partial files still reads as one text (TestSources).
+            string src = TestSources.ReadClass("Assets/_Game/Scripts/UI/MatchOverlaysController.cs");
             StringAssert.Contains("_lobbySettingTime.text = MatchSettingsText.Time(_matchConfig.MatchDurationSeconds)", src,
                 "the waiting room's TIME must come from MatchConfig through MatchSettingsText");
             StringAssert.Contains("_lobbySettingGoal.text = MatchSettingsText.Goal(_matchConfig.FoodTargetToWin)", src,

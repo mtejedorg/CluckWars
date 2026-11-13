@@ -14,8 +14,8 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class MenuJuiceGuardTests
     {
-        private static string Read(string rel) =>
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(UnityEngine.Application.dataPath), rel));
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         /// <summary>Public instance members of MenuJuice that are housekeeping, not effects.</summary>
         private static readonly string[] NotEffects = { "LandNow", "CancelAll", "Dispose" };

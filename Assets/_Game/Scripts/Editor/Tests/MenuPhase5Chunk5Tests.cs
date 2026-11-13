@@ -13,8 +13,8 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class MenuPhase5Chunk5Tests
     {
-        private static string Read(string rel) =>
-            File.ReadAllText(Path.Combine(Path.GetDirectoryName(UnityEngine.Application.dataPath), rel));
+        // A21: a class split across partial files still reads as one text (TestSources).
+        private static string Read(string rel) => TestSources.ReadClass(rel);
 
         private static string Rule(string css, string selector)
         {
