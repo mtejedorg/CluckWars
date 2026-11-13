@@ -107,6 +107,42 @@ namespace CluckWars.Visuals
                 (EggWorldHeight(classScale) / Mathf.Max(0.01f, classScale) + FeedbackTuning.ShellBodyTopAllowance) / FeedbackTuning.ShellModelHeight);
 
         /// <summary>
+        /// The cap's height as a multiple of its seated height during the close: <see cref="FeedbackTuning.ShellCapDropFromScale"/>
+        /// down to 1 on an ease-in quad over <see cref="FeedbackTuning.ShellCloseDropSeconds"/>. <see cref="TickClose"/> flies exactly
+        /// this, so a guard can ask when the shell has closed far enough to be drawn over the bird.
+        /// </summary>
+        public static float CapSeatFactor(float stateT)
+        {
+            float drop = Mathf.Clamp01(stateT / FeedbackTuning.ShellCloseDropSeconds);
+            return Mathf.Lerp(FeedbackTuning.ShellCapDropFromScale, 1f, drop * drop);
+        }
+
+        /// <summary>How far down the cap has travelled at <paramref name="stateT"/>: 0 still up where it started, 1 seated.</summary>
+        public static float CapTravel01(float stateT) =>
+            Mathf.InverseLerp(FeedbackTuning.ShellCapDropFromScale, 1f, CapSeatFactor(stateT));
+
+        /// <summary>
+        /// The cup's vertical scale during the hatch: 1 down to 0 on an ease-in quad over
+        /// <see cref="FeedbackTuning.ShellCupSinkSeconds"/>. <see cref="TickOpen"/> flies exactly this; at 0 there is no shell left
+        /// for the returning bird to be drawn over.
+        /// </summary>
+        public static float CupSinkYScale(float stateT)
+        {
+            float sink = Mathf.Clamp01(stateT / FeedbackTuning.ShellCupSinkSeconds);
+            return 1f - sink * sink;
+        }
+
+        /// <summary>
+        /// The extra uniform shrink the body wears while it is concealed: 1 at conceal 0 down to
+        /// <see cref="FeedbackTuning.ShellBodyVanishScale"/> at 1, on <c>conceal^<see cref="FeedbackTuning.ShellBodyVanishLead"/></c>
+        /// so the shrink LEADS the fade. This is why a bird bigger than its egg never stipples over or outside the shell: by the
+        /// time it is translucent enough to read as a dither, it is already small enough to sit inside it.
+        /// </summary>
+        public static float BodyVanishScale(float conceal01) =>
+            Mathf.Lerp(1f, FeedbackTuning.ShellBodyVanishScale,
+                       Mathf.Pow(Mathf.Clamp01(conceal01), FeedbackTuning.ShellBodyVanishLead));
+
+        /// <summary>
         /// How far the body is concealed over the CLOSE phase: 0 at the start, 1 once
         /// <see cref="FeedbackTuning.ShellBodyFadeOutFraction"/> of the phase has passed — by construction the moment the cap
         /// seats and the egg seals. Smoothstepped so it rides the same shape as the tuck instead of reading as a cut.
@@ -706,20 +742,25 @@ namespace CluckWars.Visuals
             // The bird itself disappears into the egg and comes back out of the hatch (Maestro 2026-11-13). The egg is capped
             // per class, so the larger classes never fit it and used to clip through the shell; hiding the body is the fix that
             // changes no size. The ramps ride the same phases as the tuck above, so the fade and the squash read as one move.
+            //
+            // Reduced Motion gets no fade at all, on purpose: its close does not drop a cap, it grows the already-CLOSED egg
+            // from ShellReducedGrowFrom, and its open shrinks that whole egg away. There is no open shell for a translucent
+            // bird to be seen inside, so a partial alpha there could only ever be drawn over the egg. Hidden for the whole
+            // of close / idle / open, released by GoOff: "alpha only, no travel", which is the Reduced Motion rule anyway.
+            float conceal;
             switch (_state)
             {
-                case State.Close:
-                    SetBodyConceal(CloseConceal01(_stateT, _reduced ? FeedbackTuning.ShellCloseReducedSeconds : FeedbackTuning.ShellCloseSeconds));
-                    break;
-                case State.Idle: SetBodyConceal(1f); break;
-                case State.Open:
-                    SetBodyConceal(OpenConceal01(_stateT, _reduced ? FeedbackTuning.ShellOpenReducedSeconds : FeedbackTuning.ShellOpenSeconds));
-                    break;
-                default: SetBodyConceal(0f); break;
+                case State.Close: conceal = _reduced ? 1f : CloseConceal01(_stateT, FeedbackTuning.ShellCloseSeconds); break;
+                case State.Idle:  conceal = 1f; break;
+                case State.Open:  conceal = _reduced ? 1f : OpenConceal01(_stateT, FeedbackTuning.ShellOpenSeconds); break;
+                default:          conceal = 0f; break;
             }
+            SetBodyConceal(conceal);
 
             var cls = _controller.Class;   // Tick only runs after ReadShell found the object valid
-            _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x, cls), tuck01);
+            // The vanish shrink rides the conceal and LEADS it, so the body is already small enough to sit inside the shell
+            // before it is translucent enough to read as a dither. Transient body scale only: the egg is untouched.
+            _bodyScale = Mathf.Lerp(1f, BodyScaleFor(transform.localScale.x, cls), tuck01) * BodyVanishScale(conceal);
             _bodySink = FeedbackTuning.ShellBodySinkFor(cls) * tuck01;
             _bodySqueezeZ = Mathf.Lerp(1f, FeedbackTuning.ShellBodySqueezeZFor(cls), tuck01);
             if (_animator != null)
@@ -754,7 +795,7 @@ namespace CluckWars.Visuals
             }
 
             float drop = Mathf.Clamp01(_stateT / FeedbackTuning.ShellCloseDropSeconds);
-            _capSeatFactor = Mathf.Lerp(FeedbackTuning.ShellCapDropFromScale, 1f, drop * drop);              // ease-in quad
+            _capSeatFactor = CapSeatFactor(_stateT);                                                        // ease-in quad
             _cupRise = Mathf.Lerp(_closeRise0, 1f, 1f - (1f - drop) * (1f - drop));                           // ease-out quad
             if (_stateT >= FeedbackTuning.ShellCloseDropSeconds)
             {
@@ -823,8 +864,7 @@ namespace CluckWars.Visuals
             float outStart = FeedbackTuning.ShellOpenSeconds - FeedbackTuning.ShellCapScaleOutSeconds;
             _capScale = _stateT <= outStart ? 1f : Mathf.Clamp01(1f - (_stateT - outStart) / FeedbackTuning.ShellCapScaleOutSeconds);
 
-            float sink = Mathf.Clamp01(_stateT / FeedbackTuning.ShellCupSinkSeconds);
-            _cupYScale = 1f - sink * sink;                    // ease-in
+            _cupYScale = CupSinkYScale(_stateT);              // ease-in
             if (_stateT >= FeedbackTuning.ShellOpenSeconds) GoOff();
         }
 

@@ -28,9 +28,9 @@ namespace CluckWars.Tests
         // ---- The close: gone by the time the shell seals --------------------------------------------
 
         [Test]
-        public void TheBirdFadesOutOverTheClose_AndIsGoneWhenTheShellSeals()
+        public void TheBirdFadesOutOverTheClose_AndIsGoneBeforeTheShellClosesOverIt()
         {
-            foreach (float dur in new[] { Close, CloseReduced })
+            foreach (float dur in new[] { Close })
             {
                 Assert.AreEqual(0f, ChickenShellVisuals.CloseConceal01(0f, dur), 1e-5f, "visible when the shell starts closing");
                 float seal = dur * FeedbackTuning.ShellBodyFadeOutFraction;
@@ -50,13 +50,97 @@ namespace CluckWars.Tests
             }
         }
 
-        [Test]
-        public void TheCloseFade_EndsExactlyWhenTheCapSeats()
+        /// <summary>The first <paramref name="stateT"/> of the close at which the cap has come <paramref name="travel"/> of the way
+        /// down, found on the real curve <see cref="ChickenShellVisuals.CapSeatFactor"/> that <c>TickClose</c> flies — never a
+        /// hand-written duration.</summary>
+        private static float TimeAtCapTravel(float travel)
         {
-            // The fraction is not a free number: it is the cap drop over the whole close, so the fade and the seal coincide.
-            Assert.AreEqual(FeedbackTuning.ShellCloseDropSeconds / FeedbackTuning.ShellCloseSeconds,
-                            FeedbackTuning.ShellBodyFadeOutFraction, 1e-5f,
-                            "the body must be gone when the cap seats, not before or after");
+            for (int i = 0; i <= 20000; i++)
+            {
+                float t = FeedbackTuning.ShellCloseSeconds * i / 20000f;
+                if (ChickenShellVisuals.CapTravel01(t) >= travel) return t;
+            }
+            Assert.Fail("the cap never reaches travel " + travel + " within the close");
+            return 0f;
+        }
+
+        [Test]
+        public void TheCloseFade_IsOverBeforeTheCapHasComeDownOverTheBird()
+        {
+            // THE invariant this second pass exists for. The first pass finished the fade when the cap SEATED, so the bird was
+            // still drawn as a dither while the cap was already coming down over it: on a bird bigger than its egg the stipple
+            // was punched through the shell's art and haloed outside its silhouette. It must be gone well before that.
+            float occlude = TimeAtCapTravel(FeedbackTuning.ShellBodyGoneByCapTravel);
+            Assert.Greater(ChickenShellVisuals.CapSeatFactor(occlude), 1f, "the cap is still plainly open at the occlusion point");
+            Assert.AreEqual(1f, ChickenShellVisuals.CloseConceal01(occlude, Close), 1e-5f,
+                            "the body must be fully gone before the cap has come " + FeedbackTuning.ShellBodyGoneByCapTravel +
+                            " of the way down, not when it seats");
+
+            // And the fade is still a fade: several frames long at 60 fps, not a cut.
+            float span = Close * FeedbackTuning.ShellBodyFadeOutFraction;
+            Assert.GreaterOrEqual(span, 4f / 60f, "a fade this short would read as a pop");
+            Assert.LessOrEqual(span, occlude + 1e-5f, "and it ends no later than the occlusion point");
+        }
+
+        [Test]
+        public void WhateverIsStillDrawn_FitsInsideTheSeatedEgg_ForEveryClass()
+        {
+            // The second lever: the body shrinks on the conceal, ahead of it, so from very early in the close whatever is still
+            // drawn already sits inside the egg. Walked over the REAL close timeline with the same composition Tick writes.
+            var reg = AssetDatabase.LoadAssetAtPath<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
+            Assert.IsNotNull(reg);
+            float from = TimeAtCapTravel(FeedbackTuning.ShellBodyFitByCapTravel);
+            int classes = 0;
+            foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
+            {
+                if (!reg.TryGet(cls, out var e) || e.Stats == null) continue;
+                classes++;
+                float scale = e.Stats.Scale;
+                float eggTop = ChickenShellVisuals.EggWorldHeight(scale);
+                for (int i = 0; i <= 600; i++)
+                {
+                    float t = from + (Close - from) * i / 600f;
+                    float conceal = ChickenShellVisuals.CloseConceal01(t, Close);
+                    if (conceal >= FeedbackTuning.ShellBodySealedConceal) continue;   // nothing is drawn at all
+                    float tuck01 = Mathf.SmoothStep(0f, 1f, t / Close);
+                    float bodyScale = Mathf.Lerp(1f, ChickenShellVisuals.BodyScaleFor(scale, cls), tuck01)
+                                      * ChickenShellVisuals.BodyVanishScale(conceal);
+                    float top = FeedbackTuning.ShellModelHeight * scale * bodyScale - FeedbackTuning.ShellBodySinkFor(cls) * tuck01;
+                    Assert.LessOrEqual(top, eggTop, cls + ": at " + t + " s of the close the drawn body (" + top +
+                                       " m) is taller than its egg (" + eggTop + " m) — it would stipple over and outside the shell");
+                }
+            }
+            Assert.AreEqual(4, classes, "the four shipped classes");
+        }
+
+        [Test]
+        public void TheVanishShrink_LeadsTheFade_AndEndsSmall()
+        {
+            Assert.AreEqual(1f, ChickenShellVisuals.BodyVanishScale(0f), 1e-6f, "a visible bird wears no extra shrink");
+            Assert.AreEqual(FeedbackTuning.ShellBodyVanishScale, ChickenShellVisuals.BodyVanishScale(1f), 1e-6f);
+            Assert.That(FeedbackTuning.ShellBodyVanishLead, Is.LessThan(1f), "below 1 is what makes the shrink LEAD the alpha");
+            // Leading: at every partial conceal the bird has shrunk further than a straight lerp would have taken it.
+            float prev = 2f;
+            for (float c = 0.05f; c < 1f; c += 0.05f)
+            {
+                float v = ChickenShellVisuals.BodyVanishScale(c);
+                Assert.Less(v, Mathf.Lerp(1f, FeedbackTuning.ShellBodyVanishScale, c) + 1e-5f, "the shrink leads the fade at " + c);
+                Assert.Less(v, prev, "and never grows back mid-fade");
+                prev = v;
+            }
+        }
+
+        [Test]
+        public void ReducedMotion_HidesTheBirdOutright_WithNoPartialAlphaOverAClosedEgg()
+        {
+            // The Reduced close never drops a cap: it grows the already-closed egg from ShellReducedGrowFrom, and the Reduced
+            // open shrinks that whole egg away. There is no open shell to be seen inside, so any partial alpha there could only
+            // be drawn OVER the egg. The runtime takes the binary path instead; this pins that it does.
+            string shell = Src(ShellPath);
+            StringAssert.Contains("case State.Close: conceal = _reduced ? 1f : CloseConceal01(_stateT, FeedbackTuning.ShellCloseSeconds); break;", shell);
+            StringAssert.Contains("case State.Open:  conceal = _reduced ? 1f : OpenConceal01(_stateT, FeedbackTuning.ShellOpenSeconds); break;", shell);
+            Assert.AreEqual(FeedbackTuning.ShellCapDropFromScale, ChickenShellVisuals.CapSeatFactor(0f), 1e-6f,
+                            "the full-motion close starts with the cap up, which is what a Reduced close never does");
         }
 
         // ---- The hatch: out of the shards, never before them ----------------------------------------
@@ -64,7 +148,7 @@ namespace CluckWars.Tests
         [Test]
         public void TheBirdFadesBackInOverTheOpen_AfterTheShellHasBroken()
         {
-            foreach (float dur in new[] { Open, OpenReduced })
+            foreach (float dur in new[] { Open })
             {
                 float delay = dur * FeedbackTuning.ShellBodyFadeInDelayFraction;
                 Assert.AreEqual(1f, ChickenShellVisuals.OpenConceal01(0f, dur), 1e-5f, "the hatch starts with no bird in sight");
@@ -87,13 +171,17 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheHatchFadeIn_StartsAfterTheShellHasVisiblyBroken()
+        public void TheHatchFadeIn_StartsOnlyOnceTheCupHasSunkAway()
         {
+            // The mirror of the close invariant: by the time any of the bird is drawn again there is no shell left for it to be
+            // drawn over. Taken from the real cup curve TickOpen flies, not a hand-picked delay.
             float delay = Open * FeedbackTuning.ShellBodyFadeInDelayFraction;
             Assert.Greater(delay, 0f, "the bird must not start appearing on the same frame as the cap");
-            // By the time it starts, the cap has already travelled most of its pop arc (1-(1-u)^2 of ShellCapPopHeight).
+            Assert.AreEqual(0f, ChickenShellVisuals.CupSinkYScale(delay), 1e-5f, "the cup has fully sunk before the bird returns");
+            Assert.Greater(ChickenShellVisuals.CupSinkYScale(delay * 0.99f), 0f, "and it is not waiting longer than it has to");
+            // The cap left long before that, carrying the shards, yolk and cap feathers with it.
             float u = Mathf.Clamp01(delay / FeedbackTuning.ShellCapPopSeconds);
-            Assert.Greater(1f - (1f - u) * (1f - u), 0.4f, "the shell must be visibly open before the bird shows");
+            Assert.Greater(1f - (1f - u) * (1f - u), 0.8f, "the cap is away before the bird shows");
         }
 
         // ---- The fade can never outlast its phase, for any class or preference ----------------------
