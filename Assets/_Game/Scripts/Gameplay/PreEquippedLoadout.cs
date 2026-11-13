@@ -96,7 +96,7 @@ namespace CluckWars.Gameplay
         /// <c>SctTargets.Exempt</c>, pinned by a test). This is NOT read from any ability's
         /// AllowedClasses.
         /// </summary>
-        public static bool ClassMayForage(ChickenClass cls) => cls != ChickenClass.Assassin;
+        public static bool ClassMayForage(ChickenClass cls) => ChickenClasses.MayForage(cls);
 
         /// <summary>
         /// The one predicate for BOTH slots: a real, non-passive ability, and, if it is a Peck,
@@ -326,15 +326,6 @@ namespace CluckWars.Gameplay
 
         /// <summary>True (and the class) when <paramref name="flags"/> has exactly one class bit set.</summary>
         public static bool TryGetSingleClass(ChickenClassFlags flags, out ChickenClass cls)
-        {
-            switch (flags)
-            {
-                case ChickenClassFlags.Warrior:  cls = ChickenClass.Warrior;  return true;
-                case ChickenClassFlags.Speedy:   cls = ChickenClass.Speedy;   return true;
-                case ChickenClassFlags.Fatty:    cls = ChickenClass.Fatty;    return true;
-                case ChickenClassFlags.Assassin: cls = ChickenClass.Assassin; return true;
-                default: cls = default; return false;
-            }
-        }
+        => ChickenClasses.TryGetSingleClass(flags, out cls);
     }
 }

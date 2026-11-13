@@ -153,73 +153,11 @@ namespace CluckWars.Gameplay
         // ---- Class table ----------------------------------------------------
 
         /// <summary>
-        /// The strategy and envelope for <paramref name="cls"/>. This is the only place
-        /// class identity is expressed for bots; <c>BotController</c> reads it and never
-        /// switches on <see cref="ChickenClass"/> itself.
+        /// The strategy and envelope for <paramref name="cls"/>, from the one class table
+        /// (<see cref="ChickenClasses"/>, A17); <c>BotController</c> reads it and never
+        /// switches on <see cref="ChickenClass"/> itself. An unknown class gets the Warrior's.
         /// </summary>
-        public static BotProfile ProfileFor(ChickenClass cls) => cls switch
-        {
-            // Warrior — Brawler. Banks late because its income is robbery, not foraging: a
-            // big beakful is the bait that makes rivals come to it. Hunts anyone, loaded or
-            // not, out to a long radius, and guards the pile it is standing on.
-            //
-            // Picks piles on proximity ALONE (roundTripBias 0) — it does not care about the
-            // walk home, because the walk home is exactly when it wants to be jumped.
-            //
-            // This shipped at 0.25 and that was a real inconsistency, not a rounding
-            // preference: any nonzero weight lets a large enough base-distance spread
-            // overwhelm the proximity term, and on a 51.3 m arena those spreads are ordinary.
-            // At 0.25 a pile 5 m away but 26 m from base lost to one 8 m away and 4 m from
-            // base — the Brawler walking to the quiet corner, which is the opposite of the
-            // sentence above it. Pinned twice now: once by
-            // RoundTripBias_IsWhatSeparatesARouteFromAStep against the Runner, and once by
-            // TheBrawler_TakesTheNearerPile_AtEveryBaseDistance, which sweeps the return leg
-            // and so states the property rather than sampling it. If this class is ever meant
-            // to have partial round-trip awareness, argue with the sweep first.
-            //
-            // dangerRadius 4.0 -> 5.5 (2026-10-22, decision A10): 4.0 sat inside the longest
-            // steal reaches (Sneaky Steal 5.4 m, Dive Bomb 3.25 + 2.05 = 5.3 m), so a loaded
-            // Brawler let a thief stand in range without reacting. 5.5 is just past 5.4.
-            ChickenClass.Warrior => new BotProfile(
-                strategy: BotStrategy.Brawler,
-                returnThreshold: 0.85f, protectCargoThreshold: 0.60f, dangerRadius: 5.5f,
-                huntRadius: 11.0f, huntCargoThreshold: 0.10f, engageRadius: 9.0f,
-                guardRadius: 6.0f, roundTripBias: 0.0f, leaderFocus: 0.35f,
-                thinkInterval: 0.28f),
-
-            // Speedy — Runner. The only class that plans a ROUTE: pile choice is a full
-            // round-trip cost, not proximity. Banks at 45% because four fast trips beat two
-            // slow ones, and refuses every fight.
-            ChickenClass.Speedy => new BotProfile(
-                strategy: BotStrategy.Runner,
-                returnThreshold: 0.45f, protectCargoThreshold: 0.10f, dangerRadius: 7.5f,
-                huntRadius: 0f, huntCargoThreshold: 1f, engageRadius: 0f,
-                guardRadius: 0f, roundTripBias: 1.0f, leaderFocus: 0f,
-                thinkInterval: 0.22f),
-
-            // Fatty — Bunker. Does not chase (HuntRadius 0) but is NOT passive: GuardRadius
-            // is what makes its whole control kit reachable. Anything that walks within 7 m
-            // of the pile it is working, or of its own base, eats Ground Quake / Belly Flop.
-            // Highest cargo capacity, so it banks in single big hauls.
-            ChickenClass.Fatty => new BotProfile(
-                strategy: BotStrategy.Bunker,
-                returnThreshold: 0.90f, protectCargoThreshold: 0.35f, dangerRadius: 6.0f,
-                huntRadius: 0f, huntCargoThreshold: 1f, engageRadius: 0f,
-                guardRadius: 7.0f, roundTripBias: 0.6f, leaderFocus: 0.15f,
-                thinkInterval: 0.30f),
-
-            // Assassin — Predator. Cannot forage at all (Peck excludes it), so 100% of its
-            // income is theft plus the execute bounty. Hunts across the map, weights the
-            // scoreboard hardest, and banks the moment it holds anything worth losing.
-            ChickenClass.Assassin => new BotProfile(
-                strategy: BotStrategy.Predator,
-                returnThreshold: 0.30f, protectCargoThreshold: 0.05f, dangerRadius: 6.5f,
-                huntRadius: 16.0f, huntCargoThreshold: 0.05f, engageRadius: 7.0f,
-                guardRadius: 0f, roundTripBias: 0f, leaderFocus: 1.0f,
-                thinkInterval: 0.25f),
-
-            _ => ProfileFor(ChickenClass.Warrior),
-        };
+        public static BotProfile ProfileFor(ChickenClass cls) => ChickenClasses.Of(cls).Bot;
 
         /// <summary>
         /// Identity prefix for <c>[Bot]</c> log lines: class and home corner, e.g.

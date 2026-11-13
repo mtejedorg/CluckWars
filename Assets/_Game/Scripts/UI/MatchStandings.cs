@@ -27,7 +27,7 @@ namespace CluckWars.UI
         /// (bot i = class i) and <c>MenuUiController.BotClasses</c> (seat i + 1 = class i, named
         /// <c>lobby.bot.(i + 1)</c>); <c>MatchStandingsTests</c> fails if either copy drifts.
         /// </summary>
-        public static readonly ChickenClass[] SoloBotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+        public static readonly ChickenClass[] SoloBotClasses = ChickenClasses.SoloBotRoster;
 
         private static readonly string[] BotNameKeys = { UiKeys.LobbyBot1, UiKeys.LobbyBot2, UiKeys.LobbyBot3, UiKeys.LobbyBot4 };
 
@@ -79,22 +79,10 @@ namespace CluckWars.UI
         public static string DisplayName(in Entry e) => DisplayName(e.IsLocal, e.IsBot, e.Class, e.Corner);
 
         /// <summary>Player-facing class name from the wording dictionary (class.*.short).</summary>
-        public static string ClassName(ChickenClass cls) => UiText.Get(cls switch
-        {
-            ChickenClass.Speedy   => UiKeys.ClassSpeedyShort,
-            ChickenClass.Fatty    => UiKeys.ClassFattyShort,
-            ChickenClass.Assassin => UiKeys.ClassAssassinShort,
-            _                     => UiKeys.ClassWarriorShort,
-        });
+        public static string ClassName(ChickenClass cls) => UiText.Get(ChickenClasses.Of(cls).ShortNameKey);
 
         /// <summary>The class's role from the wording dictionary (role.*), as THE COOP's seat line shows it.</summary>
-        public static string RoleName(ChickenClass cls) => UiText.Get(cls switch
-        {
-            ChickenClass.Speedy   => UiKeys.RoleSpeedy,
-            ChickenClass.Fatty    => UiKeys.RoleFatty,
-            ChickenClass.Assassin => UiKeys.RoleAssassin,
-            _                     => UiKeys.RoleWarrior,
-        });
+        public static string RoleName(ChickenClass cls) => UiText.Get(ChickenClasses.Of(cls).RoleKey);
 
         /// <summary>"{CLASS} · {role}": the seat line of THE COOP and of the in-match waiting room.</summary>
         public static string ClassRoleLine(ChickenClass cls) =>

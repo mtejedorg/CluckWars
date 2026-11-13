@@ -376,13 +376,7 @@ namespace CluckWars.AbilityLab
         }
 
         /// <summary>Player-facing class short name (class.*.short), the same keys the menus use.</summary>
-        private static string ClassShort(ChickenClass cls) => UiText.Get(cls switch
-        {
-            ChickenClass.Speedy   => UiKeys.ClassSpeedyShort,
-            ChickenClass.Fatty    => UiKeys.ClassFattyShort,
-            ChickenClass.Assassin => UiKeys.ClassAssassinShort,
-            _                     => UiKeys.ClassWarriorShort,
-        });
+        private static string ClassShort(ChickenClass cls) => UiText.Get(ChickenClasses.Of(cls).ShortNameKey);
 
         private static string Name(AbilityBaseSO ability) =>
             ability != null ? ability.DisplayName : "(none)";

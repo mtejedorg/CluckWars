@@ -150,8 +150,7 @@ namespace CluckWars.UI
         private static readonly Color CreamInset = UiGfx.Hex32("f3e6c8");
         private static readonly Color InkSoft    = UiGfx.Hex32("6b4a2a");
 
-        private static readonly ChickenClass[] Order =
-            { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+        private static readonly ChickenClass[] Order = ChickenClasses.All;
 
         /// <summary>
         /// UI class colours: tile fills, the hero wash and the PICK YOUR BIRD backdrop. NOT the match tints, on
@@ -169,24 +168,9 @@ namespace CluckWars.UI
         };
 
         // Class names, roles and callouts are player-facing copy and live in the wording
-        // dictionary; this table only picks the keys.
-        private readonly struct ClassKeySet
-        {
-            public readonly string Short, Role, Strong, Weak;
-            public ClassKeySet(string shortName, string role, string strong, string weak)
-            { Short = shortName; Role = role; Strong = strong; Weak = weak; }
-        }
-
-        private static readonly Dictionary<ChickenClass, ClassKeySet> ClassKeys = new()
-        {
-            [ChickenClass.Warrior]  = new ClassKeySet(UiKeys.ClassWarriorShort,  UiKeys.RoleWarrior,  UiKeys.CalloutWarriorStrong,  UiKeys.CalloutWarriorWeak),
-            [ChickenClass.Speedy]   = new ClassKeySet(UiKeys.ClassSpeedyShort,   UiKeys.RoleSpeedy,   UiKeys.CalloutSpeedyStrong,   UiKeys.CalloutSpeedyWeak),
-            [ChickenClass.Fatty]    = new ClassKeySet(UiKeys.ClassFattyShort,    UiKeys.RoleFatty,    UiKeys.CalloutFattyStrong,    UiKeys.CalloutFattyWeak),
-            [ChickenClass.Assassin] = new ClassKeySet(UiKeys.ClassAssassinShort, UiKeys.RoleAssassin, UiKeys.CalloutAssassinStrong, UiKeys.CalloutAssassinWeak),
-        };
-
-        private static string ClassShortName(ChickenClass cls) => UiText.Get(ClassKeys[cls].Short);
-        private static string RoleName(ChickenClass cls) => UiText.Get(ClassKeys[cls].Role);
+        // dictionary; the keys are the class table's (ChickenClasses, A17).
+        private static string ClassShortName(ChickenClass cls) => UiText.Get(ChickenClasses.Of(cls).ShortNameKey);
+        private static string RoleName(ChickenClass cls) => UiText.Get(ChickenClasses.Of(cls).RoleKey);
 
         private static readonly string[] ChipNames  = { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
 
@@ -1474,9 +1458,9 @@ namespace CluckWars.UI
         /// </summary>
         private void RefreshRoleCallouts(ChickenClass cls)
         {
-            var keys = ClassKeys[cls];
-            SetCallout(_roleCalloutStrong, UiText.Get(keys.Strong));
-            SetCallout(_roleCalloutWeak, UiText.Get(keys.Weak));
+            var keys = ChickenClasses.Of(cls);
+            SetCallout(_roleCalloutStrong, UiText.Get(keys.StrongKey));
+            SetCallout(_roleCalloutWeak, UiText.Get(keys.WeakKey));
         }
 
         private static void SetCallout(Label callout, string text)
@@ -2116,7 +2100,7 @@ namespace CluckWars.UI
         // so "You" is the same colour here, in the HUD and on the podium (round-2 finding 1).
         private int[] _lobbyPermutation;   // null = corners not known yet (a guest, or a host before its code)
         // Sample CPU bots shown in the Solo lobby (you always spawn vs 3 bots).
-        private static readonly ChickenClass[] BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+        private static readonly ChickenClass[] BotClasses = ChickenClasses.SoloBotRoster;
 
         private string _joinCode = string.Empty;
 

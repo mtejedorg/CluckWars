@@ -217,7 +217,7 @@ namespace CluckWars.Gameplay
             if (chickenPrefab == null) return;
 
             // Free mode: Speedy → corner 1, Fatty → corner 2, Assassin → corner 3.
-            var botClasses = new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+            var botClasses = ChickenClasses.SoloBotRoster;
             // Fixed mode: the lineup THE COOP showed (same seed, same rule), never the scene presets.
             bool fixedKits = ActiveLoadoutMode == LoadoutMode.Fixed;
             var lineup = fixedKits

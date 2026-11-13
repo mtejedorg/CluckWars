@@ -56,7 +56,8 @@ namespace CluckWars.Balance
         /// how a class ends up with no balance guard at all.
         /// </para>
         /// </remarks>
-        public static readonly string[] Exempt = { "Assassin" };
+        public static readonly string[] Exempt = System.Array.ConvertAll(
+            System.Array.FindAll(Gameplay.ChickenClasses.All, c => !Gameplay.ChickenClasses.MayForage(c)), c => c.ToString());
 
         /// <summary>True when <paramref name="className"/> is excused from the SCT axiom.</summary>
         public static bool IsExempt(string className)

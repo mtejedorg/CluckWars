@@ -55,9 +55,11 @@ namespace CluckWars.Tests
         {
             // The name mapping is only right while all three lists agree (bot i = class i = seat i + 1).
             CollectionAssert.AreEqual(new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin }, MatchStandings.SoloBotClasses);
-            StringAssert.Contains("var botClasses = new[] { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };",
+            // A17: the three lists are one (ChickenClasses.SoloBotRoster), so they cannot disagree any more.
+            Assert.AreSame(ChickenClasses.SoloBotRoster, MatchStandings.SoloBotClasses);
+            StringAssert.Contains("var botClasses = ChickenClasses.SoloBotRoster;",
                 Read("Assets/_Game/Scripts/Gameplay/MatchBootstrapper.cs"), "MatchBootstrapper.TrySpawnBots order changed");
-            StringAssert.Contains("BotClasses = { ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };",
+            StringAssert.Contains("BotClasses = ChickenClasses.SoloBotRoster;",
                 Read("Assets/_Game/Scripts/UI/MenuUiController.cs"), "MenuUiController.BotClasses (Coop seats) order changed");
         }
 

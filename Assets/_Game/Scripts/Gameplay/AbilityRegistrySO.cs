@@ -32,14 +32,7 @@ namespace CluckWars.Gameplay
         /// <summary>Returns passives allowed for a specific class.</summary>
         public IEnumerable<PassiveAbilitySO> GetPassivesForClass(ChickenClass cls)
         {
-            var flag = cls switch
-            {
-                ChickenClass.Warrior  => ChickenClassFlags.Warrior,
-                ChickenClass.Speedy   => ChickenClassFlags.Speedy,
-                ChickenClass.Fatty    => ChickenClassFlags.Fatty,
-                ChickenClass.Assassin => ChickenClassFlags.Assassin,
-                _ => ChickenClassFlags.None,
-            };
+            var flag = FlagOf(cls);
             return Passives.Where(p => (p.AllowedClasses & flag) != 0);
         }
 
@@ -89,14 +82,7 @@ namespace CluckWars.Gameplay
         // ---- Class-gated pools (ADR 0003 Decision 3) -------------------------
 
         /// <summary>Bit flag for a class, so callers don't re-derive the mapping.</summary>
-        public static ChickenClassFlags FlagOf(ChickenClass cls) => cls switch
-        {
-            ChickenClass.Warrior  => ChickenClassFlags.Warrior,
-            ChickenClass.Speedy   => ChickenClassFlags.Speedy,
-            ChickenClass.Fatty    => ChickenClassFlags.Fatty,
-            ChickenClass.Assassin => ChickenClassFlags.Assassin,
-            _ => ChickenClassFlags.None,
-        };
+        public static ChickenClassFlags FlagOf(ChickenClass cls) => ChickenClasses.FlagOf(cls);
 
         /// <summary>
         /// Is this ability legal for <paramref name="cls"/>? The single authority on class

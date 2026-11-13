@@ -77,8 +77,7 @@ namespace CluckWars.AbilityLab
         private ChickenController _lastSeenPlayer;
         private int _lastSeenDummyCount = -1;
 
-        private static readonly ChickenClass[] ClassOrder =
-            { ChickenClass.Warrior, ChickenClass.Speedy, ChickenClass.Fatty, ChickenClass.Assassin };
+        private static readonly ChickenClass[] ClassOrder = ChickenClasses.All;
 
         private static readonly string[] ClassChipNames =
             { "ClassWarrior", "ClassSpeedy", "ClassFatty", "ClassAssassin" };
