@@ -94,6 +94,7 @@ Every rule in this document. "Enforced" is the primary mechanism (the first one 
 | ARCH-NET-17 | Read game input only from the Fusion input buffer | COMPILER | PARTIAL |
 | ARCH-NET-18 | Read every input provider every tick; never read a press getter for diagnostics | TEST | PARTIAL |
 | ARCH-NET-19 | Keep the duplicated SessionNameSeed copies identical | TEST | CURRENT |
+| ARCH-NET-20 | Keep the simulation identical in solo and online; branch on SessionMode only for seeds and session setup | NONE | CURRENT |
 | ARCH-EVT-01 | Keep animation, VFX, audio cues and HUD reactions local and never RPC them | TEST | PARTIAL |
 | ARCH-EVT-02 | Announce a one-shot moment by bumping a networked byte event id, and never reset it | TEST | PARTIAL |
 | ARCH-EVT-03 | Watch the counters in exactly one per-chicken observer; presentation keeps no cursor | TEST | PARTIAL |
@@ -548,6 +549,15 @@ Photon Fusion 2 in Shared Mode: each peer is state authority over its own chicke
 - Source: docs/TESTING.md:211
 - Status: CURRENT
 
+### ARCH-NET-20 — Keep the simulation identical in solo and online; branch on SessionMode only for seeds and session setup
+- Rule: The simulation must behave identically whether the match is solo or online. Game logic never branches on `SessionMode`. Two kinds of code may: **seed derivation** (every peer must reach the same number without talking) and **session setup** (which connection to open, and what a seat can know before join order exists). The four sites that do so today are the whole allow-list: `CornerAssignment.SeedFor` (solo rolls a menu seed, online hashes the session name), `CornerAssignment.LobbySeatCorner` (a guest returns -1 because its join order is not decided yet), `MapGenerator.BuildInteriorObstacles` (online seeds the obstacle layout from the session name so every peer builds the same arena, solo uses a random seed), and `MatchBootstrapper` (host, join or solo connection, and the corner permutation it seeds from them).
+- Why: ruling D06 (2026-11-14). The rule as inherited (`docs/TDD.md:145`, "game logic never branches on `SessionMode`") was broken at four sites and so taught nothing, but its intent is intact: none of the four changes how the game plays, only how a shared number is derived or which connection is opened. Stating the intent plus the allow-list makes it enforceable; the absolute wording was not.
+- Enforced by: NONE
+- Audit check: `git grep -n "SessionMode" -- Assets/_Game/Scripts` outside `Scripts/Services` and `Scripts/App`. Every hit must be one of the four named sites, or be seed derivation or session setup with that reason written at the site. A branch that changes a gameplay value, a duration, a rate or a spawn count is a violation whatever it is called.
+- Proposed guard: a source test over the runtime folders that lists the allowed `SessionMode` call sites by file and member, the way `SceneObjectAccessTests.AllowedFinds` lists the allowed `Find*` sites, so a fifth site has to be argued for in the test rather than appearing silently.
+- Source: docs/TDD.md:145 (the inherited wording), Assets/_Game/Scripts/Gameplay/CornerAssignment.cs:39, Assets/_Game/Scripts/Gameplay/CornerAssignment.cs:49, Assets/_Game/Scripts/Gameplay/MapGenerator.cs:613, Assets/_Game/Scripts/Gameplay/MatchBootstrapper.cs:114-127
+- Status: CURRENT
+
 ## 3.4 Replicated moments and presentation (ARCH-EVT)
 
 Presentation (visuals, animation, audio, HUD) learns about gameplay by reading replicated state. It is never told by an RPC or by a call from the tick. One-shot moments travel as networked byte event ids, read by one shared per-chicken observer, and payloads carry ids only so language packs can swap text and voice (decision D2a). The observer side is well tested. The producer side and the UI-facing rules are mostly review only.
@@ -962,15 +972,16 @@ This table lists every rule whose Enforced-by line includes CONVENTION or NONE, 
 | Rank | ID | What is not enforced | Proposed guard | Effort |
 |---|---|---|---|---|
 | 1 | ARCH-NET-01 | `HasStateAuthority` gate at the top of every `FixedUpdateNetwork` (holds today, 10/10 sites) | Source test over every override, with `AbilityController` allow-listed | S |
-| 2 | ARCH-NET-14 | `[Networked]` layout outside `ChickenController`'s windows | Reflection snapshot of every NetworkBehaviour's networked properties (name, type, order) | M |
-| 3 | ARCH-NET-02 | Foreign writes to networked state (69 one-line `[Networked]` properties have a public `set`) | Reflection test: networked setters private, with a counted allow-list | L |
-| 4 | ARCH-NET-03 | Gate-before-write in a new RPC (pinned only per named RPC) | A generic test: each `[Rpc]` body's first statement calls one of the three sender checks | M |
-| 5 | ARCH-NET-13 | Ordinal pins for `MatchEventKind`, `ComebackGrant`, `CastArchetype` and any new wire enum | Collect enums from `[Networked]` and `[Rpc]` signatures; require a central pin table | S |
-| 6 | ARCH-NET-07 | Total-food conservation in a running match | Pure simulation of request/report/timeout/bounce sequences asserting conservation | M |
-| 7 | ARCH-EVT-02 | Producer side of event ids: write-before-bump, never reset | Ban literal assignment to `*EventId`; per-site `MethodBody` ordering | S |
-| 8 | ARCH-EVT-01 | Presentation calls inside RPC bodies | Run the boundary pattern list over every `[Rpc]` body by reflection | S |
-| 9 | ARCH-DI-12 | SubsystemRegistration reset of every mutable static (only 6 singletons and 1 material pinned) | Reflection: static non-readonly fields need a reset method in their type | M |
-| 10 | ARCH-ERR-08 | `UiElements.Bind` / `SetShown` (rule not followed: 182 bare `.Q`, 53 inline `style.display =`) | Counted allow-list scan of `UI/` and `Input/`, burned down per file | M |
+| 2 | ARCH-NET-20 | Branching on `SessionMode` (4 sites today, all seed derivation or session setup) | Source test with the allowed sites listed by file and member, like `SceneObjectAccessTests.AllowedFinds` | S |
+| 3 | ARCH-NET-14 | `[Networked]` layout outside `ChickenController`'s windows | Reflection snapshot of every NetworkBehaviour's networked properties (name, type, order) | M |
+| 4 | ARCH-NET-02 | Foreign writes to networked state (69 one-line `[Networked]` properties have a public `set`) | Reflection test: networked setters private, with a counted allow-list | L |
+| 5 | ARCH-NET-03 | Gate-before-write in a new RPC (pinned only per named RPC) | A generic test: each `[Rpc]` body's first statement calls one of the three sender checks | M |
+| 6 | ARCH-NET-13 | Ordinal pins for `MatchEventKind`, `ComebackGrant`, `CastArchetype` and any new wire enum | Collect enums from `[Networked]` and `[Rpc]` signatures; require a central pin table | S |
+| 7 | ARCH-NET-07 | Total-food conservation in a running match | Pure simulation of request/report/timeout/bounce sequences asserting conservation | M |
+| 8 | ARCH-EVT-02 | Producer side of event ids: write-before-bump, never reset | Ban literal assignment to `*EventId`; per-site `MethodBody` ordering | S |
+| 9 | ARCH-EVT-01 | Presentation calls inside RPC bodies | Run the boundary pattern list over every `[Rpc]` body by reflection | S |
+| 10 | ARCH-DI-12 | SubsystemRegistration reset of every mutable static (only 6 singletons and 1 material pinned) | Reflection: static non-readonly fields need a reset method in their type | M |
+| 11 | ARCH-ERR-08 | `UiElements.Bind` / `SetShown` (rule not followed: 182 bare `.Q`, 53 inline `style.display =`) | Counted allow-list scan of `UI/` and `Input/`, burned down per file | M |
 | 11 | Blind spot 1 (see below) | `UiTextTests` literal-text guards skip the partial files of split controllers | Read through `TestSources.ReadClass` | S |
 | 12 | ARCH-DATA-12 | Passive raw `Description` prose, the wrong-field argument, digits in other csv rows | Field-named arguments; a default arm that fails in `PerkTextTests`; csv digit test | M |
 | 13 | ARCH-DATA-11 | Literal tunables in Gameplay, Abilities and UI (e.g. `ab.Cooldown <= 6f`) | Counted allow-list scan of float literals outside constant declarations | M |
@@ -1089,7 +1100,7 @@ Kept so nobody re-adds them. No ARCH ID has been retired yet.
 
 ## 10. Open questions for the owner
 
-> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. Still open: whether game logic may branch on `SessionMode` (the three sites are seed derivation and session setup, not simulation behaviour).
+> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. All of them are now ruled on; the last, branching on `SessionMode`, became `ARCH-NET-20`.
 
 
 These need Maestro's ruling; the code cannot settle them.
@@ -1100,12 +1111,4 @@ These need Maestro's ruling; the code cannot settle them.
 
 **Q3 — What does "never call Fusion directly from gameplay code" mean?** (docs/CONVENTIONS.md:11, docs/TDD.md:103.) Every gameplay object is a Fusion NetworkBehaviour, and Gameplay calls `Runner.Spawn`, `GetInput` and RPCs by design. A proposed reading: session lifecycle (start, join, host, shutdown, runner creation) goes through `INetworkService`, and NetworkBehaviour APIs are allowed in Gameplay. Confirm, and the rule can be made enforceable (ARCH-DI-01).
 
-**Q4 — Keep "game logic never branches on `SessionMode`"?** (docs/TDD.md:145.) Three gameplay files branch on it today (Appendix A). Either list them as exceptions (seeding and corner assignment differ between solo and online by design) or retire the rule.
-
-**Q5 — Static access to configuration SOs.** ARCH-DI-09 says a service or SO is a `Construct()` parameter, "never a static". `FeedbackPalette.Current` and `AbilityTargeting.Mode` are statics set by `ProjectInstaller`, because their readers are static (`FeedbackTuning`, `AbilityAccent`, ability SOs). Ratify them as named exceptions, or move their readers to injection?
-
-**Q6 — `UiElements` everywhere, or menus only?** docs/CONVENTIONS.md:267 states the `UiElements.Bind` / `SetShown` rule for all UI, but only `MenuUiController` was converted: 182 bare `.Q` lookups and 53 inline `style.display` assignments remain in the HUD, overlays and touch controls (ARCH-ERR-08). Convert them all, or narrow the rule to new code?
-
-**Q7 — Write the adopted rule set B.5 and B.7 into CONVENTIONS?** "UI polls; cross-HUD cues use a reset static mailbox" and "UI calls a public method on the gameplay owner, which checks authority" were adopted with D1/D2a but appear nowhere in docs/CONVENTIONS.md (ARCH-EVT-14, ARCH-EVT-15).
-
-**Q8 — Should the suite run without a human?** Every TEST in this document is enforced only when someone runs it (section 7, blind spot 0). A pre-push hook running `unity test` in batch, or a scheduled local run, would turn them into gates.
+**Q4 — answered (ruling D06, 2026-11-14).** The rule is kept, restated around its intent and given a named allow-list: see `ARCH-NET-20`.

@@ -1519,7 +1519,7 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 
 ## 10. Open questions for the owner
 
-> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. Still open: whether game logic may branch on `SessionMode` (the three sites are seed derivation and session setup, not simulation behaviour).
+> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. All of them are now ruled on; the last, branching on `SessionMode`, became `ARCH-NET-20` in the architecture rules.
 
 
 - **Q1 In-game HUD technology.** docs/CONVENTIONS.md:523-525 says the HUD is a UGUI island to leave alone; the 2026-07 rebuild memory says UI Toolkit for all screen-space UI. At b7c2616e: `MatchHudController` (top bar) and `TouchControlsController` use a `UIDocument` (Assets/_Game/Scripts/UI/MatchHudController.cs:20, Assets/_Game/Scripts/Input/TouchControlsController.cs:89), the overlays are UXML, `TouchControlsHud` is gone, `MatchHud` still builds a procedural UGUI canvas for the full-screen hit flash (Assets/_Game/Scripts/UI/MatchHud.cs:162-173) and `DebugHud` draws with IMGUI `OnGUI` (Assets/_Game/Scripts/UI/DebugHud.cs:159). Is the rule "all screen-space UI is UI Toolkit, with the hit-flash canvas and the debug HUD as named exceptions"?
