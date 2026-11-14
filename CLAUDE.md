@@ -45,7 +45,7 @@ When you begin a session:
 1. `cat docs/STATE.md` — orient yourself to current state.
 2. Skim `git log --oneline -10` — what just changed.
 3. If the user asks for a change in a system you haven't touched before, check `docs/ARCHITECTURE.md` for how it's wired.
-4. Before making nontrivial changes, skim `docs/CONVENTIONS.md` — the project has a few hard-won rules (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.).
+4. Before making nontrivial changes, check the rules that cover the area you are touching in `docs/ARCHITECTURE_RULES.md` (layering, DI, networking, events, data-driven design, errors) and `docs/CODE_RULES.md` (text, UI, tests, process, design constraints): rules have stable IDs and say what enforces them or that nothing does. `docs/CONVENTIONS.md` still holds the hard-won detail (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.); where it disagrees with the rules docs, they win. Where to put a new file: `docs/FILE_STRUCTURE.md`.
 5. After making changes, **update `docs/STATE.md`** so the next agent doesn't lose context. ROADMAP entries get ticked too when phases complete.
 6. **If you changed the design docs or any gameplay `.asset` value, update `docs/site/index.html` too.** Standing instruction from Maestro (2026-09-04): the compendium is a living document, not a snapshot. It is one self-contained HTML file with no build step. Its numbers must be read from the shipped `.asset` files and gameplay constants, **never** from GDD prose — the GDD carries known-stale figures. Republish it to the same Artifact URL (see `memory/mechanics-compendium-site.md`).
 7. **Slow batches (artist icons, lab captures, five-minute suite runs) run their specialists from the main session, one foreground agent at a time**, not through a background orchestrator: on 2026-11-10 a background `code-architect` died twice on API timeouts mid-item, taking its child with it. If an orchestrator dies, check `git status` before redoing anything.
@@ -65,7 +65,7 @@ Full diagnostic playbook: `docs/TESTING.md`.
 
 ## Latest tag
 
-`v0.3.0-alpha` (commit `312f511`) — Pre-test polish + build tooling. See `docs/STATE.md` for the full list.
+`v0.4.0-alpha` (commit `aadcd048`, 2026-10-26) — the playtest release. `simplify-abilities` is now ~330 commits ahead of it (audit batches, the Slow split, the five-assembly layout); the alpha build is not cut yet. See `docs/STATE.md` for the full list.
 
 ---
 
