@@ -6,10 +6,19 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔢 2026-11-14 - One build number per build: tag, Android versionCode and build info (`a0778d8f`)
+
+Maestro's rule: every build gets one **build number** = two-digit UTC year + minute of the year padded to 6 digits, always 8 digits (2026-11-14 13:05 UTC = `26457265`). Tags are `v<version>+<build number>`; year + seconds was ruled out because it exceeds Play's versionCode cap of 2,100,000,000.
+- `CluckWarsBuildMenu.BuildNumber` / `PlayVersionCode(number, current)` (never below current + 1, capped) / `TagName`; every menu run computes the number once, so Build All's Windows and Android share it; every Android build (APK and AAB) sets the versionCode for the build only (ProjectSettings stays `1`). `BuildInfo.json` and the Session line carry `build=`. The run ends with `[Build] Build number N - tag this commit as v<version>+N`. Docs: `docs/TESTING.md`, "Build number and tag".
+- Tests: filtered 26/26, full EditMode 3659/3660 (the known flaky `MarkScreenEffectTests` PC case, 2/2 alone).
+- The alpha tag was renamed by hand to `v0.5.0-alpha+26457265` (from its build time). The current `Builds/` predate this code: their APK has versionCode 1 and no build number in BuildInfo. Not yet seen in a real build log; the next build shows it.
+
+---
+
 ## 🏷 2026-11-14 - `v0.5.0-alpha` tagged on `ef72450d`; alpha playtest builds made
 
 Builds for the alpha playtest (BL-124), from `balance` at `ef72450d`, production (devtools off), Build All OK, 0 compile errors:
-`Builds/Windows/CluckWars.exe` (227 MB, BuildInfo `ef72450`) and `Builds/Android/CluckWars-1.0.apk` (120 MB, BuildInfo `ef72450+dirty`: Unity rewrote `UnityConnectSettings.asset` mid-build, the code is the tagged commit). Annotated tag `v0.5.0-alpha`, local, not pushed. A stale Nov 11 `Assembly-CSharp.dll` left in `Builds/Windows/CluckWars_Data/Managed/` (not in `ScriptingAssemblies.json`, so never loaded) was deleted. Not launched by an agent. After the test: `balance` into `main` (BL-163).
+`Builds/Windows/CluckWars.exe` (227 MB, BuildInfo `ef72450`) and `Builds/Android/CluckWars-1.0.apk` (120 MB, BuildInfo `ef72450+dirty`: Unity rewrote `UnityConnectSettings.asset` mid-build, the code is the tagged commit). Annotated tag `v0.5.0-alpha` (renamed `v0.5.0-alpha+26457265` the same day), local, not pushed. A stale Nov 11 `Assembly-CSharp.dll` left in `Builds/Windows/CluckWars_Data/Managed/` (not in `ScriptingAssemblies.json`, so never loaded) was deleted. Not launched by an agent. After the test: `balance` into `main` (BL-163).
 
 ---
 
@@ -377,7 +386,7 @@ Maestro's answers of 10 Nov (spec §12): e9c + note "always draw the player abov
 
 ## 🛠 2026-11-06 - Play Store internal-testing bundle build (`simplify-abilities`, not merged, not pushed)
 
-- New menu `Cluck Wars / Build / Android Play Store bundle (.aab)` (`CluckWarsBuildMenu.BuildPlayStore`, batch-callable): signed `.aab` with versionCode = minutes since 2026-01-01 UTC, upload key from `CW_KEYSTORE_PATH` / `CW_KEYSTORE_PASS` (+ optional `CW_KEY_ALIAS`, `CW_KEY_PASS`). ProjectSettings is restored after the build; `*.jks`/`*.keystore` gitignored. Tests: `PlayStoreBuildTests`.
+- New menu `Cluck Wars / Build / Android Play Store bundle (.aab)` (`CluckWarsBuildMenu.BuildPlayStore`, batch-callable): signed `.aab` with versionCode = minutes since 2026-01-01 UTC (replaced 2026-11-14 by the build number, see that entry), upload key from `CW_KEYSTORE_PATH` / `CW_KEYSTORE_PASS` (+ optional `CW_KEY_ALIAS`, `CW_KEY_PASS`). ProjectSettings is restored after the build; `*.jks`/`*.keystore` gitignored. Tests: `PlayStoreBuildTests`.
 - Not done yet: the upload keystore, the Play Console app and the first upload are Maestro's (steps in `docs/TESTING.md`, "Play Store internal testing"). No `.aab` has been built yet.
 
 ## 🛠 2026-11-05 - Shorter cooldowns, three kit swaps, Slippery resists ability slows only, Sneaky 11.1 (`simplify-abilities`, commits `5cac4b43`..`b53dc3fb` + docs, not merged, not pushed)
