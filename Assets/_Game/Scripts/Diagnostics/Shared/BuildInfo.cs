@@ -12,6 +12,8 @@ namespace CluckWars.Diagnostics
         public bool dirty;
         public string builtUtc;
         public bool devTools;
+        /// <summary>The build number (<c>yy</c> + minute of the UTC year, 8 digits); 0 in a BuildInfo.json from before it existed.</summary>
+        public int buildNumber;
     }
 
     /// <summary>
@@ -41,6 +43,10 @@ namespace CluckWars.Diagnostics
                 return null;
             }
         }
+
+        /// <summary>The build number as text, or <c>unknown</c> when the build info predates it (0).</summary>
+        public static string BuildNumberLabel(int buildNumber) =>
+            buildNumber > 0 ? buildNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) : "unknown";
 
         public static string ShaLabel(string sha, bool dirty) =>
             (string.IsNullOrEmpty(sha) ? "unknown" : ShortSha(sha)) + (dirty ? "+dirty" : string.Empty);
@@ -137,12 +143,15 @@ namespace CluckWars.Diagnostics
         /// The build's identity: from .git in the Editor (built=editor), from the generated TextAsset in a player.
         /// False (with the reason) when neither is available; the caller prints <c>sha=unknown</c> and warns.
         /// </summary>
-        public static bool TryLoad(out string shaLabel, out string built, out string problem)
+        /// <remarks><paramref name="buildNumber"/> is the number as text in a player, <c>unknown</c> for a build from
+        /// before it existed, <c>editor</c> in the Editor.</remarks>
+        public static bool TryLoad(out string shaLabel, out string built, out string buildNumber, out string problem)
         {
             problem = null;
             if (Application.isEditor)
             {
                 built = "editor";
+                buildNumber = "editor";
                 var root = Directory.GetParent(Application.dataPath)?.FullName;
                 if (root != null && TryReadGitSha(root, out var sha, out problem))
                 {
@@ -160,11 +169,13 @@ namespace CluckWars.Diagnostics
             {
                 shaLabel = "unknown";
                 built = "unknown";
+                buildNumber = "unknown";
                 problem = asset == null ? $"no Resources/{ResourceName} asset in this build" : $"Resources/{ResourceName} is not valid build info";
                 return false;
             }
             shaLabel = ShaLabel(data.sha, data.dirty);
             built = string.IsNullOrEmpty(data.builtUtc) ? "unknown" : data.builtUtc;
+            buildNumber = BuildNumberLabel(data.buildNumber);
             return true;
         }
     }

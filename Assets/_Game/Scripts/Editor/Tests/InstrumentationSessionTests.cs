@@ -69,6 +69,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void BuildInfo_BuildNumber_ParsesWhenPresent_AndIsUnknownInAnOlderBuild()
+        {
+            var data = BuildInfo.Parse("{\"sha\":\"3c522ba\",\"dirty\":false,\"builtUtc\":\"2026-11-14T13:05:54Z\",\"devTools\":false,\"buildNumber\":26457265}");
+            Assert.IsNotNull(data);
+            Assert.AreEqual(26457265, data.buildNumber);
+            Assert.AreEqual("26457265", BuildInfo.BuildNumberLabel(data.buildNumber));
+
+            var old = BuildInfo.Parse("{\"sha\":\"3c522ba\",\"dirty\":false,\"builtUtc\":\"2026-10-20T10:00:00Z\",\"devTools\":false}");
+            Assert.IsNotNull(old, "a BuildInfo.json from before the build number still parses");
+            Assert.AreEqual(0, old.buildNumber);
+            Assert.AreEqual("unknown", BuildInfo.BuildNumberLabel(old.buildNumber));
+        }
+
+        [Test]
         public void GitHead_RefAndDetachedAndPackedRefs()
         {
             Assert.AreEqual("refs/heads/test/instrumentation-2026-10-20",
@@ -116,14 +130,14 @@ namespace CluckWars.Tests
         {
             var f = new SessionFields
             {
-                Sha = "3c522ba+dirty", Built = "2026-10-20T10:00:00Z", DevTools = true, Platform = "Android",
+                Sha = "3c522ba+dirty", Built = "2026-10-20T10:00:00Z", Build = "26421080", DevTools = true, Platform = "Android",
                 Device = "Google Pixel 9", Gpu = "Mali-G715 MC7", Api = "Vulkan", Quality = "Mobile", PerfMode = true,
                 Width = 2424, Height = 1080, RefreshHz = 60.0, Os = "Android OS 15 / API-35 (AP4A=1)", Unity = "6000.3.14f1",
                 Date = "2026-10-20", Battery = SessionLine.Battery(0.8f),
             };
             Assert.AreEqual(
-                "Session sha=3c522ba+dirty built=2026-10-20T10:00:00Z devtools=1 platform=Android device=Google_Pixel_9 " +
-                "gpu=Mali-G715_MC7 api=Vulkan quality=Mobile perfMode=1 res=2424x1080 hz=60 os=Android_OS_15_/_API-35_(AP4A1) " +
+                "Session sha=3c522ba+dirty built=2026-10-20T10:00:00Z build=26421080 devtools=1 platform=Android " +
+                "device=Google_Pixel_9 gpu=Mali-G715_MC7 api=Vulkan quality=Mobile perfMode=1 res=2424x1080 hz=60 os=Android_OS_15_/_API-35_(AP4A1) " +
                 "unity=6000.3.14f1 date=2026-10-20 battery=80%",
                 SessionLine.Format(SessionLine.BootPrefix, f));
             StringAssert.StartsWith("SessionChange sha=", SessionLine.Format(SessionLine.ChangePrefix, f));

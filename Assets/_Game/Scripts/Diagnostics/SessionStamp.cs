@@ -11,14 +11,14 @@ namespace CluckWars.Diagnostics
     /// <summary>The values of one <c>Session</c> line, already as text (see <see cref="SessionLine"/>).</summary>
     public struct SessionFields
     {
-        public string Sha, Built, Platform, Device, Gpu, Api, Quality, Os, Unity, Date, Battery;
+        public string Sha, Built, Build, Platform, Device, Gpu, Api, Quality, Os, Unity, Date, Battery;
         public bool DevTools, PerfMode;
         public int Width, Height;
         public double RefreshHz;
     }
 
     /// <summary>
-    /// Formats the <c>Session</c> line: <c>Session sha=.. built=.. devtools=0|1 platform=.. device=.. gpu=.. api=..
+    /// Formats the <c>Session</c> line: <c>Session sha=.. built=.. build=.. devtools=0|1 platform=.. device=.. gpu=.. api=..
     /// quality=.. perfMode=0|1 res=WxH hz=.. os=.. unity=.. date=yyyy-MM-dd battery=..</c>. Values are made
     /// key=value-safe (whitespace → <c>_</c>, no <c>=</c>), empty ones print <c>n/a</c>. Pure; pinned by tests.
     /// </summary>
@@ -33,6 +33,7 @@ namespace CluckWars.Diagnostics
             sb.Append(prefix);
             Add(sb, "sha", f.Sha);
             Add(sb, "built", f.Built);
+            Add(sb, "build", f.Build);
             Add(sb, "devtools", f.DevTools ? "1" : "0");
             Add(sb, "platform", f.Platform);
             Add(sb, "device", f.Device);
@@ -83,7 +84,7 @@ namespace CluckWars.Diagnostics
         private const string Source = "Session";
 
         private readonly ILogService _log;
-        private string _sha = "unknown", _built = "unknown";
+        private string _sha = "unknown", _built = "unknown", _build = "unknown";
         private int _quality = -1;
         private bool _perfMode;
 
@@ -91,7 +92,7 @@ namespace CluckWars.Diagnostics
 
         public void Initialize()
         {
-            if (!BuildInfo.TryLoad(out _sha, out _built, out var problem))
+            if (!BuildInfo.TryLoad(out _sha, out _built, out _build, out var problem))
                 _log.Warn(Source, $"Build info unavailable ({problem}); the Session line says sha=unknown.");
             _quality = QualitySettings.GetQualityLevel();
             _perfMode = PlayerPreferences.PerformanceModeEnabled;
@@ -116,6 +117,7 @@ namespace CluckWars.Diagnostics
             {
                 Sha = _sha,
                 Built = _built,
+                Build = _build,
                 DevTools = DevTools.Available,
                 Platform = Application.platform.ToString(),
                 Device = SystemInfo.deviceModel,

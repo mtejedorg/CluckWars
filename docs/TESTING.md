@@ -15,7 +15,7 @@ Single-keypress builds from the Unity Editor:
 | `Cluck Wars / Build / Windows` | `Ctrl+Shift+W` | `Builds/Windows/CluckWars.exe` |
 | `Cluck Wars / Build / Android` | `Ctrl+Shift+A` | `Builds/Android/CluckWars-<version>.apk` |
 | `Cluck Wars / Build / Windows + Android` | `Ctrl+Shift+B` | both, sequential |
-| `Cluck Wars / Build / Android Play Store bundle (.aab)` | — | `Builds/Android/CluckWars-<version>-<versionCode>.aab`, signed (see below) |
+| `Cluck Wars / Build / Android Play Store bundle (.aab)` | — | `Builds/Android/CluckWars-<version>-<build number>.aab`, signed (see below) |
 | `Cluck Wars / Build / Reveal Builds Folder` | — | opens `Builds/` |
 
 The Android build forces:
@@ -26,15 +26,31 @@ The Android build forces:
 
 `Builds/` is gitignored. APK filename embeds `PlayerSettings.bundleVersion`.
 
+### Build number and tag
+
+Every build run gets one **build number**: the two-digit UTC year, then the minute of that year
+zero-padded to six digits, always 8 digits (2026-11-14 13:05 UTC is `26457265`; 2026-01-01 00:00 is
+`26000000`). `CluckWarsBuildMenu.BuildNumber` computes it once per menu run, so in `Windows + Android`
+both builds share it. The same number is:
+
+- the Android **versionCode** of every Android build (sideload `.apk` and Play `.aab`), set for the
+  build only; ProjectSettings keeps `AndroidBundleVersionCode: 1`. If ProjectSettings ever holds a code
+  at or above the number, the build uses that code + 1 and warns;
+- the `buildNumber` in the in-game build info: the `[Build] BuildInfo: build=...` log line and
+  `build=` in the `Session` line (`unknown` for builds from before it existed, `editor` in the Editor);
+- the git **tag**, `v<semver>+<build number>`, e.g. `v0.5.0-alpha+26457265`. The run's last log line
+  is `[Build] Build number 26457265 - tag this commit as v0.5.0-alpha+26457265`; copy the tag from it.
+
 ### Play Store internal testing (builds arrive as Play updates)
 
 `Cluck Wars / Build / Android Play Store bundle (.aab)` builds a signed bundle,
-`Builds/Android/CluckWars-<version>-<versionCode>.aab`. Batch form:
+`Builds/Android/CluckWars-<version>-<build number>.aab`. Batch form:
 `Unity.exe -batchmode -quit -projectPath . -executeMethod CluckWars.EditorTools.CluckWarsBuildMenu.BuildPlayStore -logFile build.log`
 (add `-cwDevTools` for an instrumented build; a failure exits non-zero).
 
-- **versionCode** = minutes since 2026-01-01 UTC, so every bundle outranks the last one and Play
-  offers it as an update. It is set for the build only; ProjectSettings keeps `AndroidBundleVersionCode: 1`.
+- **versionCode** = the build number (see "Build number and tag" above), so every bundle outranks the
+  last one (including the old minutes-since-2026-01-01 codes) and Play offers it as an update. It is set
+  for the build only; ProjectSettings keeps `AndroidBundleVersionCode: 1`.
 - **Signing** comes from environment variables, never from the repo or ProjectSettings:
   `CW_KEYSTORE_PATH`, `CW_KEYSTORE_PASS`, optional `CW_KEY_ALIAS` (default `upload`) and `CW_KEY_PASS`
   (default = keystore password). Missing ones fail the build with the variable's name. `*.jks` / `*.keystore` are gitignored.

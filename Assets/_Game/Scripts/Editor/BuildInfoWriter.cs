@@ -12,7 +12,7 @@ namespace CluckWars.EditorTools
 {
     /// <summary>
     /// Stamps every player build with its identity for the runtime <c>Session</c> line: writes
-    /// <see cref="AssetPath"/> (short SHA, dirty flag, UTC build time, dev-tools flag) before the build and deletes it
+    /// <see cref="AssetPath"/> (build number, short SHA, dirty flag, UTC build time, dev-tools flag) before the build and deletes it
     /// after, so the working tree stays clean. <c>CluckWarsBuildMenu</c> also calls <see cref="Cleanup"/> after every
     /// build, because Unity skips the postprocess callback when a build fails.
     /// </summary>
@@ -24,6 +24,12 @@ namespace CluckWars.EditorTools
 
         /// <summary>Set by <c>CluckWarsBuildMenu</c> around a build compiled with <c>CLUCKWARS_DEV_TOOLS</c>.</summary>
         public static bool DevToolsForNextBuild;
+
+        /// <summary>
+        /// Set by <c>CluckWarsBuildMenu</c> to its run's build number, so every target of one run stamps the same one.
+        /// 0 (a build started outside the menu) means the current minute's <see cref="CluckWarsBuildMenu.BuildNumber"/>.
+        /// </summary>
+        public static int BuildNumberForNextBuild;
 
         public int callbackOrder => 0;
 
@@ -39,6 +45,7 @@ namespace CluckWars.EditorTools
                 dirty = !string.IsNullOrWhiteSpace(status),
                 builtUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
                 devTools = devTools,
+                buildNumber = BuildNumberForNextBuild != 0 ? BuildNumberForNextBuild : CluckWarsBuildMenu.BuildNumber(DateTime.UtcNow),
             };
             if (string.IsNullOrEmpty(data.sha))
             {
@@ -48,7 +55,7 @@ namespace CluckWars.EditorTools
 
             File.WriteAllText(AssetPath, JsonUtility.ToJson(data));
             AssetDatabase.ImportAsset(AssetPath, ImportAssetOptions.ForceSynchronousImport);
-            Debug.Log($"{LogTag} BuildInfo: sha={BuildInfo.ShaLabel(data.sha, data.dirty)} built={data.builtUtc} devtools={(devTools ? 1 : 0)} → {AssetPath}");
+            Debug.Log($"{LogTag} BuildInfo: build={data.buildNumber} sha={BuildInfo.ShaLabel(data.sha, data.dirty)} built={data.builtUtc} devtools={(devTools ? 1 : 0)} → {AssetPath}");
         }
 
         public void OnPostprocessBuild(BuildReport report) => Cleanup();

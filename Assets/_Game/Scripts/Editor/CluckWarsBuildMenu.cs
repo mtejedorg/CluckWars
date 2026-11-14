@@ -66,10 +66,10 @@ namespace CluckWars.EditorTools
         // MenuItem methods for validation), so each delegates to a Do* helper
         // that reports success for Build All to summarise.
         [MenuItem("Cluck Wars/Build/Windows %#w", priority = 1)]
-        public static void BuildWindows() => DoWindows();
+        public static void BuildWindows() => WithBuildNumber(DoWindows);
 
         [MenuItem("Cluck Wars/Build/Android %#a", priority = 2)]
-        public static void BuildAndroid() => DoAndroid();
+        public static void BuildAndroid() => WithBuildNumber(DoAndroid);
 
         [MenuItem("Cluck Wars/Build/iOS", priority = 3)]
         public static void BuildIos()
@@ -84,7 +84,7 @@ namespace CluckWars.EditorTools
                                 "needs a Mac with Xcode to become an installable app.");
                 return;
             }
-            DoIos();
+            WithBuildNumber(DoIos);
         }
 
         [MenuItem("Cluck Wars/Build/iOS", true)]
@@ -109,11 +109,13 @@ namespace CluckWars.EditorTools
         }
 
         [MenuItem("Cluck Wars/Build/All %#b", priority = 4)]
-        public static void BuildAll()
+        public static void BuildAll() => WithBuildNumber(BuildAllCore);
+
+        private static bool BuildAllCore()
         {
             // Validate once up front rather than letting all targets fail with
             // the same scene-list error.
-            if (!ValidateScenes()) return;
+            if (!ValidateScenes()) return false;
 
             // iOS is deliberately never part of Build All, regardless of the
             // Enable iOS Export toggle — an export nobody on this machine can
@@ -138,6 +140,7 @@ namespace CluckWars.EditorTools
             var summary = $"{LogTag} Build All — Windows: {Verdict(windows)}, Android: {Verdict(android)}";
             if (windows && android) Debug.Log(summary);
             else Debug.LogError(summary + "  One or more targets did not succeed; see the errors above.");
+            return windows || android;
         }
 
         /// <summary>
@@ -147,9 +150,11 @@ namespace CluckWars.EditorTools
         /// times it logs are the ones a player would get. Restores the Windows target afterwards, like Build All.
         /// </summary>
         [MenuItem(TestSessionMenuPath, priority = 5)]
-        public static void BuildTestSession()
+        public static void BuildTestSession() => WithBuildNumber(BuildTestSessionCore);
+
+        private static bool BuildTestSessionCore()
         {
-            if (!ValidateScenes()) return;
+            if (!ValidateScenes()) return false;
             bool windows = false, android = false;
             _forceDevTools = true;
             try
@@ -166,6 +171,7 @@ namespace CluckWars.EditorTools
             var summary = $"{LogTag} Test Session build (dev tools) — Windows: {Verdict(windows)}, Android: {Verdict(android)}";
             if (windows && android) Debug.Log(summary);
             else Debug.LogError(summary + "  One or more targets did not succeed; see the errors above.");
+            return windows || android;
         }
 
         private const string TestSessionMenuPath = "Cluck Wars/Build/Test Session (Windows + Android, dev tools)";
@@ -209,9 +215,6 @@ namespace CluckWars.EditorTools
         public const string KeyPassEnvVar = "CW_KEY_PASS";
         public const string DefaultKeyAlias = "upload";
 
-        /// <summary>versionCode epoch: codes are minutes since this instant, so every bundle outranks the last one.</summary>
-        public static readonly DateTime VersionCodeEpochUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
         /// <summary>Google Play's ceiling for versionCode.</summary>
         public const int MaxPlayVersionCode = 2100000000;
 
@@ -225,12 +228,14 @@ namespace CluckWars.EditorTools
 
         /// <summary>
         /// Builds a signed Android App Bundle for Google Play internal testing: <c>Builds/Android/CluckWars-&lt;version&gt;-&lt;code&gt;.aab</c>.
-        /// The upload key comes from <see cref="KeystorePathEnvVar"/> and friends; the versionCode is minutes since
-        /// <see cref="VersionCodeEpochUtc"/>, so each upload is accepted as an update. ProjectSettings is left as it was.
+        /// The upload key comes from <see cref="KeystorePathEnvVar"/> and friends; the versionCode is the build number
+        /// (<see cref="PlayVersionCode"/>), so each upload is accepted as an update. ProjectSettings is left as it was.
         /// In -batchmode a failure throws, so the Editor exits non-zero.
         /// </summary>
         [MenuItem(PlayStoreMenuPath, priority = 7)]
-        public static void BuildPlayStore()
+        public static void BuildPlayStore() => WithBuildNumber(BuildPlayStoreCore);
+
+        private static bool BuildPlayStoreCore()
         {
             bool ok = false;
             try
@@ -249,17 +254,77 @@ namespace CluckWars.EditorTools
                 Debug.LogError(summary + "  See the errors above.");
                 if (Application.isBatchMode) throw new BuildFailedException(summary);
             }
+            return ok;
+        }
+
+        // ---- Build number (Maestro, 2026-11-14) ---------------------------------
+
+        /// <summary>
+        /// The build number: two-digit UTC year, then the minute of that year zero-padded to six digits, so always 8
+        /// digits (2026-11-14 13:05 UTC → <c>26457265</c>). One number per build run, the same in the git tag
+        /// (<c>v&lt;version&gt;+&lt;number&gt;</c>), the Android versionCode and the in-game build info. A leap year's
+        /// last minute is 527039, so it stays far below <see cref="MaxPlayVersionCode"/> until 2099. Pure so a test pins it.
+        /// </summary>
+        public static int BuildNumber(DateTime utcNow)
+        {
+            var u = utcNow.ToUniversalTime();
+            int minuteOfYear = (u.DayOfYear - 1) * 1440 + u.Hour * 60 + u.Minute;
+            return (u.Year % 100) * 1_000_000 + minuteOfYear;
         }
 
         /// <summary>
-        /// The versionCode for a new Play bundle: minutes since <see cref="VersionCodeEpochUtc"/>, and always above
-        /// <paramref name="current"/>. Pure so a test pins it.
+        /// The Android versionCode for a build: the build number, but always above <paramref name="current"/> (Play only
+        /// accepts a higher code) and never above <see cref="MaxPlayVersionCode"/>. Pure so a test pins it.
         /// </summary>
-        public static int PlayVersionCode(DateTime utcNow, int current)
+        public static int PlayVersionCode(int buildNumber, int current)
         {
-            long minutes = (long)Math.Floor((utcNow.ToUniversalTime() - VersionCodeEpochUtc).TotalMinutes);
-            long code = Math.Max(minutes, (long)current + 1);
+            long code = Math.Max(buildNumber, (long)current + 1);
             return (int)Math.Min(Math.Max(code, 1), MaxPlayVersionCode);
+        }
+
+        /// <summary>The git tag for a build: <c>v&lt;version&gt;+&lt;build number&gt;</c>. Pure so a test pins it.</summary>
+        public static string TagName(string version, int buildNumber) =>
+            $"v{(string.IsNullOrWhiteSpace(version) ? "0.0.0" : version.Trim())}+{buildNumber}";
+
+        // Set for the duration of one menu run, so every target in it (Build All: Windows and Android) shares one number.
+        private static int _runBuildNumber;
+
+        /// <summary>This run's build number; a build started outside a menu run gets the current minute's.</summary>
+        internal static int CurrentBuildNumber => _runBuildNumber != 0 ? _runBuildNumber : BuildNumber(DateTime.UtcNow);
+
+        /// <summary>
+        /// Runs one menu entry under a single build number, then prints the tag line as the run's last line when
+        /// anything was built.
+        /// </summary>
+        private static void WithBuildNumber(Func<bool> run)
+        {
+            int number = BuildNumber(DateTime.UtcNow);
+            _runBuildNumber = number;
+            bool built;
+            try
+            {
+                built = run();
+            }
+            finally
+            {
+                _runBuildNumber = 0;
+            }
+            if (built)
+                Debug.Log($"{LogTag} Build number {number} - tag this commit as {TagName(PlayerSettings.bundleVersion, number)}");
+        }
+
+        /// <summary>
+        /// The versionCode for the Android build about to run, from this run's build number. Warns when ProjectSettings
+        /// holds a code at or above it, because then the versionCode and the build number differ.
+        /// </summary>
+        private static int AndroidVersionCode(int current)
+        {
+            int number = CurrentBuildNumber;
+            int code = PlayVersionCode(number, current);
+            if (code != number)
+                Debug.LogWarning($"{LogTag} ProjectSettings holds Android versionCode {current}, at or above build number {number}; " +
+                                 $"this build uses versionCode {code}, so it no longer matches the build number.");
+            return code;
         }
 
         /// <summary>
@@ -305,7 +370,7 @@ namespace CluckWars.EditorTools
             string storeWas = PlayerSettings.Android.keystoreName, aliasWas = PlayerSettings.Android.keyaliasName;
             string storePassWas = PlayerSettings.Android.keystorePass, aliasPassWas = PlayerSettings.Android.keyaliasPass;
 
-            int code = PlayVersionCode(DateTime.UtcNow, codeWas);
+            int code = AndroidVersionCode(codeWas);
             try
             {
                 PlayerSettings.Android.bundleVersionCode = code;
@@ -354,7 +419,19 @@ namespace CluckWars.EditorTools
         private static bool DoAndroid()
         {
             ConfigureAndroidPlayerSettings();
-            return Build(BuildTarget.Android, AndroidSubdir, $"CluckWars-{SanitizedVersion()}.apk");
+            // The versionCode is set for this build only: ProjectSettings keeps its own value, so no diff.
+            int codeWas = PlayerSettings.Android.bundleVersionCode;
+            int code = AndroidVersionCode(codeWas);
+            try
+            {
+                PlayerSettings.Android.bundleVersionCode = code;
+                Debug.Log($"{LogTag} Android .apk: versionCode {code}, versionName {PlayerSettings.bundleVersion}.");
+                return Build(BuildTarget.Android, AndroidSubdir, $"CluckWars-{SanitizedVersion()}.apk");
+            }
+            finally
+            {
+                PlayerSettings.Android.bundleVersionCode = codeWas;
+            }
         }
 
         private static bool DoIos()
@@ -448,6 +525,7 @@ namespace CluckWars.EditorTools
             bool frameTimingWas = PlayerSettings.enableFrameTimingStats;
             if (devTools) PlayerSettings.enableFrameTimingStats = true;
             BuildInfoWriter.DevToolsForNextBuild = devTools;
+            BuildInfoWriter.BuildNumberForNextBuild = CurrentBuildNumber;
 
             Debug.Log($"{LogTag} {target} → {Path.GetFullPath(location)}  (scenes: {options.scenes.Length}, " +
                       $"devtools={(devTools ? "on" : "off")} [{devToolsReason}]" +
@@ -461,6 +539,7 @@ namespace CluckWars.EditorTools
             {
                 PlayerSettings.enableFrameTimingStats = frameTimingWas;
                 BuildInfoWriter.DevToolsForNextBuild = false;
+                BuildInfoWriter.BuildNumberForNextBuild = 0;
                 // The postprocess callback is skipped when a build fails: never leave the generated asset behind.
                 BuildInfoWriter.Cleanup();
             }

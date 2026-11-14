@@ -308,7 +308,7 @@ namespace CluckWars.Diagnostics
             var path = Path.Combine(Application.persistentDataPath, ResultFileName);
             try
             {
-                BuildInfo.TryLoad(out var sha, out _, out _);
+                BuildInfo.TryLoad(out var sha, out _, out _, out _);
                 var json = JsonUtility.ToJson(new Result
                 {
                     code = code,
