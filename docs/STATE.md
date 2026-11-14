@@ -8,7 +8,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## 🌿 2026-11-14 - `simplify-abilities` merged into `balance` (BL-162); the branch is deleted
 
-`balance` was fast-forwarded from `907869a0` to `ca3a8d51` (everything that was on `simplify-abilities`, no conflicts) and `simplify-abilities` was deleted (it never had a remote branch). **Work now continues on `balance`.** The entries below still name `simplify-abilities`: read that as `balance`. `balance` is 258 commits ahead of `origin/balance` and not pushed. Next: the human test (BL-124) on fresh builds (the Nov 11 builds predate the Slow split), then `balance` into `main` (BL-163, closes PR 3), then `main` into `develop`.
+`balance` was fast-forwarded from `907869a0` to `ca3a8d51` (everything that was on `simplify-abilities`, no conflicts) and `simplify-abilities` was deleted (it never had a remote branch). **Work now continues on `balance`.** The entries below still name `simplify-abilities`: read that as `balance`. `balance` is 258 commits ahead of `origin/balance` and not pushed. Next: the human test (BL-124) on fresh builds (the Nov 11 builds predate the Slow split), then `balance` into `main` (BL-163, closes PR 3), then rebase `develop` onto `main`.
 
 Correction to the Slow split entry below: the icons were changed afterwards (`7e47445d`). The instant Slow keeps the plain snail; Slow Area now shows the snail inside a disc.
 
