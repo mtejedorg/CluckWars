@@ -10,12 +10,17 @@ a hard-won bug. Don't rediscover them.
 > [`CODE_RULES.md`](CODE_RULES.md); the map of folders and assemblies is
 > [`FILE_STRUCTURE.md`](FILE_STRUCTURE.md). Where this file and those disagree,
 > they win until the stale line here is fixed (their Appendix A lists each one).
+>
+> **One home per rule** (ruling D10, 2026-11-14): a rule is written in exactly one
+> document and cross-referenced from the others by its ID. Do not copy a rule here
+> to make this file complete — redundancy only creates two things to keep in step.
+> The `librarian` agent owns upkeep of the rules docs (ruling D13).
 
 ---
 
 ## Core rules
 
-- **All services go behind interfaces.** Never call Fusion, UGS, or Unity Input directly from gameplay code. Use `INetworkService`, `IUGSService`, `IAudioService`, `IInputProvider`, `ILogService`.
+- **All services go behind interfaces.** Use `INetworkService`, `IUGSService`, `IAudioService`, `IInputProvider`, `ILogService`. The point is that each part of the code stays agnostic of the others, not that Fusion is hidden: **session and lobby lifecycle** (start, host, join, shutdown, session list) goes only through `INetworkService`, while `NetworkBehaviour`, `[Rpc]`, `GetInput` and `Runner.Spawn` are ordinary gameplay code. UGS is touched only by its service; device input only by the input providers. (Ruling D05, 2026-11-14; `ARCH-DI-01`.)
 - **ScriptableObjects use the `SO` suffix** — `ChickenStatsSO`, `AbilityBaseSO`, `MatchConfigSO`. Assets live in `/Assets/_Game/Data/`.
 - **Game logic reads input only from the Fusion buffer** — `GetInput<PlayerNetworkInput>(out var input)` inside `FixedUpdateNetwork`. Never `Keyboard.current` from gameplay scripts.
 - **All log output goes through `ILogService`.** No ad-hoc `Debug.Log`. Pass a `Source` tag per call. `MinLevel` defaults to `Verbose` during dev; raise via `ProjectInstaller._logMinLevel` for release builds.
@@ -266,7 +271,7 @@ Five enums name the same handful of effects in different orders, three of them n
 ### Colours and timings
 
 - A colour that carries **gameplay meaning** — carry level, health, a status, a removed chicken — is a named constant in `FeedbackTuning`, used by every consumer. So is a **juice timing**. A colour that is a texture pixel, a serialized prefab default or an alpha rebuild of a colour it already has stays where it is.
-- `FeedbackTuning` holds them as **code constants, not fields on `FeedbackPaletteSO` or `ColorSchemeSO`**: a new serialized field on a shipped palette asset reads as black until somebody re-authors it.
+- **Which home depends on who tunes it** (ruling D02, 2026-11-14): a colour a **designer** should be able to change without a build lives on the palette asset (`FeedbackPaletteSO` already holds the status colours — stun, slow, knock, ink); a colour **derived in code** (a ramp, a computed tint, anything interpolated) is a named constant in `FeedbackTuning`. Adding a serialized field to a shipped palette asset is the cost of the first: it reads as black until somebody re-authors it.
 - A **Gameplay** file cannot name `FeedbackTuning` (it is Presentation). Its colour stays local, with a comment saying why (`PlayerBase.UnownedColor`).
 
 ### UI Toolkit plumbing
@@ -542,7 +547,7 @@ Guards: `AssemblyLayoutTests` (folder -> assembly, exact reference lists, settin
 
 - One concern per commit. Avoid "fix bug + add feature + refactor" mega-commits.
 - Commit message body explains the *why*. Subject is the *what*.
-- Co-authored attribution for agent contributions: `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`.
+- Co-authored attribution for agent contributions, one generic line whatever the model (ruling D15, 2026-11-14): `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - Build output is gitignored (`/Builds/`). `.gitattributes` enforces LF. `.editorconfig` keeps IDEs from re-introducing CRLF.
 
 ---

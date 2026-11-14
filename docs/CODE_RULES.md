@@ -23,7 +23,7 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 
 **IDs.** `CODE-STYLE` naming, placement, language-level conventions, line endings; `CODE-TEXT` player-facing text, localization, numbers from data; `CODE-UI` UI Toolkit, UXML/USS, screenshots; `CODE-AUD` audio; `CODE-ASSET` assets, scenes, prefabs, GUIDs, URP, rigs; `CODE-TEST` testing and verification; `CODE-BUILD` builds, tooling, Unity MCP/CLI, suites, environment; `CODE-PROC` agents, models, branching, commits, docs, backlog; `CODE-DESIGN` balance and design constraints that bind code; `CODE-FOOT` footguns. IDs are permanent: never renumber; retire an ID instead of reusing it. Gaps are `G-nn` (section 7), open questions `Qn` (section 10).
 
-**Source notation.** Repo paths are relative to the repo root at `b7c2616e`. `.claude/CLAUDE.md` is the git-ignored project agent config, read from disk. `~/.claude/CLAUDE.md` is the owner's global config. `M:<file>.md` is a file in the project memory folder (`~/.claude/projects/C--Users-MARCO-Documents-GitHub-CluckWars/memory/`). Owner rulings stated in a Claude session are labelled by thread (UI thread, balance thread, audit thread, ...) and date; quotes are the owner's words. A rule whose only provenance is the 2026-11-12/13 architecture audit (a lesson learned that no repo file states) cites "lesson from the 2026-11-12/13 architecture audit (no repo document states it)".
+**Source notation.** Repo paths are relative to the repo root at `b7c2616e`. `.claude/CLAUDE.md` is the git-ignored project agent config, read from disk. `~/.claude/CLAUDE.md` is the owner's global config. `M:<file>.md` is a file in the project memory folder (`~/.claude/projects/C--Users-MARCO-Documents-GitHub-CluckWars/memory/`). Owner rulings stated in a Claude session are labelled by thread (UI thread, balance thread, audit thread, ...) and date; quotes are the owner's words. A rule whose only provenance is the 2026-11-12/13 architecture audit (a lesson learned that no repo file states) cites "the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)".
 
 ### Contents
 
@@ -801,7 +801,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Why: batch EditMode cannot prove weaving at spawn, Zenject in a player, IL2CPP or presentation timing; batches 3-6 of the audit were owed live checks (docs/STATE.md) and the first live run found two real defects.
 - Enforced by: CONVENTION (review only)
 - Audit check: docs/STATE.md entries that say "not verified in game" have a matching backlog item (for example BL-157, BL-160).
-- Source: docs/TESTING.md:241-258; the tester-agent practice: lesson from the 2026-11-12/13 architecture audit (no repo document states it)
+- Source: docs/TESTING.md:241-258; the tester-agent practice: the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)
 - Status: CURRENT
 
 ## 3.7 BUILD: builds, tooling, Unity MCP/CLI, running suites, environment
@@ -1008,7 +1008,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Why: stale line numbers and missing stop conditions caused rework; a commit per green item loses at most one item to a timeout.
 - Enforced by: CONVENTION (review only)
 - Audit check: read the written brief of each implementation agent and confirm it names the context (branch, HEAD, foreign dirty files, validation method, baseline), numbered items with exact verified sites, the constraints, the process (commit per green item, no push, no amend), the stop conditions and the report format.
-- Source: .claude/CLAUDE.md:26-33 (commit per item); the rest: lesson from the 2026-11-12/13 architecture audit (no repo document states it)
+- Source: .claude/CLAUDE.md:26-33 (commit per item); the rest: the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)
 - Status: CURRENT
 
 ### CODE-PROC-09 — Review risky batches independently, pinned to a commit range
@@ -1036,7 +1036,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Status: CURRENT (the trailer's model name is open question Q2)
 
 ### CODE-PROC-12 — Update docs/STATE.md after every change, and update docs in place
-- Rule: After making changes update `docs/STATE.md` (and tick `docs/ROADMAP.md` when phases complete); update each doc in place when its concern changes; record final decisions in the repo docs (the owner also wants them in Notion) and rewrite the GDD destructively rather than appending.
+- Rule: After making changes update `docs/STATE.md` (and tick `docs/ROADMAP.md` when phases complete); update each doc in place when its concern changes; record final decisions in the repo docs and rewrite the GDD destructively rather than appending. The Notion mirror is retired (ruling D16, 2026-11-14); an Obsidian vault is an open option, not a rule.
 - Why: so the next agent does not lose context; owner, design-reset thread 2026-07-25: "update the GDD, this time in a destructive way".
 - Enforced by: CONVENTION (review only)
 - Audit check: `git log -10 --stat` shows docs/STATE.md in every session's last commit.
@@ -1273,7 +1273,7 @@ Footguns that are layering, networking or injection traps live in ARCHITECTURE_R
 - Why: heredocs mangle backslashes and quotes in C# and Python.
 - Enforced by: CONVENTION (review only)
 - Audit check: `git diff --check` and a compile; look for stray control characters (`grep -P "[\x00-\x08]"`) in changed files.
-- Source: M:test-session-2026-10-20-learnings.md:18 (sed); the heredoc half: lesson from the 2026-11-12/13 architecture audit (no repo document states it)
+- Source: M:test-session-2026-10-20-learnings.md:18 (sed); the heredoc half: the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)
 - Status: CURRENT
 
 ### CODE-FOOT-03 — Give every PC client its own `-cw_profile`; restart Android with `am start -S`
@@ -1297,7 +1297,7 @@ Footguns that are layering, networking or injection traps live in ARCHITECTURE_R
 - Why: not stated beyond being listed among the failure modes met during the 2026-11-12/13 audit.
 - Enforced by: CONVENTION (review only)
 - Audit check: a default-behaviour check states the prefs were cleared first.
-- Source: Assets/_Game/Scripts/Editor/Tests/DeveloperModeTests.cs:49; the rest: lesson from the 2026-11-12/13 architecture audit (no repo document states it)
+- Source: Assets/_Game/Scripts/Editor/Tests/DeveloperModeTests.cs:49; the rest: the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)
 - Status: CURRENT
 
 ### CODE-FOOT-06 — Capture short visual windows with ffmpeg, not homemade burst scripts
@@ -1305,7 +1305,7 @@ Footguns that are layering, networking or injection traps live in ARCHITECTURE_R
 - Why: antivirus blocks the homemade scripts (failure mode met during the 2026-11-12/13 audit).
 - Enforced by: CONVENTION (review only)
 - Audit check: n/a (tool choice).
-- Source: lesson from the 2026-11-12/13 architecture audit (no repo document states it)
+- Source: the 2026-11-12/13 architecture audit; ratified as a rule by Maestro on 2026-11-14 (ruling D13)
 - Status: CURRENT
 
 ### CODE-FOOT-07 — Delete a stray legacy EventSystem; let `UiElements` create the right one
@@ -1478,7 +1478,7 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 | docs/TESTING.md:535-538 | Source tags `TouchHud`, `CharacterSelect`, `MatchHud` "UGUI HUD", `CargoHud` | `TouchControlsHud`, `CharacterSelectController`, `CargoHud` no longer exist; the HUD is mostly UI Toolkit (Q1) | code-architect |
 | docs/TESTING.md:551 | Check the stray EventSystem, naming `TouchControlsHud` | The rule stands (CODE-FOOT-07); the class name is gone | code-architect |
 | docs/TESTING.md:712 | Time-to-target "≈ 70 % of the 180 s timer" | `MatchConfig.asset` is 45 s (CODE-DESIGN-03) | code-architect |
-| docs/TESTING.md:77, docs/TESTING.md:745 | All Android testing on the Pixel 9 | Test PC-only until a phone is reconnected; the phone is a Pixel 10 Pro (M:test-session-2026-10-20-learnings.md:14) | code-architect |
+| docs/TESTING.md:77, docs/TESTING.md:745 | All Android testing on the Pixel 9 | The device is the Pixel 10 Pro (ruling D16, 2026-11-14); PC-only while no phone is reconnected; the phone is a Pixel 10 Pro (M:test-session-2026-10-20-learnings.md:14) | code-architect |
 | docs/TEST_STRATEGY.md:46 | Layer 0 "≈ 1 960 tests" | Quote docs/STATE.md:11 | code-architect |
 | docs/TEST_STRATEGY.md:50 | Layer 4 uses a phone | PC-only until a phone is reconnected (CODE-TEST-11) | code-architect |
 | docs/CONVENTIONS.md:523-525 | The in-game HUD (`MatchHud`, `TouchControlsHud`, `DebugHud`, `UiGfx`) is a legacy procedural-UGUI island | Top bar, touch controls and overlays are UI Toolkit; `TouchControlsHud` is gone; `MatchHud` keeps only a hit-flash canvas; `DebugHud` is IMGUI (Q1) | code-architect after the owner rules on Q1 |
@@ -1511,13 +1511,16 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 | Use Unity's own MCP | `ai-game-developer` MCP plus the `unity` CLI for what it lacks: CODE-BUILD-01 |
 | Use cravify / Antigravity for 3+ file tasks; run agy in a visible PowerShell window, prompt last; watch its empty "fix" commits | Banned unless the owner names it (since 2026-09-24): CODE-PROC-05; the agy launch rules are dormant |
 | `code-architect` pinned to Fable | opus; Fable never: CODE-PROC-03 |
-| All Android testing on the Pixel 9 | PC EXE clients only until a phone is reconnected (2026-10-20): CODE-TEST-11 |
+| All Android testing on the Pixel 9 | The device is the Pixel 10 Pro (ruling D16, 2026-11-14); PC EXE clients only while no phone is connected: CODE-TEST-11 |
 | Fixed, non-following camera (TDD) | Follow camera: Appendix A |
 | `IAudioService.PlaySFX(AudioClip, Vector3)` | Typed `SfxId`: CODE-AUD-01 |
 | Progression rules (one `IMatchEventSink`, `ChickenCargo.ReceiveStolen` chokepoint, two wallets, commit each slice on QA plus green suite) | Not on this branch: `IMatchEventSink` does not exist at b7c2616e; the rules apply on `develop` / `feature/progression` |
 | Assassin execute counts as a steal for transferred cargo only (2026-09-12) | Reworked with the Death Mark / Hunt kit; check against current code before relying on it |
 
 ## 10. Open questions for the owner
+
+> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. Still open: whether game logic may branch on `SessionMode` (the three sites are seed derivation and session setup, not simulation behaviour).
+
 
 - **Q1 In-game HUD technology.** docs/CONVENTIONS.md:523-525 says the HUD is a UGUI island to leave alone; the 2026-07 rebuild memory says UI Toolkit for all screen-space UI. At b7c2616e: `MatchHudController` (top bar) and `TouchControlsController` use a `UIDocument` (Assets/_Game/Scripts/UI/MatchHudController.cs:20, Assets/_Game/Scripts/Input/TouchControlsController.cs:89), the overlays are UXML, `TouchControlsHud` is gone, `MatchHud` still builds a procedural UGUI canvas for the full-screen hit flash (Assets/_Game/Scripts/UI/MatchHud.cs:162-173) and `DebugHud` draws with IMGUI `OnGUI` (Assets/_Game/Scripts/UI/DebugHud.cs:159). Is the rule "all screen-space UI is UI Toolkit, with the hit-flash canvas and the debug HUD as named exceptions"?
 - **Q2 Commit co-author line.** docs/CONVENTIONS.md:538 names "Claude Opus 4.7"; sessions now attribute a different model. Name the model per commit, or a generic line?
@@ -1529,4 +1532,3 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 - **Q8 Roster numbers in wording.** Template "4-PLAYER" and "3 CPU" from `MatchConfig` and the solo roster, or allow-list them (G-06)?
 - **Q9 Automation.** Should the guards run automatically (pre-push hook or CI, G-10)? Today nothing blocks a red commit.
 - **Q10 Tracked home for agent rules.** `.claude/CLAUDE.md` is git-ignored (`.gitignore:130`), so the routing, model and slow-batch rules have no history. Move the standing process rules into a tracked file (this document holds them now as CODE-PROC-*)?
-- **Q11 Notion.** In 2026-08 you asked for decisions to be recorded in Notion as well as the docs. Still wanted?

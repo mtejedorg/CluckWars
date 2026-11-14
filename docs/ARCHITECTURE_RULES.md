@@ -328,6 +328,7 @@ A dependency arrives one way (a `Construct()` parameter) and a scene object is f
 - Enforced by: TEST `SceneObjectAccessTests.FindCalls_ExistOnlyInTheListedBootstrapSites_AndTheDevTools` (Tests/SceneObjectAccessTests.cs:113), `SceneObjectAccessTests.RegisteredAndSingletonObjects_AreNeverSearchedFor` (:190); CONVENTION for "never a static" for services
 - Audit check: `git grep -nE "static [A-Za-z]+SO [A-Za-z]+ *\{|static [A-Za-z]+SO Current" -- Assets/_Game/Scripts`. Any static that hands out a service or SO needs a stated reason. The known one is `FeedbackPalette.Current`, set by `ProjectInstaller` because `FeedbackTuning` colours are static reads (Scripts/Installers/ProjectInstaller.cs:225-226).
 - Source: docs/CONVENTIONS.md:76-84, docs/CONVENTIONS.md:91, docs/STATE.md:157, docs/STATE.md:159
+- Ruling D07 (2026-11-14): a static accessor is allowed **only** for data whose readers are themselves static and cannot take an injected parameter (`FeedbackPalette.Current` read by `FeedbackTuning`/`AbilityAccent`, `AbilityTargeting.Mode` read by ability SOs), and only when an installer sets it once at startup. Anything with an instance reader takes a `Construct()` parameter.
 - Status: PARTIAL
 
 ### ARCH-DI-10 — Make a registry an IReadOnlyList over a private list that only its owner mutates
@@ -1087,6 +1088,9 @@ Kept so nobody re-adds them. No ARCH ID has been retired yet.
 | Several abilities per job under different names per class | One ability per job, ARCH-DATA-04 (2026-11-05) |
 
 ## 10. Open questions for the owner
+
+> **Answered 2026-11-14.** Maestro ruled on these via the decision page (https://claude.ai/artifact/PtyqzDvoGh6ZoF5N1zgGcJ); the rulings are folded into the rules above and recorded in the project memory `rule-decisions-2026-11-14`. The questions are kept here for the reasoning that produced them. Still open: whether game logic may branch on `SessionMode` (the three sites are seed derivation and session setup, not simulation behaviour).
+
 
 These need Maestro's ruling; the code cannot settle them.
 
