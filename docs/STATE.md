@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🏷 2026-11-14 - `v0.5.0-alpha` tagged on `ef72450d`; alpha playtest builds made
+
+Builds for the alpha playtest (BL-124), from `balance` at `ef72450d`, production (devtools off), Build All OK, 0 compile errors:
+`Builds/Windows/CluckWars.exe` (227 MB, BuildInfo `ef72450`) and `Builds/Android/CluckWars-1.0.apk` (120 MB, BuildInfo `ef72450+dirty`: Unity rewrote `UnityConnectSettings.asset` mid-build, the code is the tagged commit). Annotated tag `v0.5.0-alpha`, local, not pushed. A stale Nov 11 `Assembly-CSharp.dll` left in `Builds/Windows/CluckWars_Data/Managed/` (not in `ScriptingAssemblies.json`, so never loaded) was deleted. Not launched by an agent. After the test: `balance` into `main` (BL-163).
+
+---
+
 ## 🌿 2026-11-14 - `simplify-abilities` merged into `balance` (BL-162); the branch is deleted
 
 `balance` was fast-forwarded from `907869a0` to `ca3a8d51` (everything that was on `simplify-abilities`, no conflicts) and `simplify-abilities` was deleted (it never had a remote branch). **Work now continues on `balance`.** The entries below still name `simplify-abilities`: read that as `balance`. `balance` is 258 commits ahead of `origin/balance` and not pushed. Next: the human test (BL-124) on fresh builds (the Nov 11 builds predate the Slow split), then `balance` into `main` (BL-163, closes PR 3), then rebase `develop` onto `main`.
