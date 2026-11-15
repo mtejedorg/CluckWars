@@ -6,6 +6,17 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🏷 2026-11-15 - Alpha version 0.1, package `com.wugnar.games.wars.cluck`; builds regenerated
+
+Maestro's rulings: the alpha is version **0.1** and the package is **com.wugnar.games.wars.cluck** (was `com.cluckwars.game`). Set in `ProjectSettings.asset` (`bundleVersion`, Android and iPhone identifiers), in `BuildGuards.AppIdentifier` and its test (`cc8bc169`), and in the settings commit `194a4df8`. Build tests 54/54.
+- Windows + Android APK: build **26458919**, tag `v0.1+26458919`, `Builds/Android/CluckWars-0.1.apk` (versionCode 26458919).
+- Play bundle: build **26458925**, tag `v0.1+26458925`, `Builds/Android/CluckWars-0.1-26458925.aab` (versionCode 26458925, upload key). Each run has its own number, so the two differ by minutes.
+- Tags are `v<version>+<build>` now, without the word alpha, because the version is 0.1. The build info's `sha=` still reads `cc8bc16` (the build ran before the settings commit); the content is the same.
+- **Play Console:** the package name cannot change after the first upload. If the app was created with `com.cluckwars.game`, create a new app with `com.wugnar.games.wars.cluck`.
+- Earlier tags (`v0.5.0-alpha+26458746`) stay as history.
+
+---
+
 ## 🏷 2026-11-15 - `v0.5.0-alpha+26458746` on `91a0b04a`: the alpha rebuilt with the build number
 
 Rebuilt with Build All on the build-number code (`a0778d8f`): Windows and Android, production, devtools off, 0 compile errors. Build number **26458746** (2026-11-15 13:46 UTC), in the Android `versionCode`, `BuildInfo.json` (`build=26458746`) and the Windows data. Tag `v0.5.0-alpha+26458746` on `91a0b04a`, local, not pushed. The build's own last line suggested `v1.0+26458746` (from `bundleVersion` 1.0); the alpha keeps the `v0.5.0-alpha` name. This replaces the earlier `v0.5.0-alpha+26457265`, which was made by hand and had no build number inside it.
