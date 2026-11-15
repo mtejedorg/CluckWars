@@ -144,7 +144,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 1.0
+  bundleVersion: 0.1
   preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -167,8 +167,8 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.cluckwars.game
-    iPhone: com.cluckwars.game
+    Android: com.wugnar.games.wars.cluck
+    iPhone: com.wugnar.games.wars.cluck
   buildNumber:
     Standalone: 0
     VisionOS: 0
