@@ -6,6 +6,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🏷 2026-11-15 - `v0.5.0-alpha+26458746` on `91a0b04a`: the alpha rebuilt with the build number
+
+Rebuilt with Build All on the build-number code (`a0778d8f`): Windows and Android, production, devtools off, 0 compile errors. Build number **26458746** (2026-11-15 13:46 UTC), in the Android `versionCode`, `BuildInfo.json` (`build=26458746`) and the Windows data. Tag `v0.5.0-alpha+26458746` on `91a0b04a`, local, not pushed. The build's own last line suggested `v1.0+26458746` (from `bundleVersion` 1.0); the alpha keeps the `v0.5.0-alpha` name. This replaces the earlier `v0.5.0-alpha+26457265`, which was made by hand and had no build number inside it.
+
+---
+
 ## 🔢 2026-11-14 - One build number per build: tag, Android versionCode and build info (`a0778d8f`)
 
 Maestro's rule: every build gets one **build number** = two-digit UTC year + minute of the year padded to 6 digits, always 8 digits (2026-11-14 13:05 UTC = `26457265`). Tags are `v<version>+<build number>`; year + seconds was ruled out because it exceeds Play's versionCode cap of 2,100,000,000.
