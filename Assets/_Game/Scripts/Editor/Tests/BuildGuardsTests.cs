@@ -84,7 +84,7 @@ namespace CluckWars.Tests
         [Test]
         public void ApplicationIdentifier_AcceptsThePinnedId()
         {
-            Assert.AreEqual("com.cluckwars.game", BuildGuards.AppIdentifier);
+            Assert.AreEqual("com.wugnar.games.wars.cluck", BuildGuards.AppIdentifier);
             Assert.IsNull(BuildGuards.ValidateApplicationIdentifier(BuildGuards.AppIdentifier));
         }
 

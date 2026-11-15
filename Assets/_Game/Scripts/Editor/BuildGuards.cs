@@ -16,7 +16,7 @@ namespace CluckWars.EditorTools
         public const string CloudProjectIdEnvVar = "CW_CLOUD_PROJECT_ID";
 
         /// <summary>Pinned Android / iOS application identifier. Changing it makes installed builds a different app.</summary>
-        public const string AppIdentifier = "com.cluckwars.game";
+        public const string AppIdentifier = "com.wugnar.games.wars.cluck";
 
         private static readonly Regex ReverseDns =
             new Regex(@"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$", RegexOptions.Compiled);
