@@ -30,7 +30,7 @@ This is the first alpha for human testing. The ability set is simplified, and ev
 
 **Classes and specializations.** Bully, Relentless, Featherfoot, Slippery, Bulwark, Hoarder, Spoiler and Thief each have a passive that changes how their kit plays. Featherfoot banks food a bit faster. Slippery shrugs off ability slows.
 
-**Feedback.** Badges above each bird show its state: stunned, slowed, shelled, marked. Egg Shell has its own egg visuals and sounds. Ability hexes show cooldowns and timers.
+**Feedback.** Badges above each bird show its state: stunned, slowed, shelled, marked. Egg Shell has its own egg visuals. Ability hexes show cooldowns and timers.
 
 **Ability text** is written in plain words and reads its numbers from the game data.
 
@@ -47,7 +47,7 @@ This is the first alpha for human testing. The ability set is simplified, and ev
 
 - **Not yet played:** the new Slow and Slow Area, and their placed-patch mode, have not been run in the game.
 - **Long texts:** Hunt and Egg Shell descriptions are long. Check that they fit the detail panel.
-- **Similar icons:** none known.
+- **Ability sounds:** the six ability-feedback sounds (hit, miss, denied, shell open and close, hunt) are not made yet, so most of them are silent.
 - **Speedy and Steal:** in free-pick mode only (not in this build), a Speedy can pick Steal.
 
 ## Install
