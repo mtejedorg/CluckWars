@@ -870,7 +870,7 @@ One log path, a fixed line format, and one rule for which failures are loud: a w
 
 This is how the 2026-11-12/13 architecture audit was run, reproduced here so it can be re-run. Each lens was one read-only agent with one concern.
 
-Rules common to every lens agent: read-only; no sub-agents; never the fable model; scope = runtime C# under `Assets/_Game` (Editor and Tests only to see what is pinned); every claim needs a `path:line` the agent actually opened; every count comes from a grep whose pattern is stated; anything unverified is labelled `[unverified]`; read docs/ARCHITECTURE.md and docs/CONVENTIONS.md first. A pattern that follows a documented rule is not a finding. A documented rule the code breaks is a finding, and so is an undocumented de-facto rule. Stop after about 60 files opened and say what was not covered.
+Rules common to every lens agent: read-only; no sub-agents; run on opus, never on Fable (CODE-PROC-03: Fable is an escalation for the final verdict, not for a lens); scope = runtime C# under `Assets/_Game` (Editor and Tests only to see what is pinned); every claim needs a `path:line` the agent actually opened; every count comes from a grep whose pattern is stated; anything unverified is labelled `[unverified]`; read docs/ARCHITECTURE.md and docs/CONVENTIONS.md first. A pattern that follows a documented rule is not a finding. A documented rule the code breaks is a finding, and so is an undocumented de-facto rule. Stop after about 60 files opened and say what was not covered.
 
 Each lens returns: a verdict and a grade A-F; evidence tables; findings (ID, title, severity critical/high/medium/low, PRE-ALPHA = likely to cause a bug or block the playtest vs POST-ALPHA = debt, two `path:line` pieces of evidence, why it matters, smallest fix, effort S/M/L); a keep-list; a proposed rule set; and what was not covered.
 
@@ -1079,7 +1079,7 @@ Every line here was checked against `b7c2616e`. Until a line is fixed, this docu
 | docs/TDD.md:420 | "Fixed camera — no player-following" | `MatchCamera` follows the local chicken by default (`_followLocalChicken = true`, Scripts/Visuals/MatchCamera.cs:59) | agent |
 | CLAUDE.md:65 | Latest tag `v0.3.0-alpha` | The newest tag is `v0.4.0-alpha` | agent |
 | M/branching-model-v0-4-release.md:26 | The branching model is "Recorded in `CLAUDE.md` (Branches)" | Root `CLAUDE.md` has no Branches section | memory |
-| M/ui-rebuild-2026-07.md:40 | `code-architect` is pinned to Fable | It runs on opus; Fable is banned unless named (.claude/CLAUDE.md:20-24) | memory |
+| M/ui-rebuild-2026-07.md:40 | `code-architect` is pinned to Fable | It runs on opus; Fable is a per-call escalation, never pinned (CODE-PROC-03, ban lifted 2026-11-17) | memory |
 | M/agent-model-routing.md:3, :10 | Offers cravify/Antigravity as a coding route | The global rule forbids it unless asked for by name | memory |
 | docs/TESTING.md:77 | All Android testing on the Pixel 9 | **Not settled**: M/test-session-2026-10-20-learnings.md names a Pixel 10 Pro, and M/feedback-verify-state-not-logs.md says PC-only until a phone is reconnected. Code cannot settle it | Maestro |
 | docs/CONVENTIONS.md:538 | Attribution `Claude Opus 4.7` | **Not settled**: the model name is set per session by the harness; whether the rule should name a model at all is a process question for CODE_RULES.md | Maestro |

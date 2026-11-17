@@ -133,8 +133,8 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 | CODE-BUILD-18 | Check ComfyUI's port before diagnosing a generation failure | REVIEW | CURRENT |
 | CODE-PROC-01 | Orient before changing anything non-trivial | REVIEW | CURRENT |
 | CODE-PROC-02 | Route non-trivial work through `code-architect`; let specialists implement; `librarian` looks up before and maintains the docs after | REVIEW | CURRENT |
-| CODE-PROC-03 | Never pass `model: "fable"` to any agent unless the owner names it | REVIEW | CURRENT |
-| CODE-PROC-04 | Plan with opus, implement with sonnet | REVIEW | CURRENT |
+| CODE-PROC-03 | Fable is a per-call escalation, never a default and never pinned | REVIEW | CURRENT |
+| CODE-PROC-04 | Plan with opus, implement with sonnet, run routine work on haiku | REVIEW | CURRENT |
 | CODE-PROC-05 | Do not use cravify or Antigravity unless the owner asks for it by name | REVIEW | CURRENT |
 | CODE-PROC-06 | Run slow batches from the main session, one foreground specialist at a time | REVIEW | CURRENT |
 | CODE-PROC-07 | Build every agent brief with the prompt-master skill | REVIEW | CURRENT |
@@ -963,21 +963,21 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Source: .claude/CLAUDE.md:14-26 (routing and lifecycle), .claude/CLAUDE.md:49 (routing table), .claude/agents/librarian.md, .claude/agents/code-architect.md:57-61 (docs upkeep), .claude/agents/senior-dev.md:29 ("Docs upkeep" line), ~/.claude/CLAUDE.md (Agent routing)
 - Status: CURRENT
 
-### CODE-PROC-03 — Never pass `model: "fable"` to any agent unless the owner names it
-- Rule: No agent or sub-agent is spawned with the fable model unless Maestro names Fable in the request; default `opus` or `sonnet`.
-- Why: Fable's credit pool is exhausted; the agent dies instantly. Owner, feedback thread 2026-08-01: "never use Fable unless explicitly stated".
+### CODE-PROC-03 — Fable is a per-call escalation, never a default and never pinned
+- Rule: `fable` is passed only as a per-call `model` override, never pinned in agent frontmatter, and only when (1) an opus attempt came back wrong or stuck, (2) the decision is costly to reverse and cross-system, or (3) it is a high-stakes synthesis over conflicting sources (full text: "Model policy" paragraph, ~/.claude/CLAUDE.md). Never for implementation, lookups, docs upkeep, art/capture batches, slow batches or scheduled runs. One Fable agent at a time; its brief's first line says "Fable because: ..."; its sub-agents get an explicit model.
+- Why: Fable costs more and is only worth it as a big upgrade. Owner, 2026-11-17: "use it only when necessary or when it means a big upgrade". Supersedes the "never unless the owner names it" form (feedback thread 2026-08-01), which existed only because the credit pool was empty and a fable call died instantly; the owner upgraded the subscription on 2026-11-17.
 - Enforced by: CONVENTION (review only)
-- Audit check: `grep -rn "fable" .claude/agents` (disk) finds no model pin; agent briefs carry no `model: "fable"`.
-- Source: .claude/CLAUDE.md:20-24, ~/.claude/CLAUDE.md (Model overrides); feedback thread 2026-08-01 (owner)
-- Status: CURRENT
+- Audit check: `grep -n "^model:" .claude/agents/*.md` shows only opus/sonnet/haiku (none pins fable); every Fable brief starts with "Fable because: ..." and names case 1, 2 or 3; no Fable brief is an implementation, lookup, docs, art, slow or scheduled one.
+- Source: ~/.claude/CLAUDE.md:15-40 ("Model policy" paragraph, the one home), .claude/CLAUDE.md:31-38 (summary), .claude/agents/code-architect.md:24-28; owner 2026-11-17 (supersedes feedback thread 2026-08-01)
+- Status: CURRENT (rewritten 2026-11-17; the owner reviewed and confirmed the three cases on 2026-11-17 ("Yes!"); `grep -n "^model:" .claude/agents/*.md` shows no fable pin)
 
-### CODE-PROC-04 — Plan with opus, implement with sonnet
-- Rule: Planning and architecture agents run on opus; implementation agents (senior-dev and similar) on sonnet.
-- Why: owner, progression thread 2026-09-15: "opus is for plans and sonnet for coding"; opus coding agents hit the usage limit three times.
+### CODE-PROC-04 — Plan with opus, implement with sonnet, run routine work on haiku
+- Rule: Planning and architecture agents run on opus; implementation agents (senior-dev and similar) on sonnet. Routine work that needs no judgement (git handling: status, diffs, staging by explicit path, commits whose grouping and message are already decided, fetch, tags, branch clean-up; mechanical lookups; small fully specified edits; file moves and renames; running a known command and reporting its output) goes to a haiku agent (`developer-haiku`) when it is more than two or three commands; one or two commands stay inline. The caller keeps the decisions (what goes in which commit, what a failure means). A git brief lists files by path and forbids `git add -A`, stash, reset and broad checkout, because other sessions share the tree. Haiku never pushes unless the owner's words say so.
+- Why: owner, progression thread 2026-09-15: "opus is for plans and sonnet for coding"; opus coding agents hit the usage limit three times. Owner, 2026-11-17: "Also use haiku for routinary tasks such as git handling, etc." (a spawn costs more than one or two commands, so those stay inline).
 - Enforced by: CONVENTION (review only)
-- Audit check: an implementation brief passes `model: "sonnet"` or an agent whose frontmatter says sonnet.
-- Source: M:agent-model-routing.md:10-13; progression thread 2026-09-15, arena thread 2026-07-29 (owner)
-- Status: CURRENT (`.claude/agents/senior-dev.md:3` now pins `model: sonnet`; the audit check holds on disk; the memory M:agent-model-routing.md still offers cravify as a coding path, superseded by CODE-PROC-05)
+- Audit check: an implementation brief passes `model: "sonnet"` or an agent whose frontmatter says sonnet; a git or other routine batch of more than two or three commands is run by `developer-haiku` (or `model: "haiku"`), its brief lists files by path and forbids `git add -A`, stash, reset and broad checkout, and no haiku agent pushed without the owner's words.
+- Source: M:agent-model-routing.md:10-13; progression thread 2026-09-15, arena thread 2026-07-29 (owner); owner 2026-11-17 (haiku tier); ~/.claude/CLAUDE.md:21-32 (`haiku` tier line and "Routine work runs on haiku", the one home), .claude/CLAUDE.md:42-46 (summary), ~/.claude/agents/developer-haiku.md
+- Status: CURRENT (extended 2026-11-17 with the haiku tier; `.claude/agents/*.md` frontmatter pins only opus/sonnet, `developer-haiku` is a global agent; `.claude/agents/senior-dev.md:3` now pins `model: sonnet`; the audit check holds on disk; the memory M:agent-model-routing.md still offers cravify as a coding path, superseded by CODE-PROC-05; Fable sits above these tiers as a per-call escalation, CODE-PROC-03)
 
 ### CODE-PROC-05 — Do not use cravify or Antigravity unless the owner asks for it by name
 - Rule: "Do NOT use cravify / Antigravity unless the user explicitly asks for it by name"; this applies to all agents and sub-agents; implementation goes through Claude implementers or directly.
@@ -1490,7 +1490,7 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 | .claude/CLAUDE.md:111 | "cravify skill: hybrid Claude+Antigravity for any task touching 3+ scripts/prefabs" | Forbidden unless the owner names it (~/.claude/CLAUDE.md, CODE-PROC-05) | FIXED 2026-11-17 (.claude/CLAUDE.md:123 now allows cravify only when Maestro names it) |
 | M:agent-model-routing.md:10, M:agent-model-routing.md:13 | `cravify` is a coding path | Same as above | owner (memory) |
 | M:ui-toolkit-decision.md:14 | In-game HUD stays UGUI | Superseded by M:ui-rebuild-2026-07.md:15 (Q1) | owner (memory) |
-| M:ui-rebuild-2026-07.md:40 | `code-architect` is pinned to Fable | It runs on opus; Fable is banned (CODE-PROC-03) | owner (memory) |
+| M:ui-rebuild-2026-07.md:40 | `code-architect` is pinned to Fable | It runs on opus; Fable is a per-call escalation, never pinned (CODE-PROC-03, ban lifted 2026-11-17) | owner (memory) |
 | M:mcp-tests-run-leaves-empty-scene.md:11-17 | Reopen Bootstrap with `scene-open` / `scene-list-opened` | The 2.0 bridge has no `scene-*` tools; use `script-execute` (CODE-BUILD-05) | owner (memory) |
 | docs/TDD.md:371-378 | `IAudioService.PlaySFX(AudioClip clip, Vector3 position)` | `PlaySFX(SfxId, volume, pitch)` (CODE-AUD-01) | librarian |
 | docs/TDD.md:419-421 | Fixed camera, no player-following, no zoom | `MatchCamera` follows the local chicken (docs/CONVENTIONS.md:407-409) | librarian |
@@ -1510,7 +1510,7 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 | Do not add runtime asmdefs | Five assemblies with the weave rule (ARCH-LAY-01, ARCH-LAY-06) |
 | Use Unity's own MCP | `ai-game-developer` MCP plus the `unity` CLI for what it lacks: CODE-BUILD-01 |
 | Use cravify / Antigravity for 3+ file tasks; run agy in a visible PowerShell window, prompt last; watch its empty "fix" commits | Banned unless the owner names it (since 2026-09-24): CODE-PROC-05; the agy launch rules are dormant |
-| `code-architect` pinned to Fable | opus; Fable never: CODE-PROC-03 |
+| `code-architect` pinned to Fable | opus; Fable only as a per-call escalation, never pinned (CODE-PROC-03; the blanket ban was lifted 2026-11-17) |
 | All Android testing on the Pixel 9 | The device is the Pixel 10 Pro (ruling D16, 2026-11-14); PC EXE clients only while no phone is connected: CODE-TEST-11 |
 | Fixed, non-following camera (TDD) | Follow camera: Appendix A |
 | `IAudioService.PlaySFX(AudioClip, Vector3)` | Typed `SfxId`: CODE-AUD-01 |
