@@ -890,5 +890,181 @@ namespace CluckWars.Tests
                 Assert.AreEqual(CluckWars.UI.PlayerPalette.ForCorner(corner), HuntRules.MarkerColour(MarkMarkerMode.Hunt, corner));
             }
         }
+
+        // ---- The hunter's screen edge (K10) ---------------------------------------------------------------------------
+
+        private static float GlowFadeFrames() => Mathf.Ceil(FeedbackTuning.MarkHuntMoodGlowFadeSeconds / Dt) + 1f;
+
+        [Test]
+        public void HuntEdge_NothingWhileTheDrawRuns()
+        {
+            var w = new World { ArmRemaining = 1f };
+            w.SetMark(Me, Rival);
+            w.Run(w.Arm * 0.5f, out var o);
+            Assert.IsFalse(o.DrawLocked, "still drawing");
+            Assert.AreEqual(HuntScreenTint.None, o.HuntTint);
+            Assert.AreEqual(0f, o.HuntEdge);
+            Assert.AreEqual(0f, o.HuntGlow);
+        }
+
+        [Test]
+        public void HuntEdge_WhileArming_IsTheDarkEdgeOnly()
+        {
+            var w = new World { ArmRemaining = 1f };
+            w.SetMark(Me, Rival);
+            w.Run(w.Arm + FeedbackTuning.MarkDimFadeInSeconds + 0.1f, out var o);
+            Assert.IsTrue(o.DrawLocked);
+            Assert.IsFalse(o.Armed);
+            Assert.AreEqual(HuntScreenTint.Arming, o.HuntTint);
+            Assert.AreEqual(1f, o.HuntEdge, 1e-4f, "the dark edge is in");
+            Assert.AreEqual(0f, o.HuntGlow, "no glow while arming");
+        }
+
+        [Test]
+        public void HuntEdge_DarkEdgeFadesInOverTheDimTime_NotAtOnce()
+        {
+            var w = new World { ArmRemaining = 1f };
+            w.SetMark(Me, Rival);
+            MarkOutputs o = default;
+            for (int i = 0; i < 200 && !o.DrawLocked; i++) o = w.Step();
+            Assert.IsTrue(o.DrawLocked);
+            Assert.Less(o.HuntEdge, 1f, "starts at the lock, not at full");
+            w.Run(FeedbackTuning.MarkDimFadeInSeconds * 0.5f, out o);
+            Assert.That(o.HuntEdge, Is.GreaterThan(0f).And.LessThan(1f));
+        }
+
+        [Test]
+        public void HuntEdge_ArmedAndBlocked_IsRedWithTheBlockedAmount()
+        {
+            var w = AssassinLocked();
+            w.Run(FeedbackTuning.MarkDimFadeInSeconds + FeedbackTuning.MarkHuntMoodGlowFadeSeconds + 0.1f, out var o);
+            Assert.IsTrue(o.Armed);
+            Assert.AreEqual(HuntScreenTint.Blocked, o.HuntTint);
+            Assert.AreEqual(1f, o.HuntEdge, 1e-4f);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowBlocked, o.HuntGlow, 1e-4f);
+            AssertColour(FeedbackTuning.MarkHuntBlockedColor, o.HuntGlowColour);
+        }
+
+        [Test]
+        public void HuntEdge_WhenThePounceIsLegal_IsYellowWithThePounceAmount()
+        {
+            var w = AssassinLocked();
+            w.CanKillNow = true;
+            w.Run(FeedbackTuning.MarkDimFadeInSeconds + FeedbackTuning.MarkHuntMoodGlowFadeSeconds + 0.1f, out var o);
+            Assert.AreEqual(HuntScreenTint.Pounce, o.HuntTint);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowPounce, o.HuntGlow, 1e-4f);
+            AssertColour(FeedbackTuning.MarkKillColor, o.HuntGlowColour);
+        }
+
+        [Test]
+        public void HuntEdge_ColourCrossesFromRedToYellowWithinTheFadeTime_NotAtOnce()
+        {
+            var w = AssassinLocked();
+            w.Run(1f, out var o);
+            AssertColour(FeedbackTuning.MarkHuntBlockedColor, o.HuntGlowColour);
+            w.CanKillNow = true;
+            o = w.Step();
+            Assert.AreEqual(HuntScreenTint.Pounce, o.HuntTint, "the state flips at once");
+            Assert.AreNotEqual(FeedbackTuning.MarkKillColor, o.HuntGlowColour, "the colour crosses, it does not snap");
+            for (int i = 0; i < GlowFadeFrames(); i++) o = w.Step();
+            AssertColour(FeedbackTuning.MarkKillColor, o.HuntGlowColour);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowPounce, o.HuntGlow, 1e-4f);
+
+            w.CanKillNow = false;
+            for (int i = 0; i < GlowFadeFrames(); i++) o = w.Step();
+            AssertColour(FeedbackTuning.MarkHuntBlockedColor, o.HuntGlowColour);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowBlocked, o.HuntGlow, 1e-4f);
+        }
+
+        [Test]
+        public void HuntEdge_EndFadeScalesEdgeAndGlow_AndKeepsTheColour()
+        {
+            var w = AssassinLocked();
+            w.Run(1f, out var o);
+            Assert.Greater(o.HuntGlow, 0f);
+            w.ClearMark(Me);
+            o = w.Step();
+            Assert.Greater(o.HuntGlow, 0f, "fading, not snapped off");
+            Assert.Less(o.HuntGlow, FeedbackTuning.MarkHuntMoodGlowBlocked, "scaled by the end fade");
+            Assert.Less(o.HuntEdge, 1f);
+            Assert.Greater(o.HuntEdge, 0f);
+            AssertColour(FeedbackTuning.MarkHuntBlockedColor, o.HuntGlowColour);
+        }
+
+        [Test]
+        public void HuntEdge_VictimAndThirdPartyKeepTheHuntFieldsAtZero_AssassinKeepsTheVictimMoodAtZero()
+        {
+            var victim = VictimMarked(cold: true);
+            victim.Run(2f, out var v);
+            Assert.AreEqual(MarkRole.Victim, v.Role);
+            Assert.AreEqual(1f, v.Dim);
+            AssertNoHuntMood(v, "victim");
+
+            var third = new World();
+            third.SetMark(Rival, Third);
+            third.Run(2f, out var t);
+            Assert.AreEqual(MarkRole.ThirdParty, t.Role);
+            AssertNoHuntMood(t, "third party");
+
+            var hunter = AssassinLocked();
+            hunter.CanKillNow = true;
+            hunter.Run(2f, out var a);
+            Assert.AreEqual(MarkRole.Assassin, a.Role);
+            Assert.AreEqual(0f, a.Dim); Assert.AreEqual(0f, a.Cold); Assert.AreEqual(0f, a.Red);
+            Assert.Greater(a.HuntEdge, 0f);
+        }
+
+        [Test]
+        public void HuntEdge_TheEndFadeTakesBothToZero_ThenTheModelIsClean()
+        {
+            var w = AssassinLocked();
+            w.CanKillNow = true;
+            w.Run(1f, out var o);
+            Assert.IsFalse(o.IsClean);
+            w.ClearMark(Me);
+            AssertEndsClean(w, "hunt edge");
+            var after = w.Step();
+            Assert.AreEqual(0f, after.HuntEdge);
+            Assert.AreEqual(0f, after.HuntGlow);
+            Assert.AreEqual(HuntScreenTint.None, after.HuntTint);
+        }
+
+        [Test]
+        public void HuntEdge_ASecondHuntNeverStartsFromTheFirstHuntsColour()
+        {
+            var w = AssassinLocked();
+            w.CanKillNow = true;
+            w.Run(1f, out var o);
+            AssertColour(FeedbackTuning.MarkKillColor, o.HuntGlowColour);
+            w.ClearMark(Me);
+            w.Run(FeedbackTuning.MarkEndHoldSeconds + FeedbackTuning.MarkEndFadeSeconds + 0.1f, out o);
+            Assert.IsTrue(o.IsClean);
+
+            w.CanKillNow = false;
+            w.SetMark(Me, Third);
+            bool sawGlow = false;
+            for (int i = 0; i < 300 && !sawGlow; i++)
+            {
+                o = w.Step();
+                if (o.HuntGlow <= 0f) continue;
+                sawGlow = true;
+                AssertColour(FeedbackTuning.MarkHuntBlockedColor, o.HuntGlowColour);
+            }
+            Assert.IsTrue(sawGlow, "the second hunt reaches its live second");
+        }
+
+        private static void AssertColour(Color want, Color got)
+        {
+            Assert.AreEqual(want.r, got.r, 1e-4f, "r");
+            Assert.AreEqual(want.g, got.g, 1e-4f, "g");
+            Assert.AreEqual(want.b, got.b, 1e-4f, "b");
+        }
+
+        private static void AssertNoHuntMood(MarkOutputs o, string who)
+        {
+            Assert.AreEqual(HuntScreenTint.None, o.HuntTint, who);
+            Assert.AreEqual(0f, o.HuntEdge, who);
+            Assert.AreEqual(0f, o.HuntGlow, who);
+        }
     }
 }

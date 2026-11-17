@@ -20,6 +20,19 @@ namespace CluckWars.Visuals
         NotStunned = 4,
     }
 
+    /// <summary>What the hunter's screen edge shows (design section 10): a function of the hunt state only.</summary>
+    public enum HuntScreenTint : byte
+    {
+        /// <summary>Nothing: no hunt, or the draw is still running.</summary>
+        None = 0,
+        /// <summary>Locked, not yet armed: a dark edge, the hunt is running.</summary>
+        Arming = 1,
+        /// <summary>Armed and the pounce is not legal: the red edge.</summary>
+        Blocked = 2,
+        /// <summary>The pounce is legal: the yellow edge.</summary>
+        Pounce = 3,
+    }
+
     /// <summary>The one corner badge the hunter's marker shows (bottom-right): egg, wall, star, or none.</summary>
     public enum MarkerBadge : byte
     {
@@ -230,5 +243,19 @@ namespace CluckWars.Visuals
             !armed ? PlayerPalette.ForCorner(corner)
             : canKill ? FeedbackTuning.MarkKillColor
             : FeedbackTuning.MarkHuntBlockedColor;
+
+        /// <summary>The hunter's screen edge by hunt state: nothing until the draw has locked, dark while arming, then red or yellow.</summary>
+        public static HuntScreenTint ScreenTintFor(bool locked, bool armed, bool canKill) =>
+            !locked ? HuntScreenTint.None
+            : !armed ? HuntScreenTint.Arming
+            : canKill ? HuntScreenTint.Pounce
+            : HuntScreenTint.Blocked;
+
+        /// <summary>The edge glow's colour: the brackets' own red or yellow, so the edge and the brackets cannot disagree. Clear for
+        /// the states that draw no glow (None, and Arming, which is the dark edge only).</summary>
+        public static Color ScreenTintColour(HuntScreenTint tint, int targetCorner) =>
+            tint == HuntScreenTint.Blocked ? BracketColour(true, false, targetCorner)
+            : tint == HuntScreenTint.Pounce ? BracketColour(true, true, targetCorner)
+            : Color.clear;
     }
 }

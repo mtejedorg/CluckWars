@@ -15,8 +15,10 @@ namespace CluckWars.Visuals
     }
 
     /// <summary>
-    /// The Death Mark victim's full-screen mood: DIM (vignette darkness), COLD (violet darkness + desaturation),
-    /// RED (a ~7% red tint inside the darkness). This class only holds the caller's already-faded weights;
+    /// The Death Mark's full-screen mood. The victim's: DIM (vignette darkness), COLD (violet darkness + desaturation),
+    /// RED (a ~7% red tint inside the darkness). The hunter's (<see cref="SetHunt"/>): an edge-only mood, a dark edge and a
+    /// red or yellow glow, centre untouched, never desaturated. One role is shown at a time; if both were ever set the
+    /// victim's wins. This class only holds the caller's already-faded weights;
     /// <see cref="MarkScreenFeature"/> (on PC_Renderer and Mobile_Renderer) reads them every frame and draws
     /// <c>CWMarkMood.shader</c> on the base game camera before post-processing, so every HUD layer stays on top.
     /// </summary>
@@ -31,12 +33,17 @@ namespace CluckWars.Visuals
     public static class MarkScreenEffect
     {
         private static Vector3 _current;
+        private static float _huntEdge, _huntGlow;
+        private static Color _huntColour;
 
         /// <summary>Last applied weights (x = dim01, y = cold01, z = red01), clamped to [0, 1].</summary>
         public static Vector3 Current => _current;
 
         /// <summary>The pass the current weights need.</summary>
-        public static MarkScreenPass ActivePass => PassFor(_current);
+        public static MarkScreenPass ActivePass => PassFor(_current, _huntEdge, _huntGlow);
+
+        /// <summary>Last applied hunt mood: the dark edge weight, the glow alpha and the glow colour.</summary>
+        public static (float Edge, float Glow, Color Colour) HuntCurrent => (_huntEdge, _huntGlow, _huntColour);
 
         /// <summary>
         /// Lets an Editor capture tool render the effect outside Play mode. Reset on SubsystemRegistration; never set it
@@ -53,18 +60,34 @@ namespace CluckWars.Visuals
             _current = new Vector3(Clamp01(dim01), Clamp01(cold01), Clamp01(red01));
         }
 
-        /// <summary>Immediate off (scene unload, match end safety net).</summary>
+        /// <summary>The hunter's edge mood: <paramref name="edge01"/> the dark edge's weight, <paramref name="glow01"/> the glow's
+        /// alpha at the corners (already faded by the caller), <paramref name="glowColour"/> its colour. Clamped like <see cref="Set"/>.</summary>
+        public static void SetHunt(float edge01, Color glowColour, float glow01)
+        {
+            _huntEdge = Clamp01(edge01);
+            _huntGlow = Clamp01(glow01);
+            _huntColour = glowColour;
+        }
+
+        /// <summary>Immediate off, both moods (scene unload, match end safety net).</summary>
         public static void Clear()
         {
             _current = Vector3.zero;
+            _huntEdge = _huntGlow = 0f;
+            _huntColour = Color.clear;
         }
 
         /// <summary>Pass selection, pure: None when every weight is under <see cref="FeedbackTuning.MarkMoodOffEpsilon"/>,
         /// Graded when cold is above it, Overlay otherwise.</summary>
-        public static MarkScreenPass PassFor(Vector3 weights)
+        public static MarkScreenPass PassFor(Vector3 weights) => PassFor(weights, 0f, 0f);
+
+        /// <summary>Pass selection with the hunt mood: None only when the victim weights AND the hunt weights are all under
+        /// <see cref="FeedbackTuning.MarkMoodOffEpsilon"/>; the hunt mood alone is always the blend-only Overlay, never Graded.</summary>
+        public static MarkScreenPass PassFor(Vector3 weights, float huntEdge, float huntGlow)
         {
             float eps = FeedbackTuning.MarkMoodOffEpsilon;
-            if (weights.x < eps && weights.y < eps && weights.z < eps) return MarkScreenPass.None;
+            if (weights.x < eps && weights.y < eps && weights.z < eps)
+                return huntEdge < eps && huntGlow < eps ? MarkScreenPass.None : MarkScreenPass.Overlay;
             return weights.y >= eps ? MarkScreenPass.Graded : MarkScreenPass.Overlay;
         }
 
@@ -73,7 +96,34 @@ namespace CluckWars.Visuals
         /// dark.rgb = darkness colour; shape = (centre alpha, edge alpha, vignette inner, 1 / (outer - inner));
         /// red = (red colour rgb, red edge alpha); grade = (desaturation, red centre share, 0, 0).
         /// </summary>
-        public static void Uniforms(Vector3 weights, out Vector4 dark, out Vector4 shape, out Vector4 red, out Vector4 grade)
+        public static void Uniforms(Vector3 weights, out Vector4 dark, out Vector4 shape, out Vector4 red, out Vector4 grade) =>
+            Uniforms(weights, 0f, Color.clear, 0f, out dark, out shape, out red, out grade);
+
+        /// <summary>
+        /// The shader uniforms for both moods. When every victim weight is under <see cref="FeedbackTuning.MarkMoodOffEpsilon"/>
+        /// and the hunt mood is not, the same four vectors carry the hunter's edge: dark = the DIM colour, shape = (0, edge x
+        /// <see cref="FeedbackTuning.MarkHuntMoodEdge"/>, hunt inner, 1 / (outer - inner)), the tint slot = (glow colour, glow alpha),
+        /// grade = (0, glow centre share). The victim's mood wins if both are set.
+        /// </summary>
+        public static void Uniforms(Vector3 weights, float huntEdge, Color huntColour, float huntGlow,
+            out Vector4 dark, out Vector4 shape, out Vector4 red, out Vector4 grade)
+        {
+            float eps = FeedbackTuning.MarkMoodOffEpsilon;
+            bool victimOff = weights.x < eps && weights.y < eps && weights.z < eps;
+            if (victimOff && (huntEdge >= eps || huntGlow >= eps))
+            {
+                var dim = FeedbackTuning.MarkMoodDimColour;
+                dark = new Vector4(dim.r, dim.g, dim.b, 1f);
+                float huntSpan = Mathf.Max(1e-4f, FeedbackTuning.MarkMoodVignetteOuter - FeedbackTuning.MarkHuntMoodVignetteInner);
+                shape = new Vector4(0f, Clamp01(huntEdge) * FeedbackTuning.MarkHuntMoodEdge, FeedbackTuning.MarkHuntMoodVignetteInner, 1f / huntSpan);
+                red = new Vector4(huntColour.r, huntColour.g, huntColour.b, Clamp01(huntGlow));
+                grade = new Vector4(0f, FeedbackTuning.MarkHuntMoodGlowCentreShare, 0f, 0f);
+                return;
+            }
+            VictimUniforms(weights, out dark, out shape, out red, out grade);
+        }
+
+        private static void VictimUniforms(Vector3 weights, out Vector4 dark, out Vector4 shape, out Vector4 red, out Vector4 grade)
         {
             float dim = Clamp01(weights.x), cold = Clamp01(weights.y), redW = Clamp01(weights.z);
 

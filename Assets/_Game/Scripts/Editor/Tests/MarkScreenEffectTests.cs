@@ -324,5 +324,184 @@ namespace CluckWars.Tests
                 sum += Mathf.Abs(a[i].r - b[i].r) + Mathf.Abs(a[i].g - b[i].g) + Mathf.Abs(a[i].b - b[i].b);
             return (float)(sum / (3.0 * a.Length));
         }
+
+        // ---- The hunter's screen edge (K10) ---------------------------------------------------------------------------
+
+        [Test]
+        public void SetHunt_ClampsAndIsNaNSafe_PassesTheColourThrough()
+        {
+            var c = new Color(0.2f, 0.4f, 0.6f, 1f);
+            MarkScreenEffect.SetHunt(-0.5f, c, 1.7f);
+            Assert.AreEqual((0f, 1f, c), MarkScreenEffect.HuntCurrent);
+            MarkScreenEffect.SetHunt(float.NaN, c, float.NaN);
+            Assert.AreEqual((0f, 0f, c), MarkScreenEffect.HuntCurrent, "NaN reads as off, never stuck");
+            MarkScreenEffect.SetHunt(2f, c, 0.3f);
+            Assert.AreEqual((1f, 0.3f, c), MarkScreenEffect.HuntCurrent);
+        }
+
+        [Test]
+        public void Clear_ZeroesTheHuntMoodToo_AndTurnsThePassOff()
+        {
+            MarkScreenEffect.SetHunt(1f, Color.yellow, 0.4f);
+            Assert.AreEqual(MarkScreenPass.Overlay, MarkScreenEffect.ActivePass);
+            MarkScreenEffect.Clear();
+            Assert.AreEqual((0f, 0f, Color.clear), MarkScreenEffect.HuntCurrent);
+            Assert.AreEqual(MarkScreenPass.None, MarkScreenEffect.ActivePass);
+        }
+
+        [Test]
+        public void HuntMood_AloneIsAlwaysTheOverlay_NeverGraded_AndNoneUnderEpsilon()
+        {
+            float eps = FeedbackTuning.MarkMoodOffEpsilon;
+            Assert.AreEqual(MarkScreenPass.Overlay, MarkScreenEffect.PassFor(Vector3.zero, 1f, 0f), "dark edge only");
+            Assert.AreEqual(MarkScreenPass.Overlay, MarkScreenEffect.PassFor(Vector3.zero, 0f, FeedbackTuning.MarkHuntMoodGlowPounce), "glow only");
+            Assert.AreEqual(MarkScreenPass.Overlay, MarkScreenEffect.PassFor(Vector3.zero, 1f, FeedbackTuning.MarkHuntMoodGlowBlocked));
+            Assert.AreEqual(MarkScreenPass.None, MarkScreenEffect.PassFor(Vector3.zero, eps * 0.5f, eps * 0.5f), "faded out costs nothing");
+            Assert.AreEqual(MarkScreenPass.Graded, MarkScreenEffect.PassFor(new Vector3(0f, 1f, 0f), 1f, 0.3f), "the victim's cold still grades");
+            MarkScreenEffect.SetHunt(1f, Color.yellow, 0.3f);
+            Assert.AreEqual(MarkScreenPass.Overlay, MarkScreenEffect.ActivePass);
+        }
+
+        [Test]
+        public void HuntUniforms_CentreUntouched_EdgeAndGlowFromTheTuning_ColourPassedThrough()
+        {
+            var colour = FeedbackTuning.MarkKillColor;
+            MarkScreenEffect.Uniforms(Vector3.zero, 1f, colour, FeedbackTuning.MarkHuntMoodGlowPounce, out var dark, out var shape, out var red, out var grade);
+            Assert.AreEqual(0f, shape.x, "no darkness at the centre");
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodEdge, shape.y, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodVignetteInner, shape.z, 1e-5f);
+            Assert.AreEqual(1f / (FeedbackTuning.MarkMoodVignetteOuter - FeedbackTuning.MarkHuntMoodVignetteInner), shape.w, 1e-4f);
+            Assert.AreEqual(FeedbackTuning.MarkMoodDimColour.r, dark.x, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.MarkMoodDimColour.g, dark.y, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.MarkMoodDimColour.b, dark.z, 1e-5f);
+            Assert.AreEqual(colour.r, red.x, 1e-5f); Assert.AreEqual(colour.g, red.y, 1e-5f); Assert.AreEqual(colour.b, red.z, 1e-5f);
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowPounce, red.w, 1e-5f);
+            Assert.AreEqual(0f, grade.x, "never desaturated");
+            Assert.AreEqual(FeedbackTuning.MarkHuntMoodGlowCentreShare, grade.y, 1e-5f);
+
+            MarkScreenEffect.Uniforms(Vector3.zero, 0.5f, colour, 0f, out _, out var half, out var none, out _);
+            Assert.AreEqual(0.5f * FeedbackTuning.MarkHuntMoodEdge, half.y, 1e-5f, "edge scales with its weight");
+            Assert.AreEqual(0f, none.w, "no glow, no tint");
+        }
+
+        [Test]
+        public void Uniforms_VictimOnlyIsUnchanged_AndTheVictimWinsWhenBothAreSet()
+        {
+            var w = new Vector3(1f, 0.5f, 1f);
+            MarkScreenEffect.Uniforms(w, out var d0, out var s0, out var r0, out var g0);
+            MarkScreenEffect.Uniforms(w, 0f, Color.clear, 0f, out var d1, out var s1, out var r1, out var g1);
+            Assert.AreEqual((d0, s0, r0, g0), (d1, s1, r1, g1), "no hunt mood: the same four vectors");
+            MarkScreenEffect.Uniforms(w, 1f, Color.yellow, 0.4f, out var d2, out var s2, out var r2, out var g2);
+            Assert.AreEqual((d0, s0, r0, g0), (d2, s2, r2, g2), "both set: the victim's mood is drawn");
+        }
+
+        [TestCase("PC")]
+        [TestCase("Mobile")]
+        public void RealRender_HuntEdge_DarkensAndTintsTheCornersAndLeavesTheCentre(string tier)
+        {
+            ShaderUtil.allowAsyncCompilation = false;
+            int level = Array.IndexOf(QualitySettings.names, tier);
+            Assert.GreaterOrEqual(level, 0, $"no '{tier}' quality level");
+            EditorSceneManager.OpenScene(GameScene, OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Additive);
+            SceneManager.SetActiveScene(SceneManager.GetSceneByPath(GameScene));
+            QualitySettings.SetQualityLevel(level, true);
+            var rp = GraphicsSettings.currentRenderPipeline;
+            Assert.IsNotNull(rp, tier);
+
+            var matchCam = UnityEngine.Object.FindFirstObjectByType<MatchCamera>(FindObjectsInactive.Include);
+            Assert.IsNotNull(matchCam, "Game.unity has no MatchCamera");
+            var mc = new SerializedObject(matchCam);
+            float pitch = mc.FindProperty("_pitch").floatValue, distance = mc.FindProperty("_distance").floatValue;
+
+            var camGo = new GameObject("__HuntMoodTestCam");
+            RenderTexture rt = null;
+            try
+            {
+                var cam = camGo.AddComponent<Camera>();
+                cam.enabled = false;
+                var data = camGo.AddComponent<UniversalAdditionalCameraData>();
+                data.renderPostProcessing = RenderTierPolicy.PostProcessingFor(rp);
+                cam.orthographic = true;
+                cam.orthographicSize = mc.FindProperty("_orthoSize").floatValue;
+                cam.nearClipPlane = mc.FindProperty("_nearClipPlane").floatValue;
+                cam.farClipPlane = 1000f;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = mc.FindProperty("_backgroundColor").colorValue;
+                var rot = Quaternion.Euler(pitch, 225f, 0f);
+                cam.transform.SetPositionAndRotation(-(rot * Vector3.forward) * distance, rot);
+
+                int msaa = 1;
+                var msaaProp = rp.GetType().GetProperty("msaaSampleCount");
+                if (msaaProp != null) msaa = Mathf.Max(1, Convert.ToInt32(msaaProp.GetValue(rp)));
+                rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = msaa };
+
+                MarkScreenEffect.RenderOutsidePlayMode = true;
+                var off = RenderHunt(cam, rt, 0f, Color.clear, 0f);
+                var dark = RenderHunt(cam, rt, 1f, Color.clear, 0f);
+                var yellow = RenderHunt(cam, rt, 1f, FeedbackTuning.MarkKillColor, FeedbackTuning.MarkHuntMoodGlowPounce);
+                var red = RenderHunt(cam, rt, 1f, FeedbackTuning.MarkHuntBlockedColor, FeedbackTuning.MarkHuntMoodGlowBlocked);
+
+                var centre = new RectInt(W * 2 / 5, H * 2 / 5, W / 5, H / 5);
+                Vector3 offE = Corners(off), darkE = Corners(dark), yellowE = Corners(yellow), redE = Corners(red);
+                string ctx = $"[{tier}] corners off{offE} dark{darkE} yellow{yellowE} red{redE}";
+                TestContext.WriteLine(ctx);
+                Assert.Greater(Lum(Mean(off, centre)), 20f, "scene too dark to judge " + ctx);
+
+                // The centre stays within the frame-to-frame noise of the untinted render, for every state.
+                foreach (var (label, px) in new[] { ("dark", dark), ("yellow", yellow), ("red", red) })
+                    Assert.Less(RectDiff(off, px, centre), 0.5f, $"{label}: the centre must stay untouched {ctx}");
+
+                // Dark edge: the corners darken by a clear share of the tuned edge alpha, nothing desaturated at the centre.
+                Assert.Less(Lum(darkE), Lum(offE) * (1f - 0.5f * FeedbackTuning.MarkHuntMoodEdge), "dark edge must darken the corners " + ctx);
+
+                // Glow: the corners move toward the glow's colour (the distance to it shrinks by a share of the tuned alpha).
+                var kill = FeedbackTuning.MarkKillColor; var block = FeedbackTuning.MarkHuntBlockedColor;
+                Assert.Less(Dist(yellowE, kill), Dist(darkE, kill) * (1f - 0.5f * FeedbackTuning.MarkHuntMoodGlowPounce), "yellow glow missing " + ctx);
+                Assert.Less(Dist(redE, block), Dist(darkE, block) * (1f - 0.5f * FeedbackTuning.MarkHuntMoodGlowBlocked), "red glow missing " + ctx);
+            }
+            finally
+            {
+                MarkScreenEffect.Clear();
+                MarkScreenEffect.RenderOutsidePlayMode = false;
+                if (rt != null) { rt.Release(); UnityEngine.Object.DestroyImmediate(rt); }
+                UnityEngine.Object.DestroyImmediate(camGo);
+            }
+        }
+
+        private static Color32[] RenderHunt(Camera cam, RenderTexture rt, float edge, Color colour, float glow)
+        {
+            MarkScreenEffect.Clear();
+            MarkScreenEffect.SetHunt(edge, colour, glow);
+            cam.targetTexture = rt;
+            cam.Render();
+            cam.targetTexture = null;
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var t = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+            t.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            t.Apply();
+            RenderTexture.active = prev;
+            var px = t.GetPixels32();
+            UnityEngine.Object.DestroyImmediate(t);
+            return px;
+        }
+
+        /// <summary>Mean absolute per-channel difference of two frames inside a rectangle.</summary>
+        private static float RectDiff(Color32[] a, Color32[] b, RectInt r)
+        {
+            double sum = 0; int n = 0;
+            for (int y = r.yMin; y < r.yMax; y++)
+            for (int x = r.xMin; x < r.xMax; x++)
+            {
+                int i = y * W + x;
+                sum += Mathf.Abs(a[i].r - b[i].r) + Mathf.Abs(a[i].g - b[i].g) + Mathf.Abs(a[i].b - b[i].b);
+                n += 3;
+            }
+            return (float)(sum / n);
+        }
+
+        /// <summary>Distance between a mean pixel (0..255) and a colour (0..1), in 0..255 units.</summary>
+        private static float Dist(Vector3 px, Color c) => (px - new Vector3(c.r, c.g, c.b) * 255f).magnitude;
     }
 }

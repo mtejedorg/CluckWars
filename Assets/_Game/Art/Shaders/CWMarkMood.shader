@@ -1,4 +1,4 @@
-// Cluck Wars — Death Mark victim's screen mood. Full-screen triangle drawn by CluckWars.Visuals.MarkScreenFeature
+// Cluck Wars — Death Mark screen mood (the victim's, and the hunter's edge tint through the same uniforms). Full-screen triangle drawn by CluckWars.Visuals.MarkScreenFeature
 // (PC_Renderer and Mobile_Renderer) on the base game camera, before post-processing, so every HUD layer draws on top.
 // Pass 0 "Overlay": blend only (no colour read). Premultiplied (dark vignette + faint red) over the scene; destination
 //   alpha kept. Used whenever cold01 is ~0 — costs one blended full-screen triangle, merges into the native render pass.
@@ -22,7 +22,8 @@ Shader "Cluck Wars/Mark Mood"
         float4 _CW_MarkDark;
         // x = darkness alpha at the centre, y = at the corners, z = vignette inner radius, w = 1 / (outer - inner).
         float4 _CW_MarkShape;
-        // rgb = red tint colour, w = red alpha at the corners (red01 * amount).
+        // rgb = tint colour, w = tint alpha at the corners. The victim's red (red01 * amount), or the hunter's edge glow
+// (the brackets' red or yellow, its own alpha); the hunter's edge uses only the shape.y darkness and this slot.
         float4 _CW_MarkRed;
         // x = desaturation amount (cold01 * desaturation), y = red centre share.
         float4 _CW_MarkGrade;

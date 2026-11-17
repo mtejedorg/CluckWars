@@ -172,12 +172,23 @@ namespace CluckWars.Visuals
         public float HunterBadgeAlpha;
         public bool ForceShowHunter;
 
+        // Hunt screen edge (Assassin only; every other role keeps all four at their defaults).
+        /// <summary>Which state the hunter's screen edge is in (kept through the end fade, None once clean).</summary>
+        public HuntScreenTint HuntTint;
+        /// <summary>Weight of the dark edge (0 to 1, already faded).</summary>
+        public float HuntEdge;
+        /// <summary>Alpha of the red / yellow glow at the corners (already faded; 0 to <see cref="FeedbackTuning.MarkHuntMoodGlowPounce"/>).</summary>
+        public float HuntGlow;
+        /// <summary>The glow's colour, crossing to the state colour over <see cref="FeedbackTuning.MarkHuntMoodGlowFadeSeconds"/>.</summary>
+        public Color HuntGlowColour;
+
         public MarkEvents Events;
 
         /// <summary>Nothing shown at all.</summary>
         public bool IsClean =>
             Role == MarkRole.None && !AssassinMarkActive && !Armed && !SkullLive && MarkerAlpha == 0f && SkullAlpha == 0f && DrawAlpha == 0f &&
             !AmbushLit && !KillHex && ToastAlpha == 0f && ClockAlpha == 0f && Dim == 0f && Cold == 0f && Red == 0f &&
+            HuntTint == HuntScreenTint.None && HuntEdge == 0f && HuntGlow == 0f &&
             HunterBadgeAlpha == 0f && !ForceShowHunter && Events == MarkEvents.None && !EndHolding && EndCause == MarkEndCause.None;
     }
 
@@ -331,6 +342,8 @@ namespace CluckWars.Visuals
         private bool _toastDone;
         private float _toastT = -1f;      // < 0: not started
         private float _dim, _cold, _red;
+        private float _huntEdge, _huntGlow;   // the Assassin's screen edge: dark weight, glow alpha
+        private Color _huntGlowColour;
         private bool _coldOn;
         private float _beyondExit;        // seconds continuously beyond the exit radius
         private int _clockSeconds;
@@ -491,6 +504,8 @@ namespace CluckWars.Visuals
             _toastDone = false;
             _toastT = -1f;
             _dim = _cold = _red = 0f;
+            _huntEdge = _huntGlow = 0f;
+            _huntGlowColour = Color.clear;
             _coldOn = false;
             _beyondExit = 0f;
             _clockSeconds = 0;
@@ -621,6 +636,7 @@ namespace CluckWars.Visuals
             o.KillRange = input.KillRange;
             o.Blocker = HuntRules.BlockerFor(o.Armed, input.CanKillNow, input.TargetShelled, input.Walled, input.Distance, input.KillRange, input.TargetStunned);
             o.Remaining = input.Remaining;
+            StepHuntEdge(input, dt, ref o);
             _lastHunt = new HuntLastFrame
             {
                 Role = MarkRole.Assassin, Armed = o.Armed, CanKill = input.CanKillNow, Shelled = input.TargetShelled,
@@ -638,6 +654,32 @@ namespace CluckWars.Visuals
                 _sinceKillSting = 0f;
             }
             _prevCanKill = input.CanKillNow;
+        }
+
+        /// <summary>The hunter's screen edge: the dark edge fades in from the lock on and stays; the glow fades in and out with the
+        /// red / yellow state and its colour crosses over the same time. A glow that starts from nothing takes its colour at once,
+        /// so a new hunt never starts from the last one's.</summary>
+        private void StepHuntEdge(in MarkInputs input, float dt, ref MarkOutputs o)
+        {
+            var tint = HuntRules.ScreenTintFor(_locked, o.Armed, input.CanKillNow);
+            float amount = tint == HuntScreenTint.Blocked ? FeedbackTuning.MarkHuntMoodGlowBlocked
+                         : tint == HuntScreenTint.Pounce ? FeedbackTuning.MarkHuntMoodGlowPounce : 0f;
+            float fade = FeedbackTuning.MarkHuntMoodGlowFadeSeconds;
+
+            if (_locked) _huntEdge = Approach(_huntEdge, 1f, dt, FeedbackTuning.MarkDimFadeInSeconds);
+            if (amount > 0f)
+            {
+                var want = HuntRules.ScreenTintColour(tint, _targetCorner);
+                _huntGlowColour = _huntGlow <= 0f || fade <= 0f ? want : ApproachColour(_huntGlowColour, want, dt, fade);
+            }
+            // The alpha range is the larger glow amount, so any change completes within the fade time.
+            float range = Mathf.Max(FeedbackTuning.MarkHuntMoodGlowBlocked, FeedbackTuning.MarkHuntMoodGlowPounce);
+            _huntGlow = Approach(_huntGlow, amount, dt, fade, range);
+
+            o.HuntTint = tint;
+            o.HuntEdge = _huntEdge;
+            o.HuntGlow = _huntGlow;
+            o.HuntGlowColour = _huntGlowColour;
         }
 
         // ---- Victim ------------------------------------------------------------------------------------------------
@@ -742,14 +784,24 @@ namespace CluckWars.Visuals
             o.Dim = last.Dim * f;
             o.Cold = last.Cold * f;
             o.Red = last.Red * f;
+            o.HuntTint = last.HuntTint;
+            o.HuntEdge = last.HuntEdge * f;
+            o.HuntGlow = last.HuntGlow * f;
+            o.HuntGlowColour = last.HuntGlowColour;
             o.HunterBadgeAlpha = last.HunterBadgeAlpha * f;
         }
 
-        private static float Approach(float v, float target, float dt, float seconds)
+        /// <summary>Moves <paramref name="v"/> toward <paramref name="target"/> by <paramref name="range"/> every <paramref name="seconds"/>.</summary>
+        private static float Approach(float v, float target, float dt, float seconds, float range = 1f)
         {
             if (seconds <= 0f) return target;
-            return Mathf.MoveTowards(v, target, dt / seconds);
+            return Mathf.MoveTowards(v, target, dt / seconds * range);
         }
+
+        /// <summary>Each channel moves toward the target at one full range per <paramref name="seconds"/>, so a crossing takes at most that long.</summary>
+        private static Color ApproachColour(Color c, Color target, float dt, float seconds) =>
+            new Color(Approach(c.r, target.r, dt, seconds), Approach(c.g, target.g, dt, seconds),
+                      Approach(c.b, target.b, dt, seconds), Approach(c.a, target.a, dt, seconds));
     }
 
     /// <summary>The Death Mark hex's KILL size, pure: a pop from <see cref="FeedbackTuning.MarkHexKillPopFrom"/> settling to

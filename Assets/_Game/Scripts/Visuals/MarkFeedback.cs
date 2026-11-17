@@ -151,6 +151,7 @@ namespace CluckWars.Visuals
             var o = _model.Step(Gather(), Time.unscaledDeltaTime);
             if (o.Role == MarkRole.None) _target = _hunter = _localHunter = null;
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
+            MarkScreenEffect.SetHunt(o.HuntEdge, o.HuntGlowColour, o.HuntGlow);
             DriveBrackets(in o);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if ((o.Events & MarkEvents.Ended) != 0 && _localHunter != null) SpawnEndWord(o.EndCause);

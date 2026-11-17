@@ -123,5 +123,32 @@ namespace CluckWars.Tests
             Assert.AreEqual(FeedbackTuning.MarkHuntBlockedColor, HuntRules.BracketColour(true, false, 2));
             Assert.AreEqual(FeedbackTuning.MarkSkullLiveColor, FeedbackTuning.MarkHuntBlockedColor, "one red");
         }
+
+        // ---- The hunter's screen edge (K10) ---------------------------------------------------------------------------
+
+        [Test]
+        public void ScreenTint_NothingUntilTheDrawLocks_ThenDarkWhileArming_ThenRedOrYellow()
+        {
+            foreach (bool armed in new[] { false, true })
+            foreach (bool canKill in new[] { false, true })
+                Assert.AreEqual(HuntScreenTint.None, HuntRules.ScreenTintFor(false, armed, canKill), $"draw running armed={armed} canKill={canKill}");
+            Assert.AreEqual(HuntScreenTint.Arming, HuntRules.ScreenTintFor(true, false, false));
+            Assert.AreEqual(HuntScreenTint.Arming, HuntRules.ScreenTintFor(true, false, true), "arming wins over a stray canKill");
+            Assert.AreEqual(HuntScreenTint.Blocked, HuntRules.ScreenTintFor(true, true, false));
+            Assert.AreEqual(HuntScreenTint.Pounce, HuntRules.ScreenTintFor(true, true, true));
+        }
+
+        [Test]
+        public void ScreenTintColour_BlockedAndPounceAreTheBracketsOwn_OthersDrawNoGlow()
+        {
+            for (int corner = 0; corner < 4; corner++)
+            {
+                Assert.AreEqual(HuntRules.BracketColour(true, false, corner), HuntRules.ScreenTintColour(HuntScreenTint.Blocked, corner));
+                Assert.AreEqual(HuntRules.BracketColour(true, true, corner), HuntRules.ScreenTintColour(HuntScreenTint.Pounce, corner));
+                Assert.AreEqual(UnityEngine.Color.clear, HuntRules.ScreenTintColour(HuntScreenTint.None, corner));
+                Assert.AreEqual(UnityEngine.Color.clear, HuntRules.ScreenTintColour(HuntScreenTint.Arming, corner), "arming is the dark edge only");
+            }
+            Assert.AreNotEqual(HuntRules.ScreenTintColour(HuntScreenTint.Blocked, 0), HuntRules.ScreenTintColour(HuntScreenTint.Pounce, 0));
+        }
     }
 }

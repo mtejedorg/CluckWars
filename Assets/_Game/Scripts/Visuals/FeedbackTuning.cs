@@ -941,6 +941,24 @@ namespace CluckWars.Visuals
         /// cold under it and the cheap blend-only pass is used instead of the colour-reading one.</summary>
         public const float MarkMoodOffEpsilon = 1f / 255f;
 
+        // ---- Hunt screen edge (the hunter's side of the Death Mark screen mood) ---------------------------------------
+        // The local Assassin's edge-only tint, drawn by the same pass as the victim's mood: the centre of the screen is
+        // untouched and nothing is desaturated. Dark while the mark arms, then the brackets' red or yellow (HuntRules).
+
+        /// <summary>Dark edge: darkness alpha at the corners at full weight (the victim's DIM edge is 0.66; the hunter must still see).</summary>
+        public const float MarkHuntMoodEdge = 0.40f;
+        /// <summary>Dark edge and glow: the ramp starts this far out (fraction of the centre-to-corner distance), further than the
+        /// victim's <see cref="MarkMoodVignetteInner"/> so the play area stays clean; it ends at <see cref="MarkMoodVignetteOuter"/>.</summary>
+        public const float MarkHuntMoodVignetteInner = 0.45f;
+        /// <summary>Glow alpha at the corners while the pounce is blocked (red).</summary>
+        public const float MarkHuntMoodGlowBlocked = 0.30f;
+        /// <summary>Glow alpha at the corners while the pounce is legal (yellow).</summary>
+        public const float MarkHuntMoodGlowPounce = 0.40f;
+        /// <summary>Seconds for the glow to fade in or out and for its colour to cross from red to yellow (the live window is one second).</summary>
+        public const float MarkHuntMoodGlowFadeSeconds = 0.1f;
+        /// <summary>Glow alpha at the screen centre as a share of its corner alpha: 0 keeps the centre untouched.</summary>
+        public const float MarkHuntMoodGlowCentreShare = 0f;
+
         /// <summary>
         /// Chevron size as a fraction of the viewport's height. A fraction rather than a
         /// world-space length on purpose: it makes the chevron a constant share of the

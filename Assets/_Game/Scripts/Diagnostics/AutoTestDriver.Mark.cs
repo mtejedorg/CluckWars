@@ -82,7 +82,7 @@ namespace CluckWars.Diagnostics
             var o = MarkFeedback.Current;
             if (_markRound >= 2 && !_shotRound2 && now - _roundGoAt >= 2f)
             {
-                _log.Info(Source, $"AutoTest markshots playagain-clean: presentation clean={o.IsClean}, screen mood={MarkScreenEffect.Current}");
+                _log.Info(Source, $"AutoTest markshots playagain-clean: presentation clean={o.IsClean}, screen mood={MarkScreenEffect.Current}, hunt mood={MarkScreenEffect.HuntCurrent}");
                 Capture(ref _shotRound2, "playagain-clean");
             }
 
@@ -119,7 +119,7 @@ namespace CluckWars.Diagnostics
                 else if (_lastMarkRole == MarkRole.Victim && !_shotVicEnd)
                 {
                     _log.Info(Source, $"AutoTest markshots victim-end: role now={o.Role} (ThirdParty = another mark, its skull only), " +
-                        $"victim outputs clean={o.ToastAlpha == 0f && o.ClockAlpha == 0f && o.HunterBadgeAlpha == 0f}, screen mood={MarkScreenEffect.Current}");
+                        $"victim outputs clean={o.ToastAlpha == 0f && o.ClockAlpha == 0f && o.HunterBadgeAlpha == 0f}, screen mood={MarkScreenEffect.Current}, hunt mood={MarkScreenEffect.HuntCurrent}");
                     Capture(ref _shotVicEnd, "victim-end");
                 }
                 _markEndedAt = -1f;
@@ -152,7 +152,8 @@ namespace CluckWars.Diagnostics
             string state = Inv($"mode={o.MarkerMode} kill={o.KillHex} lit={o.AmbushLit} ready={exec.KillReady} canKill={exec.CanKillNow} ") +
                            Inv($"stunned={target.CurrentControlState == ControlState.Stunned} selfCast={ControlRules.CanCast(self.CurrentControlState)} ") +
                            Inv($"walled={PlayerBase.WallBetween(self.transform.position, target.transform.position)} offscreen={MarkHudController.MarkerOffScreenNow} ") +
-                           Inv($"anchor={MarkHudController.AnchorNow} blocker={o.Blocker} brackets={HuntBrackets.StateNow}");
+                           Inv($"anchor={MarkHudController.AnchorNow} blocker={o.Blocker} brackets={HuntBrackets.StateNow} ") +
+                           Inv($"tint={o.HuntTint} edge={o.HuntEdge:0.00} glow={o.HuntGlow:0.00}");
             if (state != _lastMarkState)
             {
                 _lastMarkState = state;

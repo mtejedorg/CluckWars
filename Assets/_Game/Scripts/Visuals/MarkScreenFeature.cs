@@ -9,7 +9,7 @@ using Zenject;
 namespace CluckWars.Visuals
 {
     /// <summary>
-    /// Draws the Death Mark victim's screen mood (<see cref="MarkScreenEffect"/>) with <c>CWMarkMood.shader</c>.
+    /// Draws the Death Mark's screen mood (the victim's, or the hunter's edge tint; <see cref="MarkScreenEffect"/>) with <c>CWMarkMood.shader</c>.
     /// Lives on BOTH <c>PC_Renderer.asset</c> and <c>Mobile_Renderer.asset</c>; needs no post-processing (Mobile has it off).
     /// </summary>
     /// <remarks>
@@ -70,7 +70,8 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            MarkScreenEffect.Uniforms(MarkScreenEffect.Current, out var dark, out var shape, out var red, out var grade);
+            var hunt = MarkScreenEffect.HuntCurrent;
+            MarkScreenEffect.Uniforms(MarkScreenEffect.Current, hunt.Edge, hunt.Colour, hunt.Glow, out var dark, out var shape, out var red, out var grade);
             _material.SetVector(DarkId, dark);
             _material.SetVector(ShapeId, shape);
             _material.SetVector(RedId, red);
