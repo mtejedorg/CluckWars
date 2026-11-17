@@ -851,11 +851,11 @@ namespace CluckWars.Visuals
         public const float MarkPointerBasePx = 45f;
         public const float MarkPointerTipBeyondRingPx = 27f;
         public const float MarkPointerInkPx = 4.5f;
-        /// <summary>Marker box (126 x 153 incl. pointer; 1.5x since K3, with MarkHud.uss) and placement: half-box, the clearance from the clear-viewport edge,
+        /// <summary>Marker box (144 wide like the MarkHud.uss box; 156 tall = half-box + ring radius + pointer tip, centre to tip 84; 1.5x since K3) and placement: half-box, the clearance from the clear-viewport edge,
         /// the gap above the anchor, the most the marker rises to clear the local "You" plate (inflated by the margin).</summary>
-        public const float MarkMarkerHalfPx = 63f;
-        public const float MarkMarkerBoxWidthPx = 126f;
-        public const float MarkMarkerBoxHeightPx = 153f;
+        public const float MarkMarkerHalfPx = 72f;
+        public const float MarkMarkerBoxWidthPx = 144f;
+        public const float MarkMarkerBoxHeightPx = 156f;
         public const float MarkMarkerEdgeClearancePx = 96f;
         /// <summary>Extra vertical clearance at the clear-viewport edge: a full four-row landscape board hangs ~34 px below the
         /// top information zone (accepted, HudControlZones), and the marker's pointer (84 px from its centre; the overhang is 1.5x the board's 34 since K3) must not tuck

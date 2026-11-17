@@ -212,8 +212,39 @@ namespace CluckWars.Tests
             Assert.LessOrEqual(wordWidth + 12f, content, "the word fits the content width with margin");
             float badgeBottom = HexPx(".cw-hex-badge", "top") + HexPx(".cw-hex-badge", "height");
             Assert.GreaterOrEqual(HexPx(".cw-hex-killtext", "top"), badgeBottom - 4f, "the word starts below the slot badge");
-            float tenthsInkTop = hexWidth - HexPx(".cw-hex--hunt .cw-hex-cdnum", "bottom") - HexPx(".cw-hex--hunt .cw-hex-cdnum", "height") + 6f;
-            Assert.LessOrEqual(HexPx(".cw-hex-killtext", "top") + HexPx(".cw-hex-killtext", "height"), tenthsInkTop, "the tenths do not touch the word");
+            const string killCount = ".cw-hud--pad .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum";
+            float tenthsTop = hexWidth - HexPx(killCount, "bottom") - HexPx(killCount, "height");
+            Assert.LessOrEqual(HexPx(".cw-hex-killtext", "top") + HexPx(".cw-hex-killtext", "height") + 4f, tenthsTop, "the tenths box starts clear below the word");
+            Assert.LessOrEqual(HexPx(killCount, "font-size"), HexPx(".cw-hex-cdnum", "font-size"), "in the kill state the tenths use the cooldown size");
+            Assert.Less(HexPx(killCount, "font-size"), HexPx(".cw-hex--hunt .cw-hex-cdnum", "font-size"), "arming and live-not-legal keep the bigger count");
+        }
+
+        [Test]
+        public void HexGlyph_FollowsTheMarkersBadge_WallAndEggWhileArming_StarAndChipOnlyLive()
+        {
+            Assert.AreEqual(HuntHexRules.GlyphLockClass, HuntHexRules.GlyphClassFor(MarkMarkerMode.Walled, HuntBlocker.None), "wall while arming");
+            Assert.AreEqual(HuntHexRules.GlyphEggClass, HuntHexRules.GlyphClassFor(MarkMarkerMode.Shelled, HuntBlocker.None), "egg while arming");
+            Assert.IsNull(HuntHexRules.GlyphClassFor(MarkMarkerMode.Hunt, HuntBlocker.None), "no star while arming");
+            Assert.AreEqual(HuntHexRules.GlyphStarClass, HuntHexRules.GlyphClassFor(MarkMarkerMode.Hunt, HuntBlocker.NotStunned));
+            Assert.AreEqual(HuntHexRules.GlyphFarClass, HuntHexRules.GlyphClassFor(MarkMarkerMode.Hunt, HuntBlocker.TooFar));
+            foreach (MarkMarkerMode mode in System.Enum.GetValues(typeof(MarkMarkerMode)))
+                foreach (HuntBlocker blocker in System.Enum.GetValues(typeof(HuntBlocker)))
+                {
+                    string cls = HuntHexRules.GlyphClassFor(mode, blocker);
+                    var badge = HuntRules.BadgeFor(mode, blocker);
+                    Assert.AreEqual(badge == MarkerBadge.Shell, cls == HuntHexRules.GlyphEggClass, $"{mode}/{blocker}");
+                    Assert.AreEqual(badge == MarkerBadge.Lock, cls == HuntHexRules.GlyphLockClass, $"{mode}/{blocker}");
+                    Assert.AreEqual(badge == MarkerBadge.Star, cls == HuntHexRules.GlyphStarClass, $"{mode}/{blocker}");
+                }
+            StringAssert.Contains("HuntHexRules.GlyphClassFor(_huntOut.MarkerMode, _huntOut.Blocker)", File.ReadAllText("Assets/_Game/Scripts/Input/TouchControlsController.Hud.cs"));
+        }
+
+        [Test]
+        public void FarChip_HasItsOwnRedBacking()
+        {
+            string uss = File.ReadAllText(Uss);
+            StringAssert.Contains("background-color: rgb(230, 10, 10);", Regex.Match(uss, @"\.cw-hex-huntfar\s*\{([^}]*)\}").Groups[1].Value);
+            Assert.GreaterOrEqual(HexPx(".cw-hex-huntfar", "font-size"), 28f);
         }
     }
 }

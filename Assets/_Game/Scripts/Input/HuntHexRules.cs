@@ -66,6 +66,19 @@ namespace CluckWars.Input
             }
         }
 
+        /// <summary>The hex glyph class, from the marker's own decision (<see cref="HuntRules.BadgeFor"/>): the egg and the wall show
+        /// from the lock on, arming included; the star and the red metres chip (too far) are live-second reasons only. Null = none.</summary>
+        public static string GlyphClassFor(MarkMarkerMode mode, HuntBlocker blocker)
+        {
+            switch (HuntRules.BadgeFor(mode, blocker))
+            {
+                case MarkerBadge.Shell: return GlyphEggClass;
+                case MarkerBadge.Lock: return GlyphLockClass;
+                case MarkerBadge.Star: return GlyphStarClass;
+                default: return blocker == HuntBlocker.TooFar ? GlyphFarClass : null;
+            }
+        }
+
         /// <summary>The label hand-over for this frame, from whether the hunt owns the label now and whether it should.</summary>
         public static HuntDigitStep DigitStep(bool owned, bool show)
         {

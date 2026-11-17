@@ -789,5 +789,12 @@
     top: auto; bottom: 20px; height: 46px;
     font-size: 51px;
 }
-/* POUNCE carries the tenths: the word (y 64..90) sits above the count. */
-.cw-hex--kill.cw-hex--hunt .cw-hex-cdnum { visibility: visible; }
+/* POUNCE carries the tenths: the word (y 64..90) sits above them, so in the kill state they drop to the 36 px cooldown size in the
+   cooldown band (y 98..138). Arming and live-not-legal keep the 51 px count. */
+.cw-hex--kill.cw-hex--hunt .cw-hex-cdnum,
+.cw-hud--desktop .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum,
+.cw-hud--pad .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum {
+    visibility: visible;
+    top: auto; bottom: 12px; height: 40px;
+    font-size: 36px;
+}

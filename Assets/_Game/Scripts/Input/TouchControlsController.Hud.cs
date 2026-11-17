@@ -264,7 +264,7 @@ namespace CluckWars.Input
                 refs.HuntDot.style.backgroundColor = PlayerPalette.ForCorner(_huntOut.TargetCorner);
             }
 
-            string glyph = HuntHexRules.GlyphClass(_huntOut.Blocker);
+            string glyph = HuntHexRules.GlyphClassFor(_huntOut.MarkerMode, _huntOut.Blocker);
             SetHuntGlyph(slot, glyph);
             // The marker's chip and this one share HuntRules.MetresKey / ChipText, so they never disagree.
             int metresKey = HuntRules.MetresKey(_huntOut.MarkerDistance);

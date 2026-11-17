@@ -93,10 +93,19 @@
 
 /* The metres chip, whenever a mark is shown: above the disc on screen; off screen on the inward vertical side (the controller
    moves it above when the bearing points down). Red when the target is beyond the kill range. It stays 34 px text (a label is
-   not scaled with the box): the 0.85 appear pop must keep it at or above the 28 px HUD floor. 120 px wide fits "999 m". */
+   not scaled with the box): the 0.85 appear pop must keep it at or above the 28 px HUD floor. An ink pill backs it so it reads on
+   grass and over a bird; it is centred on the box (left 72 + translate -50%) and "999 m" is ~134 px wide. */
 .cw-mark-distance {
-    position: absolute; left: 12px; top: 152px;
-    width: 120px; height: 42px;
+    position: absolute; left: 72px; top: 152px;
+    translate: -50% 0;
+    min-width: 64px; height: 42px;
+    padding-left: 14px; padding-right: 14px;
+    background-color: rgba(20, 10, 26, 0.88);
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgba(254, 245, 224, 0.4); border-right-color: rgba(254, 245, 224, 0.4);
+    border-top-color: rgba(254, 245, 224, 0.4); border-bottom-color: rgba(254, 245, 224, 0.4);
+    border-top-left-radius: 21px; border-top-right-radius: 21px;
+    border-bottom-left-radius: 21px; border-bottom-right-radius: 21px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px;
     color: rgb(254, 245, 224);

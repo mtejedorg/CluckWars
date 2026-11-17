@@ -266,8 +266,8 @@ namespace CluckWars.Tests
         public void AboveAndBelowBlocked_ItGoesToTheFreeSide()
         {
             // Under the band above, a hex cluster right under the feet. The plate ends above the side slots' 1.5x-tall boxes.
-            var hexes = new Rect(700f, 480f, 500f, 400f);
-            var s = Scene(new Rect(900f, 360f, 80f, 100f), plate: new Rect(820f, 300f, 240f, 40f), clearTop: 290f, avoid: hexes);
+            var hexes = new Rect(700f, 490f, 500f, 400f);
+            var s = Scene(new Rect(900f, 360f, 80f, 100f), plate: new Rect(820f, 290f, 240f, 40f), clearTop: 290f, avoid: hexes);
             Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, new Vector2(940f, 220f), out var c, out var slot));
             Assert.IsTrue(slot == MarkerPlacement.MarkerSlot.Left || slot == MarkerPlacement.MarkerSlot.Right);
             AssertClear(s, c, slot);

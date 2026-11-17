@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using CluckWars.Abilities;
 using CluckWars.Localization;
+using CluckWars.UI;
 using CluckWars.Visuals;
 using NUnit.Framework;
 using UnityEditor;
@@ -62,7 +63,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(box, Px("cw-mark-marker", "height"));
             Assert.AreEqual(box, Px("cw-mark-ring", "width"), "ring and pointer paint over the whole box");
             Assert.AreEqual(box, Px("cw-mark-pointer", "width"));
-            Assert.GreaterOrEqual(box, FeedbackTuning.MarkMarkerBoxWidthPx, "the placement box is not larger than the drawn one");
+            Assert.AreEqual(box, FeedbackTuning.MarkMarkerBoxWidthPx, 1e-4f, "the placement box is the drawn box (K3b: the old 84 vs 96 gap is gone)");
 
             float disc = Px("cw-mark-disc", "width");
             Assert.AreEqual((box - disc) * 0.5f, Px("cw-mark-disc", "left"), 1e-4f, "disc centred");
@@ -87,7 +88,8 @@ namespace CluckWars.Tests
             const float hudFloorPx = 28f;
             Assert.GreaterOrEqual(Px("cw-mark-distance", "font-size") * FeedbackTuning.MarkMarkerPopFrom, hudFloorPx);
             float box = Px("cw-mark-marker", "width");
-            Assert.AreEqual(box * 0.5f, Px("cw-mark-distance", "left") + Px("cw-mark-distance", "width") * 0.5f, 1e-4f, "chip centred on the box");
+            Assert.AreEqual(box * 0.5f, Px("cw-mark-distance", "left"), 1e-4f, "chip centred on the box (translate -50%)");
+            StringAssert.Contains("translate: -50%", Rule("cw-mark-distance"));
         }
 
         [Test]
@@ -162,5 +164,54 @@ namespace CluckWars.Tests
                     else Assert.AreEqual(MarkerBadge.None, got, $"{mode}/{b}");
                 }
         }
+
+        [Test]
+        public void Chip_HasAnInkPillBehindTheText()
+        {
+            string rule = Rule("cw-mark-distance");
+            var m = Regex.Match(rule, @"background-color:\s*rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\s*\)");
+            Assert.IsTrue(m.Success, "the chip has an rgba background");
+            Assert.GreaterOrEqual(float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture), 0.8f, "ink at high alpha");
+            Assert.Less(int.Parse(m.Groups[1].Value), 60, "dark");
+            Assert.GreaterOrEqual(Px("cw-mark-distance", "border-top-left-radius"), Px("cw-mark-distance", "height") * 0.5f, "a pill");
+            Assert.GreaterOrEqual(Px("cw-mark-distance", "font-size"), 34f, "the text keeps its size");
+        }
+
+        /// <summary>Everything drawn by a marker pinned at an edge (the 144 px box, the pointer's reach, the chip on its side) is inside the panel.</summary>
+        [TestCase(2133f, 960f)]
+        [TestCase(1920f, 1080f)]
+        [TestCase(960f, 2133f)]
+        [TestCase(1080f, 1920f)]
+        public void PinnedAtEveryEdge_BoxPointerAndChipStayOnThePanel(float w, float h)
+        {
+            var panel = new UnityEngine.Vector2(w, h);
+            float box = Px("cw-mark-marker", "width"), half = box * 0.5f;
+            float chipHalfW = 70f;   // "999 m" at 34 px + padding
+            float chipBelowTop = Px("cw-mark-distance", "top") - half, chipBelowH = Px("cw-mark-distance", "height");
+            float chipAboveTop = Rule("cw-mark-distance--above").Contains("top: -48px") ? -48f - half : float.NaN;
+            Assert.IsFalse(float.IsNaN(chipAboveTop), "the --above chip rule is where the test expects it");
+            float pointerReach = FeedbackTuning.MarkRingRadiusPx + FeedbackTuning.MarkPointerTipBeyondRingPx;
+
+            // The raw edge pins: centre on each edge (and in each corner) as the edge projection can hand it over, then clamped.
+            foreach (var raw in new[] {
+                new UnityEngine.Vector2(w * 0.5f, 0f), new UnityEngine.Vector2(w * 0.5f, h), new UnityEngine.Vector2(0f, h * 0.5f), new UnityEngine.Vector2(w, h * 0.5f),
+                new UnityEngine.Vector2(0f, 0f), new UnityEngine.Vector2(w, h), new UnityEngine.Vector2(0f, h), new UnityEngine.Vector2(w, 0f) })
+            {
+                var at = MarkerPlacement.ClampPin(raw, panel);
+                var bounds = new UnityEngine.Rect(0f, 0f, w, h);
+                Assert.IsTrue(Contains(bounds, at.x - half, at.y - half, at.x + half, at.y + half), $"box at {raw}");
+                Assert.IsTrue(Contains(bounds, at.x - pointerReach, at.y - pointerReach, at.x + pointerReach, at.y + pointerReach), $"pointer at {raw}");
+                foreach (var bearing in new[] { UnityEngine.Vector2.up, UnityEngine.Vector2.down, UnityEngine.Vector2.left, UnityEngine.Vector2.right })
+                {
+                    bool above = MarkerPlacement.DistanceGoesAbove(at.y, h, bearing);
+                    float top = at.y + (above ? chipAboveTop : chipBelowTop);
+                    Assert.IsTrue(Contains(bounds, at.x - chipHalfW, top, at.x + chipHalfW, top + chipBelowH), $"chip (above={above}) at {raw}, bearing {bearing}");
+                }
+            }
+            Assert.AreEqual(chipBelowTop + chipBelowH, MarkerPlacement.DistanceBelowExtentPx, 1e-4f, "the placement's below-extent constant matches the USS chip");
+        }
+
+        private static bool Contains(UnityEngine.Rect r, float x0, float y0, float x1, float y1) =>
+            x0 >= r.xMin - 1e-3f && x1 <= r.xMax + 1e-3f && y0 >= r.yMin - 1e-3f && y1 <= r.yMax + 1e-3f;
     }
 }

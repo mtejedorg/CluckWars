@@ -75,7 +75,7 @@ namespace CluckWars.UI
             if (tp != null && tp.TryGetPlateViewport(cam, out Rect tvp)) at = AvoidPlate(at, ToPanel(tvp, panel), 0f);
             // The clamp's edge band is a viewport fraction of the chevron's; the marker and its distance label are wider: keep
             // the whole of them on the panel.
-            at.x = Mathf.Clamp(at.x, c, panel.x - c);
+            at = ClampPin(at, panel);
             return true;
         }
 
@@ -161,6 +161,7 @@ namespace CluckWars.UI
         {
             var box = BoxFor(centre, slot);
             if (box.xMin < 0f || box.xMax > s.Panel.x || box.yMax > s.Panel.y || box.yMin < s.ClearTop) return false;
+            if (box.yMin - ChipAboveBoxPx < 0f) return false;   // the chip above the disc stays on the panel
             if (box.Overlaps(s.Body)) return false;
             if (s.HasPlate && box.Overlaps(s.TargetPlate)) return false;
             float m = FeedbackTuning.MarkMarkerYouPlateMarginPx;
@@ -230,8 +231,21 @@ namespace CluckWars.UI
             return at + direction * FeedbackTuning.MarkMarkerYouPlateMaxRisePx;
         }
 
-        /// <summary>The distance label's lowest extent below the marker centre (MarkHud.uss: 96 px box, label top 100, height 42).</summary>
-        public const float DistanceBelowExtentPx = 94f;
+        /// <summary>The distance chip's lowest extent below the marker centre (MarkHud.uss: 144 px box, chip top 152, height 42: 152 + 42 - 72).</summary>
+        public const float DistanceBelowExtentPx = 122f;
+
+        /// <summary>How far the chip's top, when it sits above the disc, rises over the marker box's top (MarkHud.uss: chip top -48).</summary>
+        public const float ChipAboveBoxPx = 48f;
+
+        /// <summary>Pure: a pinned marker's centre kept far enough from every panel edge for the whole drawn marker: the 144 px box, the
+        /// pointer that reaches 84 px from the centre toward the target, and the 120 px chip (the clearance is the larger of them). The
+        /// safe-area band the edge projection pins to was sized for the old, smaller marker and bounds only the chevron.</summary>
+        public static Vector2 ClampPin(Vector2 at, Vector2 panel)
+        {
+            float c = FeedbackTuning.MarkMarkerEdgeClearancePx;
+            float top = Mathf.Max(c, FeedbackTuning.MarkMarkerHalfPx + ChipAboveBoxPx);   // the chip may sit above the disc at the top edge
+            return new Vector2(Mathf.Clamp(at.x, c, Mathf.Max(c, panel.x - c)), Mathf.Clamp(at.y, top, Mathf.Max(top, panel.y - c)));
+        }
 
         /// <summary>The distance label goes above the disc when the target is below it (the inward side), and whenever the
         /// label under the disc would leave the panel. Pure.</summary>
