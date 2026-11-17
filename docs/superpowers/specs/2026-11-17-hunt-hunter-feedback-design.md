@@ -86,3 +86,26 @@ This replaces H5a and the off-screen half of H1a(b). The circle is the floor rin
 - Fallback only: if the floor ring cannot paint the arrow (pool full, the dev edge-arrow mode, no local bird), the mark rides the edge chevron or the edge pin as before, so a mark is never left with no sign.
 - This is the same pattern the victim already has (the hunter's arrow carries the skull while the hunter is beyond the inner circle).
 - Unchanged: the ground brackets under the target when it is in view (H1a(a)), the hex (H2a), the blocker glyphs (H3a), the end word (H4a), the buzzes (H8a).
+
+## 10. Owner revision, 2026-11-17 (evening): the hunter gets a screen tint too
+
+Maestro: "we are using screen tint colours for the victim, to easily differentiate states of the mark. We definitely should apply that to the hunter (equal or different)".
+
+Builder's call (mine unless Maestro overrides): **different shape, same colour language**.
+
+- The victim's mood is unchanged (dark vignette for the mark's life, violet and washed-out while the hunter is near, a faint red while the hunter is near and hidden). Its states are about where the hunter is, which means nothing to the hunter, and its darkness and desaturation would cost the hunter the view it needs to chase.
+- The hunter gets an **edge-only** tint: the centre of the screen stays untouched, nothing is desaturated, and the colour is the one the arrow, the brackets and the Hunt hex already use for that state.
+
+| Hunt state | Screen edge |
+|---|---|
+| The draw is still running (no target told yet) | nothing |
+| Arming (from the lock to live, 3 s) | dark edge (the victim's DIM colour, weaker): a hunt is running |
+| Live, the pounce blocked (not stunned, too far, wall, shell) | red edge (`MarkHuntBlockedColor`) |
+| The pounce is legal | yellow edge (`MarkKillColor`) |
+| The mark ended | fades out with the mark's end fade |
+
+- The red and yellow follow `HuntRules.BracketColour` for the armed states, so the edge, the brackets and the arrow can never disagree.
+- The live window is one second, so a colour change crosses in about 0.1 s; the dark edge fades in over the victim's DIM time.
+- No pulse and no flash: nothing to switch off under Reduced Motion.
+- Cost: the blend-only Overlay pass of the existing `MarkScreenFeature` (one full-screen triangle, no colour read) on PC and Mobile; no new renderer feature, no new shader, no post-processing needed.
+- One role at a time: the model's role decides which mood is drawn; a peer is never shown both.

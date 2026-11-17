@@ -294,3 +294,22 @@ Design §9. The old K5 (pinned marker plus an arrow from the hunter's bird) is v
   single-valued per frame); the arrow pool being full falls back to the edge.
 
 Order from here: K5r, K4 (brackets), K6, K7, K8 (new shots: `mark-outside-circle`, `mark-inside-circle`, `mark-end-word`), K9.
+
+## 6. Revision 2026-11-17 (owner, evening): K10, the hunter's screen edge tint
+
+Design §10. One item, after the batch was closed at `c1ffb0ab`.
+
+### K10 The hunter's screen edge follows the hunt state (senior-dev, S/M)
+- Pure rule in `Visuals/HuntRules.cs`: `enum HuntScreenTint { None, Arming, Blocked, Pounce }`,
+  `ScreenTintFor(locked, armed, canKill)` and `ScreenTintColour(tint)` (the armed colours come from `BracketColour`).
+- `MarkPresentationModel`: `MarkOutputs` += `HuntTint`, `HuntEdge`, `HuntGlow`, `HuntGlowColour`; faded in `StepAssassin`, scaled by the
+  end fade in `FillFrozen`, part of `IsClean`. The victim's `Dim / Cold / Red` stay zero for the Assassin and the hunt values stay zero
+  for every other role.
+- `MarkScreenEffect`: `SetHunt(edge01, glowColour, glow01)` beside `Set`; `Clear` zeroes both; the hunt mood never selects the Graded
+  pass; `Uniforms` fills the same four vectors (centre alpha 0, the glow colour in the shader's tint slot). `CWMarkMood.shader` keeps its
+  maths (comments only).
+- `FeedbackTuning`: a "Hunt screen edge" block (edge darkness, vignette inner, glow amounts, glow cross-fade seconds).
+- `MarkFeedback.Update` hands the outputs on; `AutoTestDriver.Mark.cs` logs `tint=` on the state line and in the clean checks.
+- Tests in the existing files: `HuntRulesTests`, `MarkPresentationModelTests`, `MarkScreenEffectTests` (incl. a real render per tier).
+- Captures: `mark-arming` (dark edge), `mark-hunt-*` live (red edge), `mark-kill` (yellow edge), `mark-end-word` (fading).
+- Rules: ARCH-EVT-01 (one model, one observer), CODE-ASSET-12 (tuning in `FeedbackTuning`), no `[Networked]` field, no RPC.
