@@ -38,7 +38,7 @@ namespace CluckWars.Diagnostics
         private bool _shotOutside, _shotInside, _shotEndWord, _endLogged;
         private MarkEndCause _markEndCause;
         private bool _shotVicMarked, _shotVicFar, _shotVicClose, _shotVicInvisible, _shotVicEnd, _shotRound2;
-        private bool _shotArming, _shotLive, _shotVicArming, _shotVicLive;
+        private bool _shotArming, _shotLive, _shotVicArming, _shotVicLive, _shotRedEdge;
         private float _markLockedAt = -1f, _markEndedAt = -1f;
         private MarkRole _lastMarkRole;
         private long _lastMarkHunter;
@@ -184,6 +184,9 @@ namespace CluckWars.Diagnostics
             // Where the marker rides (K5r): on the target's floor arrow outside the circle, over its head inside it.
             if (MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OnArrow && Settled("outside")) Capture(ref _shotOutside, "mark-outside-circle");
             if (MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OverHead && Settled("inside")) Capture(ref _shotInside, "mark-inside-circle");
+
+            // The hunter's screen edge (K10): the red edge of a live second whose pounce is blocked, at its full glow.
+            if (o.HuntTint == HuntScreenTint.Blocked && o.HuntGlow >= FeedbackTuning.MarkHuntMoodGlowBlocked) Capture(ref _shotRedEdge, "mark-live-blocked");
 
             bool firstPassDone = _shotOn && _shotAmbush && _shotKill;
             if (o.MarkerMode == MarkMarkerMode.Walled && Settled("walled")) Capture(ref _shotWalled, "mark-walled");
