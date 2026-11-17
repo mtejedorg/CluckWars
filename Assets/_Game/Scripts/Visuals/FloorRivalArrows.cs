@@ -421,7 +421,8 @@ namespace CluckWars.Visuals
             for (int i = 0; i < count; i++) anyEmphasised |= _emphasised[i];
             // The emphasised arrow is wider: it keeps the ring's separation from the others by the mean of the two widths.
             float minSep = FloorArrowRules.MinSeparationDegrees(_radius, anyEmphasised ? FeedbackTuning.MarkArrowScale : 1f);
-            FloorArrowRules.Spread(_bearings, _keys, count, minSep, _spread);
+            // K5r-c: the marked target's arrow keeps its true bearing; the others make room round it.
+            FloorArrowRules.Spread(_bearings, _keys, _emphasised, count, minSep, _spread);
             _paintedCount = count;
             for (int i = 0; i < _arrowRenderers.Length; i++)
             {

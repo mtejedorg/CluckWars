@@ -540,5 +540,67 @@ namespace CluckWars.Tests
             int decide = src.IndexOf("if (!chevron) _wasUnderHud = false;", System.StringComparison.Ordinal);
             Assert.That(offer, Is.GreaterThan(decide), "offered after the clear-viewport / under-HUD decision is final");
         }
+
+        // ---- K5r-c: the emphasised (marked) arrow keeps its true bearing ---------------------------------------------------
+
+        private static float[] SpreadPinned(float[] bearings, int[] keys, bool[] emphasised, float sep)
+        {
+            var result = new float[bearings.Length];
+            FloorArrowRules.Spread(bearings, keys, emphasised, bearings.Length, sep, result);
+            return result;
+        }
+
+        [Test]
+        public void SpreadPinned_AnOrdinaryArrowOnTheSameBearing_MovesAwayTheFullSeparation_TheMarkedOneStays()
+        {
+            float sep = FloorArrowRules.MinSeparationDegrees(4.48f, FeedbackTuning.MarkArrowScale);
+            var r = SpreadPinned(new[] { 40f, 40f }, new[] { 1, 2 }, new[] { false, true }, sep);
+            Assert.AreEqual(40f, r[1], 0f, "the marked arrow keeps its true bearing");
+            Assert.GreaterOrEqual(Mathf.Abs(Mathf.DeltaAngle(r[0], r[1])), sep - 1e-3f);
+            var r2 = SpreadPinned(new[] { 40f, 40f }, new[] { 2, 1 }, new[] { true, false }, sep);
+            Assert.AreEqual(40f, r2[0], 0f);
+            Assert.AreEqual(r[0], r2[1], 1e-3f);
+        }
+
+        [Test]
+        public void SpreadPinned_TwoOthersCrowdingTheMarkedOne_AllKeepTheSeparation()
+        {
+            float sep = 30f;
+            var r = SpreadPinned(new[] { 100f, 105f, 95f }, new[] { 5, 6, 7 }, new[] { true, false, false }, sep);
+            Assert.AreEqual(100f, r[0], 0f);
+            for (int i = 0; i < 3; i++)
+                for (int j = i + 1; j < 3; j++)
+                    Assert.GreaterOrEqual(Mathf.Abs(Mathf.DeltaAngle(r[i], r[j])), sep - 1e-3f, i + " vs " + j);
+        }
+
+        [Test]
+        public void SpreadPinned_AnArrowAlreadyClear_KeepsItsBearing_AndAcrossZero()
+        {
+            var r = SpreadPinned(new[] { 350f, 200f, 10f }, new[] { 1, 2, 3 }, new[] { true, false, false }, 20f);
+            Assert.AreEqual(350f, r[0], 0f);
+            Assert.AreEqual(200f, r[1], 0f);
+            Assert.GreaterOrEqual(Mathf.Abs(Mathf.DeltaAngle(r[2], r[0])), 20f - 1e-3f, "10 deg is 20 from 350: enough");
+        }
+
+        [Test]
+        public void SpreadPinned_NoEmphasisedArrow_IsExactlyTheOrdinarySpread()
+        {
+            var b = new[] { 40f, 44f, 300f };
+            var k = new[] { 7, 3, 5 };
+            var plain = Spread(b, k, 25f);
+            var pinned = SpreadPinned(b, k, new[] { false, false, false }, 25f);
+            for (int i = 0; i < 3; i++) Assert.AreEqual(plain[i], pinned[i], 0f);
+            var nullFlags = new float[3];
+            FloorArrowRules.Spread(b, k, null, 3, 25f, nullFlags);
+            for (int i = 0; i < 3; i++) Assert.AreEqual(plain[i], nullFlags[i], 0f);
+        }
+
+        [Test]
+        public void SpreadPinned_TwoEmphasisedArrows_LowestKeyIsPinned_TheOtherSpreadsLikeOrdinary()
+        {
+            var r = SpreadPinned(new[] { 80f, 80f }, new[] { 9, 4 }, new[] { true, true }, 30f);
+            Assert.AreEqual(80f, r[1], 0f);
+            Assert.GreaterOrEqual(Mathf.Abs(Mathf.DeltaAngle(r[0], r[1])), 30f - 1e-3f);
+        }
     }
 }

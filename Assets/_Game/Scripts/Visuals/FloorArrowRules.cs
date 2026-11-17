@@ -319,6 +319,64 @@ namespace CluckWars.Visuals
             }
         }
 
+        /// <summary>
+        /// K5r-c: <see cref="Spread"/> with a pinned arrow. The emphasised arrow (the local hunter's marked target, the one the hunter
+        /// follows) keeps its TRUE bearing bit-for-bit; every other arrow keeps at least <paramref name="minSepDeg"/> from it, and from
+        /// each other on the same side, by moving away from the pinned one (the side it already lies on; exactly on it, the first by
+        /// key goes to the positive side, the next to the other). An arrow that already clears them keeps its bearing. With no
+        /// emphasised arrow this is exactly <see cref="Spread"/>. There is one local mark at most; should two arrows ever be flagged,
+        /// the one with the lowest key (bearing breaks a tie) is the pinned one and the other is spread like an ordinary arrow.
+        /// Deterministic and order-independent, no allocation.
+        /// </summary>
+        public static void Spread(float[] bearings, int[] keys, bool[] emphasised, int count, float minSepDeg, float[] result)
+        {
+            int n = Mathf.Min(count, MaxArrows);
+            int pin = -1;
+            for (int i = 0; i < n; i++)
+            {
+                if (emphasised == null || !emphasised[i]) continue;
+                if (pin < 0 || Before(bearings, keys, i, pin)) pin = i;
+            }
+            if (pin < 0) { Spread(bearings, keys, count, minSepDeg, result); return; }
+
+            for (int i = 0; i < n; i++) result[i] = Normalise(bearings[i]);
+            float sep = Mathf.Clamp(minSepDeg, 0f, 59f);
+            if (n < 2 || sep <= 0f) return;
+
+            float p = result[pin];
+            float lastPositive = -1f, lastNegative = -1f;   // magnitude of the last arrow placed on each side, -1 none
+            int placed = 0, doneMask = 1 << pin;
+            // Nearest to the pinned bearing first (ties by key), so the inner arrow of a side is laid out before the outer one.
+            while (placed < n - 1)
+            {
+                int next = -1;
+                float nextMag = 0f;
+                for (int i = 0; i < n; i++)
+                {
+                    if ((doneMask & (1 << i)) != 0) continue;
+                    float d = Delta(result[i], p), mag = Mathf.Abs(d);
+                    if (next < 0 || mag < nextMag || (mag == nextMag && (keys != null ? keys[i] < keys[next] : i < next)))
+                    { next = i; nextMag = mag; }
+                }
+                doneMask |= 1 << next;
+                float delta = Delta(result[next], p);
+                bool positive = delta > 0f || (delta == 0f && lastPositive <= lastNegative);
+                float last = positive ? lastPositive : lastNegative;
+                float m = Mathf.Max(nextMag, sep);
+                if (last >= 0f) m = Mathf.Max(m, last + sep);
+                if (positive) lastPositive = m; else lastNegative = m;
+                result[next] = Normalise(p + (positive ? m : -m));
+                placed++;
+            }
+        }
+
+        /// <summary>Signed shortest angle from <paramref name="from"/> to <paramref name="to"/>, degrees in (-180, 180].</summary>
+        private static float Delta(float to, float from)
+        {
+            float d = Normalise(to - from);
+            return d > 180f ? d - 360f : d;
+        }
+
         /// <summary>Degrees into [0, 360).</summary>
         public static float Normalise(float deg)
         {

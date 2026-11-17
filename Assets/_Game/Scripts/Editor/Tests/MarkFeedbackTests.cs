@@ -368,6 +368,81 @@ namespace CluckWars.Tests
             Assert.IsFalse(MarkerPlacement.Box(moved).Overlaps(Inflate(plate)));
         }
 
+        // ---- K5r-c: the over-head marker never covers the hunter's own bird ------------------------------------------------
+
+        [TestCase(1200f, 540f, 0f, 100f)]    // hunter directly below the target (panel y is down), phone landscape
+        [TestCase(1200f, 540f, 0f, -100f)]   // above
+        [TestCase(1200f, 540f, -100f, 0f)]   // left
+        [TestCase(1200f, 540f, 100f, 0f)]    // right
+        [TestCase(540f, 1200f, 0f, 100f)]    // the same four in a portrait panel
+        [TestCase(540f, 1200f, 0f, -100f)]
+        [TestCase(540f, 1200f, -100f, 0f)]
+        [TestCase(540f, 1200f, 100f, 0f)]
+        public void TheMarker_NeverCoversTheHuntersOwnBird_OrItsYouPlate(float w, float h, float hx, float hy)
+        {
+            // The target 2.5 m from the hunter is ~100 px away: body 40x60, plate above it; the hunter likewise with a You plate.
+            var tc = new Vector2(w * 0.5f, h * 0.5f);
+            var body = new Rect(tc.x - 20f, tc.y - 30f, 40f, 60f);
+            var plate = new Rect(tc.x - 45f, body.yMin - 30f, 90f, 24f);
+            var hc = tc + new Vector2(hx, hy);
+            var hunter = new Rect(hc.x - 20f, hc.y - 30f, 40f, 60f);
+            var you = new Rect(hc.x - 45f, hunter.yMin - 30f, 90f, 24f);
+            var s = new MarkerPlacement.MarkerScene
+            {
+                Panel = new Vector2(w, h), Body = body, HasPlate = true, TargetPlate = plate,
+                HasYou = true, You = you, HasLocalBody = true, LocalBody = hunter,
+                Others = new System.Collections.Generic.List<Rect>(), ClearTop = 0f,
+                Avoid = new System.Collections.Generic.List<Rect>(),
+            };
+            float tip = FeedbackTuning.MarkMarkerBoxHeightPx - FeedbackTuning.MarkMarkerHalfPx;
+            var above = new Vector2(tc.x, plate.yMin - tip - FeedbackTuning.MarkMarkerAnchorGapPx);
+
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, above, out var c, out var slot), "a slot is found");
+            var box = MarkerPlacement.BoxFor(c, slot);
+            Assert.IsFalse(box.Overlaps(hunter), "never on the hunter's body: " + slot + " " + box);
+            Assert.IsFalse(box.Overlaps(Inflate(you)), "never on the hunter's You plate: " + slot + " " + box);
+            Assert.IsFalse(box.Overlaps(body), "never on the target's body");
+            Assert.GreaterOrEqual(box.xMin, 0f);
+            Assert.LessOrEqual(box.xMax, w);
+            Assert.GreaterOrEqual(box.yMin, MarkerPlacement.ChipAboveBoxPx, "the chip above the disc stays on the panel");
+            Assert.LessOrEqual(box.yMax, h);
+        }
+
+        [Test]
+        public void TheMarker_PrefersAbove_ThenTheSideAwayFromTheHunter()
+        {
+            var tc = new Vector2(960f, 540f);
+            var body = new Rect(tc.x - 20f, tc.y - 30f, 40f, 60f);
+            var plate = new Rect(tc.x - 20f, body.yMin - 30f, 40f, 24f);
+            float tip = FeedbackTuning.MarkMarkerBoxHeightPx - FeedbackTuning.MarkMarkerHalfPx;
+            var above = new Vector2(tc.x, plate.yMin - tip - FeedbackTuning.MarkMarkerAnchorGapPx);
+
+            // Hunter to the left, room above: above.
+            var s = Scene(body, plate: plate);
+            s.HasLocalBody = true;
+            s.LocalBody = new Rect(tc.x - 120f, tc.y - 30f, 40f, 60f);
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, above, out _, out var slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Above, slot);
+
+            // Above blocked by a HUD zone: the side away from the hunter (right of the target when the hunter is on its left).
+            var s2 = Scene(body, plate: plate, avoid: new Rect(0f, 0f, 1920f, 380f));
+            s2.HasLocalBody = true;
+            s2.LocalBody = s.LocalBody;
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s2, above, out _, out slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Right, slot);
+            s2.LocalBody = new Rect(tc.x + 80f, tc.y - 30f, 40f, 60f);
+            Assert.IsTrue(MarkerPlacement.TryPlaceAround(s2, above, out _, out slot));
+            Assert.AreEqual(MarkerPlacement.MarkerSlot.Left, slot);
+        }
+
+        [Test]
+        public void TheMarkerPlacement_SourceGuard_HunterBodyIsInTheScene()
+        {
+            string src = Read("Assets/_Game/Scripts/UI/MarkerPlacement.cs");
+            StringAssert.Contains("if (s.HasLocalBody && box.Overlaps(s.LocalBody)) return false;", src);
+            StringAssert.Contains("s.LocalBody = BodyRect(cam, panel, local, out bool shown);", src);
+        }
+
         private static Rect Inflate(Rect r)
         {
             float m = FeedbackTuning.MarkMarkerYouPlateMarginPx;

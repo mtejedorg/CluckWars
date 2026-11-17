@@ -7,7 +7,8 @@ namespace CluckWars.UI
 {
     /// <summary>
     /// Where the Death Mark hunt marker goes this frame, in panel px (y down). On screen (feet in frame): above the target's
-    /// plate, else below its feet pointing up, else beside it (<see cref="TryPlaceAround"/>), never on its body or any plate.
+    /// plate, else (hunter's bird on screen) the side away from it, else below its feet pointing up, else beside it, else slid outward
+    /// off the hunter (<see cref="TryPlaceAround"/>), never on the target's body, the hunter's own bird or any plate.
     /// Off screen, or every slot blocked: pinned to the clear-viewport edge by the rival chevron's own clamp
     /// (<see cref="ScreenEdgeProjection.TryProject(Camera, Vector3, Rect, System.Collections.Generic.IReadOnlyList{Rect}, System.Collections.Generic.IReadOnlyList{Rect}, Vector2, out Vector2, out Vector2)"/>,
     /// <see cref="HudControlZones"/>), pointing at it, with the distance.
@@ -92,6 +93,9 @@ namespace CluckWars.UI
             public Rect TargetPlate;
             public bool HasYou;
             public Rect You;
+            /// <summary>K5r-c: the hunter's own bird on screen (its body footprint); the marker never lands on it.</summary>
+            public bool HasLocalBody;
+            public Rect LocalBody;
             /// <summary>Other rivals' plates (third parties).</summary>
             public List<Rect> Others;
             /// <summary>The top of the clear area: below the top information band.</summary>
@@ -138,24 +142,80 @@ namespace CluckWars.UI
             var below = new Vector2(s.Body.center.x, s.Body.yMax + gap + tip);
             var left = new Vector2(s.Body.xMin - gap - tip, s.Body.center.y);
             var right = new Vector2(s.Body.xMax + gap + tip, s.Body.center.y);
-            bool rightFirst = s.Panel.x - s.Body.xMax >= s.Body.xMin;
+            // The side with more room first; with the hunter's bird on screen, the side AWAY from it first (K5r-c).
+            bool rightFirst = s.HasLocalBody ? s.LocalBody.center.x <= s.Body.center.x
+                                             : s.Panel.x - s.Body.xMax >= s.Body.xMin;
 
             centre = aboveCentre;
             slot = MarkerSlot.Above;
             if (Fits(s, aboveCentre, MarkerSlot.Above)) return true;
-            centre = below;
-            slot = MarkerSlot.Below;
-            if (Fits(s, below, MarkerSlot.Below)) return true;
+            if (!s.HasLocalBody)
+            {
+                centre = below;
+                slot = MarkerSlot.Below;
+                if (Fits(s, below, MarkerSlot.Below)) return true;
+            }
             centre = rightFirst ? right : left;
             slot = rightFirst ? MarkerSlot.Right : MarkerSlot.Left;
             if (Fits(s, centre, slot)) return true;
+            if (s.HasLocalBody)
+            {
+                centre = below;
+                slot = MarkerSlot.Below;
+                if (Fits(s, below, MarkerSlot.Below)) return true;
+            }
             centre = rightFirst ? left : right;
             slot = rightFirst ? MarkerSlot.Left : MarkerSlot.Right;
             if (Fits(s, centre, slot)) return true;
+
+            // Nothing is free round the target and the hunter stands in the way: slide outward, along the line from the hunter's
+            // bird to the target (the way the on-arrow badge slides), from the slot that faces that way.
+            if (s.HasLocalBody && TrySlideOutward(s, aboveCentre, below, left, right, out centre, out slot)) return true;
             centre = default;
             slot = MarkerSlot.Above;
             return false;
         }
+
+        private static bool TrySlideOutward(in MarkerScene s, Vector2 above, Vector2 below, Vector2 left, Vector2 right,
+                                            out Vector2 centre, out MarkerSlot slot)
+        {
+            Vector2 dir = s.Body.center - s.LocalBody.center;
+            if (dir.sqrMagnitude < 1e-6f) dir = Vector2.up * -1f;
+            dir.Normalize();
+            Vector2 from;
+            if (Mathf.Abs(dir.y) >= Mathf.Abs(dir.x))
+            {
+                slot = dir.y < 0f ? MarkerSlot.Above : MarkerSlot.Below;
+                from = dir.y < 0f ? above : below;
+            }
+            else
+            {
+                slot = dir.x > 0f ? MarkerSlot.Right : MarkerSlot.Left;
+                from = dir.x > 0f ? right : left;
+            }
+            for (float moved = 0f; moved <= SlideOutwardMaxPx; moved += 8f)
+            {
+                centre = KeepOnPanel(s, from + dir * moved, slot);
+                if (Fits(s, centre, slot)) return true;
+            }
+            centre = default;
+            return false;
+        }
+
+        /// <summary>Shifts a slot's centre the least that puts its box, and the chip above it, whole on the panel and under the top band.</summary>
+        private static Vector2 KeepOnPanel(in MarkerScene s, Vector2 centre, MarkerSlot slot)
+        {
+            var box = BoxFor(centre, slot);
+            float top = Mathf.Max(s.ClearTop, ChipAboveBoxPx);
+            if (box.xMin < 0f) centre.x -= box.xMin;
+            else if (box.xMax > s.Panel.x) centre.x -= box.xMax - s.Panel.x;
+            if (box.yMin < top) centre.y += top - box.yMin;
+            else if (box.yMax > s.Panel.y) centre.y -= box.yMax - s.Panel.y;
+            return centre;
+        }
+
+        /// <summary>How far the over-head marker may slide outward off the hunter's own bird, panel px.</summary>
+        public const float SlideOutwardMaxPx = 480f;
 
         public static bool Fits(in MarkerScene s, Vector2 centre, MarkerSlot slot)
         {
@@ -166,6 +226,7 @@ namespace CluckWars.UI
             if (s.HasPlate && box.Overlaps(s.TargetPlate)) return false;
             float m = FeedbackTuning.MarkMarkerYouPlateMarginPx;
             if (s.HasYou && box.Overlaps(Rect.MinMaxRect(s.You.xMin - m, s.You.yMin - m, s.You.xMax + m, s.You.yMax + m))) return false;
+            if (s.HasLocalBody && box.Overlaps(s.LocalBody)) return false;
             if (s.Others != null) for (int i = 0; i < s.Others.Count; i++) if (box.Overlaps(s.Others[i])) return false;
             if (s.Avoid != null) for (int i = 0; i < s.Avoid.Count; i++) if (box.Overlaps(s.Avoid[i])) return false;
             return true;
@@ -182,9 +243,12 @@ namespace CluckWars.UI
             AvoidScratch.Clear();
 
             // The body: the CharacterController's bounds projected (a 1 m box at the feet without one).
-            var cc = target.Body;
-            Bounds b = cc != null && cc.enabled ? cc.bounds : new Bounds(target.transform.position + Vector3.up * 0.5f, Vector3.one);
-            s.Body = ScreenEdgeProjection.TryProjectBounds(cam, b, out Rect bvp) ? ToPanel(bvp, panel) : new Rect(-1e5f, -1e5f, 0f, 0f);
+            s.Body = BodyRect(cam, panel, target, out _);
+            if (local != null && local != target)
+            {
+                s.LocalBody = BodyRect(cam, panel, local, out bool shown);
+                s.HasLocalBody = shown;
+            }
 
             var plate = target.Nameplate();
             s.HasPlate = plate != null && plate.TryGetPlateViewport(cam, out Rect tvp) && Assign(out s.TargetPlate, ToPanel(tvp, panel));
@@ -210,6 +274,16 @@ namespace CluckWars.UI
             var controls = HudControlZones.Current(cam);
             if (controls != null) for (int i = 0; i < controls.Count; i++) AvoidScratch.Add(ToPanel(controls[i], panel));
             return s;
+        }
+
+        /// <summary>A chicken's body footprint on screen, panel px: its CharacterController bounds projected (a 1 m box without one).
+        /// <paramref name="projected"/> is false when it has no footprint (behind the camera); the rect is then far off screen.</summary>
+        private static Rect BodyRect(Camera cam, Vector2 panel, ChickenController c, out bool projected)
+        {
+            var cc = c.Body;
+            Bounds b = cc != null && cc.enabled ? cc.bounds : new Bounds(c.transform.position + Vector3.up * 0.5f, Vector3.one);
+            projected = ScreenEdgeProjection.TryProjectBounds(cam, b, out Rect vp);
+            return projected ? ToPanel(vp, panel) : new Rect(-1e5f, -1e5f, 0f, 0f);
         }
 
         private static bool Assign(out Rect r, Rect v) { r = v; return true; }
