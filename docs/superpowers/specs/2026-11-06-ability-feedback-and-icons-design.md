@@ -114,7 +114,7 @@ Numbers are from the shipped assets. "Primary" = the one cue that must survive R
 | Hidden | HIDDEN · POOF! | dither ghost (remote); dashed cream ring + HIDDEN row (self only) | self only |
 | Zoom *(as shipped: Speed · FAST · FAST! — §12 D1)* | ZOOM · ZOOM! | hip-height streaks + stride dust, lean | everyone (motion), self (row) |
 | Jump landing | — · (HOP! optional) | launch dust, arc dots, landing shockwave + dust | everyone |
-| Marked / Hunting | MARKED · MARKED! / HUNT · HUNT! | MarkFeedback unchanged | victim / Assassin |
+| Marked / Hunting | MARKED · MARKED! / HUNT · HUNT!, then MISSED or SAFE at the end | MarkFeedback; the hunter's side reworked 2026-11-17 (`2026-11-17-hunt-hunter-feedback-design.md`: marker with count and blocker badge riding the target's floor arrow outside the circle and by its head inside, ground brackets, the Hunt hex mirroring the state, end word, haptics) | victim / Assassin |
 | Steal-proof | — · SAFE | the egg itself; clinks on a refused steal | the robber |
 | Peck chain | — · +1 … FULL! | hex chain ring; no body cue | self |
 

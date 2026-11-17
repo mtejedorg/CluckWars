@@ -653,14 +653,26 @@ about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills
 
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
 - **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
-  target (lock sting); reduced motion skips the sweep. Then **one hunt marker**: a disc with a skull in the **target's own
-  player colour**, a ring draining over the mark's life, and the distance beneath. Off screen it is pinned to the edge
-  pointing at the target; on screen it sits above the target pointing down, kept off the local You plate and the
-  nameplates. It stays visible through Hide. **Yellow** while a kill is possible, **grey with a lock**
-  while the target is behind a base wall, **cream with a shell** while the target is shelled. The target's standings row
-  shows a skull. The Stun hex lights while the target is inside Stun's reach (read from the ability); the Death Mark
-  hex becomes a big yellow **KILL** exactly while a kill is possible, with a sting. During a mark only the Stun range
-  guide stays on. No banner, no magenta arrow, no chevrons, no kill ring.
+  target (lock sting); reduced motion skips the sweep. Then **one hunt marker** (reworked 2026-11-17, Maestro: "Killer
+  must know the state of the ability and who is the target at a glance"; design
+  `docs/superpowers/specs/2026-11-17-hunt-hunter-feedback-design.md`): a disc in the **target's own player colour** that
+  holds the **count** in its centre (3, 2, 1 while arming, then tenths in the live second), a ring draining over the
+  mark's life, the paw as a corner badge, **one blocker badge** (star = not stunned, lock = behind its base wall, egg =
+  shelled) and the **distance** on a pill, with one decimal under 10 m, a red pill while the target is beyond the kill
+  range. **Where it sits follows the rival arrows** (Maestro, same day: "Mark should be integrated in the arrow at the
+  floor, and only appear above head if inside the circle"): while the target is outside the floor circle round the
+  Assassin's own bird, its floor arrow stays, larger and in the mark's colour, and carries the marker as a compact badge
+  at its tip, in view or not and through Hide; nothing is pinned to the screen edge. Inside the circle the marker sits
+  by the target's head, never over the Assassin's own bird. **Ground brackets** in the target's colour frame the target
+  whenever it is in view (red while live and blocked, yellow when the kill is possible). **Yellow** while a kill is
+  possible, **grey with a lock** behind a base wall, **cream with a shell** while shelled. The target's standings row
+  shows a skull. The Stun hex lights while the target is inside Stun's reach (read from the ability). The **Hunt hex**
+  mirrors the marker for the whole hunt: a dot in the target's colour, the draining ring, the count and the blocker
+  badge, then a big yellow **POUNCE** with the tenths exactly while a kill is possible, with a sting. When a hunt ends
+  without a kill the Assassin reads **MISSED** (time ran out, target lost) or **SAFE** (wall or shell) over its own
+  bird while the marker holds its last state for 0.6 s; a landed kill shows no word. The phone buzzes when the mark
+  goes live and harder when the kill becomes possible (the "Buzz When Hit" setting). During a mark only the Stun
+  range guide stays on. No banner, no kill range ring, no second clock for the Assassin.
 - **Victim.** A short **MARKED!** toast with a sting; the clock pill reads **LIVE IN 3 / 2 / 1** while the mark arms, then a red **LIVE 1s** that pops and pulses. The screen stays **darkened** (heavier at the edges, nothing
   over the centre) for the mark's life; the time left sits beside the match clock and its own row shows the skull. With
   the Assassin outside the inner circle (the floor-arrow ring radius) its rival arrow carries a skull, shown even while
