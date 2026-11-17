@@ -5,6 +5,7 @@ using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
 using CluckWars.Logging;
+using CluckWars.Services;
 using CluckWars.Settings;
 using CluckWars.UI;
 using Fusion;
@@ -97,6 +98,7 @@ namespace CluckWars.Visuals
             _log?.Error(Source, message);
         }
         private IAudioService _audio;
+        private IHapticsService _haptics;   // K7: the local Assassin's buzz; the preference and the limiter live inside the service
         private AudioRegistrySO _sfx;
         private bool _missingAudioReported;
 
@@ -109,11 +111,12 @@ namespace CluckWars.Visuals
         private float _introLastSeenAt = float.NegativeInfinity;
 
         [Inject]
-        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO sfx)
+        public void Construct(ILogService log, IAudioService audio, AudioRegistrySO sfx, [InjectOptional] IHapticsService haptics)
         {
             _log = log;
             _audio = audio;
             _sfx = sfx;
+            _haptics = haptics;
         }
 
         private void Awake()
@@ -151,6 +154,7 @@ namespace CluckWars.Visuals
             DriveBrackets(in o);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if ((o.Events & MarkEvents.Ended) != 0 && _localHunter != null) SpawnEndWord(o.EndCause);
+            if (HapticFor(in o) is HapticKind kind) _haptics?.Buzz(kind);
             if (ShowsHuntPop(o) && _localHunter != null)
                 FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor(),
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
@@ -172,6 +176,17 @@ namespace CluckWars.Visuals
         {
             var indicator = target.Indicator();
             return indicator != null ? indicator.RingWorldRadius : FeedbackTuning.RivalRingRadius * target.transform.lossyScale.x;
+        }
+
+        /// <summary>The hunter's buzz this frame (K7), or null: the local Assassin's own hunt going live (a tick) or its pounce becoming
+        /// legal (stronger, and it wins when both land on one frame). A victim or an observer never buzzes. The "Buzz When Hit"
+        /// preference and the minimum gap are applied by <see cref="IHapticsService"/>, not here.</summary>
+        public static HapticKind? HapticFor(in MarkOutputs o)
+        {
+            if (o.Role != MarkRole.Assassin) return null;
+            if ((o.Events & MarkEvents.KillReady) != 0) return HapticKind.HuntPounce;
+            if ((o.Events & MarkEvents.KillLive) != 0) return HapticKind.HuntLive;
+            return null;
         }
 
         /// <summary>The word the hunter reads when a mark ends (K6): MISSED, or SAFE when the target was behind a wall or in an egg;

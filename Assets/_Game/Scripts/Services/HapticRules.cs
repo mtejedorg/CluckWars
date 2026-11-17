@@ -45,10 +45,20 @@ namespace CluckWars.Services
         public static readonly HapticPattern CancelArm =
             new HapticPattern(new long[] { 0, 15 }, new[] { 0, 80 });
 
+        /// <summary>The hunt goes live: a 30 ms tick, a little under a hit.</summary>
+        public static readonly HapticPattern HuntLive =
+            new HapticPattern(new long[] { 0, 30 }, new[] { 0, 120 });
+
+        /// <summary>The pounce is legal: two firm 50 and 40 ms pulses, stronger than the live tick (longer and louder).</summary>
+        public static readonly HapticPattern HuntPounce =
+            new HapticPattern(new long[] { 0, 50, 40, 50 }, new[] { 0, 220, 0, 220 });
+
         public static HapticPattern PatternFor(HapticKind kind) => kind switch
         {
             HapticKind.Stun      => Stun,
             HapticKind.CancelArm => CancelArm,
+            HapticKind.HuntLive  => HuntLive,
+            HapticKind.HuntPounce => HuntPounce,
             _                    => Hit,
         };
 

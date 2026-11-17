@@ -9,6 +9,10 @@ namespace CluckWars.Services
         Hit = 1,
         /// <summary>Your bird was stunned or knocked out: the longer double buzz.</summary>
         Stun = 2,
+        /// <summary>The local Assassin's hunt just went live (K7): a short tick. Appended: the order is the limiter's severity.</summary>
+        HuntLive = 3,
+        /// <summary>The local Assassin's pounce just became legal (K7): stronger than the live tick, so it takes over a stun buzz.</summary>
+        HuntPounce = 4,
     }
 
     /// <summary>
