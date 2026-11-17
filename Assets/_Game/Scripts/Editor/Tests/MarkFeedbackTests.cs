@@ -124,9 +124,47 @@ namespace CluckWars.Tests
             StringAssert.Contains("_localHunter = r.Role == MarkRole.Assassin ? local : null;", src);
             StringAssert.Contains("IsLocal = c.HasInputAuthority,", src);
             StringAssert.Contains("UiText.Get(UiKeys.HudPopHunt)", src);
-            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(src, "FloatingCombatText.Spawn").Count, "HUNT! is the only pop spawned here");
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(src, @"FloatingCombatText\.Spawn\(").Count, "HUNT! is the only world pop spawned here");
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(src, @"FloatingCombatText\.SpawnSelfPop\(").Count, "the end word is the only self-pop (K6)");
             StringAssert.DoesNotContain("[Rpc", src);
             StringAssert.DoesNotContain("[Networked", src);
+        }
+
+        [Test]
+        public void EndWordKey_Table()
+        {
+            Assert.AreEqual(UiKeys.HudPopMissed, MarkFeedback.EndWordKey(MarkEndCause.Missed));
+            Assert.AreEqual(UiKeys.HudPopSafe, MarkFeedback.EndWordKey(MarkEndCause.Safe), "SAFE reuses the existing key");
+            Assert.IsNull(MarkFeedback.EndWordKey(MarkEndCause.None));
+            Assert.IsNull(MarkFeedback.EndWordKey(MarkEndCause.Pounced), "a pounce has no word");
+            foreach (MarkEndCause cause in System.Enum.GetValues(typeof(MarkEndCause)))
+                Assert.AreEqual(HuntRules.ShowsEndWord(cause), MarkFeedback.EndWordKey(cause) != null, $"{cause}: a word iff the end holds the marker");
+        }
+
+        [Test]
+        public void EndWordColour_SafeIsNeutralGrey_MissedIsHuntAccent()
+        {
+            Assert.AreEqual(FeedbackTuning.NeutralNoEffectColor, MarkFeedback.EndWordColour(MarkEndCause.Safe), "the grey HitFeedback gives SAFE");
+            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Hunt), MarkFeedback.EndWordColour(MarkEndCause.Missed));
+        }
+
+        [Test]
+        public void HudPopMissed_HasCatalogueRow()
+        {
+            Assert.AreEqual("hud.pop.missed", UiKeys.HudPopMissed);
+            Assert.IsTrue(UiText.HasKey(UiKeys.HudPopMissed));
+            Assert.AreEqual("MISSED", UiText.Get(UiKeys.HudPopMissed));
+            int rows = 0;
+            foreach (var l in File.ReadAllLines("Assets/_Game/Resources/Text/UiText.csv")) if (l.StartsWith(UiKeys.HudPopMissed + ",")) rows++;
+            Assert.AreEqual(1, rows, "exactly one CSV row");
+        }
+
+        [Test]
+        public void EndWord_OnEndedEventOnly_ThroughTheSelfPopPath_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/Visuals/MarkFeedback.cs");
+            StringAssert.Contains("(o.Events & MarkEvents.Ended) != 0 && _localHunter != null) SpawnEndWord(o.EndCause);", src);
+            StringAssert.Contains("FloatingCombatText.SpawnSelfPop(_localHunter, key,", src);
         }
 
         [Test]

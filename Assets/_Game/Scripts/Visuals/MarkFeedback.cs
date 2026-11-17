@@ -150,6 +150,7 @@ namespace CluckWars.Visuals
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
             DriveBrackets(in o);
             if (o.Events != MarkEvents.None) PlayStings(o);
+            if ((o.Events & MarkEvents.Ended) != 0 && _localHunter != null) SpawnEndWord(o.EndCause);
             if (ShowsHuntPop(o) && _localHunter != null)
                 FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor(),
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
@@ -171,6 +172,26 @@ namespace CluckWars.Visuals
         {
             var indicator = target.Indicator();
             return indicator != null ? indicator.RingWorldRadius : FeedbackTuning.RivalRingRadius * target.transform.lossyScale.x;
+        }
+
+        /// <summary>The word the hunter reads when a mark ends (K6): MISSED, or SAFE when the target was behind a wall or in an egg;
+        /// null for a pounce, a stopped round or a gone hunter (no word).</summary>
+        public static string EndWordKey(MarkEndCause cause) =>
+            cause == MarkEndCause.Missed ? UiKeys.HudPopMissed
+            : cause == MarkEndCause.Safe ? UiKeys.HudPopSafe
+            : null;
+
+        /// <summary>MISSED in the Hunt accent (as HUNT!), SAFE in the neutral no-effect grey <see cref="HitFeedback"/> gives it.</summary>
+        public static Color EndWordColour(MarkEndCause cause) =>
+            cause == MarkEndCause.Safe ? FeedbackTuning.NeutralNoEffectColor : FeedbackPalette.Current.Accent(AccentKey.Hunt);
+
+        /// <summary>The end word over the local hunter's own bird, on its owner's screen only (<see cref="FloatingCombatText.SpawnSelfPop"/>).</summary>
+        private void SpawnEndWord(MarkEndCause cause)
+        {
+            string key = EndWordKey(cause);
+            if (key == null) return;
+            if (!FloatingCombatText.SpawnSelfPop(_localHunter, key, EndWordColour(cause)))
+                _log?.Warn(Source, $"End word {key} not drawn: the local hunter is not a self-pop target");
         }
 
         /// <summary>HUNT! over the hunter the frame its kill goes live, on the hunter's own screen only: the Assassin role is

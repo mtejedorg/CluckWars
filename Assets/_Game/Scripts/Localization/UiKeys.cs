@@ -263,6 +263,8 @@ namespace CluckWars.Localization
         public const string HudPopFull = "hud.pop.full";
         /// <summary>The hunter's own pop as its Hunt (Death Mark) kill goes live; local player only (spec D5b / D7b).</summary>
         public const string HudPopHunt = "hud.pop.hunt";
+        /// <summary>The hunter's own pop when its mark ends without a pounce and not behind a wall or egg (K6); local Assassin only.</summary>
+        public const string HudPopMissed = "hud.pop.missed";
         /// <summary>Self-pops (spec D7b): drawn on the local bird's own screen only, via <c>FloatingCombatText.SpawnSelfPop</c>.</summary>
         public const string HudPopWaddle = "hud.pop.waddle";
         public const string HudPopEgg = "hud.pop.egg";

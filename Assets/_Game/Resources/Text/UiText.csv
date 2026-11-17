@@ -209,6 +209,7 @@ hud.event.underdogSurge,UNDERDOG SURGE!
 hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,PILES RESTOCKED!
 hud.pop.safe,SAFE
+hud.pop.missed,MISSED
 hud.pop.stun,STUN
 hud.pop.stuck,STUCK
 hud.pop.slow,SLOW
