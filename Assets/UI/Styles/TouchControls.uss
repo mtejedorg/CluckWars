@@ -703,3 +703,75 @@
 .cw-hex--lit { -unity-background-image-tint-color: rgb(254, 245, 224); }
 .cw-hex--lit .cw-hex-icon { -unity-background-image-tint-color: rgb(22, 16, 28); }
 .cw-hex--lit .cw-hex-pip { visibility: hidden; }
+
+/* --- Hunt hex (TouchControlsController + HuntHexRules, from MarkFeedback.Current) -------------------------
+   While the local player's Death Mark is on, the Death Mark hex carries the hunt: .cw-hex--hunt shows the dot (the target's
+   seat colour, written inline), the blocker badge or metres chip, and the layer-9 count (cream, written inline). The duration
+   ring is the mark window (HexDurationRing, the marker's colour). The hex stays at full alpha (the controller's tint). */
+/* Top-centre, where the hex is narrowest; clear of the slot badge (top-left) and the category mark (top-right). */
+.cw-hex-huntdot {
+    position: absolute;
+    left: 66px; top: 10px;
+    width: 18px; height: 18px;
+    border-left-width: 2px; border-right-width: 2px; border-top-width: 2px; border-bottom-width: 2px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 9px; border-top-right-radius: 9px;
+    border-bottom-left-radius: 9px; border-bottom-right-radius: 9px;
+    display: none;
+}
+/* The blocker badge at the left rim, below the slot badge: an ink disc (egg: cream) with the sprite on it. One class per blocker,
+   none for "too far" (the metres chip is the glyph there) or when nothing blocks. */
+.cw-hex-huntglyph {
+    position: absolute;
+    left: 2px; top: 84px;
+    width: 34px; height: 34px;
+    border-top-left-radius: 17px; border-top-right-radius: 17px;
+    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+    background-color: rgb(20, 10, 26);
+    -unity-background-scale-mode: scale-to-fit;
+    display: none;
+}
+.cw-hex-huntglyph--star {
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Stunned.png");
+}
+.cw-hex-huntglyph--lock {
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Lock.png");
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}
+.cw-hex-huntglyph--egg {
+    background-color: rgb(254, 245, 224);
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_ShieldEgg.png");
+}
+.cw-hex-huntglyph--far { display: none; }
+/* The red metres chip ("6 m", mark.distance): the glyph for a target beyond the kill range. 28 px text is the HUD floor. */
+.cw-hex-huntfar {
+    position: absolute;
+    left: 0; top: 84px;
+    min-width: 64px; height: 34px;
+    padding-left: 6px; padding-right: 6px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px;
+    color: rgb(254, 245, 224);
+    background-color: rgb(230, 10, 10);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    display: none;
+}
+.cw-hex--hunt .cw-hex-huntdot { display: flex; }
+/* The count owns the lower centre, where the in-range pip sits. */
+.cw-hex--hunt .cw-hex-pip { visibility: hidden; }
+.cw-hex--hunt .cw-hex-huntglyph--star,
+.cw-hex--hunt .cw-hex-huntglyph--lock,
+.cw-hex--hunt .cw-hex-huntglyph--egg { display: flex; }
+/* POUNCE carries the tenths: the count shows under the word (the word moves up to make room). On the desktop / pad strip the
+   centred digit moves to the same lower band. */
+.cw-hex--kill.cw-hex--hunt .cw-hex-cdnum { visibility: visible; }
+.cw-hex--kill.cw-hex--hunt .cw-hex-killtext { bottom: 28px; }
+.cw-hud--desktop .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum,
+.cw-hud--pad .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum {
+    top: auto; bottom: 12px; height: 40px;
+    font-size: 36px;
+}

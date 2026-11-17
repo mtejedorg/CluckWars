@@ -146,6 +146,9 @@ namespace CluckWars.Input
             public VisualElement FizzleSlash;// built in code: the 0.3 s slash flash after a fizzle
             public VisualElement Puff;       // built in code: the Fx_Whiff puff after a fizzle
             public Label         KillText;   // Death Mark: "KILL" over the hex while a press would kill
+            public VisualElement HuntDot;    // Hunt: the target's seat colour, top-centre, while a mark is on
+            public VisualElement HuntGlyph;  // Hunt: the star / lock / egg badge for what blocks the pounce
+            public Label         HuntFar;    // Hunt: the red metres chip while the target is beyond the kill range
         }
         /// <summary>Mirrors <see cref="Gameplay.AbilityController.SlotCount"/> so the hex
         /// cluster and the gameplay slot count cannot drift apart.</summary>
@@ -210,6 +213,17 @@ namespace CluckWars.Input
         private readonly bool[]  _appliedMarkLit  = new bool[SlotCount];
         private readonly float[] _markKillSince = new float[SlotCount];
         private const string MarkKillClass = "cw-hex--kill";
+
+        // The Hunt hex (HuntHexRules): the local player's live mark on the Death Mark slot. _huntOn is this frame's verdict per slot,
+        // _huntOut the mark it was read from; the applied caches keep style writes to real changes.
+        private readonly bool[]  _huntOn           = new bool[SlotCount];
+        private readonly bool[]  _appliedHuntOn    = new bool[SlotCount];
+        private MarkOutputs      _huntOut;
+        private readonly bool[]  _huntDigitShown   = new bool[SlotCount];
+        private readonly string[] _appliedHuntText = new string[SlotCount];
+        private readonly int[]   _appliedHuntCorner = new int[SlotCount];
+        private readonly string[] _appliedHuntGlyph = new string[SlotCount];
+        private readonly int[]   _appliedHuntMetres = new int[SlotCount];
         private const string MarkLitClass  = "cw-hex--lit";
 
         // Phase 6 chunk 6: layout mode (A10), haptics (A9) and the first-time hold hint (A1).
@@ -454,6 +468,9 @@ namespace CluckWars.Input
                     Pip        = _root.Q<VisualElement>($"Pip{n}"),
                     BadgeText  = _root.Q<Label>($"BadgeText{n}"),
                     KillText   = _root.Q<Label>($"KillText{n}"),
+                    HuntDot    = _root.Q<VisualElement>($"HuntDot{n}"),
+                    HuntGlyph  = _root.Q<VisualElement>($"HuntGlyph{n}"),
+                    HuntFar    = _root.Q<Label>($"HuntFar{n}"),
                     Mark       = hex != null ? CategoryMark.Create() : null,
                     Ring       = hex != null ? new HexDurationRing() : null,
                     Chain      = hex != null ? new HexChainRing() : null,
@@ -472,6 +489,10 @@ namespace CluckWars.Input
                         _log?.Error(Source, $"TouchControls.uxml is missing #KillText{n}: a Death Mark on that hex shows no KILL word.");
                     else
                         _slots[i].KillText.text = UiText.Get(UiKeys.MarkHexKill);
+                    if (_slots[i].HuntDot == null || _slots[i].HuntGlyph == null || _slots[i].HuntFar == null)
+                        _log?.Error(Source, $"TouchControls.uxml is missing #HuntDot{n}, #HuntGlyph{n} or #HuntFar{n}: the Hunt hex draws without its target dot or blocker glyph.");
+                    _appliedHuntCorner[i] = int.MinValue;
+                    _appliedHuntMetres[i] = int.MinValue;
 
                     // Held hex scales up and the others dim with a 60 ms ease-out (A1). Scale/opacity are
                     // written inline from FeedbackTuning; only the transition is declared here, once.

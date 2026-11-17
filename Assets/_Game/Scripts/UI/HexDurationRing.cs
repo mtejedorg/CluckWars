@@ -22,10 +22,12 @@ namespace CluckWars.UI
         public const float RingRadiusPx = 80f;
 
         private const float StrokePx = 7f;
-        private static readonly Color Fill  = new Color(0.996f, 0.961f, 0.878f, 1f); // cream
+        /// <summary>The ring's colour unless a caller sets another (the ability duration: cream).</summary>
+        public static readonly Color DefaultFill = new Color(0.996f, 0.961f, 0.878f, 1f); // cream
         private static readonly Color Track = new Color(0.165f, 0.102f, 0.047f, 0.65f); // ink
 
         private float _fraction;
+        private Color _fill = DefaultFill;
 
         public HexDurationRing()
         {
@@ -41,6 +43,14 @@ namespace CluckWars.UI
             bool moved = Mathf.Abs(f - _fraction) >= 0.005f || ((f == 0f || f == 1f) && f != _fraction);
             if (!moved) return;
             _fraction = f;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>The colour of the remaining arc (the Hunt hex wears the marker's colour); repaints only on a change.</summary>
+        public void SetColour(Color colour)
+        {
+            if (colour == _fill) return;
+            _fill = colour;
             MarkDirtyRepaint();
         }
 
@@ -80,7 +90,7 @@ namespace CluckWars.UI
             if (_fraction <= 0f) return;
 
             // Remaining arc, from the top vertex clockwise.
-            p.strokeColor = Fill;
+            p.strokeColor = _fill;
             p.lineCap = LineCap.Round;
             p.BeginPath();
             p.MoveTo(Vertex(0, c, RingRadiusPx));

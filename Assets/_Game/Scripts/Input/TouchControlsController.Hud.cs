@@ -157,9 +157,11 @@ namespace CluckWars.Input
         private void UpdateMarkHexes(AbilityController abilities)
         {
             var mark = MarkFeedback.Current;
+            _huntOut = mark;
             for (int slot = 0; slot < SlotCount; slot++)
             {
                 var a = abilities != null ? SlotAbility(abilities, slot) : null;
+                _huntOn[slot] = HuntHexRules.Applies(mark, a.Is(AbilityJob.DeathMark));
                 bool kill = mark.KillHex && a.Is(AbilityJob.DeathMark);
                 if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
                 _markKill[slot] = kill;
@@ -231,6 +233,63 @@ namespace CluckWars.Input
                 _appliedMarkLit[slot] = _markLit[slot];
                 hex.EnableInClassList(MarkLitClass, _markLit[slot]);
             }
+            ApplyHuntHex(slot);
+        }
+
+        /// <summary>
+        /// The Hunt hex's drawn parts (HuntHexRules): the class that shows them, the dot in the target's seat colour, and the one
+        /// glyph for what blocks the pounce (a badge, or the red metres chip when the target is too far). Each part is written
+        /// only when its input changes.
+        /// </summary>
+        private void ApplyHuntHex(int slot)
+        {
+            var refs = _slots[slot];
+            bool on = _huntOn[slot];
+            if (on != _appliedHuntOn[slot])
+            {
+                _appliedHuntOn[slot] = on;
+                refs.Hex.EnableInClassList(HuntHexRules.HuntClass, on);
+                if (!on)
+                {
+                    _appliedHuntCorner[slot] = int.MinValue;
+                    _appliedHuntMetres[slot] = int.MinValue;
+                    SetHuntGlyph(slot, null);
+                }
+            }
+            if (!on) return;
+
+            if (refs.HuntDot != null && _huntOut.TargetCorner != _appliedHuntCorner[slot])
+            {
+                _appliedHuntCorner[slot] = _huntOut.TargetCorner;
+                refs.HuntDot.style.backgroundColor = PlayerPalette.ForCorner(_huntOut.TargetCorner);
+            }
+
+            string glyph = HuntHexRules.GlyphClass(_huntOut.Blocker);
+            SetHuntGlyph(slot, glyph);
+            if (glyph == HuntHexRules.GlyphFarClass && refs.HuntFar != null && _huntOut.MarkerMetres != _appliedHuntMetres[slot])
+            {
+                _appliedHuntMetres[slot] = _huntOut.MarkerMetres;
+                refs.HuntFar.text = UiText.Format(UiKeys.MarkDistance, ("m", _huntOut.MarkerMetres));
+            }
+        }
+
+        /// <summary>Swaps the blocker glyph class (null = none); "too far" shows the metres chip instead of a badge.</summary>
+        private void SetHuntGlyph(int slot, string glyphClass)
+        {
+            if (glyphClass == _appliedHuntGlyph[slot]) return;
+            var refs = _slots[slot];
+            if (refs.HuntGlyph != null)
+            {
+                if (_appliedHuntGlyph[slot] != null) refs.HuntGlyph.RemoveFromClassList(_appliedHuntGlyph[slot]);
+                if (glyphClass != null) refs.HuntGlyph.AddToClassList(glyphClass);
+            }
+            if (refs.HuntFar != null)
+            {
+                bool far = glyphClass == HuntHexRules.GlyphFarClass;
+                refs.HuntFar.style.display = far ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!far) _appliedHuntMetres[slot] = int.MinValue;
+            }
+            _appliedHuntGlyph[slot] = glyphClass;
         }
 
         private const string HeldClass = "cw-hex--held";
@@ -294,7 +353,10 @@ namespace CluckWars.Input
             RefreshEggPhase(slot, abilities, equipped);
 
             // Phase 6 (A1): while the ability runs, a duration ring around the hex rim drains with it.
-            bool ringOn = active01 > 0f;
+            // While a hunt is on, the same ring shows the mark window draining in the marker's colour; the hunt takes it over
+            // from the ability's own 0.1 s run.
+            bool hunt = _huntOn[slot];
+            bool ringOn = hunt || active01 > 0f;
             if (refs.Ring != null)
             {
                 if (ringOn != _ringShown[slot])
@@ -302,7 +364,11 @@ namespace CluckWars.Input
                     _ringShown[slot] = ringOn;
                     refs.Ring.style.display = ringOn ? DisplayStyle.Flex : DisplayStyle.None;
                 }
-                if (ringOn) refs.Ring.SetFraction(active01);
+                if (ringOn)
+                {
+                    refs.Ring.SetColour(hunt ? HuntRules.MarkerColour(_huntOut.MarkerMode, _huntOut.TargetCorner) : HexDurationRing.DefaultFill);
+                    refs.Ring.SetFraction(hunt ? _huntOut.MarkerFill01 : active01);
+                }
             }
 
             // Phase 6 (A6): the auto-chain is running on this Peck hex. Spins; static under Reduced Motion.
@@ -350,8 +416,9 @@ namespace CluckWars.Input
                 default:
                     // Ready, and "no target in range" too (Phase 6, A1): nobody around is not a refusal, so
                     // the hex rests at its full category hue, opaque. The in-range pip says when someone is.
+                    // The hunt is no refusal either: the Death Mark hex stays opaque while the pounce is not legal.
                     tint = accent;
-                    tint.a = FeedbackTuning.HexAlphaReady;
+                    tint.a = HuntHexRules.TintAlpha(refusal, _huntOn[slot]);
                     break;
             }
             // Death Mark: KILL and lit Ambush paint the fill kill-yellow through this same inline path (USS would be overwritten).
@@ -419,6 +486,7 @@ namespace CluckWars.Input
             // A4: the victims' remaining stun takes the centre over the cooldown seconds (the cooldown is necessarily
             // running: he just cast) on the touch arc and the desktop / pad strip alike. The cooldown clip and the
             // duration ring are separate layers and keep drawing. A "you are stunned" cross keeps the centre.
+            if (RefreshHuntDigit(slot, mark)) return;
             if (RefreshCasterStunDigit(slot, equipped, mark)) return;
             if (RefreshEggDigit(slot, equipped, mark)) return;
 
@@ -468,6 +536,48 @@ namespace CluckWars.Input
             if (egg == _eggIconShown[slot]) return;
             _eggIconShown[slot] = egg;
             _slots[slot].Icon?.EnableInClassList(EggPhaseHexRules.EggIconClass, egg);
+        }
+
+        /// <summary>
+        /// The hunt's count (<see cref="HuntRules.CountText"/>: 3, 2, 1, then tenths in the live second) owns the layer-9 label on
+        /// the Death Mark hex while the hunt is on, in cream (the dot and ring carry the seat colour). Same contract as
+        /// <see cref="RefreshEggDigit"/>: it outranks the caster-stun and egg digits and the cooldown seconds, yields to the
+        /// stunned cross, writes text only when it changes, and on hand-back restores the stylesheet colour and forces the cooldown
+        /// readout to repaint. Taking the label over clears the other owners' "shown" flags so they re-initialise when it returns.
+        /// </summary>
+        private bool RefreshHuntDigit(int slot, HexCenterMark mark)
+        {
+            var label = _slots[slot].CdNum;
+            bool show = _huntOn[slot] && mark != HexCenterMark.StunnedCross;
+
+            switch (HuntHexRules.DigitStep(_huntDigitShown[slot], show))
+            {
+                case HuntDigitStep.Idle:
+                    return false;
+                case HuntDigitStep.HandBack:
+                    _huntDigitShown[slot] = false;
+                    _appliedHuntText[slot] = null;
+                    label.style.color = new StyleColor(StyleKeyword.Null);
+                    _appliedCdSeconds[slot] = int.MinValue;
+                    _appliedCdText[slot] = null;
+                    return false;
+                case HuntDigitStep.Acquire:
+                    _huntDigitShown[slot] = true;
+                    _stunDigitShown[slot] = false;
+                    _eggDigitShown[slot] = false;
+                    _appliedHuntText[slot] = null;
+                    label.style.color = FeedbackTuning.MarkCream;
+                    label.style.display = DisplayStyle.Flex;
+                    break;
+            }
+
+            string text = HuntRules.CountText(_huntOut.Armed, _huntOut.ArmCountdownSeconds, _huntOut.Remaining);
+            if (text != _appliedHuntText[slot])
+            {
+                _appliedHuntText[slot] = text;
+                label.text = text;
+            }
+            return true;
         }
 
         /// <summary>
