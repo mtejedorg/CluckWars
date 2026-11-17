@@ -171,10 +171,7 @@ namespace CluckWars.UI
                          (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkMarkerKillPulseHz * 2f * Mathf.PI));
             _marker.style.scale = new Scale(new Vector3(scale, scale, 1f));
 
-            Color c = o.MarkerMode == MarkMarkerMode.Kill ? FeedbackTuning.MarkKillColor
-                    : o.MarkerMode == MarkMarkerMode.Walled ? FeedbackTuning.MarkWalledColor
-                    : o.MarkerMode == MarkMarkerMode.Shelled ? FeedbackTuning.MarkCream
-                    : PlayerPalette.ForCorner(o.TargetCorner);
+            Color c = HuntRules.MarkerColour(o.MarkerMode, o.TargetCorner);
             if (c != _stateColour || Mathf.Abs(o.MarkerFill01 - _fill) >= 0.004f)
             {
                 _stateColour = c;

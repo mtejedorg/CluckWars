@@ -780,6 +780,12 @@ namespace CluckWars.Visuals
 
         /// <summary>Any ending: every output fades to 0 over this long, then the presentation is clean.</summary>
         public const float MarkEndFadeSeconds = 0.3f;
+        /// <summary>A hunter whose mark ended Missed or Safe keeps the marker at its last alpha this long before the usual
+        /// <see cref="MarkEndFadeSeconds"/> fade (the reason glyph and word need time to read). Hunter only.</summary>
+        public const float MarkEndHoldSeconds = 0.6f;
+        /// <summary>A mark that ended with this much window left (or less) counts as expired, not lost early: two frames and a
+        /// tick at 30 fps.</summary>
+        public const float MarkEndExpiryToleranceSeconds = 0.15f;
         /// <summary>The standings skull fades in over this long.</summary>
         public const float MarkSkullFadeInSeconds = 0.15f;
 
@@ -832,6 +838,8 @@ namespace CluckWars.Visuals
         public const float MarkLivePulseHz = 4f;
         /// <summary>The standings skull's tint once the kill is live (the screen mood's red), and its ink tint before.</summary>
         public static readonly Color MarkSkullLiveColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+        /// <summary>The hunt's "not legal yet" red (live second, pounce blocked): the skull's live red, one home.</summary>
+        public static Color MarkHuntBlockedColor => MarkSkullLiveColor;
         public static readonly Color MarkSkullInkColor = new Color(22f / 255f, 16f / 255f, 28f / 255f, 1f);
 
         /// <summary>Hunt marker geometry, panel px (MarkHud.uss holds the element boxes): ring radius, ink track and colour

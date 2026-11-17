@@ -44,6 +44,9 @@ namespace CluckWars.Visuals
         /// <summary>The mark armed: the kill is live from now to expiry. Once per mark, every role; never for a mark first seen
         /// already armed or found again (host migration).</summary>
         KillLive = 16,
+        /// <summary>The Assassin's mark ended Missed or Safe (once, on the first end frame; <see cref="MarkOutputs.EndCause"/> says
+        /// which). Never for a landed pounce, a victim, an observer, or a mark replaced by another.</summary>
+        Ended = 32,
     }
 
     /// <summary>Everything the model needs for one frame, gathered by <see cref="MarkFeedback"/> from replicated state.
@@ -81,6 +84,13 @@ namespace CluckWars.Visuals
         public bool Walled;
         /// <summary>The target is shelled: steal-proof, so <c>ExecuteRules.CanBeExecuted</c> refuses it.</summary>
         public bool TargetShelled;
+        /// <summary>The target is stunned (<c>ControlState.Stunned</c>).</summary>
+        public bool TargetStunned;
+        /// <summary>The mark's kill range (<c>AssassinExecute.KillRange</c>).</summary>
+        public float KillRange;
+        /// <summary>The local player's own chicken is removed or gone. Gathered even when no mark is live, so an end caused by the
+        /// hunter's own removal is told from a lost target.</summary>
+        public bool LocalRemoved;
 
         // ---- Victim ----------------------------------------------------------------------------------------------
         /// <summary>The hunter is invisible to the victim (Invisibility / Smoke Roost fade).</summary>
@@ -119,6 +129,14 @@ namespace CluckWars.Visuals
         /// <summary>Remaining / window: the ring drains clockwise from 12 o'clock.</summary>
         public float MarkerFill01;
         public int MarkerMetres;
+        /// <summary>What blocks the pounce in the live second (Assassin; None while arming, legal, or when frozen by an end).</summary>
+        public HuntBlocker Blocker;
+        /// <summary>Seconds left in the mark's window (Assassin; frozen during the end).</summary>
+        public float Remaining;
+        /// <summary>Why the Assassin's mark ended, on every frame of its end fade (None otherwise).</summary>
+        public MarkEndCause EndCause;
+        /// <summary>The Assassin's end hold is running: the marker keeps its last alpha (Missed or Safe only).</summary>
+        public bool EndHolding;
 
         // Standings.
         public int SkullCorner;
@@ -157,7 +175,7 @@ namespace CluckWars.Visuals
         public bool IsClean =>
             Role == MarkRole.None && !AssassinMarkActive && !Armed && !SkullLive && MarkerAlpha == 0f && SkullAlpha == 0f && DrawAlpha == 0f &&
             !AmbushLit && !KillHex && ToastAlpha == 0f && ClockAlpha == 0f && Dim == 0f && Cold == 0f && Red == 0f &&
-            HunterBadgeAlpha == 0f && !ForceShowHunter && Events == MarkEvents.None;
+            HunterBadgeAlpha == 0f && !ForceShowHunter && Events == MarkEvents.None && !EndHolding && EndCause == MarkEndCause.None;
     }
 
     /// <summary>One living chicken as the mark resolver sees it, copied from replicated state each frame (decoys left out).</summary>
@@ -285,6 +303,8 @@ namespace CluckWars.Visuals
         private bool _showing;            // a mark is shown (live, or in its end fade)
         private bool _ending;             // in the end fade
         private float _endT;              // seconds into the end fade
+        private MarkEndCause _endCause;   // the Assassin's end cause (Missed / Safe hold the marker)
+        private HuntLastFrame _lastHunt;  // the last live Assassin frame's facts
         private long _key;
         private MarkRole _role;
         private int _targetCorner, _hunterCorner;
@@ -361,7 +381,7 @@ namespace CluckWars.Visuals
             bool switching = live && _showing && input.MarkKey != _key;
             if (switching && _ending) { ClearShown(); switching = false; }   // the old one was already fading: start the new one clean
             if (live && !_showing) Begin(input);
-            else if (live && _ending) _ending = false;                       // the same mark came back mid-fade
+            else if (live && _ending) { _ending = false; _endCause = MarkEndCause.None; }   // the same mark came back mid-fade
             // A different live mark (a role switch, another hunter): the old one fades out first, then the new one begins.
 
             var o = new MarkOutputs { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, LiveScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
@@ -372,19 +392,27 @@ namespace CluckWars.Visuals
                 _ending = true;
                 _endT = 0f;
                 _snapshot = _out;   // the last live frame: the fade freezes it
+                // A replaced mark (switching) tells nothing about why it ended; a hunter's own end is judged from its last live frame.
+                _endCause = _role == MarkRole.Assassin && !switching ? HuntRules.EndCauseFor(_lastHunt, input.MatchRunning, input.LocalRemoved) : MarkEndCause.None;
+                if (HuntRules.ShowsEndWord(_endCause)) o.Events |= MarkEvents.Ended;
             }
 
             if (_ending)
             {
+                bool hold = HuntRules.ShowsEndWord(_endCause);
+                float fade = Mathf.Max(1e-4f, FeedbackTuning.MarkEndFadeSeconds);
                 _endT += dt;
-                float f = 1f - Mathf.Clamp01(_endT / Mathf.Max(1e-4f, FeedbackTuning.MarkEndFadeSeconds));
-                if (f <= 0f)
+                float f = 1f - Mathf.Clamp01(_endT / fade);
+                float markerF = hold ? 1f - Mathf.Clamp01((_endT - FeedbackTuning.MarkEndHoldSeconds) / fade) : f;
+                if (markerF <= 0f)
                 {
                     ClearShown();
-                    _out = o;
-                    return o;
+                    _out = new MarkOutputs { MarkerPop = 1f, DrawScale = 1f, ToastScale = 1f, LiveScale = 1f, SkullCorner = -1, TargetCorner = -1, HunterCorner = -1 };
+                    return _out;
                 }
-                FillFrozen(ref o, f);
+                FillFrozen(ref o, f, markerF);
+                o.EndCause = _endCause;
+                o.EndHolding = hold && _endT < FeedbackTuning.MarkEndHoldSeconds;
                 _out = o;
                 return o;
             }
@@ -416,6 +444,8 @@ namespace CluckWars.Visuals
             _drawSeconds = DrawDuration(input.ReducedMotion, arm);
             _drawSteps = DrawStepCount(input.ReducedMotion, _drawSeconds);
             _lastStep = -1;
+            _endCause = MarkEndCause.None;
+            _lastHunt = default;
             _prevCanKill = input.CanKillNow;      // a re-found mark already kill-ready is not a new edge
             _killLiveDone = replay || ArmedNow(input);   // only an arm watched happening is announced
             _sinceLive = float.PositiveInfinity;
@@ -437,6 +467,8 @@ namespace CluckWars.Visuals
         {
             _showing = _ending = false;
             _endT = 0f;
+            _endCause = MarkEndCause.None;
+            _lastHunt = default;
             _key = 0;
             _role = MarkRole.None;
             _targetCorner = _hunterCorner = -1;
@@ -582,6 +614,13 @@ namespace CluckWars.Visuals
             o.MarkerMode = _mode;
             o.MarkerFill01 = _fill;
             o.MarkerMetres = _metres;
+            o.Blocker = HuntRules.BlockerFor(o.Armed, input.CanKillNow, input.TargetShelled, input.Walled, input.Distance, input.KillRange, input.TargetStunned);
+            o.Remaining = input.Remaining;
+            _lastHunt = new HuntLastFrame
+            {
+                Role = MarkRole.Assassin, Armed = o.Armed, CanKill = input.CanKillNow, Shelled = input.TargetShelled,
+                Walled = input.Walled, Blocker = o.Blocker, Remaining = input.Remaining,
+            };
 
             // Hexes: KILL exactly while a press would kill; Ambush lit only once the draw has told who the target is.
             o.KillHex = input.CanKillNow;
@@ -668,16 +707,18 @@ namespace CluckWars.Visuals
         }
 
         /// <summary>The end fade: the last live frame's values, frozen, times <paramref name="f"/>; nothing boolean survives it.</summary>
-        private void FillFrozen(ref MarkOutputs o, float f)
+        private void FillFrozen(ref MarkOutputs o, float f, float markerF)
         {
             var last = _snapshot;
             o.Role = _role;
             o.TargetCorner = _targetCorner;
             o.HunterCorner = _hunterCorner;
-            o.MarkerAlpha = last.MarkerAlpha * f;
+            o.MarkerAlpha = last.MarkerAlpha * markerF;   // an Assassin's Missed / Safe end holds it, then fades
             o.MarkerMode = last.MarkerMode == MarkMarkerMode.Kill ? MarkMarkerMode.Hunt : last.MarkerMode;   // never KILL on a dead mark
             o.MarkerFill01 = last.MarkerFill01;
             o.MarkerMetres = last.MarkerMetres;
+            o.Blocker = last.Blocker;
+            o.Remaining = last.Remaining;
             o.SkullCorner = last.SkullCorner;
             o.SkullAlpha = last.SkullAlpha * f;
             o.SkullLive = last.SkullLive;

@@ -169,6 +169,8 @@ namespace CluckWars.Visuals
             };
 
             var r = MarkRoleRules.Resolve(Snapshot(), _shownHunterId);
+            // The local chicken's own removal, read before the early return: it tells an end the hunter caused from a lost target.
+            input.LocalRemoved = r.Local < 0 || _snapshot[r.Local].Removed;
             if (r.Role == MarkRole.None || !input.MatchRunning)
             {
                 _shownHunterId = 0;
@@ -207,6 +209,8 @@ namespace CluckWars.Visuals
             input.CanKillNow = exec.CanKillNow;
             input.Walled = PlayerBase.WallBetween(me, it);
             input.TargetShelled = !ExecuteRules.CanBeExecuted(target.IsStealProof);
+            input.TargetStunned = target.CurrentControlState == ControlState.Stunned;
+            input.KillRange = exec.KillRange;
 
             // Stun lit: the target inside the equipped stun's OWN shape (the hot test's WouldAffect: reach, shape, wall,
             // eligibility, all read from the asset) and the slot ready. Any stun counts (FixedKit.EmitsStun), the rule the kit

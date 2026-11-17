@@ -23,6 +23,8 @@ namespace CluckWars.Tests
             public readonly List<MarkChicken> Chickens = new List<MarkChicken>();
             public bool MatchRunning = true, ReducedMotion, BannerMayShow = true;
             public bool CanKillNow, AmbushReady, Walled, HunterInvisible, HunterHidden;
+            public bool Shelled, TargetStunned, LocalRemoved;
+            public float KillRange = 6.2f;
             public float Distance = 20f, HunterDistance = 20f, Remaining = 12f, Window = 12f, Arm = 0.6f;
             /// <summary>Seconds to the arm (the replicated ArmTimer); 0 = armed, the default of the older tests.</summary>
             public float ArmRemaining;
@@ -55,6 +57,7 @@ namespace CluckWars.Tests
                     Role = r.Role, MarkKey = r.Key, Remaining = Remaining, Window = Window, ArmSeconds = Arm, ArmRemaining = ArmRemaining,
                     Distance = Distance, CanKillNow = CanKillNow, AmbushReadyOnTarget = AmbushReady, Walled = Walled,
                     HunterInvisible = HunterInvisible, HunterHiddenFromView = HunterHidden, HunterDistance = HunterDistance, InnerRadius = R,
+                    TargetShelled = Shelled, TargetStunned = TargetStunned, KillRange = KillRange, LocalRemoved = LocalRemoved,
                 };
                 if (r.Role != MarkRole.None)
                 {
@@ -98,9 +101,10 @@ namespace CluckWars.Tests
         private static void AssertEndsClean(World w, string why)
         {
             var o = w.Step();
-            Assert.AreEqual(MarkEvents.None, o.Events, why + ": an ending fires no event");
+            Assert.AreEqual(MarkEvents.None, o.Events & ~MarkEvents.Ended, why + ": an ending fires no cue but the hunter's Ended");
             Assert.IsFalse(o.AssassinMarkActive || o.KillHex || o.AmbushLit || o.ForceShowHunter, why + ": booleans drop at once");
-            var events = w.Run(FeedbackTuning.MarkEndFadeSeconds + 0.05f, out o);
+            // A hunter's Missed / Safe end holds its marker first, so the run covers the hold and the fade.
+            var events = w.Run(FeedbackTuning.MarkEndHoldSeconds + FeedbackTuning.MarkEndFadeSeconds + 0.05f, out o);
             Assert.AreEqual(MarkEvents.None, events, why + ": the fade fires nothing");
             AssertExactlyClean(o, why);
         }
@@ -747,6 +751,144 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, o.Cold, "nothing of the old cold");
             Assert.AreEqual(0f, o.Red);
             Assert.AreEqual(2, o.HunterCorner, "the new hunter");
+        }
+
+        // ---- The hunter's end: Missed / Safe hold the marker, a pounce does not (K1) -------------------------------------
+
+        private static World AssassinLive()
+        {
+            var w = AssassinLocked();
+            w.ArmRemaining = 0f;
+            w.Remaining = FeedbackTuning.MarkEndExpiryToleranceSeconds * 0.5f;   // expired
+            return w;
+        }
+
+        [Test]
+        public void AssassinMissed_HoldsMarkerThenFades()
+        {
+            var w = AssassinLive();
+            Assert.AreEqual(1f, w.Step().MarkerAlpha);
+            w.ClearMark(Me);   // expired, nothing legal: Missed
+            var first = w.Step();
+            Assert.AreEqual(MarkEndCause.Missed, first.EndCause);
+            Assert.IsTrue(first.EndHolding);
+            Assert.IsFalse(first.AssassinMarkActive, "the range guides never wait for the hold");
+            Assert.AreEqual(1f, first.MarkerAlpha, "the marker keeps its last alpha");
+            Assert.AreNotEqual(MarkEvents.None, first.Events & MarkEvents.Ended);
+
+            // Past the usual fade the other layers are gone; the marker still holds.
+            w.Run(FeedbackTuning.MarkEndFadeSeconds + 0.05f, out var mid);
+            Assert.AreEqual(0f, mid.SkullAlpha, 1e-3f, "other layers keep today's fade");
+            Assert.AreEqual(1f, mid.MarkerAlpha, 1e-3f);
+            Assert.IsTrue(mid.EndHolding);
+
+            // After the hold the marker fades over the usual end fade, then the model is clean.
+            float intoHold = FeedbackTuning.MarkEndFadeSeconds + 0.05f + Dt;
+            w.Run(FeedbackTuning.MarkEndHoldSeconds - intoHold + FeedbackTuning.MarkEndFadeSeconds * 0.5f, out var fading);
+            Assert.IsFalse(fading.EndHolding);
+            Assert.Greater(fading.MarkerAlpha, 0f);
+            Assert.Less(fading.MarkerAlpha, 1f);
+            w.Run(FeedbackTuning.MarkEndFadeSeconds, out var clean);
+            AssertExactlyClean(clean, "after hold + fade");
+        }
+
+        [Test]
+        public void AssassinPounced_FadesWithoutHold()
+        {
+            var w = AssassinLive();
+            w.CanKillNow = true; w.Step();
+            w.SetRemoved(Rival, true);
+            var first = w.Step();
+            Assert.AreEqual(MarkEndCause.Pounced, first.EndCause);
+            Assert.IsFalse(first.EndHolding);
+            Assert.AreEqual(MarkEvents.None, first.Events & MarkEvents.Ended, "a landed pounce adds no word");
+            var events = w.Run(FeedbackTuning.MarkEndFadeSeconds + 0.05f, out var o);
+            Assert.AreEqual(MarkEvents.None, events);
+            AssertExactlyClean(o, "pounce: today's 0.3 s fade");
+        }
+
+        [Test]
+        public void AssassinSafe_WhenExpiredBehindWallOrEgg()
+        {
+            foreach (bool egg in new[] { false, true })
+            {
+                var w = AssassinLive();
+                w.Walled = !egg; w.Shelled = egg;
+                w.Step();
+                w.ClearMark(Me);
+                Assert.AreEqual(MarkEndCause.Safe, w.Step().EndCause, egg ? "egg" : "wall");
+            }
+        }
+
+        [Test]
+        public void VictimEnd_StillCleanAfterEndFade()
+        {
+            var w = VictimMarked(cold: true);
+            w.ClearMark(Rival);
+            var first = w.Step();
+            Assert.AreEqual(MarkEndCause.None, first.EndCause);
+            Assert.IsFalse(first.EndHolding);
+            var events = w.Run(FeedbackTuning.MarkEndFadeSeconds + 0.05f, out var o);
+            Assert.AreEqual(MarkEvents.None, events, "no Ended for a victim");
+            AssertExactlyClean(o, "victim: unchanged 0.3 s");
+        }
+
+        [Test]
+        public void Ended_FiresOnceAndNotOnSameKeyReturn()
+        {
+            var w = AssassinLive();
+            w.ClearMark(Me);
+            int ended = 0;
+            for (int i = 0; i < Mathf.RoundToInt(0.5f / Dt); i++) if ((w.Step().Events & MarkEvents.Ended) != 0) ended++;
+            Assert.AreEqual(1, ended, "once, on the first end frame");
+
+            // The same mark coming back during the hold resumes: no second Ended, no hold left behind.
+            w.SetMark(Me, Rival);
+            var back = w.Step();
+            Assert.AreEqual(MarkEvents.None, back.Events & MarkEvents.Ended);
+            Assert.AreEqual(MarkEndCause.None, back.EndCause);
+            Assert.IsFalse(back.EndHolding);
+            Assert.IsTrue(back.AssassinMarkActive);
+        }
+
+        [Test]
+        public void HunterRemoved_OrRoundStopped_NoWordNoHold()
+        {
+            var w = AssassinLive();
+            w.LocalRemoved = true; w.SetRemoved(Me, true);
+            var first = w.Step();
+            Assert.AreEqual(MarkEndCause.None, first.EndCause);
+            Assert.AreEqual(MarkEvents.None, first.Events & MarkEvents.Ended);
+
+            var stopped = AssassinLive();
+            stopped.ClearMark(Me); stopped.MatchRunning = false;
+            Assert.AreEqual(MarkEndCause.None, stopped.Step().EndCause);
+        }
+
+        [Test]
+        public void LiveFrames_CarryBlockerAndRemaining()
+        {
+            var w = AssassinLive();
+            w.Distance = w.KillRange + 1f; w.TargetStunned = true;
+            var o = w.Step();
+            Assert.AreEqual(HuntBlocker.TooFar, o.Blocker);
+            Assert.AreEqual(w.Remaining, o.Remaining);
+
+            var arming = new World { ArmRemaining = 1f };
+            arming.SetMark(Me, Rival);
+            Assert.AreEqual(HuntBlocker.None, arming.Step().Blocker, "none while arming");
+        }
+
+        [Test]
+        public void MarkerColour_MatchesPreviousInlineTable()
+        {
+            for (int corner = 0; corner < 4; corner++)
+            {
+                Assert.AreEqual(FeedbackTuning.MarkKillColor, HuntRules.MarkerColour(MarkMarkerMode.Kill, corner));
+                Assert.AreEqual(FeedbackTuning.MarkWalledColor, HuntRules.MarkerColour(MarkMarkerMode.Walled, corner));
+                Assert.AreEqual(FeedbackTuning.MarkCream, HuntRules.MarkerColour(MarkMarkerMode.Shelled, corner));
+                Assert.AreEqual(CluckWars.UI.PlayerPalette.ForCorner(corner), HuntRules.MarkerColour(MarkMarkerMode.Hunt, corner));
+            }
         }
     }
 }
