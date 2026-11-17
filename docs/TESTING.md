@@ -491,6 +491,19 @@ In the **Editor** the heavy probes (automatic Visual scans, Sync lines) are off 
 
 The **Editor** also ignores the live-ops balance delta by default: Play Mode runs the assets as they are on disk (`Balance: Remote Config is off in the Editor` at boot). Tick **Cluck Wars / Balance / Remote Config In Editor** to read the dev environment's `balance` key and this machine's cache (`<persistentDataPath>/balance/dev.json`); the assets are restored when Play Mode ends.
 
+#### Publishing a balance delta (`tools/balance/`)
+
+All scripts are Python 3, stdlib only, run with `python -I` from the repo root. Dry run is the default everywhere.
+
+| Script | What |
+|---|---|
+| `make_delta.py proposal.json` | proposal → validated delta (only values that differ from the shipped assets) |
+| `kitlab_to_proposal.py dump.json` / `delta_to_kitlab.py delta.json` | Kit Lab database dump → proposal, and the reverse (reset the page to what is published) |
+| `publish_delta.py publish delta.json [--env dev\|production] [--apply] [--confirm-production]` | re-validates through `make_delta.py`, prints env, delta, expected `bal=` and the diff against what is published; `--apply` publishes to UGS Remote Config key `balance` (JSON type), reads it back, writes `tools/balance/history/<UTC>-<env>.json` + `latest-<env>.json`. Also `fetch --env dev\|production` and `rollback <history file>`. Production needs `--confirm-production` (a human flag) |
+| `apply_delta.py delta.json [--apply]` | promotes a tested delta into the shipped `.asset` files (scalar lines and `Kit:` guids only; refuses enum-by-name fields and files with uncommitted changes) |
+
+`publish_delta.py` reads `UGS_SERVICE_KEY_ID`, `UGS_SERVICE_SECRET`, `UGS_PROJECT_ID` (and optionally `UGS_ENV_DEV_ID` / `UGS_ENV_PRODUCTION_ID`) from the environment only. After a publish, start a build and check `bal=<hash>` in the Session log line or the F1 HUD matches the hash the tool printed; publish to `dev` first, production only as its own deliberate step. Tests: `python -I -m unittest discover -s tools/balance/tests -t tools/balance/tests` (fake HTTP, temporary copies of the Data folder; no network, no writes to `Assets/`). The `/balance` user skill drives all of this.
+
 Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= lateJoin= reducedMotion=`, `GET READY held Xs`; `ArenaReadiness` `Render tier: rp= quality= post= haze=`; `Reveal` `first-use hitspark|invisibility|fencehole|telegraph frame=N` (once per scene load); `Fusion` join / leave / master change / shutdown with `cover= revealed= state=`.
 
 ### Auto-test (dev-tools builds)

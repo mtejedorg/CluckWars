@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluck Wars Kit Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One:wght@400&amp;family=Nunito:wght@400;700;800&amp;display=swap">
+<style>
+:root{--paper:#f6eedd;--card:#fffaf0;--ink:#2a1a0c;--muted:#6e5838;--line:#e0cfae;--gold:#a8770c;--strong:#3a2210;--on-strong:#f4e8d0;--on-strong-muted:#d9c39b;--accent:#b8432f;--chip-bg:#efe2c4;--red:#b8432f;--amber:#8a5a12;--purple:#7d3f8c;--blue:#2f6f8a;--green:#3f7d2c;--coral:#a3361f;--shadow:0 1px 0 rgba(42,26,12,.08),0 6px 18px -10px rgba(42,26,12,.35);--display:"Lilita One","Arial Black",Impact,sans-serif;--body:"Nunito","Segoe UI",system-ui,sans-serif;--display-weight:400;}
+@media (prefers-color-scheme:dark){:root:not([data-theme='light']){--paper:#16100a;--card:#211710;--ink:#f4e8d0;--muted:#c3a982;--line:#3b2b1b;--gold:#f5c842;--strong:#0e0804;--on-strong:#f4e8d0;--on-strong-muted:#d9c39b;--accent:#f08a6c;--chip-bg:#2e2116;--red:#f08a6c;--amber:#e2b45a;--purple:#cf9be0;--blue:#7cc4e6;--green:#8fd27a;--coral:#ff9a7a;--shadow:0 1px 0 rgba(0,0,0,.4),0 8px 22px -12px rgba(0,0,0,.8);--display:"Lilita One","Arial Black",Impact,sans-serif;--body:"Nunito","Segoe UI",system-ui,sans-serif;--display-weight:400;color-scheme:dark}}
+:root[data-theme='dark']{--paper:#16100a;--card:#211710;--ink:#f4e8d0;--muted:#c3a982;--line:#3b2b1b;--gold:#f5c842;--strong:#0e0804;--on-strong:#f4e8d0;--on-strong-muted:#d9c39b;--accent:#f08a6c;--chip-bg:#2e2116;--red:#f08a6c;--amber:#e2b45a;--purple:#cf9be0;--blue:#7cc4e6;--green:#8fd27a;--coral:#ff9a7a;--shadow:0 1px 0 rgba(0,0,0,.4),0 8px 22px -12px rgba(0,0,0,.8);--display:"Lilita One","Arial Black",Impact,sans-serif;--body:"Nunito","Segoe UI",system-ui,sans-serif;--display-weight:400;color-scheme:dark}
+/* review-site base stylesheet. Colours/fonts come from the :root tokens that build_site.py writes (theme preset + overrides). Layout: one reading column — verdict, evidence, the reader's decisions, the verified ledger, close-ups, keep. */
+*{box-sizing:border-box}
+img{max-width:100%;height:auto}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;margin:0;padding-inline:16px;padding-block:24px 64px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+h1,h2,h3{font-family:var(--display);font-weight:var(--display-weight,400);letter-spacing:.01em;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5vw,3rem);line-height:1.05}
+h2{font-size:1.6rem}
+h3{font-size:1.15rem}
+p{margin:0}
+a{color:var(--accent)}
+.eyebrow{font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-size:.75rem;color:var(--gold)}
+header{display:flex;flex-direction:column;gap:12px}
+.lede{max-width:65ch;color:var(--muted);font-size:1.02rem}
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:start}
+.hero.solo{grid-template-columns:1fr}
+.hero figure{margin:0}
+.hero img{border-radius:10px;border:1px solid var(--line);display:block}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+figcaption{font-size:.8rem;color:var(--muted);margin-top:6px}
+.grades{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.grade{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.grade b{font-family:var(--display);font-size:1.7rem;font-weight:var(--display-weight,400);line-height:1}
+.grade span{font-size:.8rem;color:var(--muted)}
+.grade .trail{font-variant-numeric:tabular-nums;font-size:.78rem}
+.grade.total{background:var(--strong);color:var(--on-strong);border-color:var(--strong)}
+.grade.total span{color:var(--on-strong-muted)}
+.tally{display:flex;gap:10px;flex-wrap:wrap}
+.tally div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;min-width:120px}
+.tally b{font-family:var(--display);font-weight:var(--display-weight,400);font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums}
+.tally span{font-size:.8rem;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:14px}
+.sub{color:var(--muted);max-width:70ch}
+.pairs{display:flex;flex-direction:column;gap:14px}
+.pairs figure,.gallery figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px}
+.pairs img{border-radius:6px;display:block;width:100%}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.gallery img{border-radius:6px;display:block;aspect-ratio:16/10;object-fit:cover;width:100%}
+.dec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.dec-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.dec-id{font-family:var(--display);color:var(--accent);font-size:1.1rem}
+.backing{font-size:.8rem;color:var(--muted)}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{border:1px solid var(--line);border-radius:8px;padding:9px 12px;display:flex;gap:10px;align-items:baseline}
+.opt .k{font-weight:800;min-width:1.4em}
+.opt .t{min-width:0}
+.tag{display:inline-block;font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--chip-bg);color:var(--muted);white-space:nowrap}
+.tag.rec{background:var(--gold);color:var(--strong)}
+.why{font-size:.88rem;color:var(--muted)}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filters button{font:inherit;font-weight:700;font-size:.85rem;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--strong);color:var(--on-strong);border-color:var(--strong)}
+.filters button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.list{display:flex;flex-direction:column;gap:10px}
+.f{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c,var(--muted));border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:4px 12px}
+.f .n{font-family:var(--display);color:var(--c,var(--muted));font-size:1.15rem;grid-row:span 4}
+.f h3{font-family:var(--body);font-weight:800;font-size:1.02rem}
+.f .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.f .ev,.f .fx{font-size:.88rem;min-width:0;overflow-wrap:anywhere}
+.f .ev b,.f .fx b{font-weight:800;color:var(--muted)}
+.st{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;border:1px solid currentColor;color:var(--s,var(--muted))}
+.ver{font-size:.75rem;color:var(--muted)}
+.keep{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;max-width:75ch}
+.keep ul{margin:0;padding:0}
+.keep li{margin-left:1.1em}
+.callout{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;max-width:80ch}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+footer{font-size:.78rem;color:var(--muted)}
+@media (max-width:720px){.hero{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap"><header><div class="eyebrow">Kit lab · fixed-kits baseline · numbers read from the shipped .asset files, 2026-11-17</div><h1>Build any kit you like. Your picks and tips save for Claude.</h1><p class="lede">Each specialization starts on its shipped kit, with its stats shown against a standard value. Change the passive or any of the four slots, write a tip on an equipped passive or move, or add a new ability or passive from a plain description. Nothing changes in the game until you ask me to build it.</p><div class="hero solo"><div class="side"><div class="tally"><div><b>4</b><span>classes</span></div><div><b>8</b><span>specializations</span></div><div><b>8</b><span>passives</span></div><div><b>11</b><span>active abilities</span></div></div></div></div></header><section><div class="eyebrow">Lab</div><h2>Kits by class</h2><style>
+.lab-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
+.lab-tabs button,.lab-btn{font:inherit;font-weight:700;font-size:.85rem;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+.lab-tabs button[aria-pressed="true"]{background:var(--accent);color:var(--on-strong);border-color:var(--accent)}
+.lab-btn:focus-visible,.lab-tabs button:focus-visible,.lab select:focus-visible,.lab textarea:focus-visible,.lab input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.lab-status{font-size:.85rem;color:var(--muted);margin:0 0 10px}
+.lab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px}
+.kit{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);min-width:0}
+.kit h3{margin:0;font-family:var(--display);font-size:1.25rem;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.kit .tag{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--chip-bg);color:var(--muted)}
+.kit .tag.mod{background:var(--accent);color:var(--on-strong)}
+.lab label.lbl{font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.lab select,.lab input[type=text],.lab textarea{font:inherit;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--paper);color:var(--ink)}
+.lab select{text-overflow:ellipsis}
+.lab textarea{min-height:2.6em;resize:vertical;font-size:.9rem}
+.slot{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--paper);min-width:0}
+.slot .desc{font-size:.9rem;margin:0}
+.slot .nums{font-size:.78rem;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.slot.changed{border-left:4px solid var(--accent)}
+.kit-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.kit-row label{font-size:.85rem;display:flex;gap:6px;align-items:center}
+.pdesc{font-size:.85rem;color:var(--muted);margin:4px 0 0}
+.newform{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;max-width:760px}
+.newform .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px}
+.customs{display:grid;gap:8px;margin-top:12px;max-width:760px}
+.custom{background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.custom b{font-family:var(--display)}
+.custom .meta{font-size:.78rem;color:var(--muted)}
+.custom-tag{color:var(--accent);font-weight:700}
+.stats{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper)}
+.stats summary{cursor:pointer;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.stats summary:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.srow{display:grid;grid-template-columns:minmax(0,8.5em) minmax(0,1fr) 4.6em;gap:4px 8px;align-items:center;font-size:.82rem;margin-top:6px}
+.srow .sv{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.srow .sv small{display:block;white-space:normal;font-size:.7rem;font-weight:700}
+.sbar{position:relative;height:10px;border-radius:5px;background:var(--chip-bg);overflow:hidden}
+.sbar i{position:absolute;top:0;bottom:0;left:0;border-radius:5px;background:var(--muted)}
+.sbar i.up{background:#3f9b5a}.sbar i.down{background:#c8553d}
+.sbar b{position:absolute;top:-2px;bottom:-2px;left:50%;width:2px;background:var(--ink);opacity:.55}
+.sv small.up{color:#3f9b5a}.sv small.down{color:#c8553d}.sv small.eq{color:var(--muted)}
+.snote{font-size:.72rem;color:var(--muted);margin:6px 0 0}
+.crules{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;flex-direction:column;gap:8px;max-width:900px}
+.crules h3{margin:0;font-family:var(--display);font-size:1.1rem}
+.crules ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;font-size:.9rem}
+.rulewarn{font-size:.8rem;font-weight:700;color:#c8553d;margin:0}
+.stdbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 14px;max-width:900px}
+.stdbox summary{cursor:pointer;font-weight:700}
+.stdbox summary:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.stdrow{display:grid;grid-template-columns:minmax(0,11em) 7em minmax(0,1fr);gap:4px 10px;align-items:center;margin:6px 0;font-size:.88rem}
+.stdrow input{font:inherit;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--paper);color:var(--ink)}
+.avtable{width:100%;border-collapse:collapse;font-size:.86rem;margin:8px 0}
+.avtable th,.avtable td{text-align:left;padding:5px 6px;border-top:1px solid var(--line);vertical-align:middle}
+.avtable th{font-size:.74rem;color:var(--muted);font-weight:700;border-top:0}
+.avtable td.avname{font-weight:700;white-space:nowrap}
+.avtable input{font:inherit;width:5.5em;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--paper);color:var(--ink)}
+.avtable input.mod{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.avship{font-size:.74rem;color:var(--muted)}.avship.mod{color:var(--accent);font-weight:700}
+.band{display:inline-block;font-size:.7rem;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px;border:1px solid var(--line)}
+.band.low{background:#d9f2df;color:#1d5c2e}.band.med{background:#fbeccb;color:#6b4a07}.band.high{background:#f8d9d2;color:#7a2414}.band.over{background:#7a2414;color:#fff}
+@media (prefers-color-scheme:dark){.band.low{background:#1d3d26;color:#bfe9c9}.band.med{background:#4a3a14;color:#f6dfa6}.band.high{background:#4f2219;color:#f5c6bb}}
+.avnote{width:100%;box-sizing:border-box;font:inherit;font-size:.82rem;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--paper);color:var(--ink)}
+.avwrap{overflow-x:auto}
+@media (max-width:620px){.avtable thead{display:none}.avtable tr{display:block;border-top:1px solid var(--line);padding:6px 0}.avtable td{display:flex;gap:8px;align-items:center;border:0;padding:3px 0}.avtable td[data-l]::before{content:attr(data-l);flex:0 0 8.5em;font-size:.76rem;color:var(--muted)}}
+.absec{font-family:var(--display);margin:28px 0 10px}
+.absub{font-family:var(--display);margin:18px 0 6px;font-size:1.15rem}
+.avsumt{font-weight:700}.avhint{font-weight:400;font-size:.8rem;color:var(--muted)}
+.avsum{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px;font-weight:400}
+details[open] > summary .avsum{display:none}
+.avchip{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 9px;background:var(--paper);white-space:nowrap}
+.avchip.mod{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.avchip .band{margin-left:0}
+.avchip.plain{padding-right:9px}
+.pvlist{display:grid;gap:8px;margin:10px 0 4px}
+.pvrow{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper)}
+.pvrow h4{margin:0 0 3px;font-size:.95rem;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.pvrow h4 .tag{font-size:.7rem;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--chip-bg);color:var(--muted)}
+.pvrow p{margin:0;font-size:.88rem}
+.stdwhy{font-size:.78rem;color:var(--muted)}.stdwhy.mod{color:var(--accent);font-weight:700}
+@media (max-width:520px){.stdrow{grid-template-columns:minmax(0,1fr) 6.5em}.stdwhy{grid-column:1/-1;margin-top:-2px}}
+.srow{grid-template-columns:minmax(0,8.5em) minmax(0,1fr) 5.4em !important}
+.swrap{min-width:0}
+.sends{display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.sin{font:inherit;width:100%;box-sizing:border-box;text-align:right;border:1px solid var(--line);border-radius:6px;padding:2px 5px;background:var(--paper);color:var(--ink);font-variant-numeric:tabular-nums}
+.sin:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+.sin.mod{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+@media (max-width:420px){.srow{grid-template-columns:minmax(0,6.5em) minmax(0,1fr) 5em !important;font-size:.78rem}}
+.dpbox{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:12px;padding:14px;max-width:900px;display:flex;flex-direction:column;gap:10px}
+.dpbox textarea{font:12.5px/1.45 ui-monospace,Consolas,monospace;min-height:11em;white-space:pre;overflow:auto}
+.dpbox .dprow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dpsum{font-size:.88rem;font-weight:700}.dpsum.empty{color:var(--muted);font-weight:400}
+.dplist{margin:0;padding-left:1.2em;font-size:.84rem;display:flex;flex-direction:column;gap:3px}
+.dplist.warn li{color:#c8553d}
+.dpbox h4{margin:2px 0 0;font-family:var(--display);font-size:1rem}
+.dpok{font-size:.8rem;font-weight:700;color:#3f9b5a}
+</style>
+<div class="lab">
+  <p class="lab-status" id="labStatus" role="status">Loading saved kits...</p>
+  <details class="stdbox" id="stdBox"><summary>Standard values (the centre line of every stat bar)</summary>
+    <p class="snote">Each suggested value is one that two or more classes already share. Edit any of them: every stat bar updates, and the values save for Claude.</p>
+    <div id="stdBody"></div></details>
+  <div class="lab-tabs" id="labTabs" role="group" aria-label="Class"></div>
+  <div id="classPanel"></div>
+  <div class="lab-grid" id="labGrid"></div>
+  <h2 class="absec" id="abilities">Abilities</h2>
+  <details class="stdbox" id="avBox"><summary><span class="avsumt">Ability values</span> <span class="avhint">(cooldowns, reach, strength; open to edit)</span>
+    <span class="avsum" id="avSum"></span></summary>
+    <p class="snote">The active abilities (not Peck: its cooldown is a class stat) with their shipped numbers. Type a new value to try it: the kit cards below show your value, and Claude reads every change and note from here. Nothing changes in the game until you ask. Cooldown bands for a 45 s match: <span class="band low">low 1-3 s</span> <span class="band med">medium 4-6 s</span> <span class="band high">high 7-8 s</span>. Bully recharges every move except Peck 25% faster.</p>
+    <div id="avBody"></div></details>
+  <details class="stdbox" id="pvBox"><summary><span class="avsumt">Passives</span> <span class="avhint">(one per specialization; open for what each does)</span>
+    <span class="avsum" id="pvSum"></span></summary>
+    <div id="pvBody"></div></details>
+  <h3 class="absub">Add a new ability or passive</h3>
+  <p style="margin:0 0 10px;max-width:75ch">Describe what it does in plain words. Pick <b>Passive</b> as the kind to make a passive. It shows up in the slot pickers (or the Passive picker) right away (marked <span class="custom-tag">NEW</span>), and Claude reads it as a design request: nothing is built until you ask.</p>
+  <form class="newform" id="newForm">
+    <div class="two">
+      <div><label class="lbl" for="nfName">Name</label><input type="text" id="nfName" maxlength="40" required placeholder="e.g. Egg Toss or Thick Skin"></div>
+      <div><label class="lbl" for="nfClass">Class</label><select id="nfClass"></select></div>
+      <div><label class="lbl" for="nfCat">Kind</label><select id="nfCat"><option>Steal</option><option>Control</option><option>Defense</option><option>Utility</option><option>Passive</option></select></div>
+    </div>
+    <div><label class="lbl" for="nfDesc">What it does</label><textarea id="nfDesc" maxlength="1200" required rows="4" placeholder="High level: what the player presses, what happens, who it hurts, roughly how strong and how often."></textarea></div>
+    <div><button class="lab-btn" type="submit">Add</button></div>
+  </form>
+  <div class="customs" id="customList"></div>
+  <h2 class="absec" id="delta">Delta to publish</h2>
+  <div class="dpbox" id="dpBox">
+    <p class="snote" style="margin:0;max-width:75ch">Your edits to ability values and class base stats, as the JSON for the UGS Remote Config key <b>balance</b> (Unity Dashboard, Remote Config, key <b>balance</b>, type JSON, then Publish). Only values that differ from the shipped assets are included; if every value matches, there is nothing to publish. Kit slot swaps are included when the passive is unchanged; passive swaps and NEW abilities need a build.</p>
+    <div class="dprow"><label class="lbl" for="dpNote">Note (why)</label><input type="text" id="dpNote" maxlength="200" placeholder="e.g. Steal slower, test round 2" style="flex:1;min-width:12em;font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--paper);color:var(--ink)"></div>
+    <div class="dpsum" id="dpSum" role="status"></div>
+    <textarea id="dpOut" readonly rows="12" aria-label="Delta JSON to publish" spellcheck="false"></textarea>
+    <div class="dprow"><button type="button" class="lab-btn" id="dpCopy">Copy delta</button><span class="dpok" id="dpCopied" role="status"></span></div>
+    <div id="dpIssues"></div>
+  </div>
+</div>
+<script>
+(function(){
+var G=/*KITLAB_DATA*/{};
+var SUBS=G.passives.map(function(p){return {id:p.id,cls:p.cls,name:p.name,passive:p.id,kit:p.kit.slice()};});
+var ORDER=['Relentless','Bully','Slippery','Featherfoot','Hoarder','Bulwark','Spoiler','Thief'];
+SUBS.sort(function(a,b){return ORDER.indexOf(a.id)-ORDER.indexOf(b.id);});
+var AB={}; G.abilities.forEach(function(a){AB[a.id]=a;});
+var LABEL={Warrior:'Warrior',Speedy:'Speedy',Fatty:'Fatty',Assassin:'Sneaky'};
+var state={kits:{},custom:{},classes:{},std:{values:{}},cstats:{},av:{}}, db=null, cls=null;
+try{cls=localStorage.getItem('kitlab.tab');}catch(e){}
+if(!cls||!LABEL[cls]) cls='Warrior';
+var NUMSKIP={Duration:1,Cooldown:1};
+var AVF={
+ Snatch:[['Cooldown','Cooldown','s',1],['SnatchRange','Reach','m'],['StealAmount','Food stolen','']],
+ WingSlam:[['Cooldown','Cooldown','s',1],['StunRadius','Reach','m'],['StunDuration','Stun lasts','s']],
+ CluckShock:[['Cooldown','Cooldown','s',1],['ShockRadius','Reach','m'],['KnockbackForce','Push force','']],
+  Slow:[['Cooldown','Cooldown','s',1],['Radius','Reach','m'],['SlowSeconds','Slow lasts','s'],['SlowFactor','Speed while slowed','x']],
+ FeatherAura:[['Cooldown','Cooldown','s',1],['AuraRadius','Reach','m'],['Duration','Zone lasts','s'],['AuraSlowFactor','Speed while slowed','x']],
+ SpeedBurst:[['Cooldown','Cooldown','s',1],['Duration','Lasts','s'],['SpeedMultiplier','Speed','x']],
+ Shadowstep:[['Cooldown','Cooldown','s',1],['Duration','Dash lasts','s'],['SpeedMultiplier','Dash speed','x']],
+ TurtleMode:[['Cooldown','Cooldown','s',1],['WalkSeconds','Walk lasts','s'],['SpeedMultiplier','Walk speed','x'],['EggSeconds','Egg lasts','s']],
+ Invisibility:[['Cooldown','Cooldown','s',1],['Duration','Lasts','s'],['Opacity','Seen at','x']],
+ MarkKill:[['SuccessCooldownSeconds','Cooldown after a kill','s',1],['FailCooldownSeconds','Cooldown after a miss','s',1],['KillRange','Kill reach','m'],['ArmSeconds','Mark arms in','s'],['WindowSeconds','Kill window','s']]};
+var AVORDER=['Snatch','WingSlam','CluckShock','Slow','FeatherAura','SpeedBurst','Shadowstep','TurtleMode','Invisibility','MarkKill'];
+function avEdits(id){return ((state.av[id]||{}).values)||{};}
+function numsOf(a){if(!a.nums)return null;return Object.assign({},a.nums,avEdits(a.id));}
+function bandOf(v){return v<=3?['low','low']:v<=6?['med','medium']:v<=8?['high','high']:['over','too long'];}
+var avTimers={};
+function saveAv(id){var v=state.av[id];v.updated_at=new Date().toISOString();
+  if(db){db.doc('abilityvals/'+id).set(v).catch(function(e){status('Could not save the '+id+' values: '+(e&&e.message||e));});}
+  else try{localStorage.setItem('kitlab.av',JSON.stringify(state.av));}catch(e){}}
+function saveAvLater(id){clearTimeout(avTimers[id]);avTimers[id]=setTimeout(function(){saveAv(id);renderGrid();renderAvSum();},600);}
+function renderAvSum(){var b=document.getElementById('avSum');if(!b)return;b.innerHTML='';var n=0;
+  AVORDER.forEach(function(id){var a=AB[id];if(!a||!a.inRegistry||!a.nums)return;var f=(AVF[id]||[])[0]||['Cooldown'];var key=f[0];
+    var ed=avEdits(id),v=num(ed[key])?ed[key]:a.nums[key];var mod=Object.keys(ed).length>0;if(mod)n++;if(!num(v))return;
+    var bb=bandOf(v);var c=el('span',{'class':'avchip'+(mod?' mod':''),title:a.name+' cooldown'+(mod?' (edited)':'')},[document.createTextNode(a.name+' '+fmt(v)+' s'+(mod?'*':'')),el('span',{'class':'band '+bb[0],text:bb[1]})]);
+    b.appendChild(c);});
+  if(n)b.appendChild(el('span',{'class':'avchip plain mod',text:n+' edited'}));}
+function renderPv(){var b=document.getElementById('pvBody'),sm=document.getElementById('pvSum');if(!b)return;b.innerHTML='';sm.innerHTML='';
+  var list=el('div',{'class':'pvlist'});
+  SUBS.forEach(function(sb){var p=G.passives.filter(function(x){return x.id===sb.passive;})[0];if(!p)return;
+    sm.appendChild(el('span',{'class':'avchip plain',text:pname(p)+' · '+LABEL[p.cls]}));
+    list.appendChild(el('div',{'class':'pvrow'},[el('h4',null,[document.createTextNode(pname(p)),el('span',{'class':'tag',text:LABEL[p.cls]})]),el('p',{text:p.desc||''})]));});
+  Object.keys(state.custom).forEach(function(k){var c=state.custom[k];if(!c||c.cat!=='Passive')return;
+    sm.appendChild(el('span',{'class':'avchip plain mod',text:c.name+' · NEW'}));
+    list.appendChild(el('div',{'class':'pvrow'},[el('h4',null,[document.createTextNode(c.name),el('span',{'class':'tag',text:'NEW'+(c.cls&&LABEL[c.cls]?' · '+LABEL[c.cls]:'')})]),el('p',{text:c.desc||''})]));});
+  b.appendChild(list);
+  b.appendChild(el('p',{'class':'snote',text:'Pick a passive for a kit in its card above. Their numbers show in each kit’s stat bars. To propose a new one, use the box below with Passive as the kind.'}));}
+function renderAv(){renderAvSum();var b=document.getElementById('avBody');if(!b)return;b.innerHTML='';
+  var t=el('table',{'class':'avtable'}),th=el('thead'),hr=el('tr');
+  ['Ability','Value','Yours','Shipped','Note for Claude'].forEach(function(h){hr.appendChild(el('th',{text:h}));});th.appendChild(hr);t.appendChild(th);
+  var tb=el('tbody');
+  AVORDER.forEach(function(id){var a=AB[id];if(!a||!a.inRegistry)return;
+    var f=AVF[id]||[['Cooldown','Cooldown','s',1]];
+    f.forEach(function(fd,i){var key=fd[0];var ship=a.nums?a.nums[key]:undefined;if(!num(ship))return;
+      var tr=el('tr');
+      tr.appendChild(el('td',{'class':'avname','data-l':'',text:i===0?a.name:''}));
+      tr.appendChild(el('td',{'data-l':'Value',text:fd[1]+(fd[2]&&fd[2]!=='x'?' ('+fd[2]+')':fd[2]==='x'?' (x)':'')}));
+      var cur=avEdits(id)[key],has=num(cur),iid='av_'+id+'_'+key;
+      var inp=el('input',{type:'number',step:'any',inputmode:'decimal',id:iid,'aria-label':a.name+' '+fd[1]});
+      inp.value=String(has?cur:ship);if(has)inp.className='mod';
+      var bandEl=el('span');function paintBand(v){if(!fd[3]){bandEl.className='';bandEl.textContent='';return;}var bb=bandOf(v);bandEl.className='band '+bb[0];bandEl.textContent=bb[1];}
+      paintBand(has?cur:ship);
+      var shipEl=el('span',{'class':'avship'+(has?' mod':''),text:has?('was '+fmt(ship)):fmt(ship)});
+      inp.oninput=function(){var v=parseFloat(inp.value);var o=state.av[id]=Object.assign({values:{},note:''},state.av[id]||{});o.values=Object.assign({},o.values);
+        if(inp.value===''||!isFinite(v)||Math.abs(v-ship)<1e-9){delete o.values[key];inp.className='';shipEl.className='avship';shipEl.textContent=fmt(ship);paintBand(ship);}
+        else{o.values[key]=v;inp.className='mod';shipEl.className='avship mod';shipEl.textContent='was '+fmt(ship);paintBand(v);}
+        renderDelta();saveAvLater(id);};
+      tr.appendChild(el('td',{'data-l':'Yours'},[inp,bandEl]));
+      tr.appendChild(el('td',{'data-l':'Shipped'},[shipEl]));
+      var nt=el('td',{'data-l':i===0?'Note':''});
+      if(i===0){var ta=el('input',{type:'text','class':'avnote',id:'avn_'+id,maxlength:'400',placeholder:'Optional tip'});ta.value=(state.av[id]||{}).note||'';
+        ta.oninput=function(){var o=state.av[id]=Object.assign({values:{},note:''},state.av[id]||{});o.note=ta.value;saveAvLater(id);};nt.appendChild(ta);}
+      tr.appendChild(nt);tb.appendChild(tr);});});
+  t.appendChild(tb);b.appendChild(el('div',{'class':'avwrap'},[t]));
+  var reset=el('button',{type:'button','class':'lab-btn',text:'Reset every ability to shipped'});
+  reset.onclick=function(){Object.keys(state.av).forEach(function(id){var o=state.av[id];if(o&&o.values&&Object.keys(o.values).length){o.values={};saveAv(id);}});renderAv();renderGrid();};
+  b.appendChild(el('div',null,[reset]));}
+function el(t,a,c){var e=document.createElement(t);if(a)for(var k in a){if(k==='text')e.textContent=a[k];else e.setAttribute(k,a[k]);}(c||[]).forEach(function(x){if(x)e.appendChild(x);});return e;}
+function fmt(v){return (Math.round(v*100)/100).toString();}
+function pname(p){return p.id==='Spoiler'?'Spoiler':p.name;}
+function numsLine(a){var n=numsOf(a);if(!n)return '';var p=[];if(n.Cooldown)p.push('CD '+fmt(n.Cooldown)+' s');if(n.Duration&&n.Duration>0.06)p.push('Dur '+fmt(n.Duration)+' s');
+ Object.keys(n).forEach(function(k){if(!NUMSKIP[k])p.push(k.replace(/([a-z])([A-Z])/g,'$1 $2')+' '+fmt(n[k])+(num(avEdits(a.id)[k])?'*':''));});if(num(avEdits(a.id).Cooldown))p[0]+='*';return p.join(' · ');}
+function kitOf(s){var k=state.kits[s.id]||{};return {passive:k.passive||s.passive,slots:(k.slots&&k.slots.length===4)?k.slots.slice():s.kit.slice(),notes:Object.assign({},k.notes||{}),kitNote:k.kitNote||'',anyClass:!!k.anyClass,stats:Object.assign({},k.stats||{})};}
+function pool(s,any){
+  var ids=[];
+  G.abilities.forEach(function(a){
+    if(!a.inRegistry)return;
+    var ok=any||a.classes.indexOf(s.cls)>=0||a.id==='Peck'||SUBS.some(function(o){return o.cls===s.cls&&o.kit.indexOf(a.id)>=0;});
+    if(ok)ids.push(a.id);});
+  Object.keys(state.custom).forEach(function(id){var c=state.custom[id];if(c.cat!=='Passive'&&(any||c.cls==='Any'||c.cls===s.cls))ids.push('custom:'+id);});
+  return ids;}
+function passivePool(s,any){var r=G.passives.filter(function(p){return any||p.cls===s.cls;}).map(function(p){return {id:p.id,name:pname(p)+(p.cls!==s.cls?' ['+LABEL[p.cls]+']':''),desc:p.desc};});
+  Object.keys(state.custom).forEach(function(id){var c=state.custom[id];if(c.cat==='Passive'&&(any||c.cls==='Any'||c.cls===s.cls))r.push({id:'custom:'+id,name:'NEW · '+c.name,desc:c.desc});});return r;}
+function passiveInfo(id){if(id.indexOf('custom:')===0){var c=state.custom[id.slice(7)];return c?{name:c.name,desc:c.desc}:{name:'(deleted new passive)',desc:''};}
+  var p=G.passives.filter(function(x){return x.id===id;})[0];return p?{name:pname(p),desc:p.desc}:{name:id,desc:''};}
+function info(id){if(id.indexOf('custom:')===0){var c=state.custom[id.slice(7)];return c?{name:c.name,desc:c.desc,cat:c.cat,custom:true}:{name:'(deleted new ability)',desc:'',cat:''};}
+  var a=AB[id];return a?{name:a.name+(a.inRegistry?'':' (retired)'),desc:a.desc,cat:a.cat,nums:numsLine(a)}:{name:id,desc:'',cat:''};}
+function status(t){document.getElementById('labStatus').textContent=t;}
+function save(s,k){
+  k.updated_at=new Date().toISOString(); state.kits[s.id]=k;
+  if(db){db.doc('kits/'+s.id).set(k).catch(function(e){status('Could not save '+s.name+': '+(e&&e.message||e));});}
+  else try{localStorage.setItem('kitlab.kits',JSON.stringify(state.kits));}catch(e){}
+}
+var timers={};
+function saveLater(s,k){clearTimeout(timers[s.id]);timers[s.id]=setTimeout(function(){save(s,k);},700);}
+function editing(){var a=document.activeElement;return a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT');}
+function renderTabs(){var t=document.getElementById('labTabs');t.innerHTML='';
+  ['Warrior','Speedy','Fatty','Assassin'].forEach(function(c){var b=el('button',{type:'button','aria-pressed':String(c===cls),text:LABEL[c]});
+   b.onclick=function(){cls=c;try{localStorage.setItem('kitlab.tab',c);}catch(e){}renderTabs();renderGrid();};t.appendChild(b);});}
+function renderGrid(){var g=document.getElementById('labGrid');g.innerHTML='';var cp=document.getElementById('classPanel');cp.innerHTML='';cp.appendChild(classPanel(cls));
+  SUBS.filter(function(s){return s.cls===cls;}).forEach(function(s){g.appendChild(card(s));});renderDelta();}
+
+var CSTATS={}; G.classes.forEach(function(c){CSTATS[c.id]=c.stats;});
+// Standard = a round middle value per stat (roughly the four-class average), so the bar's centre line means "normal".
+var STD=[
+ {k:'move',label:'Move speed',unit:' m/s',std:10.125,better:'up',dec:3,why:'Shared by Warrior and Fatty'},
+ {k:'carry',label:'Carry capacity',unit:'',std:10,better:'up',dec:0,why:'Shared by Speedy and Sneaky'},
+ {k:'peckAmt',label:'Peck amount',unit:'',std:3,better:'up',dec:1,why:'Shared by every class'},
+ {k:'peckCd',label:'Peck cooldown',unit:' s',std:0.71,better:'down',dec:2,why:'Shared by Speedy and Fatty'},
+ {k:'cdr',label:'Cooldown reduction',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Relentless'},
+ {k:'steal',label:'Steal bonus',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Bully and Thief'},
+ {k:'cc',label:'Stun/slow taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Relentless and Bulwark'},
+ {k:'slowIn',label:'Ability slows taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Slippery (shorter and weaker; pile and bump slows still apply)'},
+ {k:'kb',label:'Knockback taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Bulwark'},
+ {k:'bank',label:'Banking speed',unit:'%',std:100,better:'up',dec:0,why:'Every passive except Featherfoot'},
+ {k:'ccOut',label:'Stun/slow applied',unit:'%',std:100,better:'up',dec:0,why:'Every passive except Relentless'},
+ {k:'turn',label:'Turn speed',unit:'\u00b0/s',std:720,better:'up',dec:0,why:'Shared by every class'},
+ {k:'size',label:'Body size',unit:'\u00d7',std:1,better:'none',dec:2,why:'No two classes share a size; Warrior is 1.0'}
+];
+function stdOf(r){var o=state.std&&state.std.values&&state.std.values[r.k];return (typeof o==='number'&&isFinite(o))?o:r.std;}
+function fmtStd(r,v){return (r.dec?(Math.round(v*Math.pow(10,r.dec))/Math.pow(10,r.dec)):Math.round(v))+r.unit;}
+// Base stats are class values (both specializations share them); the passive stats belong to one kit.
+var BASEKEY={move:'MoveSpeed',carry:'CargoCapacity',peckAmt:'PeckAmount',peckCd:'PeckCooldown',turn:'TurnSpeed',size:'Scale'};
+function num(x){return typeof x==='number'&&isFinite(x);}
+function baseOf(c){var b=Object.assign({},CSTATS[c]||{}),o=(state.cstats[c]||{}).values||{};
+  Object.keys(BASEKEY).forEach(function(k){if(num(o[k]))b[BASEKEY[k]]=o[k];});return b;}
+function passiveNums(k){if(k.passive.indexOf('custom:')===0)return null;var p=G.passives.filter(function(x){return x.id===k.passive;})[0];return p?(p.nums||{}):{};}
+function statsOf(s,k){
+  var b=baseOf(s.cls), pn=passiveNums(k), custom=(pn===null); pn=pn||{};
+  var baseCarry=num(b.CargoCapacity)?b.CargoCapacity:10;
+  var carry=baseCarry+(pn.BonusCapacity||0); if(pn.MinimumCapacity)carry=Math.max(carry,pn.MinimumCapacity);
+  var hasPeck=k.slots.indexOf('Peck')>=0;
+  var raw={cdr:pn.CooldownMultiplier?Math.round((1-pn.CooldownMultiplier)*100):0,
+    steal:pn.StealMultiplier?Math.round((pn.StealMultiplier-1)*100):0,
+    cc:pn.DurationMultiplier?Math.round(pn.DurationMultiplier*100):100,
+    slowIn:pn.Resist?Math.round(pn.Resist*100):100,
+    kb:pn.KnockbackMultiplier?Math.round(pn.KnockbackMultiplier*100):100,
+    bank:pn.DepositRateMultiplier?Math.round(pn.DepositRateMultiplier*100):100,
+    ccOut:pn.OutgoingDurationMultiplier?Math.round(pn.OutgoingDurationMultiplier*100):100};
+  var v={move:b.MoveSpeed,carry:carry,peckAmt:hasPeck?(num(b.PeckAmount)?b.PeckAmount:3):null,peckCd:hasPeck?(num(b.PeckCooldown)?b.PeckCooldown:1):null,turn:b.TurnSpeed,size:b.Scale};
+  Object.keys(raw).forEach(function(x){v[x]=num(k.stats[x])?k.stats[x]:raw[x];});
+  return {custom:custom,hasPeck:hasPeck,v:v,raw:raw,base:b,baseCarry:baseCarry};}
+// The value the input edits (carry edits the class base, before the passive's bonus) and its shipped value.
+function editVal(s,st,key){return BASEKEY[key]?(key==='carry'?st.baseCarry:st.base[BASEKEY[key]]):st.v[key];}
+function shippedVal(s,st,key){return BASEKEY[key]?(CSTATS[s.cls]||{})[BASEKEY[key]]:st.raw[key];}
+function fmtEnd(v){var a=Math.abs(v);return String(a>=100?Math.round(v):a>=10?Math.round(v*10)/10:Math.round(v*100)/100);}
+function round(r,v){var f=Math.pow(10,(r.dec||0)+1);return Math.round(v*f)/f;}
+function fmtV(r,v){return (r.dec?(Math.round(v*Math.pow(10,r.dec))/Math.pow(10,r.dec)):Math.round(v))+r.unit;}
+// Bar scale: centre = the standard, ends = the furthest value any kit has (plus 10%), so nothing pins to an end.
+// Ratios use a log scale, so 2x and 0.5x sit the same distance from the centre.
+function rangeOf(r){var sd=stdOf(r),vals=[];
+  SUBS.forEach(function(s){var x=statsOf(s,kitOf(s)).v[r.k];if(num(x))vals.push(x);});
+  if(sd===0){var A=10;vals.forEach(function(x){A=Math.max(A,Math.abs(x));});A*=1.1;
+    return {lo:-A,hi:A,frac:function(x){return 0.5+Math.max(-A,Math.min(A,x))/(2*A);}};}
+  var R=1.25;vals.forEach(function(x){if(x>0)R=Math.max(R,x/sd,sd/x);});R*=1.1;var L=Math.log(R);
+  return {lo:sd/R,hi:sd*R,frac:function(x){return x>0?Math.max(0.02,Math.min(1,0.5+Math.log(x/sd)/(2*L))):0.02;}};}
+function saveCStats(c){var v=state.cstats[c];v.updated_at=new Date().toISOString();
+  if(db){db.doc('classstats/'+c).set(v).catch(function(e){status('Could not save the '+LABEL[c]+' stats: '+(e&&e.message||e));});}
+  else try{localStorage.setItem('kitlab.cstats',JSON.stringify(state.cstats));}catch(e){}}
+function rerenderKeepFocus(){setTimeout(function(){var a=document.activeElement&&document.activeElement.id;renderGrid();if(a){var e=document.getElementById(a);if(e&&e.focus)e.focus();}},0);}
+function setStat(s,k,st,key,x){var ship=shippedVal(s,st,key), clear=(x===null||(num(ship)&&Math.abs(x-ship)<1e-9));
+  if(BASEKEY[key]){var cs=state.cstats[s.cls]=Object.assign({values:{}},state.cstats[s.cls]||{});cs.values=Object.assign({},cs.values);
+    if(clear)delete cs.values[key];else cs.values[key]=x;saveCStats(s.cls);}
+  else{k.stats=Object.assign({},k.stats);if(clear)delete k.stats[key];else k.stats[key]=x;save(s,k);}
+  rerenderKeepFocus();}
+function statsPanel(s,k){
+  var st=statsOf(s,k), d=el('details',{'class':'stats'}); try{if(localStorage.getItem('kitlab.stats')!=='closed')d.open=true;}catch(e){d.open=true;}
+  d.addEventListener('toggle',function(){try{localStorage.setItem('kitlab.stats',d.open?'open':'closed');}catch(e){}});
+  d.appendChild(el('summary',{text:'Stats vs standard (centre line)'}));
+  var anyMod=false;
+  STD.forEach(function(r){
+    var v=st.v[r.k], row=el('div',{'class':'srow'}), sd=stdOf(r), abs=(sd===0);
+    row.appendChild(el('span',{text:r.label+(BASEKEY[r.k]?'':' · kit')}));
+    var wrap=el('div',{'class':'swrap'}), bar=el('div',{'class':'sbar'}), fill=el('i'), sm;
+    var cell=el('div',{'class':'sv'});
+    if(v===null||v===undefined){fill.style.width='0';cell.appendChild(document.createTextNode('—'));sm=el('small',{'class':'eq',text:'no Peck'});}
+    else{
+      var rg=rangeOf(r), frac=rg.frac(v), delta=abs?Math.round(v):Math.round((v/sd-1)*100);
+      fill.style.width=(frac*100).toFixed(1)+'%';
+      var dir=delta===0||r.better==='none'?'eq':((delta>0)===(r.better==='up')?'up':'down');
+      if(dir!=='eq')fill.className=dir;
+      var ev=editVal(s,st,r.k), ship=shippedVal(s,st,r.k), mod=num(ship)&&Math.abs(ev-ship)>1e-9; if(mod)anyMod=true;
+      var id='st_'+s.id+'_'+r.k;
+      var inp=el('input',{type:'text',id:id,'class':'sin'+(mod?' mod':''),autocomplete:'off',spellcheck:'false',
+        'aria-label':LABEL[s.cls]+' '+s.name+' '+r.label+(BASEKEY[r.k]?' (class base value)':' (this kit)'),
+        title:(BASEKEY[r.k]?'Class base value: changes both '+LABEL[s.cls]+' specializations.':'This kit only.')+' Shipped: '+fmtV(r,ship)+'. Type a value, or a % against the standard (e.g. +20%). Clear it to go back to shipped.'});
+      inp.value=String(round(r,ev));
+      inp.onkeydown=function(e){if(e.key==='Enter')inp.blur();};
+      inp.onchange=function(){var t=inp.value.trim().replace(',','.'),x;
+        if(t===''){x=null;}
+        else if(/%$/.test(t)){var pc=parseFloat(t);if(!isFinite(pc)){inp.value=String(round(r,ev));return;}x=abs?pc:sd*(1+pc/100);}
+        else{x=parseFloat(t);if(!isFinite(x)){inp.value=String(round(r,ev));return;}}
+        if(x!==null){if(r.k==='carry')x=Math.max(0,Math.round(x));else x=round(r,x);if(!abs&&x<0)x=0;}
+        setStat(s,k,st,r.k,x);};
+      cell.appendChild(inp);
+      var extra=(r.k==='carry'&&v!==ev)?' · '+fmtV(r,v)+' total':'';
+      sm=el('small',{'class':dir,text:(delta===0?'standard':(delta>0?'+':'')+delta+'%'+(abs&&r.pct?' pts':''))+extra});
+      wrap.appendChild(bar);
+      wrap.appendChild(el('div',{'class':'sends','aria-hidden':'true'},[el('span',{text:fmtEnd(rg.lo)}),el('span',{text:fmtEnd(sd)}),el('span',{text:fmtEnd(rg.hi)})]));
+    }
+    if(!wrap.firstChild)wrap.appendChild(bar);
+    bar.appendChild(fill);bar.appendChild(el('b'));row.appendChild(wrap);
+    cell.appendChild(sm);row.appendChild(cell);
+    d.appendChild(row);});
+  var notes=['Centre line = the standard value (edit them under Standard values). Green is better than standard, red is worse. Each bar is scaled to fit the furthest value any kit has, so nothing sits pinned at an end; the small numbers under it are its two ends and the standard.',
+    'Every value is editable: type a number, or a % against the standard (e.g. +20%), and press Enter. Clear a box to go back to shipped. Move, carry, Peck, turn and size are class base values, so they change both '+LABEL[s.cls]+' specializations; rows marked · kit come from the passive and change this kit only. Since 2026-11-05 every chicken shares one pool of active abilities; retired moves no longer appear in the pickers.'];
+  if(st.custom)notes.push('A NEW passive has no numbers yet: its passive rows start at standard, and its effect is the description.');
+  notes.push('Cooldown reduction never applies to Peck.');
+  notes.forEach(function(n){d.appendChild(el('p',{'class':'snote',text:n}));});
+  if(anyMod){var rb=el('button',{type:'button','class':'lab-btn',text:'Reset these stats to shipped'});
+    rb.onclick=function(){if(!confirm('Reset the '+LABEL[s.cls]+' base stats (both specializations) and this kit’s passive stats to shipped?'))return;
+      state.cstats[s.cls]={values:{}};saveCStats(s.cls);k.stats={};save(s,k);renderGrid();};
+    d.appendChild(el('div',null,[rb]));}
+  return d;}
+
+// Built-in class rules (shipped behaviour, from GDD 5.2 and the class assets): not passives, they apply to both specializations.
+var CLASS_RULES={
+ Warrior:['The all-rounder: a bit of everything, weaker than the specialists. Both specializations carry Peck, Steal, one crowd control and one mobility move (Maestro, 2026-11-05).','10.125 m/s, carries 14, pecks every 0.79 s (the slowest Peck).','Target: clears the map alone in 35 s over 3 trips.'],
+ Speedy:['Never gets terrain traversal: no Jump or vault over walls (Maestro, 2026-08-21). Speed and control are its escape.','Fastest forager: 12.15 m/s, pecks every 0.71 s, but carries only 10.','Target: 30 s over 4 trips.'],
+ Fatty:['Biggest body (1.35\u00d7) and biggest beak: carries 35.','Slow (10.125 m/s) but pecks fast (0.71 s). Target: 30 s over 2 trips.'],
+ Assassin:['Cannot forage: neither kit has Peck, so all of its food comes from stealing and executes.','Exempt from the solo-clear target (40 s), because it is meant to deny, not collect.','Fast (11.1 m/s) and carries 10; the only class with a hard removal (Death Mark).','Shown as Sneaky; in code it is ChickenClass.Assassin.']
+};
+var NO_PECK={Assassin:true};
+function saveClass(c,v){state.classes[c]=v;
+  if(db){db.doc('classes/'+c).set(v).catch(function(e){status('Could not save the '+LABEL[c]+' note: '+(e&&e.message||e));});}
+  else try{localStorage.setItem('kitlab.classes',JSON.stringify(state.classes));}catch(e){}}
+var ctimer=null;
+function classPanel(c){
+  var box=el('section',{'class':'crules','aria-label':LABEL[c]+' class rules'});
+  box.appendChild(el('h3',{text:LABEL[c]+' class rules'}));
+  box.appendChild(el('ul',null,CLASS_RULES[c].map(function(r){return el('li',{text:r});})));
+  var cur=state.classes[c]||{};
+  var ta=el('textarea',{id:'cr_'+c,maxlength:'1500',rows:'2',placeholder:'Class particularities to add or change, as tips for Claude (optional)'});ta.value=cur.note||'';
+  ta.oninput=function(){clearTimeout(ctimer);ctimer=setTimeout(function(){saveClass(c,{note:ta.value,updated_at:new Date().toISOString()});},700);};
+  box.appendChild(el('div',null,[el('label',{'class':'lbl','for':'cr_'+c,text:'Your notes on '+LABEL[c]}),ta]));
+  return box;}
+
+var stdTimer=null;
+function saveStd(){state.std.updated_at=new Date().toISOString();
+  if(db){db.doc('settings/standards').set(state.std).catch(function(e){status('Could not save the standard values: '+(e&&e.message||e));});}
+  else try{localStorage.setItem('kitlab.std',JSON.stringify(state.std));}catch(e){}}
+function renderStd(){var b=document.getElementById('stdBody');if(!b)return;b.innerHTML='';
+  STD.forEach(function(r){var row=el('div',{'class':'stdrow'});
+    var id='std_'+r.k, inp=el('input',{type:'number',id:id,step:'any',inputmode:'decimal'});inp.value=String(stdOf(r));
+    inp.oninput=function(){var v=parseFloat(inp.value);if(!isFinite(v))return;state.std.values=Object.assign({},state.std.values||{});state.std.values[r.k]=v;label();
+      clearTimeout(stdTimer);stdTimer=setTimeout(function(){saveStd();renderGrid();},500);};
+    var why=el('span',{'class':'stdwhy'});
+    function label(){var ch=stdOf(r)!==r.std;why.className='stdwhy'+(ch?' mod':'');why.textContent=ch?'Edited. Suggested '+fmtStd(r,r.std)+' ('+r.why.charAt(0).toLowerCase()+r.why.slice(1)+')':r.why;}
+    label();
+    row.appendChild(el('label',{'for':id,text:r.label+(r.unit.trim()?' ('+r.unit.trim()+')':'')}));
+    row.appendChild(inp);
+    row.appendChild(why);
+    b.appendChild(row);});
+  var reset=el('button',{type:'button','class':'lab-btn',text:'Reset to suggested values'});
+  reset.onclick=function(){state.std={values:{}};saveStd();renderStd();renderGrid();};
+  b.appendChild(el('div',null,[reset]));}
+function card(s){
+  var k=kitOf(s), changed=k.passive!==s.passive||k.slots.join()!==s.kit.join()||Object.keys(k.stats).length>0||Object.keys(((state.cstats[s.cls]||{}).values)||{}).length>0;
+  var c=el('article',{'class':'kit'});
+  c.appendChild(el('h3',null,[document.createTextNode(s.name),el('span',{'class':'tag'+(changed?' mod':''),text:changed?'experiment':'shipped kit'})]));
+  c.appendChild(statsPanel(s,k));
+  var ps=el('select',{id:'p_'+s.id});
+  var pp=passivePool(s,k.anyClass); if(!pp.some(function(p){return p.id===k.passive;}))pp.unshift({id:k.passive,name:passiveInfo(k.passive).name,desc:''});
+  pp.forEach(function(p){var o=el('option',{value:p.id,text:p.name+(p.id===s.passive?'  (shipped)':'')});if(p.id===k.passive)o.selected=true;ps.appendChild(o);});
+  ps.onchange=function(){k.passive=ps.value;save(s,k);renderGrid();};
+  var pi=passiveInfo(k.passive);
+  var pbox=el('div',{'class':'slot'+(k.passive!==s.passive?' changed':'')});
+  pbox.appendChild(el('label',{'class':'lbl','for':'p_'+s.id,text:'Passive'}));pbox.appendChild(ps);
+  if(pi.desc)pbox.appendChild(el('p',{'class':'desc',text:pi.desc}));
+  var pta=el('textarea',{'aria-label':'Tip for Claude about the '+pi.name+' passive in '+s.name,placeholder:'Tip for Claude about '+pi.name+' (optional)',maxlength:'800',rows:'2'});
+  var pkey='passive:'+k.passive; pta.value=k.notes[pkey]||'';
+  pta.oninput=function(){if(pta.value.trim())k.notes[pkey]=pta.value;else delete k.notes[pkey];saveLater(s,k);};
+  pbox.appendChild(pta); c.appendChild(pbox);
+  var ids=pool(s,k.anyClass);
+  k.slots.forEach(function(id,i){
+    var inf=info(id), box=el('div',{'class':'slot'+(id!==s.kit[i]?' changed':'')});
+    var sel=el('select',{id:'s_'+s.id+'_'+i});
+    var opts=ids.indexOf(id)<0?[id].concat(ids):ids;
+    opts.forEach(function(o){var oi=info(o);var op=el('option',{value:o,text:(oi.custom?'NEW · ':'')+oi.name+(o===s.kit[i]?'  (shipped)':'')});if(o===id)op.selected=true;sel.appendChild(op);});
+    sel.onchange=function(){k.slots[i]=sel.value;save(s,k);renderGrid();};
+    box.appendChild(el('label',{'class':'lbl','for':'s_'+s.id+'_'+i,text:'Slot '+(i+1)+(inf.cat?' · '+inf.cat:'')}));
+    box.appendChild(sel);
+    if(inf.desc)box.appendChild(el('p',{'class':'desc',text:inf.desc}));
+    if(id==='Peck'&&NO_PECK[s.cls])box.appendChild(el('p',{'class':'rulewarn',text:'Breaks a class rule: '+LABEL[s.cls]+' cannot forage.'}));
+    if(inf.nums)box.appendChild(el('p',{'class':'nums',text:inf.nums}));
+    var ta=el('textarea',{'aria-label':'Tip for Claude about '+inf.name+' in '+s.name,placeholder:'Tip for Claude about '+inf.name+' (optional)',maxlength:'800',rows:'2'});
+    ta.value=k.notes[id]||'';
+    ta.oninput=function(){if(ta.value.trim())k.notes[id]=ta.value;else delete k.notes[id];saveLater(s,k);};
+    box.appendChild(ta); c.appendChild(box);});
+  var kn=el('textarea',{id:'kn_'+s.id,placeholder:'Note on the whole kit (optional)',maxlength:'1200',rows:'2'});kn.value=k.kitNote;
+  kn.oninput=function(){k.kitNote=kn.value;saveLater(s,k);};
+  c.appendChild(el('div',null,[el('label',{'class':'lbl','for':'kn_'+s.id,text:'Kit note'}),kn]));
+  var any=el('input',{type:'checkbox'});any.checked=k.anyClass;any.onchange=function(){k.anyClass=any.checked;save(s,k);renderGrid();};
+  var reset=el('button',{type:'button','class':'lab-btn',text:'Reset to shipped kit'});
+  reset.onclick=function(){k.passive=s.passive;k.slots=s.kit.slice();k.anyClass=false;save(s,k);renderGrid();};
+  c.appendChild(el('div',{'class':'kit-row'},[el('label',null,[any,document.createTextNode('Allow other classes’ moves')]),reset]));
+  return c;}
+function renderCustoms(){renderPv();var l=document.getElementById('customList');l.innerHTML='';
+  var ids=Object.keys(state.custom).sort(function(a,b){return (state.custom[b].created_at||'').localeCompare(state.custom[a].created_at||'');});
+  ids.forEach(function(id){var c=state.custom[id];var del=el('button',{type:'button','class':'lab-btn',text:'Delete'});
+    del.onclick=function(){if(!confirm('Delete '+c.name+'?'))return;delete state.custom[id];
+      if(db)db.doc('custom/'+id).delete().catch(function(e){status('Delete failed: '+(e&&e.message||e));});else try{localStorage.setItem('kitlab.custom',JSON.stringify(state.custom));}catch(e){}
+      renderCustoms();renderGrid();};
+    l.appendChild(el('div',{'class':'custom'},[el('b',{text:c.name}),el('span',{'class':'meta',text:(c.cls==='Any'?'Any class':LABEL[c.cls])+' · '+c.cat}),el('span',{text:c.desc}),el('div',null,[del])]));});}
+var nfc=document.getElementById('nfClass');['Any','Warrior','Speedy','Fatty','Assassin'].forEach(function(c){nfc.appendChild(el('option',{value:c,text:c==='Any'?'Any class':LABEL[c]}));});
+document.getElementById('newForm').onsubmit=function(e){e.preventDefault();
+  var name=document.getElementById('nfName').value.trim(),desc=document.getElementById('nfDesc').value.trim();if(!name||!desc)return;
+  var id=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)+'-'+Date.now().toString(36);
+  var c={name:name,cls:nfc.value,cat:document.getElementById('nfCat').value,desc:desc,created_at:new Date().toISOString()};
+  state.custom[id]=c;
+  if(db)db.doc('custom/'+id).set(c).catch(function(e){status('Could not save '+name+': '+(e&&e.message||e));});else try{localStorage.setItem('kitlab.custom',JSON.stringify(state.custom));}catch(e){}
+  this.reset();renderCustoms();renderGrid();status('Added '+name+'. It is in the '+(c.cat==='Passive'?'Passive picker':'slot pickers')+' for '+(c.cls==='Any'?'every class':LABEL[c.cls])+'.');};
+function fromLocal(){try{state.kits=JSON.parse(localStorage.getItem('kitlab.kits')||'{}');state.custom=JSON.parse(localStorage.getItem('kitlab.custom')||'{}');state.classes=JSON.parse(localStorage.getItem('kitlab.classes')||'{}');state.std=JSON.parse(localStorage.getItem('kitlab.std')||'{"values":{}}');state.cstats=JSON.parse(localStorage.getItem('kitlab.cstats')||'{}');state.av=JSON.parse(localStorage.getItem('kitlab.av')||'{}');}catch(e){}
+  status('Saved in this browser only, so Claude cannot read these choices. Open the page on claude.ai, signed in, to share them.');renderAll();}
+// ---- Delta to publish: the balance JSON (schema 1) BalanceBook reads, from the edits above. Mirrors tools/balance/make_delta.py:
+// asset = SO asset name, only values that differ from shipped, deny-listed fields never included, whole delta only if it is valid.
+var DP_PASSIVE={cdr:['CooldownMultiplier',function(v){return 1-v/100;}],steal:['StealMultiplier',function(v){return 1+v/100;}],
+  cc:['DurationMultiplier',function(v){return v/100;}],slowIn:['Resist',function(v){return v/100;}],kb:['KnockbackMultiplier',function(v){return v/100;}],
+  bank:['DepositRateMultiplier',function(v){return v/100;}],ccOut:['OutgoingDurationMultiplier',function(v){return v/100;}]};
+var DP_DENY={AllowedClasses:1,PeckSlotPreEquippedBy:1,SignaturePreEquippedBy:1,Category:1,BotRole:1,AccentKey:1,TerrainTraversal:1,JumpTier:1,CastMotion:1,Retired:1,Subclass:1,MaxPlayers:1,TargetingMode:1,LoadoutMode:1};
+function r4(v){return Math.round(v*10000)/10000;}
+function buildDelta(){
+  var assets={},kits={},build=[],issues=[],count=0;
+  function put(asset,field,v,ship){
+    if(DP_DENY[field]){issues.push(asset+'.'+field+': deny-listed field, not published');return;}
+    if(!num(v)){issues.push(asset+'.'+field+': '+v+' is not a number, left out');return;}
+    var lim=((G.lim||{})[asset]||{})[field],whole=((G.ints||{})[asset]||[]).indexOf(field)>=0;
+    if(whole&&v!==Math.round(v)){issues.push(asset+'.'+field+': '+v+' must be a whole number, left out');return;}
+    if(v<0&&ship>=0){issues.push(asset+'.'+field+': '+v+' is negative where the shipped value is not, left out');return;}
+    if(lim&&((lim[0]!==null&&v<lim[0])||(lim[1]!==null&&v>lim[1]))){issues.push(asset+'.'+field+': '+v+' is outside the allowed range '+(lim[0]===null?'-inf':lim[0])+' to '+(lim[1]===null?'inf':lim[1])+', left out');return;}
+    if(Math.abs(v)>Math.max(1000,100*Math.abs(ship))){issues.push(asset+'.'+field+': '+v+' is past the magnitude bound, left out');return;}
+    v=r4(v);if(Math.abs(v-ship)<1e-6)return;
+    (assets[asset]=assets[asset]||{})[field]=v;count++;}
+  function kitProblems(s,slots){var e=[],seen={};
+    slots.forEach(function(id,i){var a=AB[id];if(id.indexOf('custom:')===0||!a||!a.inRegistry)e.push('slot '+(i+1)+' is a NEW or retired move');if(seen[id])e.push('"'+id+'" is in the kit twice');seen[id]=1;});
+    if(slots.length!==s.kit.length)e.push('needs '+s.kit.length+' abilities');
+    var has=function(id){return slots.indexOf(id)>=0;};
+    if(s.cls==='Assassin'&&has('Peck'))e.push('an Assassin cannot forage, so it must not hold Peck');
+    if(s.cls!=='Assassin'&&!has('Peck'))e.push('a '+LABEL[s.cls]+' must carry its Peck');
+    if(s.cls==='Speedy')slots.forEach(function(id){if(AB[id]&&AB[id].trav>0)e.push('Speedy kits grant no terrain traversal, but '+AB[id].name+' has one');});
+    var sub=G.passives.filter(function(x){return x.id===s.passive;})[0];
+    if(sub&&sub.subclass===7&&!has('MarkKill'))e.push('the Spoiler kit must hold Death Mark');
+    return e;}
+  AVORDER.forEach(function(id){var a=AB[id],ed=avEdits(id);if(!a)return;
+    Object.keys(ed).forEach(function(key){var ship=a.nums&&a.nums[key];
+      if(!num(ship)){issues.push(id+'.'+key+': not a numeric field of the shipped asset, left out');return;}
+      if(!a.inRegistry){build.push(a.name+' ('+id+') is retired: its values are not in the registry, so the delta cannot reach it');return;}
+      put(id,key,ed[key],ship);});});
+  ['Warrior','Speedy','Fatty','Assassin'].forEach(function(c){var vals=(state.cstats[c]||{}).values||{};
+    Object.keys(vals).forEach(function(k){var f=BASEKEY[k];if(!f)return;var ship=(CSTATS[c]||{})[f];
+      if(!num(ship)){build.push(LABEL[c]+' has no shipped '+f+' (the class does not forage), so '+f+' cannot be set from a delta');return;}
+      put(c,f,vals[k],ship);});});
+  SUBS.forEach(function(s){var k=kitOf(s),label=LABEL[s.cls]+' '+s.name;
+    if(k.passive!==s.passive){build.push(label+': passive swapped to '+passiveInfo(k.passive).name+' (a passive swap changes what is equipped, so it needs a build)');return;}
+    var slotsChanged=k.slots.join()!==s.kit.join();
+    if(slotsChanged){var kp=kitProblems(s,k.slots);
+      if(kp.length)issues.push(label+' kit not published: '+kp.join('; '));
+      else{kits[s.passive]=k.slots.slice();count++;}}
+    var p=G.passives.filter(function(x){return x.id===s.passive;})[0],pn=(p&&p.nums)||{};
+    Object.keys(k.stats).forEach(function(sk){var m=DP_PASSIVE[sk];if(!m||!num(k.stats[sk]))return;
+      if(!num(pn[m[0]])){build.push(label+': '+sk+' edit has no matching shipped field ('+m[0]+') on '+s.passive+', so it needs a build');return;}
+      put(s.passive,m[0],m[1](k.stats[sk]),pn[m[0]]);});});
+  Object.keys(state.custom).forEach(function(id){var c=state.custom[id];if(c)build.push('NEW '+(c.cat==='Passive'?'passive':'ability')+' "'+c.name+'" needs a build');});
+  var delta={schema:1},note=(document.getElementById('dpNote')||{}).value||'';
+  delta.note=note||('Kit Lab edit '+new Date().toISOString().slice(0,10));
+  if(Object.keys(assets).length)delta.assets=assets;
+  if(Object.keys(kits).length)delta.kits=kits;
+  return {delta:delta,empty:!(delta.assets||delta.kits),count:count,build:build,issues:issues};}
+function renderDelta(){var out=document.getElementById('dpOut');if(!out)return;
+  var r=buildDelta(),sum=document.getElementById('dpSum'),iss=document.getElementById('dpIssues');
+  if(r.empty){out.value='';sum.className='dpsum empty';sum.textContent='Nothing differs from the shipped values: publish nothing (an empty or missing balance key plays the shipped numbers).';}
+  else{out.value=JSON.stringify(r.delta,null,2);sum.className='dpsum';sum.textContent=r.count+' change'+(r.count===1?'':'s')+' to publish.';}
+  iss.innerHTML='';
+  if(r.build.length){iss.appendChild(el('h4',{text:'Needs a build ('+r.build.length+')'}));iss.appendChild(el('ul',{'class':'dplist'},r.build.map(function(t){return el('li',{text:t});})));}
+  if(r.issues.length){iss.appendChild(el('h4',{text:'Left out of the delta ('+r.issues.length+')'}));iss.appendChild(el('ul',{'class':'dplist warn'},r.issues.map(function(t){return el('li',{text:t});})));}}
+(function(){var cp=document.getElementById('dpCopy'),nt=document.getElementById('dpNote');
+  if(nt)nt.oninput=renderDelta;
+  if(cp)cp.onclick=function(){renderDelta();var out=document.getElementById('dpOut'),ok=document.getElementById('dpCopied');
+    function done(m){ok.textContent=m;setTimeout(function(){ok.textContent='';},2500);}
+    if(!out.value){done('Nothing to copy.');return;}
+    var fallback=function(){out.focus();out.select();var okc=false;try{okc=document.execCommand('copy');}catch(e){}done(okc?'Copied.':'Selected: copy it with Ctrl+C, or long-press on a phone.');};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(out.value).then(function(){done('Copied.');},fallback);}else fallback();};})();
+function renderAll(){renderStd();renderAv();renderPv();renderTabs();renderGrid();renderCustoms();}
+renderAll();
+var got={k:false,c:false};
+var to=setTimeout(function(){if(!(got.k&&got.c))status('Saved kits can’t be reached yet; showing the shipped kits. Changes still save when the connection returns.');},10000);
+function ready(){if(got.k&&got.c){clearTimeout(to);status('Saved automatically. Claude reads your kits, tips and new abilities from here.');}}
+if(window.claude&&window.claude.use){window.claude.use('db').then(function(d){
+  if(!d){clearTimeout(to);fromLocal();return;} db=d;
+  db.collection('kits').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=x.data();});state.kits=m;got.k=true;ready();if(!editing())renderGrid();},
+    function(e){clearTimeout(to);status('Could not load kits: '+(e&&e.message||e));});
+  db.doc('settings/standards').onSnapshot(function(d){state.std=d.exists?Object.assign({values:{}},d.data()):{values:{}};if(!editing()){renderStd();renderGrid();}},function(e){status('Could not load the standard values: '+(e&&e.message||e));});
+  db.collection('classstats').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=x.data();});state.cstats=m;if(!editing())renderGrid();},function(e){status('Could not load the class stat edits: '+(e&&e.message||e));});
+  db.collection('abilityvals').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=x.data();});state.av=m;if(!editing()){renderAv();renderGrid();}},function(e){status('Could not load the ability values: '+(e&&e.message||e));});
+  db.collection('classes').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=x.data();});state.classes=m;if(!editing())renderGrid();},function(e){status('Could not load class notes: '+(e&&e.message||e));});
+  db.collection('custom').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=x.data();});state.custom=m;got.c=true;ready();renderCustoms();if(!editing())renderGrid();},
+    function(e){clearTimeout(to);status('Could not load new abilities: '+(e&&e.message||e));});
+}).catch(function(){clearTimeout(to);fromLocal();});} else {clearTimeout(to);fromLocal();}
+})();
+</script>
+</section><section><div class="callout"><h3>How I use this page</h3><p>I read every saved kit, tip, ability value and new ability from here when you tell me you&#x27;re done. A changed kit is marked <b>experiment</b>, and each changed slot gets an accent bar.</p><p><b>Allow other classes&#x27; moves</b> opens the whole pool of active abilities to that specialization. Death Mark and Peck normally come only with a kit, but here you can put them in any slot. The <b>Abilities</b> section below the kits holds the ability values (closed: a cooldown summary; open: every number to edit), the passives and the box for new ones.</p></div></section></div>
