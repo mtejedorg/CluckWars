@@ -286,6 +286,60 @@ namespace CluckWars.Tests
             Assert.GreaterOrEqual(c.y, r - 1e-3f);
         }
 
+        /// <summary>The chip's height as the stylesheet declares it (.cw-mark-distance height), never a literal.</summary>
+        private static float ChipHeightFromUss()
+        {
+            string uss = Read("Assets/UI/Styles/MarkHud.uss");
+            int rule = uss.IndexOf(".cw-mark-distance {", System.StringComparison.Ordinal);
+            Assert.GreaterOrEqual(rule, 0, "the chip rule exists");
+            string body = uss.Substring(rule, uss.IndexOf('}', rule) - rule);
+            var m = System.Text.RegularExpressions.Regex.Match(body, @"[^-]height:\s*([0-9.]+)px");
+            Assert.IsTrue(m.Success, "the chip rule declares a height");
+            return float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        [TestCase(2133f, 960f)]
+        [TestCase(960f, 2133f)]
+        public void OnArrow_BadgeAndChip_StayInsideThePanel_AtEveryEdgeAndCorner(float w, float h)
+        {
+            var panel = new Vector2(w, h);
+            float chipH = ChipHeightFromUss();
+            Assert.AreEqual(chipH, 2f * MarkerPlacement.ChipHalfHeightPx, 1.5f, "the placement's chip extent is the stylesheet's");
+            float r = MarkerPlacement.OnArrowRadiusPx;
+            float[] xs = { 0f, w * 0.5f, w }, ys = { 0f, h * 0.5f, h };
+            foreach (float x in xs)
+            foreach (float y in ys)
+            {
+                if (x == w * 0.5f && y == h * 0.5f) continue;
+                var tip = new Vector2(x, y);
+                foreach (bool plateOn in new[] { false, true })
+                foreach (var outward in new[] { Vector2.up, Vector2.down, Vector2.left, Vector2.right, new Vector2(1f, 1f), new Vector2(-1f, -1f) })
+                {
+                    var plate = Rect.MinMaxRect(w * 0.5f - 60f, h * 0.5f - 20f, w * 0.5f + 60f, h * 0.5f + 20f);
+                    Vector2 c0 = MarkerPlacement.OnArrowCentre(tip, outward, panel, plateOn, plate);
+                    Vector2 c = MarkerPlacement.SettleOnArrow(c0, outward, panel, plateOn, plate, out bool above);
+                    string what = $"tip {tip} outward {outward} plate {plateOn} -> {c}, chip {(above ? "above" : "below")}";
+                    var badge = Rect.MinMaxRect(c.x - r, c.y - r, c.x + r, c.y + r);
+                    float cy = c.y + (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
+                    var chip = Rect.MinMaxRect(c.x - MarkerPlacement.ChipHalfWidthPx, cy - chipH * 0.5f, c.x + MarkerPlacement.ChipHalfWidthPx, cy + chipH * 0.5f);
+                    Assert.IsTrue(badge.xMin >= 0f && badge.yMin >= 0f && badge.xMax <= w && badge.yMax <= h, "badge inside: " + what);
+                    Assert.IsTrue(chip.xMin >= 0f && chip.yMin >= 0f && chip.xMax <= w && chip.yMax <= h, "chip inside: " + what);
+                }
+            }
+        }
+
+        [Test]
+        public void OnArrow_TheLoggedCase_ArrowPointingDownNearTheBottom_ChipDoesNotLeaveTheBottom()
+        {
+            var panel = new Vector2(2133f, 960f);
+            var tip = new Vector2(1260f, 890f);   // the 175412 run: the chip was 946..987 on a 960 panel
+            Vector2 c0 = MarkerPlacement.OnArrowCentre(tip, Vector2.down, panel, false, default);
+            Vector2 c = MarkerPlacement.SettleOnArrow(c0, Vector2.down, panel, false, default, out bool above);
+            float cy = c.y + (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
+            Assert.LessOrEqual(cy + MarkerPlacement.ChipHalfHeightPx, panel.y);
+            Assert.GreaterOrEqual(cy - MarkerPlacement.ChipHalfHeightPx, 0f);
+        }
+
         [Test]
         public void OnArrow_ChipTakesTheSideAwayFromTheBird_AndNeverTheEdgeOrThePlate()
         {

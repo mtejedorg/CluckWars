@@ -163,10 +163,10 @@ namespace CluckWars.UI
                 _anchor = ResolveAnchor(cam, panel, target, out Vector2 arrowAt, out Vector2 arrowOutward, out Rect you, out bool hasYou);
                 if (_anchor == MarkAnchor.OnArrow)
                 {
-                    _markerPanel = arrowAt;
                     _markerOffScreen = false;
                     _markerBearing = Vector2.down;
-                    _chipAbove = MarkerPlacement.OnArrowChipAbove(arrowAt, arrowOutward, panel, hasYou, you);
+                    arrowAt = MarkerPlacement.SettleOnArrow(arrowAt, arrowOutward, panel, hasYou, you, out _chipAbove);
+                    _markerPanel = arrowAt;
                     _markerPlaced = true;
                 }
                 else if (MarkerPlacement.Place(cam, panel, target, LocalChicken(), out Vector2 at, out bool off, out Vector2 dir))

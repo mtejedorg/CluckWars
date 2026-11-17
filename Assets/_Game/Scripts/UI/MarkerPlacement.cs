@@ -373,6 +373,57 @@ namespace CluckWars.UI
             return preferred || !ChipFits(centre, !preferAbove, panel, hasYou, you) ? preferAbove : !preferAbove;
         }
 
+        /// <summary>How far the on-arrow badge may slide back along its arrow to make the metres chip fit, panel px.</summary>
+        public const float OnArrowInwardMaxPx = 240f;
+
+        /// <summary>
+        /// K5r-d, pure: settles the on-arrow badge and its metres chip so the WHOLE group (badge box and the chip's real box on the
+        /// chosen side) lies inside the panel. Starting from <paramref name="centre"/> (<see cref="OnArrowCentre"/>), the chip takes
+        /// the side away from the hunter's bird when it fits, else the other side; when neither fits (a tip at an edge, or the
+        /// "You" plate on the other side), the badge slides back along its arrow, in 4 px steps, until one side does. The badge
+        /// never slides back onto the "You" plate. If the plate cannot be respected the panel still wins. A chip wider than the badge
+        /// is kept off the left and right edges too (x clamped by the chip's half width).
+        /// </summary>
+        public static Vector2 SettleOnArrow(Vector2 centre, Vector2 outward, Vector2 panel, bool hasYou, Rect you, out bool chipAbove)
+        {
+            if (outward.sqrMagnitude < 1e-8f) outward = Vector2.up;
+            outward.Normalize();
+            bool prefer = outward.y < 0f;
+            float r = OnArrowRadiusPx;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                bool respectYou = pass == 0 && hasYou;
+                for (float moved = 0f; moved <= OnArrowInwardMaxPx; moved += 4f)
+                {
+                    Vector2 c = ClampBadge(centre - outward * moved, panel, r);
+                    if (respectYou && moved > 0f && BadgeOverlaps(c, r, you)) continue;
+                    if (ChipFits(c, prefer, panel, respectYou, you)) { chipAbove = prefer; return c; }
+                    if (ChipFits(c, !prefer, panel, respectYou, you)) { chipAbove = !prefer; return c; }
+                }
+            }
+            // No room even for the panel alone (a panel smaller than the group): the preferred side, nudged whole onto the panel.
+            Vector2 last = ClampBadge(centre, panel, r);
+            chipAbove = prefer;
+            float off = (prefer ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
+            float cy = last.y + off;
+            if (cy - ChipHalfHeightPx < 0f) last.y += ChipHalfHeightPx - cy;
+            else if (cy + ChipHalfHeightPx > panel.y) last.y -= cy + ChipHalfHeightPx - panel.y;
+            return last;
+        }
+
+        private static Vector2 ClampBadge(Vector2 c, Vector2 panel, float r)
+        {
+            float hx = Mathf.Max(r, ChipHalfWidthPx);
+            return new Vector2(Mathf.Clamp(c.x, hx, Mathf.Max(hx, panel.x - hx)), Mathf.Clamp(c.y, r, Mathf.Max(r, panel.y - r)));
+        }
+
+        private static bool BadgeOverlaps(Vector2 c, float r, Rect plate)
+        {
+            float m = FeedbackTuning.MarkMarkerYouPlateMarginPx;
+            return Rect.MinMaxRect(c.x - r, c.y - r, c.x + r, c.y + r)
+                       .Overlaps(Rect.MinMaxRect(plate.xMin - m, plate.yMin - m, plate.xMax + m, plate.yMax + m));
+        }
+
         private static bool ChipFits(Vector2 centre, bool above, Vector2 panel, bool hasYou, Rect you)
         {
             float cy = centre.y + (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
