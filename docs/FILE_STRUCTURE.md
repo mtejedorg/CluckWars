@@ -44,10 +44,10 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 |---|---|---|---|---|---|
 | `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 26 |
 | `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 163 |
-| `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 139 |
+| `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 143 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 28 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 267 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 273 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -94,12 +94,12 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Diagnostics` | `CluckWars.Diagnostics` | 23 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 7 |
 | `Editor` | `Assembly-CSharp-Editor` | 16 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 243 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 249 |
 | `Gameplay` | `CluckWars.Gameplay` | 85 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
 | `Injection` | `CluckWars.Core` | 1 |
-| `Input` | `CluckWars.Presentation` | 12 |
+| `Input` | `CluckWars.Presentation` | 13 |
 | `Installers` | `CluckWars.App` | 2 |
 | `Localization` | `CluckWars.Core` | 2 |
 | `Logging` | `CluckWars.Core` | 4 |
@@ -107,7 +107,7 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Services` | `CluckWars.Core` | 10 |
 | `Settings` | `CluckWars.Gameplay` | 2 |
 | `UI` | `CluckWars.Presentation` | 51 |
-| `Visuals` | `CluckWars.Presentation` | 76 |
+| `Visuals` | `CluckWars.Presentation` | 79 |
 <!-- END GENERATED: script-folders -->
 
 ---
@@ -171,9 +171,9 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Audio` | Gameplay | `IAudioService` with `UnityAudioService` / `NullAudioService`, `AudioTicker`, `SfxId`, `AudioRegistrySO`, `UiAudioSO`, `ProceduralAudioBank`, `MissingSfxReporter` |
 | `Scripts/Balance` | Gameplay | `BalanceOracle` (Solo Clear Time simulator), `SctTargets`, `SpecSctTargets`, `BalanceTypes`; the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice` |
 | `Scripts/Settings` | Gameplay | `PlayerPreferences` (persisted display options and the dev-tools gate), `LastSetup` (last committed menu choices) |
-| `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators, `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
+| `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators and the floor arrows (`RivalIndicator`, `FloorRivalArrows`, `FloorArrowRules`, `MarkedTargetArrowRules`), the Death Mark / Hunt hunter feedback (`MarkFeedback`, `HuntBrackets`, `HuntRules`), `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
 | `Scripts/UI` | Presentation | UI Toolkit controllers (`MenuUiController` and its partials, `MatchOverlaysController` and its partials, `MatchHudController`, `MarkHudController`), `UiElements`, ability icon/palette mapping, pure layout/flow rules (`MatchStandings`, `WaitingRoomRules`, `SafeAreaPadding`, `OrientationPolicy`), `DebugHud`, and `MatchHud` (a UGUI canvas built in code for the hit flash and the comeback banner) |
-| `Scripts/Input` | Presentation | `IInputProvider` and its providers (`KeyboardInputProvider`, `GamepadInputProvider`, `TouchInputProvider`, `CompositeInputProvider`); `TouchControlsController` and its `.Hud` partial; pure input and hex rules (`JoystickRules`, `HoldCancelRules`, `HudLayoutRules`, `CasterStunCountdownRules`, `EggPhaseHexRules`) |
+| `Scripts/Input` | Presentation | `IInputProvider` and its providers (`KeyboardInputProvider`, `GamepadInputProvider`, `TouchInputProvider`, `CompositeInputProvider`); `TouchControlsController` and its `.Hud` partial; pure input and hex rules (`JoystickRules`, `HoldCancelRules`, `HudLayoutRules`, `CasterStunCountdownRules`, `EggPhaseHexRules`, `HuntHexRules`) |
 | `Scripts/Diagnostics` | Diagnostics (asmdef) | `AutoTestDriver` (+ `.Aura`, `.Mark` partials), `AutoTestArgs`, `AutoTestConfig`, `AutoPlayBrain`, `AutoPlayInputProvider`, `InvariantProbe` / `RoundInvariants`, `PerfProbe` / `PerfRules`, `VisualProbe` / `VisualScanRules`, `UiLayoutProbe` / `UiLayoutRules` / `UiLayoutAllowList`, `SyncHeartbeat` / `SyncHeartbeatFormat`, `SessionStamp`, `MenuShotsDriver`, `DebugHudSpawner`, `RevealBreadcrumbs`, `DiagnosticsObjects` (keeps a probe alive across scene loads) |
 | `Scripts/AbilityLab` | Diagnostics | The Ability Lab dev scene: `AbilityLabBootstrapper`, `AbilityLabPanel`, `AbilityLabHud`, `AbilityLabDummy`, `AbilityLabLoadout` |
 | `Scripts/App` | App (asmdef) | `FusionNetworkService` (Fusion implementation of `INetworkService`), `UGSService` (live UGS auth + lobby, lobby `bal` hash check), `RemoteConfigBalanceSource` (the only Remote Config user) |
@@ -357,7 +357,8 @@ All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each,
 - `UI/MenuUiController.cs` with partials `UI/MenuUiController.Chrome.cs` (music, backdrop), `UI/MenuUiController.Coop.cs` (host/join, seats, join code), `UI/MenuUiController.GearUp.cs` (loadout step), `UI/MenuUiController.PickBird.cs` (class tiles), `UI/MenuUiController.Sheets.cs` (disconnect and settings sheets; Ability Lab launch), `UI/MenuUiController.Stage.cs` (live 3D chicken stage).
 - `Input/TouchControlsController.cs` (input contract read by `TouchInputProvider`) with `Input/TouchControlsController.Hud.cs` (drawing of the hex cluster, stick and status strip).
 - `UI/MatchOverlaysController.cs` with `UI/MatchOverlaysController.Intro.cs`, `UI/MatchOverlaysController.Lobby.cs`, `UI/MatchOverlaysController.MatchEnd.cs`.
-- `UI/MatchHudController.cs` (top bar), `UI/MarkHudController.cs` (Death Mark HUD), `Visuals/HudControlZones.cs` (where HUD controls sit).
+- `UI/MatchHudController.cs` (top bar), `UI/MarkHudController.cs` (Death Mark HUD: the hunter's marker, anchored on the target's floor arrow outside the circle and over its head inside; `MarkHud.uxml` has a `MarkBody` wrapper, `MarkPaw`, `MarkStar`), `Visuals/HudControlZones.cs` (where HUD controls sit).
+- `Visuals/HuntRules.cs` (pure hunter-state rules: blocker priority, count text, end cause, marker and bracket colour, badge, anchor, marker scale, metres chip text and colour), `Visuals/MarkedTargetArrowRules.cs` (pure: when the marked target keeps its floor arrow), `Visuals/HuntBrackets.cs` (hunter-only ground brackets, owned by `MarkFeedback`), `Input/HuntHexRules.cs` (pure: the Hunt hex during a hunt; its `HuntDot` / `HuntGlyph` / `HuntFar` elements are in `TouchControls.uxml`, one set per slot). Tests: `Editor/Tests/HuntRulesTests.cs`, `HuntHexRulesTests.cs`, `MarkMarkerGeometryTests.cs`, `MarkOnArrowTests.cs`, `HuntBracketsTests.cs`, `HapticRulesTests.cs`.
 
 **Audio**
 - `Audio/SfxId.cs`: typed sound ids (`enum SfxId : byte`).
