@@ -6,6 +6,20 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-17 - Hunt hunter-side feedback (batch K, decisions H1-H8)
+
+Maestro, 17 Nov: "It is clearer for the victim than the killer. Killer must know the state of the ability and who is the target at a glance." He chose all eight recommended options on the decision page https://claude.ai/artifact/UKj6VChjS8sSpGa2NpaLDT. Design (binding): `docs/superpowers/specs/2026-11-17-hunt-hunter-feedback-design.md`; plan: `docs/superpowers/plans/2026-11-17-hunt-hunter-feedback-plan.md` (K1-K9).
+- **Decisions:** H1a ground brackets on the target in its seat colour + marker x1.5 + metres always shown (red beyond KillRange); H2a the Hunt hex shows the target's colour dot, the draining window and the count (3-2-1, then tenths), POUNCE + tenths; H3a one blocker glyph on marker and hex (star not stunned, red metres too far, lock home wall, egg shelled; no ground reach ring); H4a end word MISSED (new string) or SAFE + the reason glyph held 0.6 s; H5a off-screen arrow from the hunter's bird; H6a no hunter clock pill; H7a paw on the hunter's marker (already shipped since 55615fc2, docs only); H8a buzz at live and at pounce-legal.
+- **Corrections to the first read:** the Hunt hex is NOT dimmed during a hunt (NoTarget draws at `HexAlphaReady`; 0.70 is the joystick value), it simply shows no state; and the hunter's marker already wears the paw. Builder calls (design §8): count in the disc centre with the paw as a corner badge, metres with one decimal under 10 m, no word when a mark expires while the pounce was legal, buzzes obey "Buzz When Hit".
+- **Scope:** the hunter's own screen only. Nothing the victim or bystanders see changes; no timing, range or rule change; no new networked state or RPC. The live window is 1 s (ArmSeconds 3 inside WindowSeconds 4, `MarkKill.asset`).
+- **Verification:** Editor closed, so each item is gated by a batch-mode EditMode run; hunter-view frames come from `cw_markshots` on a dev-tools Windows build (`tools/test-session/scenario-pc.ps1 -Mode solo -ExtraArgs '-cw_markshots -cw_perk Assassin_Spoiler'`). The Ability Lab cannot place a mark.
+
+| Item | Status | Commit | Notes |
+|---|---|---|---|
+| K1 hunter state rule | Done (3722/3722 batch; first full run had the known flaky `MarkScreenEffectTests` PC case, green on re-run) | `4a47a10e` | New pure `Visuals/HuntRules.cs`: `HuntBlocker` (egg > wall > too far > not stunned), `CountText` (whole seconds, then tenths), `EndCauseFor` over the frozen last live frame (pounce legal -> no word; ended early -> MISSED; walled/shelled at expiry -> SAFE; else MISSED), `MarkerColour` / `BracketColour`. `MarkInputs` += TargetStunned, KillRange, LocalRemoved; `MarkOutputs` += Blocker, Remaining, EndCause, EndHolding; `MarkEvents.Ended`. The hunter's marker holds 0.6 s after a MISSED/SAFE end, then the usual 0.3 s fade; victim and third-party timings unchanged; `AssassinMarkActive` still drops on frame 0. `HuntRulesTests` + `MarkPresentationModelTests` additions. No capture (no new cue yet). senior-dev. |
+
+---
+
 ## ⚖️ 2026-11-17 - BalanceBook: server-driven live-ops balance (UGS Remote Config), not committed
 
 Owner rulings D1c/D2c/D3c/D4b (2026-11-17): balance updates ship without an app update. Clients only READ a delta the owner publishes in UGS Remote Config (key `balance`); production builds read the `production` environment, dev-tools builds (Editor, Test Session) read `dev`. No in-app editing, no local-file override. A peer mismatch only warns.
