@@ -104,6 +104,7 @@ namespace CluckWars.Visuals
         private readonly List<MarkChicken> _snapshot = new List<MarkChicken>(8);
         private readonly List<ChickenController> _snapshotRefs = new List<ChickenController>(8);
         private ChickenController _target, _hunter, _localHunter;
+        private HuntBrackets _brackets;
         private long _shownHunterId;
         private float _introLastSeenAt = float.NegativeInfinity;
 
@@ -119,6 +120,7 @@ namespace CluckWars.Visuals
         {
             SelfInject.Ensure(this, _log != null);
             SceneManager.sceneUnloaded += OnSceneUnloaded;
+            _brackets = HuntBrackets.Create(transform, _log);   // K4: the hunter's ground brackets, a child of this scene-level object
         }
 
         private void OnDisable() => HardClear();
@@ -138,6 +140,7 @@ namespace CluckWars.Visuals
             _target = _hunter = _localHunter = null;
             _shownHunterId = 0;
             MarkScreenEffect.Clear();
+            if (_brackets != null) _brackets.Hide();
         }
 
         private void Update()
@@ -145,10 +148,29 @@ namespace CluckWars.Visuals
             var o = _model.Step(Gather(), Time.unscaledDeltaTime);
             if (o.Role == MarkRole.None) _target = _hunter = _localHunter = null;
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
+            DriveBrackets(in o);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if (ShowsHuntPop(o) && _localHunter != null)
                 FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor(),
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
+        }
+
+        /// <summary>The hunter's ground brackets round the marked target (K4): only while this peer's local Assassin owns the mark
+        /// (<see cref="HuntBrackets.ShouldShow"/>), the target following the same chicken the marker rides, hidden (Hide) or not.</summary>
+        private void DriveBrackets(in MarkOutputs o)
+        {
+            if (_brackets == null) return;
+            var target = _target;   // Unity null once the chicken despawned during the end fade
+            bool has = target != null;
+            Vector3 at = has ? target.transform.position : default;
+            _brackets.Apply(in o, has, at, has ? RingWorldRadiusOf(target) : 0f, PlayerPreferences.ReducedMotionEnabled, Time.unscaledTime);
+        }
+
+        /// <summary>The target's rival ring radius in world metres (its indicator's), the authored radius at its scale if it has none.</summary>
+        private static float RingWorldRadiusOf(ChickenController target)
+        {
+            var indicator = target.Indicator();
+            return indicator != null ? indicator.RingWorldRadius : FeedbackTuning.RivalRingRadius * target.transform.lossyScale.x;
         }
 
         /// <summary>HUNT! over the hunter the frame its kill goes live, on the hunter's own screen only: the Assassin role is

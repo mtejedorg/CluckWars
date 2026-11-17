@@ -879,6 +879,23 @@ namespace CluckWars.Visuals
         public const float MarkCircleHysteresisMetres = 0.4f;
         public const float MarkArrowScale = 1.5f;
         public const float MarkMarkerOnArrowScale = 0.67f;
+
+        // The hunter's ground brackets (K4): four arcs round the marked target, seen from the high match camera on a phone.
+        /// <summary>Bracket centre-line radius as a multiple of the target's rival ring radius: the stroke's inner edge clears the
+        /// rival ring (and the cargo sparkle ring inside it) by a visible gap.</summary>
+        public const float HuntBracketRadiusFactor = 1.35f;
+        /// <summary>Angular span of each of the four arcs (they sit on the diagonals, so the target reads as framed).</summary>
+        public const float HuntBracketArcDegrees = 50f;
+        /// <summary>Cream/colour stroke width and the ink outline each side of it and at the arc ends, world metres. The rival ring
+        /// is 0.085 m: the brackets are about twice as thick so they hold on grass, dirt and the yellow piles.</summary>
+        public const float HuntBracketWidth = 0.16f;
+        public const float HuntBracketOutlineWidth = 0.045f;
+        /// <summary>Height above the floor, over the floor arrows (<c>GroundY + 0.012</c>).</summary>
+        public const float HuntBracketHeightOffset = 0.019f;
+        /// <summary>Above the rival ring (1) and the floor-arrow ring and arrows (2, 3); below the body FX (5).</summary>
+        public const int HuntBracketSortingOrder = 4;
+        /// <summary>The ink of the outline's alpha share (the stroke itself is fully opaque).</summary>
+        public const float HuntBracketInkAlpha = 0.9f;
         public const float MarkOnArrowGapPx = 8f;
         /// <summary>The metres chip's centre, panel px from the badge centre, on the vertical side away from the hunter's bird: the
         /// badge's visible radius (ring centre line + half its ink track, scaled) + a 6 px gap + half the 42 px chip.</summary>

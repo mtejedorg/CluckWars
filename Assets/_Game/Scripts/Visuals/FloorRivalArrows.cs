@@ -42,12 +42,12 @@ namespace CluckWars.Visuals
         private const string Source = "FloorRivalArrows";
 
         /// <summary>Paint layers: ring under arrows, both above the rival ring (1). With the y offsets below, no z-fighting.</summary>
-        private const int RingSortingOrder = 2;
-        private const int ArrowSortingOrder = 3;
+        public const int RingSortingOrder = 2;
+        public const int ArrowSortingOrder = 3;
 
         /// <summary>Paint heights above the y = 0 arena floor (the telegraph outlines sit at <see cref="TelegraphShapes.GroundY"/>).</summary>
         private const float RingY = TelegraphShapes.GroundY + 0.005f;
-        private const float ArrowY = TelegraphShapes.GroundY + 0.012f;
+        public const float ArrowY = TelegraphShapes.GroundY + 0.012f;
 
         /// <summary>Ring tessellation (segments round the circle).</summary>
         private const int RingSegments = 72;

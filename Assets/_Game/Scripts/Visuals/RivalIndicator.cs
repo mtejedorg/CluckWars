@@ -104,7 +104,7 @@ namespace CluckWars.Visuals
 
         /// <summary>Ring sits under the §5.1 control-state overlays (orders 2–5), which are
         /// transient and must win; the rival ring is permanent furniture.</summary>
-        private const int RingSortingOrder = 1;
+        public const int RingSortingOrder = 1;
 
         /// <summary>The chevron is screen furniture and must beat every piece of arena
         /// geometry and every world overlay it is drawn over.</summary>
@@ -439,6 +439,10 @@ namespace CluckWars.Visuals
         /// bird (<see cref="HuntRules.InsideCircle"/>, with its hysteresis). The one value the marker's anchor and the arrow decision
         /// both read, so the two can never disagree. False for any rival that is not the marked one.</summary>
         public bool MarkInsideCircle => _markInside;
+
+        /// <summary>The rival ring's outer radius in WORLD metres (the authored root-local radius times the class scale the ground
+        /// anchor inherits). Read-only: the hunter's ground brackets (<see cref="HuntBrackets"/>) stand outside it.</summary>
+        public float RingWorldRadius => _ringRadius * transform.lossyScale.x;
 
         private void UpdateMarkCircle(Camera cam)
         {
