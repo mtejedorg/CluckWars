@@ -369,6 +369,8 @@ namespace CluckWars.EditorTools
             bool customWas = PlayerSettings.Android.useCustomKeystore;
             string storeWas = PlayerSettings.Android.keystoreName, aliasWas = PlayerSettings.Android.keyaliasName;
             string storePassWas = PlayerSettings.Android.keystorePass, aliasPassWas = PlayerSettings.Android.keyaliasPass;
+            var symbolLevelWas = UnityEditor.Android.UserBuildSettings.DebugSymbols.level;
+            var symbolFormatWas = UnityEditor.Android.UserBuildSettings.DebugSymbols.format;
 
             int code = AndroidVersionCode(codeWas);
             try
@@ -380,13 +382,17 @@ namespace CluckWars.EditorTools
                 PlayerSettings.Android.keyaliasName = signing.KeyAlias;
                 PlayerSettings.Android.keyaliasPass = signing.KeyPass;
                 EditorUserBuildSettings.buildAppBundle = true;
+                // BL-182: the IL2CPP game code is native, so Play wants the native debug symbols (a symbols.zip next to the .aab).
+                // (androidCreateSymbols is obsolete since Unity 6.2.) The zip is <name>-<version>-v<code>-IL2CPP.symbols.zip in the output folder.
+                UnityEditor.Android.UserBuildSettings.DebugSymbols.level = Unity.Android.Types.DebugSymbolLevel.SymbolTable;
+                UnityEditor.Android.UserBuildSettings.DebugSymbols.format = Unity.Android.Types.DebugSymbolFormat.Zip;
 
                 Debug.Log($"{LogTag} Play Store bundle: versionCode {code}, versionName {PlayerSettings.bundleVersion}, key alias '{signing.KeyAlias}'.");
                 var file = $"CluckWars-{SanitizedVersion()}-{code}.aab";
                 bool ok = Build(BuildTarget.Android, AndroidSubdir, file);
                 if (ok)
                     Debug.Log($"{LogTag} Upload {Path.GetFullPath(Path.Combine(BuildsRoot, AndroidSubdir, file))} in Play Console → " +
-                              "Test and release → Testing → Internal testing → Create new release. Testers get it as a Play update.");
+                              "Test and release → Testing → Internal testing → Create new release. Testers get it as a Play update. Also upload the *-IL2CPP.symbols.zip from the same folder under the release's native debug symbols (BL-182).");
                 return ok;
             }
             finally
@@ -398,6 +404,8 @@ namespace CluckWars.EditorTools
                 PlayerSettings.Android.keyaliasName = aliasWas;
                 PlayerSettings.Android.keyaliasPass = aliasPassWas;
                 EditorUserBuildSettings.buildAppBundle = false;
+                UnityEditor.Android.UserBuildSettings.DebugSymbols.level = symbolLevelWas;
+                UnityEditor.Android.UserBuildSettings.DebugSymbols.format = symbolFormatWas;
             }
         }
 
