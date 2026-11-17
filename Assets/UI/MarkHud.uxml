@@ -8,6 +8,9 @@
 
         <!-- The Assassin's hunt marker: pinned over the target (pointer down) or at the clear-viewport edge (pointer at it). -->
         <ui:VisualElement name="HuntMarker" class="cw-mark-marker" picking-mode="Ignore">
+            <!-- MarkBody holds everything the anchor scales (the 0.67 badge on the arrow, the pops, the KILL pulse). The metres
+                 chip is its sibling: never in a scaled subtree, so its text stays at full size (the HUD font floor, rule U4). -->
+            <ui:VisualElement name="MarkBody" class="cw-mark-body" picking-mode="Ignore">
             <ui:VisualElement name="MarkPointer" class="cw-mark-pointer" picking-mode="Ignore" />
             <ui:VisualElement name="MarkDisc" class="cw-mark-disc" picking-mode="Ignore" />
             <ui:VisualElement name="MarkRing" class="cw-mark-ring" picking-mode="Ignore" />
@@ -23,6 +26,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="MarkStar" class="cw-mark-lock cw-mark-star" picking-mode="Ignore">
                 <ui:VisualElement name="MarkStarGlyph" class="cw-mark-star-glyph" picking-mode="Ignore" />
+            </ui:VisualElement>
             </ui:VisualElement>
             <ui:Label name="MarkDistance" text="" class="cw-mark-distance" picking-mode="Ignore" />
         </ui:VisualElement>

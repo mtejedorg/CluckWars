@@ -160,10 +160,88 @@ namespace CluckWars.Tests
             StringAssert.Contains("if (_anchor == MarkAnchor.OnArrow)", hud);
             StringAssert.Contains("else if (MarkerPlacement.Place(", hud);
             StringAssert.Contains("public static MarkAnchor AnchorNow", hud);
-            StringAssert.Contains("UiElements.SetShown(_pointer, !onArrow);", hud);
+            StringAssert.Contains("UiElements.SetShown(_pointer, HuntRules.PointerShown(_anchor));", hud);
             string ri = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
             StringAssert.Contains("public bool MarkInsideCircle", ri);
             StringAssert.Contains("HuntRules.InsideCircle(distance, FloorRivalArrows.RingRadiusFor(cam), _markInside)", ri);
+        }
+
+        // ---- K5r-b: the anchor owns the scale and the pointer, in every mode ----
+
+        private static readonly MarkMarkerMode[] Modes = { MarkMarkerMode.Hunt, MarkMarkerMode.Kill, MarkMarkerMode.Walled, MarkMarkerMode.Shelled };
+
+        [Test]
+        public void MarkerScale_IsTheAnchorsBaseTimesEveryAnimation_InEveryMode()
+        {
+            Assert.AreEqual(FeedbackTuning.MarkMarkerOnArrowScale, HuntRules.AnchorBaseScale(MarkAnchor.OnArrow));
+            Assert.AreEqual(1f, HuntRules.AnchorBaseScale(MarkAnchor.OverHead));
+            Assert.AreEqual(1f, HuntRules.AnchorBaseScale(MarkAnchor.EdgeFallback));
+            foreach (var mode in Modes)
+                foreach (bool reduced in new[] { false, true })
+                    for (float t = 0f; t < 1f; t += 0.07f)
+                    {
+                        float pulse = HuntRules.KillPulseFactor(mode, reduced, t);
+                        foreach (float pop in new[] { FeedbackTuning.MarkMarkerPopFrom, 1f })
+                            foreach (float live in new[] { 1f, FeedbackTuning.MarkLivePopFrom })
+                            {
+                                float arrow = HuntRules.MarkerScale(MarkAnchor.OnArrow, pop, live, pulse);
+                                float head = HuntRules.MarkerScale(MarkAnchor.OverHead, pop, live, pulse);
+                                Assert.AreEqual(head * FeedbackTuning.MarkMarkerOnArrowScale, arrow, 1e-5f, $"{mode} reduced={reduced} t={t} pop={pop} live={live}");
+                                Assert.Less(arrow, head);
+                            }
+                        if (mode != MarkMarkerMode.Kill || reduced) Assert.AreEqual(1f, pulse, "only KILL pulses, never under Reduced Motion");
+                        else Assert.That(pulse, Is.InRange(1f, 1f + FeedbackTuning.MarkMarkerKillPulse + 1e-5f));
+                    }
+            // Settled (pop, live pop done): the badge is exactly the base scale, whatever the mode.
+            foreach (var mode in Modes)
+                Assert.AreEqual(FeedbackTuning.MarkMarkerOnArrowScale, HuntRules.MarkerScale(MarkAnchor.OnArrow, 1f, 1f, HuntRules.KillPulseFactor(mode, true, 0f)), 1e-6f);
+        }
+
+        [Test]
+        public void Pointer_IsAFunctionOfTheAnchorOnly()
+        {
+            Assert.IsFalse(HuntRules.PointerShown(MarkAnchor.OnArrow));
+            Assert.IsTrue(HuntRules.PointerShown(MarkAnchor.OverHead));
+            Assert.IsTrue(HuntRules.PointerShown(MarkAnchor.EdgeFallback));
+            // The controller takes no other input for it: the only write is the anchor's.
+            string hud = Read("Assets/_Game/Scripts/UI/MarkHudController.cs");
+            Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(hud, @"SetShown\(_pointer,").Count, "one pointer write");
+            StringAssert.DoesNotContain("_marker.style.scale", hud, "the box is never scaled: only the body, so the chip stays outside any scale");
+            StringAssert.Contains("_body.style.scale", hud);
+        }
+
+        [Test]
+        public void Chip_OnTheArrow_StaysAtTheHudFontFloor_AndInsideTheBox()
+        {
+            // What UiProbe measures: the stylesheet's font size times the PARENT's world scale (the element's own scale is juice).
+            // The chip's parent is the marker box, which is never scaled; its own scale on the arrow is 1.
+            float font = float.Parse(System.Text.RegularExpressions.Regex.Match(
+                Read("Assets/UI/Styles/MarkHud.uss"), @"\.cw-mark-distance\s*\{[^}]*?font-size:\s*([0-9.]+)px").Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            float floor = CluckWars.Diagnostics.UiLayoutRules.FontFloor(CluckWars.Diagnostics.UiScope.Hud);
+            Assert.AreEqual(1f, MarkerPlacement.ChipScale(true, FeedbackTuning.MarkMarkerOnArrowScale), "full size on the arrow");
+            Assert.GreaterOrEqual(font * 1f, floor, "the resolved chip font on the arrow (parent scale 1)");
+            Assert.GreaterOrEqual(font * MarkerPlacement.ChipScale(false, FeedbackTuning.MarkMarkerPopFrom), floor, "and at the appear pop elsewhere");
+            // Placement: a fixed offset on the arrow, the stylesheet's own scaled elsewhere.
+            Assert.AreEqual(-FeedbackTuning.MarkOnArrowChipOffsetPx, MarkerPlacement.ChipOffsetPx(true, true, FeedbackTuning.MarkMarkerOnArrowScale));
+            Assert.AreEqual(FeedbackTuning.MarkOnArrowChipOffsetPx, MarkerPlacement.ChipOffsetPx(true, false, FeedbackTuning.MarkMarkerOnArrowScale));
+            Assert.AreEqual(MarkerPlacement.ChipBaseBelowCentrePx, MarkerPlacement.ChipOffsetPx(false, false, 1f));
+            // The uxml puts the chip beside the scaled body, not inside it.
+            string uxml = Read("Assets/UI/MarkHud.uxml");
+            int bodyOpen = uxml.IndexOf("name=\"MarkBody\"", System.StringComparison.Ordinal);
+            int chip = uxml.IndexOf("name=\"MarkDistance\"", System.StringComparison.Ordinal);
+            int star = uxml.IndexOf("name=\"MarkStarGlyph\"", System.StringComparison.Ordinal);
+            Assert.Greater(chip, star, "the chip comes after the last body child");
+            Assert.Greater(uxml.IndexOf("</ui:VisualElement>", star, System.StringComparison.Ordinal), -1);
+            Assert.Greater(bodyOpen, 0);
+        }
+
+        [Test]
+        public void HiddenMarkedTarget_KeepsItsArrow_WithoutARing_SourceGuard()
+        {
+            string ri = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
+            StringAssert.Contains("forcedHunter || MarkFeedback.IsMarkedByLocal(_controller) ? 1f", ri);
+            StringAssert.Contains("bool concealed = _controller.VisualOpacity < MinVisibleOpacity;", ri);
         }
 
         // ---- The badge on the arrow ----

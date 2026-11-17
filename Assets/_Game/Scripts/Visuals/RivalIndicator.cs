@@ -459,18 +459,22 @@ namespace CluckWars.Visuals
             bool outside = !_markInside;
             bool accepted = MarkedTargetArrowRules.OffersFloorArrow(true, outside) &&
                             FloorRivalArrows.TryRepresentEmphasised(GetInstanceID(), transform.position, MarkFeedback.MarkArrowTint(), opacity);
+            // A concealed bird (Hide) never gets a ring or a chevron here: only its floor arrow, or nothing.
+            bool concealed = _controller.VisualOpacity < MinVisibleOpacity;
             switch (MarkedTargetArrowRules.Decide(true, outside, hiddenFromClearViewport, accepted))
             {
                 case MarkedArrowDecision.FloorArrow:
                     // Off the frame: just the arrow (the ring only under a HUD zone). In view: the ground ring stays too.
-                    if (hiddenFromClearViewport) HideChevron(_wasUnderHud, tint, opacity);
+                    if (hiddenFromClearViewport || concealed) HideChevron(!concealed && _wasUnderHud, tint, opacity);
                     else ShowRing(tint, opacity);
                     return true;
                 case MarkedArrowDecision.NoArrow:
-                    HideChevron(_wasUnderHud, tint, opacity);
+                    HideChevron(!concealed && _wasUnderHud, tint, opacity);
                     return true;
                 default:
-                    return false;
+                    if (!concealed) return false;
+                    HideChevron(false, tint, opacity);
+                    return true;
             }
         }
 
@@ -544,7 +548,10 @@ namespace CluckWars.Visuals
             // The Death Mark victim's hunter, invisible beyond the inner circle, still shows its arrow (direction only):
             // the model decides (MarkPresentationModel.ForceShowHunter). Everyone else: Invisibility hides the indicator.
             forcedHunter = MarkFeedback.ForcesArrowFor(_controller);
-            opacity = forcedHunter ? 1f : Mathf.Clamp01(_controller.VisualOpacity);
+            // The local hunter's marked target keeps its arrow while hidden (Hide): the marker already tracks it, so the arrow tells
+            // nothing new, and a marker with no arrow would fall back to a full-size edge pin. Direction only, never a ring
+            // (ApplyMarkedArrow).
+            opacity = forcedHunter || MarkFeedback.IsMarkedByLocal(_controller) ? 1f : Mathf.Clamp01(_controller.VisualOpacity);
             return opacity >= MinVisibleOpacity;
         }
 

@@ -262,6 +262,16 @@ namespace CluckWars.UI
         /// top 152 below).</summary>
         public const float ChipBaseAboveCentrePx = -99f, ChipBaseBelowCentrePx = 101f;
 
+        /// <summary>The chip's own scale: full size on the arrow badge (the marker box is never scaled, so its text stays at the HUD
+        /// floor or above), the body's scale elsewhere (the appear pop, as before).</summary>
+        public static float ChipScale(bool onArrow, float bodyScale) => onArrow ? 1f : bodyScale;
+
+        /// <summary>The chip's centre from the marker box centre, px: a fixed offset on the arrow badge, the stylesheet's offset
+        /// scaled with the body elsewhere.</summary>
+        public static float ChipOffsetPx(bool onArrow, bool above, float bodyScale) =>
+            onArrow ? (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx
+                    : (above ? ChipBaseAboveCentrePx : ChipBaseBelowCentrePx) * bodyScale;
+
         /// <summary>The chip's half extents, panel px ("999 m" is ~134 px wide, the pill 42 tall).</summary>
         public const float ChipHalfWidthPx = 67f, ChipHalfHeightPx = 21f;
 

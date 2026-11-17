@@ -168,6 +168,22 @@ namespace CluckWars.Visuals
             : arrowAvailable ? MarkAnchor.OnArrow
             : MarkAnchor.EdgeFallback;
 
+        /// <summary>The marker body's base scale for an anchor: the compact badge on the arrow, full size anywhere else.</summary>
+        public static float AnchorBaseScale(MarkAnchor anchor) => anchor == MarkAnchor.OnArrow ? FeedbackTuning.MarkMarkerOnArrowScale : 1f;
+
+        /// <summary>The pointer is drawn for every anchor but the arrow, in every marker mode: a function of the anchor only.</summary>
+        public static bool PointerShown(MarkAnchor anchor) => anchor != MarkAnchor.OnArrow;
+
+        /// <summary>The KILL pulse factor (1 outside KILL and under Reduced Motion).</summary>
+        public static float KillPulseFactor(MarkMarkerMode mode, bool reducedMotion, float unscaledTime) =>
+            mode == MarkMarkerMode.Kill && !reducedMotion
+                ? 1f + FeedbackTuning.MarkMarkerKillPulse * 0.5f * (1f + Mathf.Sin(unscaledTime * FeedbackTuning.MarkMarkerKillPulseHz * 2f * Mathf.PI))
+                : 1f;
+
+        /// <summary>The marker body's final scale: the anchor's base scale times every animated factor (appear pop, live pop, KILL pulse),
+        /// so no animation can undo the anchor's size.</summary>
+        public static float MarkerScale(MarkAnchor anchor, float pop, float live, float pulse) => AnchorBaseScale(anchor) * pop * live * pulse;
+
         /// <summary>The hunter marker's colour by mode: yellow KILL, grey wall, cream egg, else the target's seat colour.</summary>
         public static Color MarkerColour(MarkMarkerMode mode, int targetCorner) =>
             mode == MarkMarkerMode.Kill ? FeedbackTuning.MarkKillColor

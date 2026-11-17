@@ -17,6 +17,12 @@
     display: none;
 }
 
+/* Everything the anchor scales; the metres chip is its sibling (never scaled by the box). */
+.cw-mark-body {
+    position: absolute; left: 0; top: 0;
+    width: 144px; height: 144px;
+}
+
 .cw-mark-pointer, .cw-mark-ring {
     position: absolute; left: 0; top: 0;
     width: 144px; height: 144px;

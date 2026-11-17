@@ -42,7 +42,7 @@ namespace CluckWars.UI
 
         private ILogService _log;
 
-        private VisualElement _root, _marker, _pointer, _ring, _paw, _pawGlyph, _lock, _shell, _star, _hunterSkull;
+        private VisualElement _root, _marker, _body, _pointer, _ring, _paw, _pawGlyph, _lock, _shell, _star, _hunterSkull;
         private Label _distance, _arm;
         private bool _bound, _reportedMissing, _missingIndicatorReported;
         private string _shownCount;
@@ -54,7 +54,7 @@ namespace CluckWars.UI
 
         // Last placement, kept through the end fade when the target is gone.
         private Vector2 _markerPanel;
-        private bool _markerPlaced, _markerOffScreen, _markerOnArrow, _chipAbove;
+        private bool _markerPlaced, _markerOffScreen, _chipAbove;
         private MarkAnchor _anchor;
         private Vector2 _markerBearing = Vector2.down;
         private int _shownMetresKey = -1;
@@ -82,6 +82,7 @@ namespace CluckWars.UI
             if (root == null) return;
             _root = root.Q<VisualElement>("MarkHudRoot");
             _marker = root.Q<VisualElement>("HuntMarker");
+            _body = root.Q<VisualElement>("MarkBody");
             _pointer = root.Q<VisualElement>("MarkPointer");
             _ring = root.Q<VisualElement>("MarkRing");
             _paw = root.Q<VisualElement>("MarkPaw");
@@ -92,13 +93,13 @@ namespace CluckWars.UI
             _distance = root.Q<Label>("MarkDistance");
             _arm = root.Q<Label>("MarkArm");
             _hunterSkull = root.Q<VisualElement>("HunterSkull");
-            if (_root == null || _marker == null || _pointer == null || _ring == null || _paw == null || _pawGlyph == null || _lock == null || _shell == null || _star == null ||
+            if (_root == null || _marker == null || _body == null || _pointer == null || _ring == null || _paw == null || _pawGlyph == null || _lock == null || _shell == null || _star == null ||
                 _distance == null || _arm == null || _hunterSkull == null)
             {
                 if (!_reportedMissing)
                 {
                     _reportedMissing = true;
-                    _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkPointer, MarkRing, MarkPaw, " +
+                    _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkBody, MarkPointer, MarkRing, MarkPaw, " +
                         "MarkLock, MarkShell, MarkStar, MarkDistance, MarkArm or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
                 }
                 return;
@@ -163,7 +164,6 @@ namespace CluckWars.UI
                 if (_anchor == MarkAnchor.OnArrow)
                 {
                     _markerPanel = arrowAt;
-                    _markerOnArrow = true;
                     _markerOffScreen = false;
                     _markerBearing = Vector2.down;
                     _chipAbove = MarkerPlacement.OnArrowChipAbove(arrowAt, arrowOutward, panel, hasYou, you);
@@ -172,7 +172,6 @@ namespace CluckWars.UI
                 else if (MarkerPlacement.Place(cam, panel, target, LocalChicken(), out Vector2 at, out bool off, out Vector2 dir))
                 {
                     _markerPanel = at;
-                    _markerOnArrow = false;
                     _markerOffScreen = off;
                     _markerBearing = dir;
                     _markerPlaced = true;
@@ -180,7 +179,7 @@ namespace CluckWars.UI
             }
             bool offScreen = _markerOffScreen;
             Vector2 bearing = _markerBearing;
-            bool onArrow = _markerOnArrow;
+            bool onArrow = _anchor == MarkAnchor.OnArrow;
             if (!_markerPlaced)
             {
                 UiElements.SetShown(_marker, false);
@@ -192,13 +191,12 @@ namespace CluckWars.UI
             _marker.style.translate = new Translate(_markerPanel.x - boxHalf, _markerPanel.y - boxHalf);
             _marker.style.opacity = o.MarkerAlpha;
 
-            float badgeScale = onArrow ? FeedbackTuning.MarkMarkerOnArrowScale : 1f;   // a compact badge of the arrow, no pointer
-            float scale = o.MarkerPop * o.LiveScale * badgeScale;   // the arm pops the marker as the kill goes live
-            UiElements.SetShown(_pointer, !onArrow);
-            if (o.MarkerMode == MarkMarkerMode.Kill && !PlayerPreferences.ReducedMotionEnabled)
-                scale *= 1f + FeedbackTuning.MarkMarkerKillPulse * 0.5f *
-                         (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkMarkerKillPulseHz * 2f * Mathf.PI));
-            _marker.style.scale = new Scale(new Vector3(scale, scale, 1f));
+            // The anchor owns the size and the pointer; every animation multiplies the anchor's base scale. Only the body is scaled:
+            // the metres chip is its sibling (HuntMarker itself is never scaled).
+            float scale = HuntRules.MarkerScale(_anchor, o.MarkerPop, o.LiveScale,
+                HuntRules.KillPulseFactor(o.MarkerMode, PlayerPreferences.ReducedMotionEnabled, Time.unscaledTime));
+            UiElements.SetShown(_pointer, HuntRules.PointerShown(_anchor));
+            _body.style.scale = new Scale(new Vector3(scale, scale, 1f));
 
             Color c = HuntRules.MarkerColour(o.MarkerMode, o.TargetCorner);
             if (c != _stateColour || Mathf.Abs(o.MarkerFill01 - _fill) >= 0.004f)
@@ -236,7 +234,7 @@ namespace CluckWars.UI
             UiElements.SetShown(_distance, true);
             bool chipAbove = onArrow ? _chipAbove : !offScreen || MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing);
             _distance.EnableInClassList("cw-mark-distance--above", chipAbove);
-            PlaceChip(onArrow, chipAbove, badgeScale);
+            PlaceChip(onArrow, chipAbove, scale);
             int red = HuntRules.ChipRed(o.MarkerDistance, o.KillRange) ? 1 : 0;
             if (red != _chipRed || o.TargetCorner != _chipCorner)
             {
@@ -288,21 +286,16 @@ namespace CluckWars.UI
 
         private static bool Assign(out Rect r, Rect v) { r = v; return true; }
 
-        /// <summary>The metres chip: on the badge (<see cref="MarkAnchor.OnArrow"/>) it stays at full size inside the 0.67 box and sits
-        /// <see cref="FeedbackTuning.MarkOnArrowChipOffsetPx"/> from the badge centre on the chosen vertical side; otherwise the
-        /// stylesheet's own place.</summary>
-        private void PlaceChip(bool onArrow, bool above, float badgeScale)
+        /// <summary>The metres chip (a sibling of the scaled body, in the never-scaled marker box): on the arrow badge full size and
+        /// <see cref="FeedbackTuning.MarkOnArrowChipOffsetPx"/> from its centre on the chosen vertical side; elsewhere it follows the
+        /// body's scale as before. The stylesheet's rule gives the unscaled place; the translate moves it from there.</summary>
+        private void PlaceChip(bool onArrow, bool above, float bodyScale)
         {
-            if (!onArrow)
-            {
-                _distance.style.scale = StyleKeyword.Null;
-                _distance.style.translate = StyleKeyword.Null;
-                return;
-            }
-            _distance.style.scale = new Scale(new Vector3(1f / badgeScale, 1f / badgeScale, 1f));
-            float basePx = above ? MarkerPlacement.ChipBaseAboveCentrePx : MarkerPlacement.ChipBaseBelowCentrePx;
-            float wantPx = (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx / badgeScale;
-            _distance.style.translate = new Translate(new Length(-50f, LengthUnit.Percent), new Length(wantPx - basePx, LengthUnit.Pixel));
+            float chipScale = MarkerPlacement.ChipScale(onArrow, bodyScale);
+            _distance.style.scale = new Scale(new Vector3(chipScale, chipScale, 1f));
+            float dy = MarkerPlacement.ChipOffsetPx(onArrow, above, bodyScale) -
+                       (above ? MarkerPlacement.ChipBaseAboveCentrePx : MarkerPlacement.ChipBaseBelowCentrePx);
+            _distance.style.translate = new Translate(new Length(-50f, LengthUnit.Percent), new Length(dy, LengthUnit.Pixel));
         }
 
         private static ChickenController LocalChicken() => MatchCamera.Instance != null ? MatchCamera.Instance.LocalChicken : null;
