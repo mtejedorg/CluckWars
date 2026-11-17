@@ -155,5 +155,65 @@ namespace CluckWars.Tests
             StringAssert.Contains("_eggDigitShown[slot] = false;", fn);
             StringAssert.Contains("HuntRules.CountText(", fn);
         }
+
+        // ---- K2b: the hex's own geometry, as relationships in the stylesheet ------------------------------------------
+
+        private static float HexPx(string selector, string property)
+        {
+            string uss = File.ReadAllText(Uss);
+            var m = Regex.Match(uss, "(?:^|\n)" + Regex.Escape(selector) + @"\s*\{([^}]*)\}");
+            Assert.IsTrue(m.Success, $"{selector} has no rule in TouchControls.uss");
+            var v = Regex.Match(m.Groups[1].Value, @"(?<![\w-])" + Regex.Escape(property) + @"\s*:\s*(-?[0-9.]+)px");
+            Assert.IsTrue(v.Success, $"{selector} has no {property} in px");
+            return float.Parse(v.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        [Test]
+        public void HuntCount_IsAtLeast1p4xTheCooldownDigit_AndTheCooldownRuleIsUntouched()
+        {
+            float cooldown = HexPx(".cw-hex-cdnum", "font-size");
+            Assert.AreEqual(36f, cooldown, "the cooldown readout after the hunt is unchanged");
+            Assert.GreaterOrEqual(HexPx(".cw-hex--hunt .cw-hex-cdnum", "font-size"), cooldown * 1.4f);
+            Assert.GreaterOrEqual(HexPx(".cw-hud--pad .cw-hex--hunt .cw-hex-cdnum", "font-size"), cooldown * 1.4f);
+        }
+
+        [Test]
+        public void HuntIcon_ShrinksAndRisesClearOfTheCount()
+        {
+            float hex = HexPx(".cw-hex", "height");
+            float iconBottom = HexPx(".cw-hex--hunt .cw-hex-icon", "top") + HexPx(".cw-hex--hunt .cw-hex-icon", "height");
+            float countTop = hex - HexPx(".cw-hex--hunt .cw-hex-cdnum", "bottom") - HexPx(".cw-hex--hunt .cw-hex-cdnum", "height");
+            Assert.Less(HexPx(".cw-hex--hunt .cw-hex-icon", "width"), HexPx(".cw-hex-icon", "width"), "the paw shrinks while hunting");
+            Assert.LessOrEqual(iconBottom, countTop + 6f, "the icon ends where the count box starts (the count's ink starts below its box top)");
+        }
+
+        [Test]
+        public void BlockerBadge_IsAtLeast36px_WithAnInkBacking_AndTheFarChipClearsTheSlotBadge()
+        {
+            Assert.GreaterOrEqual(HexPx(".cw-hex-huntglyph", "width"), 36f);
+            Assert.GreaterOrEqual(HexPx(".cw-hex-huntglyph", "height"), 36f);
+            string uss = File.ReadAllText(Uss);
+            StringAssert.Contains("background-color: rgb(20, 10, 26);", Regex.Match(uss, @"\.cw-hex-huntglyph\s*\{([^}]*)\}").Groups[1].Value, "ink backing");
+            float slotBadgeBottom = HexPx(".cw-hex-badge", "top") + HexPx(".cw-hex-badge", "height");
+            Assert.GreaterOrEqual(HexPx(".cw-hex-huntglyph", "top"), slotBadgeBottom, "the badge sits below the slot badge");
+            Assert.GreaterOrEqual(HexPx(".cw-hex-huntfar", "top"), slotBadgeBottom - 2f, "the chip does not cover the slot badge number");
+        }
+
+        [Test]
+        public void KillWord_IsSmallerThanBefore_AndFitsInsideTheHexBelowTheBadges()
+        {
+            const float fontBeforeK2b = 42f;
+            Assert.Less(HexPx(".cw-hex-killtext", "font-size"), fontBeforeK2b);
+            float hexWidth = HexPx(".cw-hex", "width");
+            float content = hexWidth - HexPx(".cw-hex-killtext", "left") - HexPx(".cw-hex-killtext", "right");
+            // POUNCE is ~3.76 em wide with its letter-spacing at 42 px / 2 px (158 px measured); with margin it must fit the content.
+            float font = HexPx(".cw-hex-killtext", "font-size");
+            float wordWidth = 158f / 42f * font;
+            Assert.LessOrEqual(wordWidth + 12f, content, "the word fits the content width with margin");
+            float badgeBottom = HexPx(".cw-hex-badge", "top") + HexPx(".cw-hex-badge", "height");
+            Assert.GreaterOrEqual(HexPx(".cw-hex-killtext", "top"), badgeBottom - 4f, "the word starts below the slot badge");
+            float tenthsInkTop = hexWidth - HexPx(".cw-hex--hunt .cw-hex-cdnum", "bottom") - HexPx(".cw-hex--hunt .cw-hex-cdnum", "height") + 6f;
+            Assert.LessOrEqual(HexPx(".cw-hex-killtext", "top") + HexPx(".cw-hex-killtext", "height"), tenthsInkTop, "the tenths do not touch the word");
+        }
     }
 }

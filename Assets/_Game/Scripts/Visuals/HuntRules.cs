@@ -20,6 +20,15 @@ namespace CluckWars.Visuals
         NotStunned = 4,
     }
 
+    /// <summary>The one corner badge the hunter's marker shows (bottom-right): egg, wall, star, or none.</summary>
+    public enum MarkerBadge : byte
+    {
+        None = 0,
+        Shell = 1,
+        Lock = 2,
+        Star = 3,
+    }
+
     /// <summary>Why a hunter's mark ended, from the hunter's own last live frame.</summary>
     public enum MarkEndCause : byte
     {
@@ -110,6 +119,15 @@ namespace CluckWars.Visuals
 
         /// <summary>The chip is red while the target is beyond the kill range (the shipped <c>KillRange</c>), the seat colour inside it.</summary>
         public static bool ChipRed(float distance, float killRange) => TooFar(distance, killRange);
+
+        /// <summary>The marker's one corner badge, priority egg, wall, not stunned. The egg and the wall show from the lock on,
+        /// arming included (the mode says so before the blocker does); the star is a live-second reason only (the blocker is None
+        /// until armed). Too far has no badge: the red metres chip is its glyph.</summary>
+        public static MarkerBadge BadgeFor(MarkMarkerMode mode, HuntBlocker blocker) =>
+            mode == MarkMarkerMode.Shelled || blocker == HuntBlocker.Shelled ? MarkerBadge.Shell
+            : mode == MarkMarkerMode.Walled || blocker == HuntBlocker.Walled ? MarkerBadge.Lock
+            : blocker == HuntBlocker.NotStunned ? MarkerBadge.Star
+            : MarkerBadge.None;
 
         /// <summary>Why the mark ended, from the frozen last live frame. Anything not provably SAFE or a pounce is MISSED.</summary>
         public static MarkEndCause EndCauseFor(in HuntLastFrame last, bool matchRunningNow, bool hunterRemovedNow)

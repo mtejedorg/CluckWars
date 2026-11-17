@@ -193,10 +193,12 @@ namespace CluckWars.UI
                 _shownCount = count;
                 _arm.text = count;
             }
-            // One blocker badge once armed (None while arming, and when the pounce is legal); the K1 end hold keeps the frozen one.
-            UiElements.SetShown(_lock, o.Blocker == HuntBlocker.Walled);
-            UiElements.SetShown(_shell, o.Blocker == HuntBlocker.Shelled);
-            UiElements.SetShown(_star, o.Blocker == HuntBlocker.NotStunned);
+            // One corner badge (HuntRules.BadgeFor): egg and wall from the lock on, arming included; the star once armed. The K1
+            // end hold keeps the frozen one.
+            var badge = HuntRules.BadgeFor(o.MarkerMode, o.Blocker);
+            UiElements.SetShown(_lock, badge == MarkerBadge.Lock);
+            UiElements.SetShown(_shell, badge == MarkerBadge.Shell);
+            UiElements.SetShown(_star, badge == MarkerBadge.Star);
 
             // Pointer: down over the target, toward it at the edge. UITK rotates clockwise; the art points down (+y).
             // The bearing is the pointer's in every placement (down above, up below, sideways beside, at the target off screen).

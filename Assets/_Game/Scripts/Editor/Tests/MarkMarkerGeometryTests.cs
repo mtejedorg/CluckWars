@@ -137,5 +137,30 @@ namespace CluckWars.Tests
             StringAssert.Contains("_huntOut.MarkerDistance", hex);
             StringAssert.Contains("o.MarkerDistance", marker);
         }
+
+        [Test]
+        public void Badge_WallAndEggShowWhileArming_StarOnlyWhenLive_OneAtATime()
+        {
+            // Arming: the blocker is None, the mode already says wall / egg.
+            Assert.AreEqual(MarkerBadge.Lock, HuntRules.BadgeFor(MarkMarkerMode.Walled, HuntBlocker.None));
+            Assert.AreEqual(MarkerBadge.Shell, HuntRules.BadgeFor(MarkMarkerMode.Shelled, HuntBlocker.None));
+            Assert.AreEqual(MarkerBadge.None, HuntRules.BadgeFor(MarkMarkerMode.Hunt, HuntBlocker.None), "no star while arming");
+            // Live.
+            Assert.AreEqual(MarkerBadge.Lock, HuntRules.BadgeFor(MarkMarkerMode.Walled, HuntBlocker.Walled));
+            Assert.AreEqual(MarkerBadge.Shell, HuntRules.BadgeFor(MarkMarkerMode.Shelled, HuntBlocker.Shelled));
+            Assert.AreEqual(MarkerBadge.Star, HuntRules.BadgeFor(MarkMarkerMode.Hunt, HuntBlocker.NotStunned));
+            Assert.AreEqual(MarkerBadge.None, HuntRules.BadgeFor(MarkMarkerMode.Hunt, HuntBlocker.TooFar), "too far is the red chip, no badge");
+            Assert.AreEqual(MarkerBadge.None, HuntRules.BadgeFor(MarkMarkerMode.Kill, HuntBlocker.None));
+            // Priority egg > wall > star, over every combination.
+            foreach (MarkMarkerMode mode in System.Enum.GetValues(typeof(MarkMarkerMode)))
+                foreach (HuntBlocker b in System.Enum.GetValues(typeof(HuntBlocker)))
+                {
+                    var got = HuntRules.BadgeFor(mode, b);
+                    if (mode == MarkMarkerMode.Shelled || b == HuntBlocker.Shelled) Assert.AreEqual(MarkerBadge.Shell, got, $"{mode}/{b}");
+                    else if (mode == MarkMarkerMode.Walled || b == HuntBlocker.Walled) Assert.AreEqual(MarkerBadge.Lock, got, $"{mode}/{b}");
+                    else if (b == HuntBlocker.NotStunned) Assert.AreEqual(MarkerBadge.Star, got, $"{mode}/{b}");
+                    else Assert.AreEqual(MarkerBadge.None, got, $"{mode}/{b}");
+                }
+        }
     }
 }

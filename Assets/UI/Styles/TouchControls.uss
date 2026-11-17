@@ -682,12 +682,15 @@
    other fill tints), the rim cream, and the icon, label, pip and seconds give way to the word. Its 1.15 size is
    multiplied into the controller's inline scale (a USS scale would be overwritten). Lit Ambush: the target stands in
    Ambush's own shape and the slot is ready; same yellow fill and cream rim, the icon inked, the pip hidden. */
-/* Offset down-right of the slot badge (top-left) so the whole word reads; 42 px keeps "KILL" inside the 150 px hex. */
+/* The word sits below the slot badge (top-left, to y 68) and the category mark (top-right), 12 px in from each side of the 150 px
+   hex: "POUNCE" at 28 px (the HUD floor) is ~100 px wide, so it fits the 126 px content with margin (UiProbe U3). It was 42 px with
+   letter-spacing 2 (158 px wide, over the 140 px content, its first letter under the badge): the rule is unchanged by K2, which
+   only moved `bottom`, so it overflowed before K2 too. */
 .cw-hex-killtext {
     position: absolute;
-    left: 10px; right: 0; top: 18px; bottom: 0;
+    left: 12px; right: 12px; top: 64px; bottom: auto; height: 26px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 42px; letter-spacing: 2px;
+    font-size: 28px; letter-spacing: 1px;
     color: rgb(22, 16, 28);
     -unity-text-align: middle-center;
     white-space: nowrap;
@@ -724,10 +727,13 @@
    none for "too far" (the metres chip is the glyph there) or when nothing blocks. */
 .cw-hex-huntglyph {
     position: absolute;
-    left: 2px; top: 84px;
-    width: 34px; height: 34px;
-    border-top-left-radius: 17px; border-top-right-radius: 17px;
-    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+    left: 2px; top: 70px;
+    width: 40px; height: 40px;
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(20, 10, 26); border-right-color: rgb(20, 10, 26);
+    border-top-color: rgb(20, 10, 26); border-bottom-color: rgb(20, 10, 26);
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
     background-color: rgb(20, 10, 26);
     -unity-background-scale-mode: scale-to-fit;
     display: none;
@@ -747,7 +753,7 @@
 /* The red metres chip ("6 m", mark.distance): the glyph for a target beyond the kill range. 28 px text is the HUD floor. */
 .cw-hex-huntfar {
     position: absolute;
-    left: 0; top: 84px;
+    left: 40px; top: 66px;
     min-width: 64px; height: 34px;
     padding-left: 6px; padding-right: 6px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
@@ -766,12 +772,22 @@
 .cw-hex--hunt .cw-hex-huntglyph--star,
 .cw-hex--hunt .cw-hex-huntglyph--lock,
 .cw-hex--hunt .cw-hex-huntglyph--egg { display: flex; }
-/* POUNCE carries the tenths: the count shows under the word (the word moves up to make room). On the desktop / pad strip the
-   centred digit moves to the same lower band. */
-.cw-hex--kill.cw-hex--hunt .cw-hex-cdnum { visibility: visible; }
-.cw-hex--kill.cw-hex--hunt .cw-hex-killtext { bottom: 28px; }
-.cw-hud--desktop .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum,
-.cw-hud--pad .cw-hex--kill.cw-hex--hunt .cw-hex-cdnum {
-    top: auto; bottom: 12px; height: 40px;
-    font-size: 36px;
+/* The count leads on the hunt hex: 51 px (1.4x the 36 px cooldown digit), cream (inline), centred low, with the icon shrunk
+   and raised above it (paw 52 px at y 32..84; the count's ink starts near y 88) so the two never touch. The cooldown readout
+   outside a hunt is the base rule, unchanged. On the desktop / pad strip the centred digit moves to the same lower band. */
+.cw-hex--hunt .cw-hex-cdnum {
+    top: auto; bottom: 20px; height: 46px;
+    font-size: 51px;
 }
+.cw-hex--hunt .cw-hex-icon {
+    position: absolute;
+    left: 49px; top: 32px;
+    width: 52px; height: 52px;
+}
+.cw-hud--desktop .cw-hex--hunt .cw-hex-cdnum,
+.cw-hud--pad .cw-hex--hunt .cw-hex-cdnum {
+    top: auto; bottom: 20px; height: 46px;
+    font-size: 51px;
+}
+/* POUNCE carries the tenths: the word (y 64..90) sits above the count. */
+.cw-hex--kill.cw-hex--hunt .cw-hex-cdnum { visibility: visible; }
