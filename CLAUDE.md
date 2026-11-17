@@ -45,8 +45,8 @@ When you begin a session:
 1. `cat docs/STATE.md` — orient yourself to current state.
 2. Skim `git log --oneline -10` — what just changed.
 3. If the user asks for a change in a system you haven't touched before, check `docs/ARCHITECTURE.md` for how it's wired.
-4. Before making nontrivial changes, check the rules that cover the area you are touching in `docs/ARCHITECTURE_RULES.md` (layering, DI, networking, events, data-driven design, errors) and `docs/CODE_RULES.md` (text, UI, tests, process, design constraints): rules have stable IDs and say what enforces them or that nothing does. `docs/CONVENTIONS.md` still holds the hard-won detail (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.); where it disagrees with the rules docs, they win. Where to put a new file: `docs/FILE_STRUCTURE.md`.
-5. After making changes, **update `docs/STATE.md`** so the next agent doesn't lose context. ROADMAP entries get ticked too when phases complete.
+4. Before making nontrivial changes, check the rules that cover the area you are touching in `docs/ARCHITECTURE_RULES.md` (layering, DI, networking, events, data-driven design, errors) and `docs/CODE_RULES.md` (text, UI, tests, process, design constraints): rules have stable IDs and say what enforces them or that nothing does. Ask the `librarian` agent which rules cover an area instead of reading both docs whole. `docs/CONVENTIONS.md` still holds the hard-won detail (self-injection pattern, RPC patterns, `LogLevel`-name collision with Fusion, `ChickenClass : byte` quirk, etc.); where it disagrees with the rules docs, they win. Where to put a new file: `docs/FILE_STRUCTURE.md`.
+5. After making changes, **update `docs/STATE.md`** so the next agent doesn't lose context. If the change added, moved or deleted scripts/folders/assemblies or changed what enforces a rule, have `librarian` update `docs/FILE_STRUCTURE.md` and the rules docs (it is their only editor, ruling D13). ROADMAP entries get ticked too when phases complete.
 6. **If you changed the design docs or any gameplay `.asset` value, update `docs/site/index.html` too.** Standing instruction from Maestro (2026-09-04): the compendium is a living document, not a snapshot. It is one self-contained HTML file with no build step. Its numbers must be read from the shipped `.asset` files and gameplay constants, **never** from GDD prose — the GDD carries known-stale figures. Republish it to the same Artifact URL (see `memory/mechanics-compendium-site.md`).
 7. **Slow batches (artist icons, lab captures, five-minute suite runs) run their specialists from the main session, one foreground agent at a time**, not through a background orchestrator: on 2026-11-10 a background `code-architect` died twice on API timeouts mid-item, taking its child with it. If an orchestrator dies, check `git status` before redoing anything.
 
@@ -65,7 +65,25 @@ Full diagnostic playbook: `docs/TESTING.md`.
 
 ## Latest tag
 
-`v0.4.0-alpha` (commit `aadcd048`, 2026-10-26) — the playtest release. `simplify-abilities` is now ~330 commits ahead of it (audit batches, the Slow split, the five-assembly layout); the alpha build is not cut yet. See `docs/STATE.md` for the full list.
+`v0.1+26458919` and `v0.1+26458925` — the v0.1 alpha playtest builds, cut from `balance` (package `com.wugnar.games.wars.cluck`). Tags are `v<semver>+<build number>`; `git describe --tags --abbrev=0` gives the newest. `simplify-abilities` was merged into `balance` and deleted on 2026-11-14. See `docs/STATE.md` and `docs/RELEASE_NOTES_v0.1.md`.
+
+---
+
+## Knowledge routing and housekeeping
+
+Where to look, by kind of question. Spawn `librarian` for a lookup you would otherwise re-derive.
+
+| Question | Source |
+|---|---|
+| Current truth: how X works now, a value, a rule | The files: code, `.asset`, the rules docs. Always wins over the stores below. |
+| Why / what was decided / what happened in an earlier session | MemPalace, wing `cluckwars` (`mempalace_search`, `mempalace_kg_timeline`). Rooms: `decisions`, `lessons`, `technical`, `architecture`, `diary`. |
+| Shape of the C# code: module clusters, shortest path between two types, what a type calls or inherits (overview only; for every user of X use Grep, the graph under-counts references) | `graphify-out/graph.json` via `graphify query` / `path` / `explain`. C# is AST-extracted, so the graph is valid for code structure here (the global "never use the graph for code flow" note is about Godot). Check `built_at_commit` in `graph.json` against `git log` first. |
+| Open work | `docs/BACKLOG.md` |
+
+**Housekeeping** (overrides for the `housekeeping` skill):
+- MemPalace: file into wing `cluckwars` (lower case, never `CluckWars`), one drawer per decision or lesson, `[LOCKED YYYY-MM-DD] title` format. Rationale and pointers only; never copy file content, never run `mempalace mine` here, never file anything containing a key or token.
+- Structural change, so flag `/graphify . --update`: a `.cs` file added, deleted or moved, an `.asmdef`/`.asmref` change, a new `Scripts/` folder.
+- Test command: the EditMode suite through `TestRunnerApi` from `script-execute` (polled result file); the MCP `tests-run` times out on the full suite.
 
 ---
 

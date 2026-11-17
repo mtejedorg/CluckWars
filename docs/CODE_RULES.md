@@ -132,7 +132,7 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 | CODE-BUILD-17 | After a hard crash, verify state and resume; do not chase hardware | REVIEW | CURRENT |
 | CODE-BUILD-18 | Check ComfyUI's port before diagnosing a generation failure | REVIEW | CURRENT |
 | CODE-PROC-01 | Orient before changing anything non-trivial | REVIEW | CURRENT |
-| CODE-PROC-02 | Route non-trivial work through `code-architect`; let specialists implement | REVIEW | CURRENT |
+| CODE-PROC-02 | Route non-trivial work through `code-architect`; let specialists implement; `librarian` looks up before and maintains the docs after | REVIEW | CURRENT |
 | CODE-PROC-03 | Never pass `model: "fable"` to any agent unless the owner names it | REVIEW | CURRENT |
 | CODE-PROC-04 | Plan with opus, implement with sonnet | REVIEW | CURRENT |
 | CODE-PROC-05 | Do not use cravify or Antigravity unless the owner asks for it by name | REVIEW | CURRENT |
@@ -955,12 +955,12 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Source: CLAUDE.md:40-45
 - Status: CURRENT (docs/ARCHITECTURE.md is partly stale: docs/ARCHITECTURE.md:15-16 still name `CharacterSelectController` and `TouchControlsHud`, which no longer exist)
 
-### CODE-PROC-02 — Route non-trivial work through `code-architect`; let specialists implement
-- Rule: `code-architect` (opus) is the default entry point for any non-trivial task: it decomposes, delegates to the specialist in the routing table and reviews the specialist's diff before signoff. Skip it only for a trivial single-file fix or a doc-only change. "Don't implement inline when a specialist applies."
+### CODE-PROC-02 — Route non-trivial work through `code-architect`; let specialists implement; `librarian` looks up before and maintains the docs after
+- Rule: `code-architect` (opus) is the default entry point for any non-trivial task: it decomposes, delegates to the specialist in the routing table and reviews the specialist's diff before signoff. Skip it only for a trivial single-file fix or a doc-only change. "Don't implement inline when a specialist applies." `librarian` (sonnet, read-only apart from the docs) has two roles in the same route: before work it answers "where / which rule / what was decided / what depends on" so nobody re-derives it; after signoff `code-architect` passes it the commit range and the specialist's "Docs upkeep" line, and it brings `docs/FILE_STRUCTURE.md` and the rules docs in line. It is the only agent that edits the rules docs (ruling D13a, 2026-11-14); `code-architect` reviews its diff like any other.
 - Why: one owner of structure and review.
 - Enforced by: CONVENTION (review only)
 - Audit check: a multi-file commit's report names the specialist that wrote it and the reviewer that signed it off.
-- Source: .claude/CLAUDE.md:14-18, .claude/CLAUDE.md:35-59, ~/.claude/CLAUDE.md (Agent routing)
+- Source: .claude/CLAUDE.md:14-26 (routing and lifecycle), .claude/CLAUDE.md:49 (routing table), .claude/agents/librarian.md, .claude/agents/code-architect.md:57-61 (docs upkeep), .claude/agents/senior-dev.md:29 ("Docs upkeep" line), ~/.claude/CLAUDE.md (Agent routing)
 - Status: CURRENT
 
 ### CODE-PROC-03 — Never pass `model: "fable"` to any agent unless the owner names it
@@ -977,7 +977,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Enforced by: CONVENTION (review only)
 - Audit check: an implementation brief passes `model: "sonnet"` or an agent whose frontmatter says sonnet.
 - Source: M:agent-model-routing.md:10-13; progression thread 2026-09-15, arena thread 2026-07-29 (owner)
-- Status: CURRENT (the same memory still offers cravify as a coding path; superseded, CODE-PROC-05)
+- Status: CURRENT (`.claude/agents/senior-dev.md:3` now pins `model: sonnet`; the audit check holds on disk; the memory M:agent-model-routing.md still offers cravify as a coding path, superseded by CODE-PROC-05)
 
 ### CODE-PROC-05 — Do not use cravify or Antigravity unless the owner asks for it by name
 - Rule: "Do NOT use cravify / Antigravity unless the user explicitly asks for it by name"; this applies to all agents and sub-agents; implementation goes through Claude implementers or directly.
@@ -985,7 +985,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Enforced by: CONVENTION (review only)
 - Audit check: no `agy` process or `cravify` skill call in an agent's transcript without a named request.
 - Source: ~/.claude/CLAUDE.md (cravify)
-- Status: CURRENT (.claude/CLAUDE.md:111 still advertises cravify; Appendix A)
+- Status: CURRENT (fixed 2026-11-17: `.claude/CLAUDE.md:123` now allows cravify only when Maestro asks by name and `.claude/agents/senior-dev.md:22` repeats the ban; only the memory M:agent-model-routing.md still lists it as a coding path, Appendix A)
 
 ### CODE-PROC-06 — Run slow batches from the main session, one foreground specialist at a time
 - Rule: A batch with slow items (artist icons, lab captures, five-minute suite runs) is run by the main session: one foreground agent at a time, verify each hand-back (git status, the capture or sheet, the suite), commit per item. Keep `code-architect` for code-only batches and design/triage. When an orchestrator dies, check `git status` first and never redo work already in the tree; resume a stalled agent with `SendMessage` rather than starting over.
@@ -1001,7 +1001,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Enforced by: CONVENTION (review only)
 - Audit check: each `Agent` call in a transcript is preceded by a `prompt-master` invocation.
 - Source: M:feedback-use-prompt-master-for-agent-prompts.md:8-15; icons thread 2026-11-07 (owner)
-- Status: CURRENT (not yet in any CLAUDE file)
+- Status: CURRENT (stated in `.claude/CLAUDE.md:28` since 2026-11-17)
 
 ### CODE-PROC-08 — Give an implementation agent a complete, verifiable brief
 - Rule: An implementation brief states: context (branch, HEAD, dirty files that are not the agent's, validation method, the current baseline from docs/STATE.md, binding rules); numbered items with exact sites (re-grep them, line numbers drift); constraints (no gameplay number, networked layout, enum, prefab or scene change unless stated); process (one commit per green item, no push, no amend); stop conditions; a report format with real counts and an "unverified" list.
@@ -1470,30 +1470,30 @@ Each line was confirmed at b7c2616e (repo files with `git show HEAD:`, `.claude/
 
 | Source path:line | What it says | What is true now | Who should fix |
 |---|---|---|---|
-| docs/TESTING.md:199 | "101 EditMode tests", per-file table at :205-213 | The suite is far larger (docs/STATE.md:11 quotes the current baseline); quote STATE, never a count | code-architect (doc pass) |
-| docs/TESTING.md:229-231 | "Baseline as of 2026-07-22: 99 passed / 2 failed ... Do not weaken them" | Current baseline is all green (docs/STATE.md:11) | code-architect |
-| docs/TESTING.md:260-263 | Do not add a runtime `.asmdef`: it can break Fusion's weaver; code is in `Assembly-CSharp` | Five asmdef assemblies with the weave-list rule (docs/CONVENTIONS.md:476-502); nothing compiles into `Assembly-CSharp` | code-architect |
-| docs/TESTING.md:106-154 | The project's MCP is Unity's own (`com.unity.ai.assistant`, relay) | Unity's own MCP is banned; the bridge is `ai-game-developer` (CODE-BUILD-01). Not a contradiction: root CLAUDE.md:57 correctly names the open-source IvanMurzak Unity-MCP | code-architect |
-| docs/TESTING.md:223 | Agents run the suite with MCP `tests-run` | The full suite times out there; use `TestRunnerApi` or batch (CODE-BUILD-02) | code-architect |
-| docs/TESTING.md:535-538 | Source tags `TouchHud`, `CharacterSelect`, `MatchHud` "UGUI HUD", `CargoHud` | `TouchControlsHud`, `CharacterSelectController`, `CargoHud` no longer exist; the HUD is mostly UI Toolkit (Q1) | code-architect |
-| docs/TESTING.md:551 | Check the stray EventSystem, naming `TouchControlsHud` | The rule stands (CODE-FOOT-07); the class name is gone | code-architect |
-| docs/TESTING.md:712 | Time-to-target "≈ 70 % of the 180 s timer" | `MatchConfig.asset` is 45 s (CODE-DESIGN-03) | code-architect |
-| docs/TESTING.md:77, docs/TESTING.md:745 | All Android testing on the Pixel 9 | The device is the Pixel 10 Pro (ruling D16, 2026-11-14); PC-only while no phone is reconnected; the phone is a Pixel 10 Pro (M:test-session-2026-10-20-learnings.md:14) | code-architect |
-| docs/TEST_STRATEGY.md:46 | Layer 0 "≈ 1 960 tests" | Quote docs/STATE.md:11 | code-architect |
-| docs/TEST_STRATEGY.md:50 | Layer 4 uses a phone | PC-only until a phone is reconnected (CODE-TEST-11) | code-architect |
-| docs/CONVENTIONS.md:523-525 | The in-game HUD (`MatchHud`, `TouchControlsHud`, `DebugHud`, `UiGfx`) is a legacy procedural-UGUI island | Top bar, touch controls and overlays are UI Toolkit; `TouchControlsHud` is gone; `MatchHud` keeps only a hit-flash canvas; `DebugHud` is IMGUI (Q1) | code-architect after the owner rules on Q1 |
-| docs/CONVENTIONS.md:509 | Source SO `.cs` definitions live in `Scripts/Gameplay/` | They live across layers (`Scripts/Abilities/AbilityBaseSO.cs`, `Scripts/Audio/AudioRegistrySO.cs`, ...); see FILE_STRUCTURE.md | code-architect |
-| docs/CONVENTIONS.md:510 | `Resources/` is used for `ProjectContext.prefab` | It also holds `Text/UiText.csv` and four fonts (CODE-STYLE-02) | code-architect |
-| docs/CONVENTIONS.md:538 | `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` | The model has changed; the attribution line in use differs (Q2) | owner (Q2), then code-architect |
-| CLAUDE.md:65 | Latest tag `v0.3.0-alpha` | `v0.4.0-alpha` is the latest tag (`git tag --sort=-creatordate`) | code-architect |
+| docs/TESTING.md:199 | "101 EditMode tests", per-file table at :205-213 | The suite is far larger (docs/STATE.md:11 quotes the current baseline); quote STATE, never a count | librarian (doc pass) |
+| docs/TESTING.md:229-231 | "Baseline as of 2026-07-22: 99 passed / 2 failed ... Do not weaken them" | Current baseline is all green (docs/STATE.md:11) | librarian |
+| docs/TESTING.md:260-263 | Do not add a runtime `.asmdef`: it can break Fusion's weaver; code is in `Assembly-CSharp` | Five asmdef assemblies with the weave-list rule (docs/CONVENTIONS.md:476-502); nothing compiles into `Assembly-CSharp` | librarian |
+| docs/TESTING.md:106-154 | The project's MCP is Unity's own (`com.unity.ai.assistant`, relay) | Unity's own MCP is banned; the bridge is `ai-game-developer` (CODE-BUILD-01). Not a contradiction: root CLAUDE.md:57 correctly names the open-source IvanMurzak Unity-MCP | librarian |
+| docs/TESTING.md:223 | Agents run the suite with MCP `tests-run` | The full suite times out there; use `TestRunnerApi` or batch (CODE-BUILD-02) | librarian |
+| docs/TESTING.md:535-538 | Source tags `TouchHud`, `CharacterSelect`, `MatchHud` "UGUI HUD", `CargoHud` | `TouchControlsHud`, `CharacterSelectController`, `CargoHud` no longer exist; the HUD is mostly UI Toolkit (Q1) | librarian |
+| docs/TESTING.md:551 | Check the stray EventSystem, naming `TouchControlsHud` | The rule stands (CODE-FOOT-07); the class name is gone | librarian |
+| docs/TESTING.md:712 | Time-to-target "≈ 70 % of the 180 s timer" | `MatchConfig.asset` is 45 s (CODE-DESIGN-03) | librarian |
+| docs/TESTING.md:77, docs/TESTING.md:745 | All Android testing on the Pixel 9 | The device is the Pixel 10 Pro (ruling D16, 2026-11-14); PC-only while no phone is reconnected; the phone is a Pixel 10 Pro (M:test-session-2026-10-20-learnings.md:14) | librarian |
+| docs/TEST_STRATEGY.md:46 | Layer 0 "≈ 1 960 tests" | Quote docs/STATE.md:11 | librarian |
+| docs/TEST_STRATEGY.md:50 | Layer 4 uses a phone | PC-only until a phone is reconnected (CODE-TEST-11) | librarian |
+| docs/CONVENTIONS.md:523-525 | The in-game HUD (`MatchHud`, `TouchControlsHud`, `DebugHud`, `UiGfx`) is a legacy procedural-UGUI island | Top bar, touch controls and overlays are UI Toolkit; `TouchControlsHud` is gone; `MatchHud` keeps only a hit-flash canvas; `DebugHud` is IMGUI (Q1) | librarian after the owner rules on Q1 |
+| docs/CONVENTIONS.md:509 | Source SO `.cs` definitions live in `Scripts/Gameplay/` | They live across layers (`Scripts/Abilities/AbilityBaseSO.cs`, `Scripts/Audio/AudioRegistrySO.cs`, ...); see FILE_STRUCTURE.md | librarian |
+| docs/CONVENTIONS.md:510 | `Resources/` is used for `ProjectContext.prefab` | It also holds `Text/UiText.csv` and four fonts (CODE-STYLE-02) | librarian |
+| docs/CONVENTIONS.md:538 | `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` | The model has changed; the attribution line in use differs (Q2) | owner (Q2), then librarian |
+| CLAUDE.md:65 | Latest tag `v0.3.0-alpha` | `v0.4.0-alpha` is the latest tag (`git tag --sort=-creatordate`) | FIXED 2026-11-17 (CLAUDE.md:68 names `v0.1+26458919` / `v0.1+26458925`) |
 | M:branching-model-v0-4-release.md:26 | The model is "Recorded in `CLAUDE.md` (Branches)" | Root CLAUDE.md has no Branches section and no "branch" string; the rule lives only in memory (CODE-PROC-14) | owner (Q4) |
-| .claude/CLAUDE.md:111 | "cravify skill: hybrid Claude+Antigravity for any task touching 3+ scripts/prefabs" | Forbidden unless the owner names it (~/.claude/CLAUDE.md, CODE-PROC-05) | owner (agents may not edit this file, CODE-PROC-20) |
+| .claude/CLAUDE.md:111 | "cravify skill: hybrid Claude+Antigravity for any task touching 3+ scripts/prefabs" | Forbidden unless the owner names it (~/.claude/CLAUDE.md, CODE-PROC-05) | FIXED 2026-11-17 (.claude/CLAUDE.md:123 now allows cravify only when Maestro names it) |
 | M:agent-model-routing.md:10, M:agent-model-routing.md:13 | `cravify` is a coding path | Same as above | owner (memory) |
 | M:ui-toolkit-decision.md:14 | In-game HUD stays UGUI | Superseded by M:ui-rebuild-2026-07.md:15 (Q1) | owner (memory) |
 | M:ui-rebuild-2026-07.md:40 | `code-architect` is pinned to Fable | It runs on opus; Fable is banned (CODE-PROC-03) | owner (memory) |
 | M:mcp-tests-run-leaves-empty-scene.md:11-17 | Reopen Bootstrap with `scene-open` / `scene-list-opened` | The 2.0 bridge has no `scene-*` tools; use `script-execute` (CODE-BUILD-05) | owner (memory) |
-| docs/TDD.md:371-378 | `IAudioService.PlaySFX(AudioClip clip, Vector3 position)` | `PlaySFX(SfxId, volume, pitch)` (CODE-AUD-01) | code-architect |
-| docs/TDD.md:419-421 | Fixed camera, no player-following, no zoom | `MatchCamera` follows the local chicken (docs/CONVENTIONS.md:407-409) | code-architect |
+| docs/TDD.md:371-378 | `IAudioService.PlaySFX(AudioClip clip, Vector3 position)` | `PlaySFX(SfxId, volume, pitch)` (CODE-AUD-01) | librarian |
+| docs/TDD.md:419-421 | Fixed camera, no player-following, no zoom | `MatchCamera` follows the local chicken (docs/CONVENTIONS.md:407-409) | librarian |
 
 ## 9. Appendix B: superseded rules
 
