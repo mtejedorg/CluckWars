@@ -844,26 +844,26 @@ namespace CluckWars.Visuals
 
         /// <summary>Hunt marker geometry, panel px (MarkHud.uss holds the element boxes): ring radius, ink track and colour
         /// arc widths, track alpha, pointer base and how far its tip reaches beyond the ring.</summary>
-        public const float MarkRingRadiusPx = 38f;
-        public const float MarkRingTrackWidthPx = 12f;
-        public const float MarkRingArcWidthPx = 8f;
+        public const float MarkRingRadiusPx = 57f;
+        public const float MarkRingTrackWidthPx = 18f;
+        public const float MarkRingArcWidthPx = 12f;
         public const float MarkRingTrackAlpha = 0.55f;
-        public const float MarkPointerBasePx = 30f;
-        public const float MarkPointerTipBeyondRingPx = 18f;
-        public const float MarkPointerInkPx = 3f;
-        /// <summary>Marker box (84 x 102 incl. pointer) and placement: half-box, the clearance from the clear-viewport edge,
+        public const float MarkPointerBasePx = 45f;
+        public const float MarkPointerTipBeyondRingPx = 27f;
+        public const float MarkPointerInkPx = 4.5f;
+        /// <summary>Marker box (126 x 153 incl. pointer; 1.5x since K3, with MarkHud.uss) and placement: half-box, the clearance from the clear-viewport edge,
         /// the gap above the anchor, the most the marker rises to clear the local "You" plate (inflated by the margin).</summary>
-        public const float MarkMarkerHalfPx = 42f;
-        public const float MarkMarkerBoxWidthPx = 84f;
-        public const float MarkMarkerBoxHeightPx = 102f;
-        public const float MarkMarkerEdgeClearancePx = 64f;
+        public const float MarkMarkerHalfPx = 63f;
+        public const float MarkMarkerBoxWidthPx = 126f;
+        public const float MarkMarkerBoxHeightPx = 153f;
+        public const float MarkMarkerEdgeClearancePx = 96f;
         /// <summary>Extra vertical clearance at the clear-viewport edge: a full four-row landscape board hangs ~34 px below the
-        /// top information zone (accepted, HudControlZones), and the marker's pointer (56 px from its centre) must not tuck
+        /// top information zone (accepted, HudControlZones), and the marker's pointer (84 px from its centre; the overhang is 1.5x the board's 34 since K3) must not tuck
         /// under it when it points up at a hidden target.</summary>
-        public const float MarkMarkerTopBandOverhangPx = 34f;
-        public const float MarkMarkerAnchorGapPx = 10f;
-        public const float MarkMarkerYouPlateMarginPx = 8f;
-        public const float MarkMarkerYouPlateMaxRisePx = 96f;
+        public const float MarkMarkerTopBandOverhangPx = 51f;
+        public const float MarkMarkerAnchorGapPx = 15f;
+        public const float MarkMarkerYouPlateMarginPx = 12f;
+        public const float MarkMarkerYouPlateMaxRisePx = 144f;
         /// <summary>Floor, in world metres above the target's pivot, the on-screen marker must clear, plus the class model's head
         /// lift. A target with badge rows showing raises it to the stack top (<c>MarkerPlacement</c> reads
         /// <c>ChickenStatusBadges.CurrentStackTopLocalY</c>).</summary>

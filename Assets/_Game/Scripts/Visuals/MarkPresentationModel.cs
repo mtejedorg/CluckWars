@@ -129,6 +129,9 @@ namespace CluckWars.Visuals
         /// <summary>Remaining / window: the ring drains clockwise from 12 o'clock.</summary>
         public float MarkerFill01;
         public int MarkerMetres;
+        /// <summary>The exact planar metres to the target and the mark's kill range (frozen by an end): the chip's number and red.</summary>
+        public float MarkerDistance;
+        public float KillRange;
         /// <summary>What blocks the pounce in the live second (Assassin; None while arming, legal, or when frozen by an end).</summary>
         public HuntBlocker Blocker;
         /// <summary>Seconds left in the mark's window (Assassin; frozen during the end).</summary>
@@ -614,6 +617,8 @@ namespace CluckWars.Visuals
             o.MarkerMode = _mode;
             o.MarkerFill01 = _fill;
             o.MarkerMetres = _metres;
+            o.MarkerDistance = Mathf.Max(0f, input.Distance);
+            o.KillRange = input.KillRange;
             o.Blocker = HuntRules.BlockerFor(o.Armed, input.CanKillNow, input.TargetShelled, input.Walled, input.Distance, input.KillRange, input.TargetStunned);
             o.Remaining = input.Remaining;
             _lastHunt = new HuntLastFrame
@@ -717,6 +722,8 @@ namespace CluckWars.Visuals
             o.MarkerMode = last.MarkerMode == MarkMarkerMode.Kill ? MarkMarkerMode.Hunt : last.MarkerMode;   // never KILL on a dead mark
             o.MarkerFill01 = last.MarkerFill01;
             o.MarkerMetres = last.MarkerMetres;
+            o.MarkerDistance = last.MarkerDistance;
+            o.KillRange = last.KillRange;
             o.Blocker = last.Blocker;
             o.Remaining = last.Remaining;
             o.SkullCorner = last.SkullCorner;

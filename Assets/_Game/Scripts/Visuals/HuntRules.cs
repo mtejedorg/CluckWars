@@ -1,4 +1,5 @@
 using CluckWars.Input;
+using CluckWars.Localization;
 using CluckWars.UI;
 using UnityEngine;
 
@@ -78,6 +79,37 @@ namespace CluckWars.Visuals
             if (remaining >= 1f) return MarkPresentationModel.ShownSeconds(remaining).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return CasterStunCountdownRules.Format(LiveTenths(remaining));
         }
+
+        /// <summary>Below this many metres the chip shows one decimal (so 6.3 m reads red and 6.1 m does not), from here whole metres.</summary>
+        public const float ChipDecimalBelowMetres = 10f;
+
+        /// <summary>The metres chip's change key, the one place the number is decided (marker and Hunt hex both read it): tenths
+        /// rounded UP under 10 m (a target a hair beyond the range never reads as the range), else whole metres plus 1000. Compare
+        /// keys to write the text only when it changes.</summary>
+        public static int MetresKey(float metres)
+        {
+            float m = Mathf.Max(0f, metres);
+            if (m < ChipDecimalBelowMetres)
+            {
+                int tenths = Mathf.CeilToInt(m * 10f);
+                if (tenths < Mathf.RoundToInt(ChipDecimalBelowMetres * 10f)) return tenths;
+            }
+            return 1000 + Mathf.RoundToInt(m);
+        }
+
+        /// <summary>The number of a <see cref="MetresKey"/>: "6.2", "24".</summary>
+        public static string MetresText(int key) => key >= 1000
+            ? (key - 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : (key / 10).ToString(System.Globalization.CultureInfo.InvariantCulture) + "." + (key % 10).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>The metres number for a distance.</summary>
+        public static string MetresText(float metres) => MetresText(MetresKey(metres));
+
+        /// <summary>The whole chip ("6.2 m") for a key: the shared <c>mark.distance</c> string.</summary>
+        public static string ChipText(int key) => UiText.Format(UiKeys.MarkDistance, ("m", MetresText(key)));
+
+        /// <summary>The chip is red while the target is beyond the kill range (the shipped <c>KillRange</c>), the seat colour inside it.</summary>
+        public static bool ChipRed(float distance, float killRange) => TooFar(distance, killRange);
 
         /// <summary>Why the mark ended, from the frozen last live frame. Anything not provably SAFE or a pounce is MISSED.</summary>
         public static MarkEndCause EndCauseFor(in HuntLastFrame last, bool matchRunningNow, bool hunterRemovedNow)

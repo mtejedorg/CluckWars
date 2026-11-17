@@ -266,10 +266,12 @@ namespace CluckWars.Input
 
             string glyph = HuntHexRules.GlyphClass(_huntOut.Blocker);
             SetHuntGlyph(slot, glyph);
-            if (glyph == HuntHexRules.GlyphFarClass && refs.HuntFar != null && _huntOut.MarkerMetres != _appliedHuntMetres[slot])
+            // The marker's chip and this one share HuntRules.MetresKey / ChipText, so they never disagree.
+            int metresKey = HuntRules.MetresKey(_huntOut.MarkerDistance);
+            if (glyph == HuntHexRules.GlyphFarClass && refs.HuntFar != null && metresKey != _appliedHuntMetres[slot])
             {
-                _appliedHuntMetres[slot] = _huntOut.MarkerMetres;
-                refs.HuntFar.text = UiText.Format(UiKeys.MarkDistance, ("m", _huntOut.MarkerMetres));
+                _appliedHuntMetres[slot] = metresKey;
+                refs.HuntFar.text = HuntRules.ChipText(metresKey);
             }
         }
 

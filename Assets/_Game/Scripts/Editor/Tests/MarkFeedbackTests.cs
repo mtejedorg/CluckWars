@@ -232,7 +232,8 @@ namespace CluckWars.Tests
         public void OnScreen_AboveIsClear_ItSitsAbovePointingDown()
         {
             var s = Scene(new Rect(900f, 600f, 80f, 100f), plate: new Rect(860f, 540f, 160f, 40f));
-            var above = new Vector2(940f, 540f - 70f);
+            // The gap above the plate: the box's pointer reach (centre to tip) plus the anchor gap, from the marker's own constants.
+            var above = new Vector2(940f, 540f - (FeedbackTuning.MarkMarkerBoxHeightPx - FeedbackTuning.MarkMarkerHalfPx) - FeedbackTuning.MarkMarkerAnchorGapPx);
             Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, above, out var c, out var slot));
             Assert.AreEqual(MarkerPlacement.MarkerSlot.Above, slot);
             Assert.AreEqual(Vector2.down, MarkerPlacement.PointerFor(slot));
@@ -264,9 +265,9 @@ namespace CluckWars.Tests
         [Test]
         public void AboveAndBelowBlocked_ItGoesToTheFreeSide()
         {
-            // Under the band above, a hex cluster right under the feet.
-            var hexes = new Rect(700f, 450f, 500f, 400f);
-            var s = Scene(new Rect(900f, 330f, 80f, 100f), plate: new Rect(820f, 290f, 240f, 40f), clearTop: 290f, avoid: hexes);
+            // Under the band above, a hex cluster right under the feet. The plate ends above the side slots' 1.5x-tall boxes.
+            var hexes = new Rect(700f, 480f, 500f, 400f);
+            var s = Scene(new Rect(900f, 360f, 80f, 100f), plate: new Rect(820f, 300f, 240f, 40f), clearTop: 290f, avoid: hexes);
             Assert.IsTrue(MarkerPlacement.TryPlaceAround(s, new Vector2(940f, 220f), out var c, out var slot));
             Assert.IsTrue(slot == MarkerPlacement.MarkerSlot.Left || slot == MarkerPlacement.MarkerSlot.Right);
             AssertClear(s, c, slot);

@@ -36,10 +36,11 @@ namespace CluckWars.UI
 
         private ILogService _log;
 
-        private VisualElement _root, _marker, _pointer, _ring, _skull, _lock, _shell, _hunterSkull;
+        private VisualElement _root, _marker, _pointer, _ring, _paw, _pawGlyph, _lock, _shell, _star, _hunterSkull;
         private Label _distance, _arm;
         private bool _bound, _reportedMissing, _missingIndicatorReported;
-        private int _shownArm = -1;
+        private string _shownCount;
+        private int _chipCorner = -1, _chipRed = -1;
 
         // Ring / pointer paint state.
         private float _fill;
@@ -49,7 +50,7 @@ namespace CluckWars.UI
         private Vector2 _markerPanel;
         private bool _markerPlaced, _markerOffScreen;
         private Vector2 _markerBearing = Vector2.down;
-        private int _shownMetres = -1;
+        private int _shownMetresKey = -1;
 
         [Inject]
         public void Construct(ILogService log) => _log = log;
@@ -76,20 +77,22 @@ namespace CluckWars.UI
             _marker = root.Q<VisualElement>("HuntMarker");
             _pointer = root.Q<VisualElement>("MarkPointer");
             _ring = root.Q<VisualElement>("MarkRing");
-            _skull = root.Q<VisualElement>("MarkSkull");
+            _paw = root.Q<VisualElement>("MarkPaw");
             _lock = root.Q<VisualElement>("MarkLock");
             _shell = root.Q<VisualElement>("MarkShell");
+            _star = root.Q<VisualElement>("MarkStar");
+            _pawGlyph = _paw?.Q<VisualElement>("MarkSkull");
             _distance = root.Q<Label>("MarkDistance");
             _arm = root.Q<Label>("MarkArm");
             _hunterSkull = root.Q<VisualElement>("HunterSkull");
-            if (_root == null || _marker == null || _pointer == null || _ring == null || _skull == null || _lock == null || _shell == null ||
+            if (_root == null || _marker == null || _pointer == null || _ring == null || _paw == null || _pawGlyph == null || _lock == null || _shell == null || _star == null ||
                 _distance == null || _arm == null || _hunterSkull == null)
             {
                 if (!_reportedMissing)
                 {
                     _reportedMissing = true;
-                    _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkPointer, MarkRing, MarkSkull, " +
-                        "MarkLock, MarkShell, MarkDistance, MarkArm or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
+                    _log?.Error(Source, "MarkHud.uxml is missing an element (MarkHudRoot, HuntMarker, MarkPointer, MarkRing, MarkPaw, " +
+                        "MarkLock, MarkShell, MarkStar, MarkDistance, MarkArm or HunterSkull): the Death Mark hunt marker and the victim's hunter badge are not drawn.");
                 }
                 return;
             }
@@ -161,7 +164,7 @@ namespace CluckWars.UI
             }
 
             UiElements.SetShown(_marker, true);
-            float boxHalf = _marker.resolvedStyle.width > 0f ? _marker.resolvedStyle.width * 0.5f : 48f;
+            float boxHalf = _marker.resolvedStyle.width > 0f ? _marker.resolvedStyle.width * 0.5f : 72f;
             _marker.style.translate = new Translate(_markerPanel.x - boxHalf, _markerPanel.y - boxHalf);
             _marker.style.opacity = o.MarkerAlpha;
 
@@ -179,37 +182,44 @@ namespace CluckWars.UI
                 _ring.MarkDirtyRepaint();
                 _pointer.MarkDirtyRepaint();
             }
-            _skull.style.unityBackgroundImageTintColor = c;
-            // Arming: the countdown to the arm sits where the skull will be; the skull (and with it the KILL look) only once live.
-            UiElements.SetShown(_skull, o.Armed);
-            UiElements.SetShown(_arm, !o.Armed);
-            if (!o.Armed)
+            // The paw is a corner badge for the whole hunt; the disc centre holds the count (3, 2, 1, then seconds and tenths).
+            _pawGlyph.style.unityBackgroundImageTintColor = c;
+            UiElements.SetShown(_paw, true);
+            UiElements.SetShown(_arm, true);
+            _arm.style.color = c;
+            string count = HuntRules.CountText(o.Armed, o.ArmCountdownSeconds, o.Remaining);
+            if (count != _shownCount)
             {
-                _arm.style.color = c;
-                if (o.ArmCountdownSeconds != _shownArm)
-                {
-                    _shownArm = o.ArmCountdownSeconds;
-                    _arm.text = _shownArm.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                }
+                _shownCount = count;
+                _arm.text = count;
             }
-            UiElements.SetShown(_lock, o.MarkerMode == MarkMarkerMode.Walled);
-            UiElements.SetShown(_shell, o.MarkerMode == MarkMarkerMode.Shelled);
+            // One blocker badge once armed (None while arming, and when the pounce is legal); the K1 end hold keeps the frozen one.
+            UiElements.SetShown(_lock, o.Blocker == HuntBlocker.Walled);
+            UiElements.SetShown(_shell, o.Blocker == HuntBlocker.Shelled);
+            UiElements.SetShown(_star, o.Blocker == HuntBlocker.NotStunned);
 
             // Pointer: down over the target, toward it at the edge. UITK rotates clockwise; the art points down (+y).
             // The bearing is the pointer's in every placement (down above, up below, sideways beside, at the target off screen).
             float angle = Mathf.Atan2(-bearing.x, -bearing.y) * Mathf.Rad2Deg;
             _pointer.style.rotate = new Rotate(new Angle(angle, AngleUnit.Degree));
 
-            // Distance: off screen only, on the inward vertical side of the disc.
-            UiElements.SetShown(_distance, offScreen);
-            if (offScreen)
+            // The metres chip, whenever a mark is shown: above the disc on screen, the inward vertical side off screen. Red while the
+            // target is beyond the kill range, else the seat colour. The text is written only when its key changes.
+            UiElements.SetShown(_distance, true);
+            _distance.EnableInClassList("cw-mark-distance--above",
+                !offScreen || MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing));
+            int red = HuntRules.ChipRed(o.MarkerDistance, o.KillRange) ? 1 : 0;
+            if (red != _chipRed || o.TargetCorner != _chipCorner)
             {
-                _distance.EnableInClassList("cw-mark-distance--above", MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing));
-                if (o.MarkerMetres != _shownMetres)
-                {
-                    _shownMetres = o.MarkerMetres;
-                    _distance.text = UiText.Format(UiKeys.MarkDistance, ("m", _shownMetres));
-                }
+                _chipRed = red;
+                _chipCorner = o.TargetCorner;
+                _distance.style.color = red == 1 ? FeedbackTuning.MarkHuntBlockedColor : PlayerPalette.ForCorner(o.TargetCorner);
+            }
+            int key = HuntRules.MetresKey(o.MarkerDistance);
+            if (key != _shownMetresKey)
+            {
+                _shownMetresKey = key;
+                _distance.text = HuntRules.ChipText(key);
             }
         }
 

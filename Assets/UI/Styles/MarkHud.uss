@@ -9,62 +9,76 @@
     position: absolute; left: 0; top: 0; right: 0; bottom: 0;
 }
 
-/* 96 x 96 box, translated so its centre sits on the anchor (the controller subtracts 48). */
+/* 144 x 144 box (1.5x the old 96), translated so its centre sits on the anchor (the controller subtracts the half). Every
+   px below and the px constants in FeedbackTuning (MarkRing*, MarkPointer*, MarkMarker*) are scaled together: MarkMarkerGeometryTests. */
 .cw-mark-marker {
     position: absolute; left: 0; top: 0;
-    width: 96px; height: 96px;
+    width: 144px; height: 144px;
     display: none;
 }
 
 .cw-mark-pointer, .cw-mark-ring {
     position: absolute; left: 0; top: 0;
-    width: 96px; height: 96px;
+    width: 144px; height: 144px;
 }
 
 .cw-mark-disc {
-    position: absolute; left: 14px; top: 14px;
-    width: 68px; height: 68px;
-    border-top-left-radius: 34px; border-top-right-radius: 34px;
-    border-bottom-left-radius: 34px; border-bottom-right-radius: 34px;
+    position: absolute; left: 21px; top: 21px;
+    width: 102px; height: 102px;
+    border-top-left-radius: 51px; border-top-right-radius: 51px;
+    border-bottom-left-radius: 51px; border-bottom-right-radius: 51px;
     background-color: rgb(20, 10, 26);
 }
 
-/* The hunter-side marker is the Hunting paw (Glyph_Hunting, cream: the controller tints it the state colour).
+/* The hunter-side marker's paw is the Hunting glyph (Glyph_Hunting, cream: the controller tints it the state colour), now a
+   corner badge (MarkPaw, top-left, the mirror of the lock badge) so the disc centre can hold the count for the whole hunt.
    The victim's badge (.cw-hunter-skull-glyph below) keeps the skull. */
 .cw-mark-skull {
-    position: absolute; left: 26px; top: 26px;
-    width: 44px; height: 44px;
+    width: 36px; height: 36px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Hunting.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 
-/* Arming only (before the kill is live): the countdown to the arm in place of the skull, in the target's colour. */
+/* The count in the disc centre, the whole hunt: 3, 2, 1 while arming, then whole seconds and tenths, in the state colour. */
 .cw-mark-arm {
-    position: absolute; left: 14px; top: 14px;
-    width: 68px; height: 68px;
+    position: absolute; left: 21px; top: 21px;
+    width: 102px; height: 102px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
-    font-size: 40px;
+    font-size: 60px;
     color: rgb(254, 245, 224);
-    -unity-text-outline-width: 3px;
+    -unity-text-outline-width: 4px;
     -unity-text-outline-color: rgb(42, 26, 12);
     -unity-text-align: middle-center;
+    white-space: nowrap;
     padding: 0; margin: 0;
     display: none;
 }
 
-/* Walled only: an ink badge at (+26, +26) from the centre with a cream lock. */
+/* The corner badges: 51 px ink discs on the ring, centred +-39 from the box centre. Bottom-right (MarkLock, MarkShell, MarkStar):
+   what blocks the pounce once the mark is live. Top-left (MarkPaw): the Hunting paw, the whole hunt. */
 .cw-mark-lock {
-    position: absolute; left: 57px; top: 57px;
-    width: 34px; height: 34px;
-    border-top-left-radius: 17px; border-top-right-radius: 17px;
-    border-bottom-left-radius: 17px; border-bottom-right-radius: 17px;
+    position: absolute; left: 85.5px; top: 85.5px;
+    width: 51px; height: 51px;
+    border-top-left-radius: 25.5px; border-top-right-radius: 25.5px;
+    border-bottom-left-radius: 25.5px; border-bottom-right-radius: 25.5px;
     background-color: rgb(20, 10, 26);
     align-items: center; justify-content: center;
     display: none;
 }
 .cw-mark-lock-glyph {
-    width: 24px; height: 24px;
+    width: 36px; height: 36px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/Glyph_Lock.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(254, 245, 224);
+}
+
+/* Top-left: the same badge, shown by the controller for the whole hunt. */
+.cw-mark-paw { left: 7.5px; top: 7.5px; }
+
+/* Not stunned (the pounce needs a stunned target): the same badge with the Stunned state glyph, cream. */
+.cw-mark-star-glyph {
+    width: 40px; height: 40px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_Stunned.png");
     -unity-background-scale-mode: scale-to-fit;
     -unity-background-image-tint-color: rgb(254, 245, 224);
 }
@@ -72,16 +86,16 @@
 /* Shelled only (the target is steal-proof and cannot be executed): the same badge, the two-tone ShieldEgg state glyph on cream (untinted). */
 .cw-mark-shell { background-color: rgb(254, 245, 224); }
 .cw-mark-shell-glyph {
-    width: 28px; height: 28px;
+    width: 42px; height: 42px;
     background-image: url("project://database/Assets/_Game/Art/UI/Icons/States/Glyph_ShieldEgg.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 
-/* Off screen only, on the inward vertical side of the disc (the controller moves it above when the bearing points down). */
-/* 34 px, not 32: the 0.85 appear pop must keep it at or above the 28 px HUD floor. 120 px wide fits "999 m" and keeps a
-   marker pinned at the edge clearance inside the panel. */
+/* The metres chip, whenever a mark is shown: above the disc on screen; off screen on the inward vertical side (the controller
+   moves it above when the bearing points down). Red when the target is beyond the kill range. It stays 34 px text (a label is
+   not scaled with the box): the 0.85 appear pop must keep it at or above the 28 px HUD floor. 120 px wide fits "999 m". */
 .cw-mark-distance {
-    position: absolute; left: -12px; top: 100px;
+    position: absolute; left: 12px; top: 152px;
     width: 120px; height: 42px;
     -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
     font-size: 34px;
@@ -93,7 +107,7 @@
     padding: 0; margin: 0;
     display: none;
 }
-.cw-mark-distance--above { top: -46px; }
+.cw-mark-distance--above { top: -48px; }
 
 /* The victim's hunter-skull badge: 44 px ink disc, 3 px border in the hunter's colour (set by the controller), cream skull. */
 .cw-hunter-skull {
