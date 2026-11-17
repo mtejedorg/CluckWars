@@ -950,8 +950,8 @@ namespace CluckWars.Visuals
         /// <summary>Dark edge and glow: the ramp starts this far out (fraction of the centre-to-corner distance), further than the
         /// victim's <see cref="MarkMoodVignetteInner"/> so the play area stays clean; it ends at <see cref="MarkMoodVignetteOuter"/>.</summary>
         public const float MarkHuntMoodVignetteInner = 0.45f;
-        /// <summary>Glow alpha at the corners while the pounce is blocked (red).</summary>
-        public const float MarkHuntMoodGlowBlocked = 0.30f;
+        /// <summary>Glow alpha at the corners while the pounce is blocked (red). 0.55: at 0.30 over the dark edge the red read as brown corners in the 1200x540 capture of 2026-11-17, where yellow at 0.40 read clearly.</summary>
+        public const float MarkHuntMoodGlowBlocked = 0.55f;
         /// <summary>Glow alpha at the corners while the pounce is legal (yellow).</summary>
         public const float MarkHuntMoodGlowPounce = 0.40f;
         /// <summary>Seconds for the glow to fade in or out and for its colour to cross from red to yellow (the live window is one second).</summary>
