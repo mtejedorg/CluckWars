@@ -346,6 +346,16 @@ namespace CluckWars.UI
             onArrow ? (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx
                     : (above ? ChipBaseAboveCentrePx : ChipBaseBelowCentrePx) * bodyScale;
 
+        /// <summary>The chip's top edge in the marker box (px from the box's top), where it puts the chip's centre
+        /// <see cref="ChipOffsetPx"/> from the box centre. It is the chip's LAYOUT place (<c>top</c>), never a translate: the UI probe
+        /// reads an element's own translate as juice and judges the box where layout put it, so a pill moved by translate was
+        /// measured up to 30 px below where it is drawn and flagged "partly off the panel" while it fitted.</summary>
+        public static float ChipTopPx(bool onArrow, bool above, float bodyScale) =>
+            MarkerBoxHalfPx + ChipOffsetPx(onArrow, above, bodyScale) - ChipHalfHeightPx;
+
+        /// <summary>Half the marker box (MarkHud.uss: 144 px square).</summary>
+        public const float MarkerBoxHalfPx = 72f;
+
         /// <summary>The chip's half extents, panel px ("999 m" is ~134 px wide, the pill 42 tall).</summary>
         public const float ChipHalfWidthPx = 67f, ChipHalfHeightPx = 21f;
 

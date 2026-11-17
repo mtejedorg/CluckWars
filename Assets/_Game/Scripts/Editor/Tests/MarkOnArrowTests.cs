@@ -341,6 +341,55 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ChipTop_IsTheStylesheetsTop_WhereTheChipSitsAtItsBase_AndPutsTheCentreAtTheOffset()
+        {
+            string uss = Read("Assets/UI/Styles/MarkHud.uss");
+            float baseTop = float.Parse(System.Text.RegularExpressions.Regex.Match(uss, @"\.cw-mark-distance\s*\{[^}]*?top:\s*(-?[0-9.]+)px").Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            float aboveTop = float.Parse(System.Text.RegularExpressions.Regex.Match(uss, @"\.cw-mark-distance--above\s*\{[^}]*?top:\s*(-?[0-9.]+)px").Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            Assert.AreEqual(baseTop, MarkerPlacement.ChipTopPx(false, false, 1f), 1e-3f, "below, unscaled: the stylesheet's top");
+            Assert.AreEqual(aboveTop, MarkerPlacement.ChipTopPx(false, true, 1f), 1e-3f, "above, unscaled: the --above rule's top");
+            foreach (bool onArrow in new[] { false, true })
+            foreach (bool above in new[] { false, true })
+            foreach (float scale in new[] { 1f, FeedbackTuning.MarkMarkerOnArrowScale, FeedbackTuning.MarkMarkerPopFrom })
+                Assert.AreEqual(MarkerPlacement.MarkerBoxHalfPx + MarkerPlacement.ChipOffsetPx(onArrow, above, scale),
+                    MarkerPlacement.ChipTopPx(onArrow, above, scale) + MarkerPlacement.ChipHalfHeightPx, 1e-3f, $"centre at the offset ({onArrow}, {above}, {scale})");
+        }
+
+        [Test]
+        public void OnArrow_TheChipsLayoutBox_WhichIsWhatTheUiProbeMeasures_StaysInsideThePanel()
+        {
+            // The probe judges an element where LAYOUT put it (its own translate is juice), so the chip's vertical place has to be
+            // layout: the box's top plus ChipTopPx, no translate. The 2026-11-17 runs flagged a pill that was drawn inside the panel
+            // because its 30 px translate was taken off again.
+            var panel = new Vector2(2133f, 960f);
+            float chipH = 2f * MarkerPlacement.ChipHalfHeightPx;
+            for (float ty = 0f; ty <= panel.y; ty += 7f)
+            foreach (var outward in new[] { Vector2.up, Vector2.down, new Vector2(1f, 1f), new Vector2(-1f, -1f) })
+            {
+                var tip = new Vector2(1300f, ty);
+                Vector2 c = MarkerPlacement.SettleOnArrow(MarkerPlacement.OnArrowCentre(tip, outward, panel, false, default), outward, panel, false, default, out bool above);
+                float boxTop = c.y - MarkerPlacement.MarkerBoxHalfPx;
+                float layoutTop = boxTop + MarkerPlacement.ChipTopPx(true, above, FeedbackTuning.MarkMarkerOnArrowScale);
+                string what = $"tip y {ty} outward {outward} chip {(above ? "above" : "below")} layout top {layoutTop}";
+                Assert.GreaterOrEqual(layoutTop, 0f, what);
+                Assert.LessOrEqual(layoutTop + chipH, panel.y, what);
+            }
+        }
+
+        [Test]
+        public void TheChipsVerticalPlace_IsTheInlineTop_NotATranslate_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/UI/MarkHudController.cs");
+            int at = src.IndexOf("private void PlaceChip", System.StringComparison.Ordinal);
+            Assert.Greater(at, 0);
+            string body = src.Substring(at, src.IndexOf("private static ChickenController LocalChicken", at, System.StringComparison.Ordinal) - at);
+            StringAssert.Contains("_distance.style.top = MarkerPlacement.ChipTopPx(", body);
+            StringAssert.DoesNotContain("style.translate", body, "a translate is invisible to the UI probe, which then reports the wrong box");
+        }
+
+        [Test]
         public void OnArrow_ChipTakesTheSideAwayFromTheBird_AndNeverTheEdgeOrThePlate()
         {
             var mid = new Vector2(960f, 540f);

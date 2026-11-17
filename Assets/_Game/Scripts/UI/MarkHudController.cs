@@ -290,14 +290,14 @@ namespace CluckWars.UI
 
         /// <summary>The metres chip (a sibling of the scaled body, in the never-scaled marker box): on the arrow badge full size and
         /// <see cref="FeedbackTuning.MarkOnArrowChipOffsetPx"/> from its centre on the chosen vertical side; elsewhere it follows the
-        /// body's scale as before. The stylesheet's rule gives the unscaled place; the translate moves it from there.</summary>
+        /// body's scale as before. Its vertical place is the inline top (<see cref="MarkerPlacement.ChipTopPx"/>).</summary>
         private void PlaceChip(bool onArrow, bool above, float bodyScale)
         {
             float chipScale = MarkerPlacement.ChipScale(onArrow, bodyScale);
             _distance.style.scale = new Scale(new Vector3(chipScale, chipScale, 1f));
-            float dy = MarkerPlacement.ChipOffsetPx(onArrow, above, bodyScale) -
-                       (above ? MarkerPlacement.ChipBaseAboveCentrePx : MarkerPlacement.ChipBaseBelowCentrePx);
-            _distance.style.translate = new Translate(new Length(-50f, LengthUnit.Percent), new Length(dy, LengthUnit.Pixel));
+            // The vertical place is layout (top), not a translate: the UI probe treats an element's own translate as juice and
+            // measures the box without it. The stylesheet's translate keeps the horizontal centring.
+            _distance.style.top = MarkerPlacement.ChipTopPx(onArrow, above, bodyScale);
         }
 
         private static ChickenController LocalChicken() => MatchCamera.Instance != null ? MatchCamera.Instance.LocalChicken : null;
