@@ -1,4 +1,5 @@
 using CluckWars.Audio;
+using CluckWars.Balance;
 using CluckWars.Diagnostics;
 using CluckWars.Gameplay;
 using CluckWars.Input;
@@ -59,6 +60,15 @@ namespace CluckWars.Installers
         [Tooltip("Drop the FeedbackPalette asset here (Assets/_Game/Data/FeedbackPalette.asset): the state colours and per-job " +
                  "ability accents (spec D3a). If null, the palette's built-in defaults (the pre-palette colours) apply and a warning is logged.")]
         [SerializeField] private FeedbackPaletteSO _feedbackPalette;
+
+        [Header("Balance (live-ops, UGS Remote Config)")]
+        [Tooltip("Remote Config environment id the DEV-TOOLS builds (Editor, Test Session) read the 'balance' key from. " +
+                 "Dashboard: Project settings > Environments. Empty = the environment of the UGS sign-in (project default).")]
+        [SerializeField] private string _balanceDevEnvironmentId = "";
+
+        [Tooltip("Remote Config environment id PRODUCTION builds read the 'balance' key from. Empty = the environment of " +
+                 "the UGS sign-in (project default, normally 'production').")]
+        [SerializeField] private string _balanceProductionEnvironmentId = "";
 
         public override void InstallBindings()
         {
@@ -237,12 +247,58 @@ namespace CluckWars.Installers
                     "coming from MatchConfig.asset. Assign it here.");
             }
 
+            InstallBalance(log, abilityRegistry, matchConfig, devTools);
+
             // Performance Mode fence meshes (Phase 8 S5): an empty instance keeps FencePerformanceSwap injectable;
             // it reports the missing meshes through ILogService and leaves the full fence on.
             var fenceMeshes = _fencePerformanceMeshes != null
                 ? _fencePerformanceMeshes
                 : ScriptableObject.CreateInstance<FencePerformanceMeshesSO>();
             Container.Bind<FencePerformanceMeshesSO>().FromInstance(fenceMeshes).AsSingle();
+        }
+
+        /// <summary>
+        /// The live-ops balance layer (<see cref="BalanceBook"/>): the book over the registries bound above, the source
+        /// (Remote Config, or <see cref="NullBalanceSource"/> in the Editor without its toggle and in <c>UGS_DISABLED</c>
+        /// builds), this device's cached last good delta applied now so the Session line already carries its hash, and the
+        /// background refresh. After MatchConfig and the registries, which the book addresses.
+        /// </summary>
+        private void InstallBalance(ILogService log, AbilityRegistrySO abilityRegistry, MatchConfigSO matchConfig, bool devTools)
+        {
+            string environment = BalanceSourceChoice.EnvironmentFor(devTools);
+#if UGS_DISABLED
+            bool remote = false;
+#else
+            bool remote = BalanceSourceChoice.Decide(Application.isEditor, BalanceSourceChoice.EditorToggle);
+#endif
+
+            var book = new BalanceBook(log, abilityRegistry, _chickenClassRegistry, matchConfig);
+            Container.BindInterfacesAndSelfTo<BalanceBook>().FromInstance(book).AsSingle();
+
+            BalanceCache cache = null;
+            if (remote)
+            {
+#if !UGS_DISABLED
+                string environmentId = devTools ? _balanceDevEnvironmentId : _balanceProductionEnvironmentId;
+                Container.Bind<IBalanceSource>()
+                    .FromMethod(ctx => new RemoteConfigBalanceSource(ctx.Container.Resolve<IUGSService>(), log, environment, environmentId))
+                    .AsSingle();
+#endif
+                cache = new BalanceCache(Application.persistentDataPath, environment);
+                BalanceRefresher.ApplyCached(book, cache, log);
+            }
+            else
+            {
+                Container.Bind<IBalanceSource>().To<NullBalanceSource>().AsSingle();
+                log.Info(Source, Application.isEditor
+                    ? "Balance: Remote Config is off in the Editor (Cluck Wars/Balance/Remote Config In Editor); running the assets as they are on disk."
+                    : "Balance: UGS_DISABLED build; running the shipped assets.");
+            }
+
+            Container.BindInterfacesTo<BalanceRefresher>()
+                .FromMethod(ctx => new BalanceRefresher(book, ctx.Container.Resolve<IBalanceSource>(), log, cache))
+                .AsSingle()
+                .NonLazy();
         }
 
         /// <summary>

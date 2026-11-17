@@ -18,13 +18,18 @@ namespace CluckWars.Gameplay
     public static class FixedKit
     {
         /// <summary>Every rule one kit breaks, in words that name the passive; empty when it is legal.</summary>
-        public static List<string> Problems(PassiveAbilitySO passive)
+        public static List<string> Problems(PassiveAbilitySO passive) => Problems(passive, passive != null ? passive.Kit : null);
+
+        /// <summary>
+        /// The same rules asked of a <paramref name="kit"/> the passive does not hold yet (a balance delta's proposed kit,
+        /// judged by <c>BalanceBook</c> before it is applied).
+        /// </summary>
+        public static List<string> Problems(PassiveAbilitySO passive, AbilityBaseSO[] kit)
         {
             var problems = new List<string>();
             if (passive == null) { problems.Add("no specialization"); return problems; }
 
             string who = passive.name;
-            var kit = passive.Kit;
             if (kit == null || kit.Length != AbilityController.SlotCount)
             {
                 problems.Add($"{who}: the kit has {kit?.Length ?? 0} abilities, expected {AbilityController.SlotCount}.");

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using CluckWars.Balance;
+using CluckWars.Diagnostics;
 using CluckWars.Logging;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -24,10 +26,17 @@ namespace CluckWars.Services
         private const string Source = "UGS";
         private const int HeartbeatIntervalMs = 15_000;
         private const int MaxQueryResults = 16;
+        /// <summary>Public lobby data key holding the host's live-ops balance hash (<see cref="BalanceBook.Hash"/>).</summary>
+        public const string BalanceLobbyKey = "bal";
 
         private readonly ILogService _log;
+        private readonly BalanceBook _balance;
 
         private bool  _initialized;
+        // Single-flight (review F1): the boot balance fetch and the menu / auto-host can ask for init and sign-in in the
+        // same second. Concurrent callers share the running task; a finished one (failed, or a sign-out since) is replaced.
+        private Task  _initTask;
+        private Task  _signInTask;
         private Lobby _currentLobby;
         private bool  _isHost;
         private CancellationTokenSource _heartbeatCts;
@@ -40,13 +49,23 @@ namespace CluckWars.Services
 
         public string LastJoinCode { get; private set; }
 
-        public UGSService(ILogService log) => _log = log;
+        public UGSService(ILogService log, BalanceBook balance)
+        {
+            _log = log;
+            _balance = balance;
+        }
 
         // ---- Auth -------------------------------------------------------
 
-        public async Task InitializeAsync()
+        public Task InitializeAsync()
         {
-            if (_initialized) return;
+            if (_initialized) return Task.CompletedTask;
+            if (_initTask == null || _initTask.IsCompleted) _initTask = InitializeOnceAsync();
+            return _initTask;
+        }
+
+        private async Task InitializeOnceAsync()
+        {
             // Dev-tools builds only: cw_profile picks an authentication profile, so two clients on one PC get two
             // anonymous identities. Unset (and every production build): the default profile, as before.
             var profile = CluckWars.Diagnostics.DevTools.Available ? CluckWars.Diagnostics.AutoTestArgs.Read(null).Profile : null;
@@ -74,7 +93,14 @@ namespace CluckWars.Services
             _log.Info(Source, "Unity Services initialized.");
         }
 
-        public async Task SignInAnonymouslyAsync()
+        public Task SignInAnonymouslyAsync()
+        {
+            if (_initialized && AuthenticationService.Instance.IsSignedIn) return Task.CompletedTask;
+            if (_signInTask == null || _signInTask.IsCompleted) _signInTask = SignInOnceAsync();
+            return _signInTask;
+        }
+
+        private async Task SignInOnceAsync()
         {
             await InitializeAsync();
             if (AuthenticationService.Instance.IsSignedIn) return;
@@ -97,7 +123,17 @@ namespace CluckWars.Services
             await SignInAnonymouslyAsync();
 
             var name    = string.IsNullOrWhiteSpace(lobbyName) ? "Cluck Wars" : lobbyName.Trim();
-            var options = new CreateLobbyOptions { IsPrivate = false };
+            // The hash the lobby advertises must be the balance the host plays: no delta applies after this point.
+            _balance.CloseApplyWindow("lobby created");
+            var options = new CreateLobbyOptions
+            {
+                IsPrivate = false,
+                Data = new Dictionary<string, DataObject>
+                {
+                    [BalanceLobbyKey] = new DataObject(DataObject.VisibilityOptions.Public, _balance.Hash),
+                },
+            };
+            DiagnosticsReadout.BalanceMismatch = null;
             var lobby   = await LobbyService.Instance.CreateLobbyAsync(name, maxPlayers, options);
 
             _currentLobby = lobby;
@@ -128,6 +164,7 @@ namespace CluckWars.Services
                     LastJoinCode  = fresh.LobbyCode;
                     _log.Info(Source, $"Already a member of lobby {fresh.Id} (code {fresh.LobbyCode}, host={_isHost}); rejoining without a new lobby join. " +
                         $"Players={fresh.Players?.Count}/{fresh.MaxPlayers}");
+                    CompareBalance(fresh);
                     return ToInfo(fresh);
                 }
                 catch (LobbyServiceException e)
@@ -155,6 +192,7 @@ namespace CluckWars.Services
             LastJoinCode  = lobby.LobbyCode;
 
             _log.Info(Source, $"Joined lobby by code. Id={lobby.Id} Code={lobby.LobbyCode} Players={lobby.Players?.Count}/{lobby.MaxPlayers}");
+            CompareBalance(lobby);
             return ToInfo(lobby);
         }
 
@@ -169,6 +207,7 @@ namespace CluckWars.Services
             LastJoinCode  = joined.LobbyCode;
 
             _log.Info(Source, $"Joined lobby by id. Id={joined.Id} Code={joined.LobbyCode} Players={joined.Players?.Count}/{joined.MaxPlayers}");
+            CompareBalance(joined);
             return ToInfo(joined);
         }
 
@@ -215,6 +254,7 @@ namespace CluckWars.Services
                 _currentLobby = null;
                 _isHost       = false;
                 LastJoinCode  = null;
+                DiagnosticsReadout.BalanceMismatch = null;
             }
         }
 
@@ -290,6 +330,35 @@ namespace CluckWars.Services
                     _log.Warn(Source, $"Heartbeat failed: {e.Message} — retrying in {HeartbeatIntervalMs / 1000} s.");
                 }
             }
+        }
+
+        // ---- Balance check (warn only, D3c) -----------------------------
+
+        /// <summary>
+        /// Compares the host's published balance hash with this peer's. A difference is a Warn and a debug-HUD line, never
+        /// a refused join: each peer plays its own copy and judges claims against it (<see cref="BalanceBook"/> remarks).
+        /// </summary>
+        private void CompareBalance(Lobby lobby)
+        {
+            // Joined: from here this peer plays the balance it has, so the hash compared is the one it will play.
+            _balance.CloseApplyWindow("lobby joined");
+            if (_isHost) return; // the host published the hash itself
+            string local = _balance.Hash;
+            string host = lobby.Data != null && lobby.Data.TryGetValue(BalanceLobbyKey, out var data) ? data?.Value : null;
+            if (host == null)
+            {
+                DiagnosticsReadout.BalanceMismatch = null;
+                _log.Info(Source, $"Lobby {lobby.Id} publishes no balance hash (host on an older build); this peer plays bal={local}.");
+                return;
+            }
+            if (host == local)
+            {
+                DiagnosticsReadout.BalanceMismatch = null;
+                return;
+            }
+            DiagnosticsReadout.BalanceMismatch = $"host={host} local={local}";
+            _log.Warn(Source, $"Balance mismatch with lobby {lobby.Id}: host bal={host}, this peer bal={local}. " +
+                              "Joining anyway; the two peers play different numbers until both have the same delta.");
         }
 
         // ---- Helpers ----------------------------------------------------

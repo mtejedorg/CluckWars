@@ -52,6 +52,7 @@ KNOWN_PACKAGE_ASMDEFS = {
     "fe25561d224ed4743af4c60938a59d0b": "Unity.Services.Core",
     "5540e30183c82e84b954c033c388e06c": "Unity.Services.Authentication",
     "37e17ffe38d86ae48bc3207e83ffef88": "Unity.Services.Multiplayer",
+    "9d6c7830d9ab746a7a12f144bdeeee7c": "Unity.Services.RemoteConfig",  # com.unity.remote-config-runtime, added 2026-11-17
 }
 
 GUID_RE = re.compile(r"^guid:\s*([0-9a-f]{32})", re.M)

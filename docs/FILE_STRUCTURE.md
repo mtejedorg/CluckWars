@@ -19,7 +19,7 @@ scenes, prefabs, art, audio), `Assets/UI` (UXML/USS) and a few URP/UI settings f
 Runtime code is five assemblies, one `.asmdef` each plus `.asmref` files that attach other folders to it:
 
 ```
-CluckWars.App            Installers (composition root), FusionNetworkService, UGSService
+CluckWars.App            Installers (composition root), FusionNetworkService, UGSService, RemoteConfigBalanceSource
    ^
 CluckWars.Diagnostics    probes, auto-test driver, Ability Lab
    ^
@@ -42,12 +42,12 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 <!-- BEGIN GENERATED: assemblies -->
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
-| `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 24 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 158 |
+| `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 26 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 163 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 139 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 28 |
-| `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer | yes | 4 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 265 |
+| `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 267 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -87,14 +87,14 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Abilities` | `CluckWars.Gameplay` | 44 |
 | `Abilities/Passives` | `CluckWars.Gameplay` | 8 |
 | `AbilityLab` | `CluckWars.Diagnostics` | 5 |
-| `App` | `CluckWars.App` | 2 |
+| `App` | `CluckWars.App` | 3 |
 | `Audio` | `CluckWars.Gameplay` | 9 |
-| `Balance` | `CluckWars.Gameplay` | 4 |
+| `Balance` | `CluckWars.Gameplay` | 9 |
 | `Bootstrap` | `CluckWars.Core` | 1 |
 | `Diagnostics` | `CluckWars.Diagnostics` | 23 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 7 |
-| `Editor` | `Assembly-CSharp-Editor` | 15 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 242 |
+| `Editor` | `Assembly-CSharp-Editor` | 16 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 243 |
 | `Gameplay` | `CluckWars.Gameplay` | 85 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
@@ -104,7 +104,7 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Localization` | `CluckWars.Core` | 2 |
 | `Logging` | `CluckWars.Core` | 4 |
 | `Networking` | `CluckWars.Gameplay` | 4 |
-| `Services` | `CluckWars.Core` | 8 |
+| `Services` | `CluckWars.Core` | 10 |
 | `Settings` | `CluckWars.Gameplay` | 2 |
 | `UI` | `CluckWars.Presentation` | 51 |
 | `Visuals` | `CluckWars.Presentation` | 76 |
@@ -161,7 +161,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Logging` | Core (asmdef) | `ILogService`, `UnityLogService`, `LogLevel`, `LogLineFormat` (the one line format and its parser) |
 | `Scripts/Localization` | Core | `UiKeys` (compile-time handles for every key in `Assets/_Game/Resources/Text/UiText.csv`) and `UiText` (loads the CSV) |
 | `Scripts/Injection` | Core | `SelfInject`, the one way a component Zenject did not build gets its dependencies |
-| `Scripts/Services` | Core | `IUGSService` / `NullUGSService` / `LobbyInfo`, haptics (`IHapticsService`, `HapticsService`, `AndroidHapticDevice`, `HapticRules`), `FrameRatePolicy` |
+| `Scripts/Services` | Core | `IUGSService` / `NullUGSService` / `LobbyInfo`, `IBalanceSource` / `NullBalanceSource` (live-ops balance fetch), haptics (`IHapticsService`, `HapticsService`, `AndroidHapticDevice`, `HapticRules`), `FrameRatePolicy` |
 | `Scripts/Bootstrap` | Core | `SceneLoader` (in `Bootstrap.unity`; loads the next scene) |
 | `Scripts/Geometry` | Core | `Planar` |
 | `Scripts/Diagnostics/Shared` | Core | `BuildInfo`, `DevTools`, `DiagnosticsState`, `DebugHudMode`, `DepositDiagnostics`, `CornerTapDetector`, `PerKeyRateLimiter` |
@@ -169,16 +169,16 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Abilities` (+ `Passives/`) | Gameplay | Ability ScriptableObjects and their shared vocabulary (below) |
 | `Scripts/Networking` | Gameplay | `INetworkService` (all Fusion runner lifecycle), `PlayerNetworkInput` (the per-tick input struct), `AimRules`, `DisconnectRules` |
 | `Scripts/Audio` | Gameplay | `IAudioService` with `UnityAudioService` / `NullAudioService`, `AudioTicker`, `SfxId`, `AudioRegistrySO`, `UiAudioSO`, `ProceduralAudioBank`, `MissingSfxReporter` |
-| `Scripts/Balance` | Gameplay | `BalanceOracle` (Solo Clear Time simulator), `SctTargets`, `SpecSctTargets`, `BalanceTypes` |
+| `Scripts/Balance` | Gameplay | `BalanceOracle` (Solo Clear Time simulator), `SctTargets`, `SpecSctTargets`, `BalanceTypes`; the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice` |
 | `Scripts/Settings` | Gameplay | `PlayerPreferences` (persisted display options and the dev-tools gate), `LastSetup` (last committed menu choices) |
 | `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators, `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
 | `Scripts/UI` | Presentation | UI Toolkit controllers (`MenuUiController` and its partials, `MatchOverlaysController` and its partials, `MatchHudController`, `MarkHudController`), `UiElements`, ability icon/palette mapping, pure layout/flow rules (`MatchStandings`, `WaitingRoomRules`, `SafeAreaPadding`, `OrientationPolicy`), `DebugHud`, and `MatchHud` (a UGUI canvas built in code for the hit flash and the comeback banner) |
 | `Scripts/Input` | Presentation | `IInputProvider` and its providers (`KeyboardInputProvider`, `GamepadInputProvider`, `TouchInputProvider`, `CompositeInputProvider`); `TouchControlsController` and its `.Hud` partial; pure input and hex rules (`JoystickRules`, `HoldCancelRules`, `HudLayoutRules`, `CasterStunCountdownRules`, `EggPhaseHexRules`) |
 | `Scripts/Diagnostics` | Diagnostics (asmdef) | `AutoTestDriver` (+ `.Aura`, `.Mark` partials), `AutoTestArgs`, `AutoTestConfig`, `AutoPlayBrain`, `AutoPlayInputProvider`, `InvariantProbe` / `RoundInvariants`, `PerfProbe` / `PerfRules`, `VisualProbe` / `VisualScanRules`, `UiLayoutProbe` / `UiLayoutRules` / `UiLayoutAllowList`, `SyncHeartbeat` / `SyncHeartbeatFormat`, `SessionStamp`, `MenuShotsDriver`, `DebugHudSpawner`, `RevealBreadcrumbs`, `DiagnosticsObjects` (keeps a probe alive across scene loads) |
 | `Scripts/AbilityLab` | Diagnostics | The Ability Lab dev scene: `AbilityLabBootstrapper`, `AbilityLabPanel`, `AbilityLabHud`, `AbilityLabDummy`, `AbilityLabLoadout` |
-| `Scripts/App` | App (asmdef) | `FusionNetworkService` (Fusion implementation of `INetworkService`), `UGSService` (live UGS auth + lobby) |
+| `Scripts/App` | App (asmdef) | `FusionNetworkService` (Fusion implementation of `INetworkService`), `UGSService` (live UGS auth + lobby, lobby `bal` hash check), `RemoteConfigBalanceSource` (the only Remote Config user) |
 | `Scripts/Installers` | App | `ProjectInstaller` (app-wide bindings, on `Assets/_Game/Resources/ProjectContext.prefab`), `GameInstaller` (scene bindings, on the SceneContext of `Game.unity` and `AbilityLab.unity`) |
-| `Scripts/Editor` | Assembly-CSharp-Editor | Build menu (`CluckWarsBuildMenu`, `BuildGuards`, `BuildInfoWriter`), import stampers (`UiAudioImportSettings`, `UiSpriteImportSettings`, `TmpEssentialsAutoImport`, `AndroidVibratePermission`), animation authoring (`ChickenAnimationSetup`, `CastArchetypeClipGenerator`, `CastArchetypePreview`), capture probes (`ParticleProbe`, `PeckEdgeProbe`), `AbilityLabMenu`, `AutoTestEditorHooks`, `AbilityIconStyleChecker` (no header; on load it logs any registered ability without an `AbilityIconStyle` mapping) |
+| `Scripts/Editor` | Assembly-CSharp-Editor | Build menu (`CluckWarsBuildMenu`, `BuildGuards`, `BuildInfoWriter`), import stampers (`UiAudioImportSettings`, `UiSpriteImportSettings`, `TmpEssentialsAutoImport`, `AndroidVibratePermission`), animation authoring (`ChickenAnimationSetup`, `CastArchetypeClipGenerator`, `CastArchetypePreview`), capture probes (`ParticleProbe`, `PeckEdgeProbe`), `AbilityLabMenu`, `AutoTestEditorHooks`, `BalanceEditorHooks` (Remote Config In Editor toggle, restores the assets on reload / Play Mode exit), `AbilityIconStyleChecker` (no header; on load it logs any registered ability without an `AbilityIconStyle` mapping) |
 | `Scripts/Editor/Tests` | Assembly-CSharp-Editor | The EditMode suite (section 6) |
 
 **`Scripts/Gameplay` sub-areas** (all 87 files):
@@ -327,6 +327,7 @@ All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each,
 **Networking services and rules**
 - `Networking/INetworkService.cs` / `App/FusionNetworkService.cs`: Fusion runner lifecycle behind an interface.
 - `Services/IUGSService.cs` / `Services/NullUGSService.cs` / `App/UGSService.cs`: lobby and auth.
+- `Services/IBalanceSource.cs` / `Services/NullBalanceSource.cs` / `App/RemoteConfigBalanceSource.cs` and `Balance/BalanceBook.cs`: live-ops balance (UGS Remote Config key `balance`), applied before the first match, hash `bal=` in the Session line.
 - `Gameplay/RpcClaim.cs`: the "who may send this" rule for `RpcSources.All` RPCs that name a network object; also `RpcRejectionLimiter`.
 - `Gameplay/FoodTransferRules.cs`: conservation rule for peck, steal and deposit between authorities; its stateful half is `FoodRequests` (same file); `Gameplay/PendingStealLedger.cs` holds the open requests.
 - `Gameplay/ControlClaimRules.cs` (which control effects a peer may send), `Gameplay/LoadoutClaimRules.cs` (receiver check of a replicated loadout), `Gameplay/StealRules.cs`, `Gameplay/BaseDepositRules.cs`.

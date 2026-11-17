@@ -30,6 +30,15 @@ namespace CluckWars.Diagnostics
         public static DebugHudMode HudModeAtBoot;
         /// <summary>Auto-test <c>cw_zones</c> (dev tools only): the overlay outlines the HUD info / control zones.</summary>
         public static bool ZonesOverlay;
+        /// <summary>8-hex hash of the live-ops balance in force (written by <c>SessionStamp</c>); "n/a" before boot.</summary>
+        public static string BalanceHash = "n/a";
+        /// <summary>Where that balance came from: Baseline / Cache / Remote (<c>BalanceOrigin</c>).</summary>
+        public static string BalanceOrigin = "n/a";
+        /// <summary>
+        /// Set by <c>UGSService</c> when the lobby host's <c>bal</c> hash differs from this peer's (warn-only, D3c); null
+        /// when they agree or nothing was compared.
+        /// </summary>
+        public static string BalanceMismatch;
     }
 
     /// <summary>

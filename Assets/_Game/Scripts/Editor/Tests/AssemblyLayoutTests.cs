@@ -63,7 +63,7 @@ namespace CluckWars.Tests
             [App] = new[]
             {
                 Core, Gameplay, Presentation, Diagnostics, "Fusion.Unity", "Zenject", "Unity.Services.Core",
-                "Unity.Services.Authentication", "Unity.Services.Multiplayer",
+                "Unity.Services.Authentication", "Unity.Services.Multiplayer", "Unity.Services.RemoteConfig",
             },
         };
 

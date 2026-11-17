@@ -1,5 +1,7 @@
+using CluckWars.Balance;
 using CluckWars.Gameplay;
 using CluckWars.Injection;
+using CluckWars.Logging;
 using CluckWars.Networking;
 using CluckWars.Visuals;
 using Zenject;
@@ -21,6 +23,13 @@ namespace CluckWars.Installers
             // First: components that Zenject does not build (network objects, runtime AddComponent) self-inject from
             // this scene's container, and some do so in Awake, before Zenject's own scene registry is filled.
             SelfInject.RegisterSceneContainer(this, Container);
+
+            // A match scene is loading: from here on this launch plays the balance it has (BalanceBook remarks, "never
+            // mid-match"). A delta that arrives later is cached and applies at the next launch.
+            var balance = Container.TryResolve<BalanceBook>();
+            if (balance != null) balance.CloseApplyWindow("Game scene loaded");
+            else Container.Resolve<ILogService>().Error("GameInstaller",
+                "BalanceBook is not bound (ProjectInstaller.InstallBalance did not run): no live-ops balance this launch.");
 
             // MatchConfigSO is deliberately NOT bound here. It moved to ProjectInstaller
             // so the Bootstrap menu lobby can advertise the same rules the match enforces

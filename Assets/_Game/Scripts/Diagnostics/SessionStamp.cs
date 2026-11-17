@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Text;
+using CluckWars.Balance;
 using CluckWars.Logging;
 using CluckWars.Settings;
 using UnityEngine;
@@ -12,6 +13,8 @@ namespace CluckWars.Diagnostics
     public struct SessionFields
     {
         public string Sha, Built, Build, Platform, Device, Gpu, Api, Quality, Os, Unity, Date, Battery;
+        /// <summary>8-hex hash of the live-ops balance delta in force (<c>BalanceBook.Hash</c>).</summary>
+        public string Balance;
         public bool DevTools, PerfMode;
         public int Width, Height;
         public double RefreshHz;
@@ -19,7 +22,7 @@ namespace CluckWars.Diagnostics
 
     /// <summary>
     /// Formats the <c>Session</c> line: <c>Session sha=.. built=.. build=.. devtools=0|1 platform=.. device=.. gpu=.. api=..
-    /// quality=.. perfMode=0|1 res=WxH hz=.. os=.. unity=.. date=yyyy-MM-dd battery=..</c>. Values are made
+    /// quality=.. perfMode=0|1 res=WxH hz=.. os=.. unity=.. date=yyyy-MM-dd battery=.. bal=..</c>. Values are made
     /// key=value-safe (whitespace → <c>_</c>, no <c>=</c>), empty ones print <c>n/a</c>. Pure; pinned by tests.
     /// </summary>
     public static class SessionLine
@@ -47,6 +50,7 @@ namespace CluckWars.Diagnostics
             Add(sb, "unity", f.Unity);
             Add(sb, "date", f.Date);
             Add(sb, "battery", f.Battery);
+            Add(sb, "bal", f.Balance);
             return sb.ToString();
         }
 
@@ -73,7 +77,8 @@ namespace CluckWars.Diagnostics
 
     /// <summary>
     /// Logs the <c>Session</c> line once at boot (Source <c>Session</c>, Info) and again, prefixed
-    /// <c>SessionChange</c>, whenever the quality tier or Performance Mode changes. Always on (one line at boot plus
+    /// <c>SessionChange</c>, whenever the quality tier, Performance Mode or the balance hash (<c>bal=</c>) changes. Two peers
+    /// whose <c>bal=</c> differ play different numbers: warn-only by design (D3c, <c>BalanceBook</c> remarks). Always on (one line at boot plus
     /// two int/bool compares per frame), unlike the dev-tools probes: it is what ties a log file to a build and a device.
     /// Bound non-lazy in <c>ProjectInstaller</c>.
     /// </summary>
@@ -84,11 +89,17 @@ namespace CluckWars.Diagnostics
         private const string Source = "Session";
 
         private readonly ILogService _log;
+        private readonly BalanceBook _balance;
         private string _sha = "unknown", _built = "unknown", _build = "unknown";
         private int _quality = -1;
         private bool _perfMode;
+        private string _balanceHash;
 
-        public SessionStamp(ILogService log) { _log = log; }
+        public SessionStamp(ILogService log, BalanceBook balance)
+        {
+            _log = log;
+            _balance = balance;
+        }
 
         public void Initialize()
         {
@@ -96,6 +107,7 @@ namespace CluckWars.Diagnostics
                 _log.Warn(Source, $"Build info unavailable ({problem}); the Session line says sha=unknown.");
             _quality = QualitySettings.GetQualityLevel();
             _perfMode = PlayerPreferences.PerformanceModeEnabled;
+            _balanceHash = PublishBalance();
             _log.Info(Source, SessionLine.Format(SessionLine.BootPrefix, Capture()));
         }
 
@@ -103,9 +115,11 @@ namespace CluckWars.Diagnostics
         {
             int quality = QualitySettings.GetQualityLevel();
             bool perf = PlayerPreferences.PerformanceModeEnabled;
-            if (quality == _quality && perf == _perfMode) return;
+            string balance = PublishBalance();
+            if (quality == _quality && perf == _perfMode && balance == _balanceHash) return;
             _quality = quality;
             _perfMode = perf;
+            _balanceHash = balance;
             _log.Info(Source, SessionLine.Format(SessionLine.ChangePrefix, Capture()));
         }
 
@@ -132,7 +146,16 @@ namespace CluckWars.Diagnostics
                 Unity = Application.unityVersion,
                 Date = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 Battery = SessionLine.Battery(SystemInfo.batteryLevel),
+                Balance = _balanceHash,
             };
+        }
+
+        /// <summary>The book's hash, also handed to the debug HUD (<see cref="DiagnosticsReadout"/>).</summary>
+        private string PublishBalance()
+        {
+            DiagnosticsReadout.BalanceHash = _balance.Hash;
+            DiagnosticsReadout.BalanceOrigin = _balance.Origin.ToString();
+            return _balance.Hash;
         }
     }
 }

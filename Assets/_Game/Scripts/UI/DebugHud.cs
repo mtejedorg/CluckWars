@@ -53,6 +53,8 @@ namespace CluckWars.UI
         private readonly CornerTapDetector _cornerTaps = new CornerTapDetector();
 
         private readonly StringBuilder _sb        = new StringBuilder(1024);
+        // Rich-text copy of the label style, used only while a balance mismatch line (yellow) is in the panel.
+        private GUIStyle _richLabel;
         private readonly StringBuilder _balanceSb = new StringBuilder(1024);
 
         [Inject]
@@ -190,7 +192,13 @@ namespace CluckWars.UI
                 float y = PanelTop;
 
                 GUI.Box(new Rect(x, y, width, height), "Debug (F1)");
-                GUI.Label(new Rect(x + 10, y + 24, width - 20, height - PanelChrome), _sb.ToString());
+                var labelRect = new Rect(x + 10, y + 24, width - 20, height - PanelChrome);
+                if (DiagnosticsReadout.BalanceMismatch != null)
+                {
+                    _richLabel ??= new GUIStyle(GUI.skin.label) { richText = true };
+                    GUI.Label(labelRect, _sb.ToString(), _richLabel);
+                }
+                else GUI.Label(labelRect, _sb.ToString());
                 // In the title strip (top-right), so it is on screen whenever the panel's top is: asks VisualProbe for a
                 // scan, same as F9 or a three-finger tap.
                 if (DevTools.Available && GUI.Button(new Rect(x + width - 128, y + 2, 124, 20), "Scan visuals (F9)"))
@@ -289,6 +297,7 @@ namespace CluckWars.UI
         {
             sb.Append("FPS ").AppendLine(_fps.ToString("0"));
             AppendDiagnostics(sb);
+            AppendBalance(sb);
 
             // --- Network ---
             sb.AppendLine();
@@ -385,6 +394,18 @@ namespace CluckWars.UI
             float rtt = DiagnosticsReadout.NetRttMs;
             sb.Append("RTT ").Append(rtt >= 0f ? rtt.ToString("0") + " ms" : "n/a")
               .Append("  loss ").AppendLine(DiagnosticsReadout.NetLoss);
+        }
+
+        /// <summary>
+        /// The live-ops balance in force (<c>bal=</c> of the Session line) and, in yellow, a lobby mismatch with the host:
+        /// warn-only (D3c), the two peers are playing different numbers.
+        /// </summary>
+        private static void AppendBalance(StringBuilder sb)
+        {
+            sb.Append("Balance ").Append(DiagnosticsReadout.BalanceHash)
+              .Append(" (").Append(DiagnosticsReadout.BalanceOrigin).AppendLine(")");
+            var mismatch = DiagnosticsReadout.BalanceMismatch;
+            if (mismatch != null) sb.Append("<color=yellow>BALANCE MISMATCH ").Append(mismatch).AppendLine("</color>");
         }
 
         // ---- Balance report (F2) -------------------------------------------------

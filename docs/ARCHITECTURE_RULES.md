@@ -123,6 +123,7 @@ Every rule in this document. "Enforced" is the primary mechanism (the first one 
 | ARCH-DATA-11 | Keep gameplay numbers in data, and tune by changing the asset only | NONE | CURRENT |
 | ARCH-DATA-12 | Fill every number in ability and passive text from the SO field it describes | TEST | PARTIAL |
 | ARCH-DATA-13 | Keep the retired ability classes until alpha feedback | REVIEW | CURRENT |
+| ARCH-DATA-14 | Change shipped balance only through the BalanceBook delta, which clients read and never write | TEST | CURRENT |
 | ARCH-ERR-01 | Send all log output through ILogService | TEST | CURRENT |
 | ARCH-ERR-02 | Keep the log line format, and lead an error with its Source line | TEST | PARTIAL |
 | ARCH-ERR-03 | Sort every null guard by whether a legal game state can produce it | REVIEW | CURRENT |
@@ -769,6 +770,7 @@ Code outside the ability folder asks an ability what it does, never which class 
 - Audit check: `git grep -nE "[^A-Za-z0-9_.][0-9]+\.[0-9]+f" -- Assets/_Game/Scripts/Gameplay Assets/_Game/Scripts/Abilities Assets/_Game/Scripts/UI`, then review the hits that are not `const` / `static readonly` declarations or SO field initialisers. Known example: `bool shortCd = ab.Cooldown <= 6f;` at Scripts/UI/MenuUiController.GearUp.cs:508.
 - Proposed guard: a counted allow-list scan of float literals in arithmetic and comparisons in Gameplay, Abilities and UI, outside constant declarations and SO field initialisers.
 - Source: docs/CONVENTIONS.md:245, M/fixed-kits-baseline-2026-10-31.md:29, M/slow-split-2026-11-13.md:18
+- Note (owner, 2026-11-17): the asset stays the source, with one sanctioned second source: the server-written BalanceBook delta over the assets (ARCH-DATA-14). A delta that proves out is promoted into the assets later (decision D5, deferred; BL-183, BL-184).
 - Status: CURRENT
 
 ### ARCH-DATA-12 — Fill every number in ability and passive text from the SO field it describes
@@ -786,6 +788,14 @@ Code outside the ability folder asks an ability what it does, never which class 
 - Enforced by: CONVENTION
 - Audit check: `git log --diff-filter=D --name-only <base>..HEAD -- Assets/_Game/Scripts/Abilities` shows no `*AbilitySO.cs` deleted before the alpha feedback is in.
 - Source: M/arch-audit-decisions-2026-11-12.md:17
+- Status: CURRENT
+
+### ARCH-DATA-14 — Change shipped balance only through the BalanceBook delta, which clients read and never write
+- Rule: A balance change that ships without an app update is one JSON delta from UGS Remote Config (key `balance`; the `dev` environment only where `DevTools.Available`, `production` otherwise), applied by `BalanceBook` over the loaded assets. Only number, bool and enum fields and kit slots, minus a deny-list (loadout legality, classification, `MaxPlayers`, `TargetingMode`, `LoadoutMode`), are overridable. A bad value refuses the whole delta; a newer `schema` is ignored. The delta applies at boot or in the menu, never after the first lobby or match of a launch. Clients only read: no local-file override and no in-app editing path, in any build. The source sits behind `IBalanceSource` (Core), and only `RemoteConfigBalanceSource` (App) references the package. Peers whose 8-hex `bal=` hashes differ get a warning only (owner D3c); each judges claims against its own copy (ARCH-NET-05).
+- Why: owner rulings 2026-11-17 (D1c, D2c, D3c, D4b): balance updates without a build, written only by the owner and designed for future live-ops, not as a client cheat panel.
+- Enforced by: TEST `BalanceBookTests` (round trips, whole-delta refusal, schema gate, deny-list, hash, snapshot/restore, `NullBalanceSource`, environment choice); `AssemblyLayoutTests` (the package only in App's pinned list)
+- Audit check: `git grep -n "Unity.Services.RemoteConfig" -- Assets/_Game/Scripts` hits only `App/RemoteConfigBalanceSource.cs`; `git grep -n "FromJsonOverwrite" -- Assets/_Game/Scripts ':!*Editor*'` hits only `Balance/BalanceBook.cs`.
+- Source: docs/STATE.md (BalanceBook entry, 2026-11-17); decision page https://claude.ai/artifact/NpJhf84c1ckj7qJthRzC7Q
 - Status: CURRENT
 
 ## 3.6 Logging and error surfacing (ARCH-ERR)
