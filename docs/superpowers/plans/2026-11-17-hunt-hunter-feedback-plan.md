@@ -257,3 +257,40 @@ pinned to the commit range (CODE-PROC-09).
 9. The hunt buzzes obey the "Buzz When Hit" toggle. [Yes, label unchanged.]
 
 Nothing blocks K1. K2-K8 need the Editor closed or the bridge up for the suite, and one PC dev-tools session per item.
+
+## 5. Revision 2026-11-17 (owner, after the first frames): K5 is replaced by K5r, built before K4
+
+Design §9. The old K5 (pinned marker plus an arrow from the hunter's bird) is void. Status when this was written: K1 4a47a10e, K2 a5299d41, K2b 113afb8a, K3 c85f141a, K3b 30822c34 are committed; K3b's `MarkerPlacement.ClampPin` stays as the fallback path only.
+
+### K5r The mark rides the target's floor arrow; over the head only inside the circle (senior-dev, M)
+- Pure rule in `Visuals/HuntRules.cs`: `enum MarkAnchor { OverHead, OnArrow, EdgeFallback }` and
+  `MarkAnchor AnchorFor(float planarDistance, float ringRadius, bool wasInside, bool arrowAvailable)`:
+  inside when `distance <= ringRadius`, and once inside stays inside until `distance > ringRadius + MarkCircleHysteresisMetres`
+  (new `FeedbackTuning` constant, 0.4 m); outside with an arrow -> `OnArrow`; outside with no arrow -> `EdgeFallback`.
+  The ring radius is `FloorRivalArrows.RingRadiusFor(cam)`; planar distance hunter to target as `FloorArrowRules.PlanarDistance`.
+- `RivalIndicator.LateUpdate` (`:377-417`): the local mark's target is no longer "marker instead of arrow". While it is outside
+  the circle its floor arrow is FORCED (offered to `FloorRivalArrows.TryRepresent` whether or not the bird is on screen, the way
+  `forcedHunter` does for the victim's hunter, `:407-412`), with mark emphasis; its edge chevron shows only if the floor ring
+  declines. Inside the circle: no arrow (unchanged for any rival). Extract the branch to a pure
+  `MarkedTargetArrowRules.Decide(marked, outsideCircle, hiddenFromClearViewport, floorAccepted)`.
+- `FloorRivalArrows.TryRepresent`: optional emphasis for one arrow (scale `MarkArrowScale` 1.5 on length and width, tint override
+  = `HuntRules.MarkerColour(mode, corner)` so the arrow goes seat colour -> red (live, blocked) -> yellow (pounce legal)). No new
+  renderer or material: the existing pooled arrow mesh, vertex colours rewritten only on a change.
+- `MarkHudController` placement: with `OnArrow` the marker element is placed at the arrow's tip in viewport space
+  (`FloorRivalArrows.TryGetArrow` tail + direction x (length + gap), the same projection the victim's hunter badge uses,
+  `MarkHudController.cs:315-335`), drawn WITHOUT its pointer and at `MarkMarkerOnArrowScale` (0.67 of the K3 size, about the old
+  96 px box) so it reads as a badge of the arrow; the metres chip goes on the side away from the hunter's bird. With `OverHead`:
+  the K3 placement above the head. With `EdgeFallback`: today's pin (`ClampPin`). The count, ring, paw, blocker badge and chip
+  logic are untouched: only where the marker is anchored and its scale change.
+- `MarkOutputs`/harness: expose the anchor (`MarkHudController.AnchorNow` static for the harness and the state log line).
+- Tests: `HuntRulesTests.Anchor_InsideOverHead_OutsideOnArrow_WithHysteresis` (ring radius from `FloorArrowRules`, no literals),
+  `Anchor_FallsBackToEdgeWithoutAnArrow`; `MarkedTargetArrowRulesTests` (marked outside -> forced arrow even on screen; marked
+  inside -> none; unmarked unchanged); `FloorRivalArrowsTests` + `Emphasis_ScalesAndTintsOneArrowOnly`; a placement test that an
+  on-arrow marker sits beyond the arrow tip on the outward side and never over the hunter's own plate.
+- Captures (after K8 adds the shot names; until then read the existing ones): `mark-hunt-offscreen` (emphasised arrow carrying
+  the badge, no pinned disc), `mark-arming` with the target on screen but outside the circle (arrow carries the mark, nothing
+  over the head), `mark-onscreen` / `mark-kill` inside the circle (disc over the head, no arrow).
+- Rules: ARCH-EVT-01, CODE-UI-08, ARCH-LAY-15, CODE-ASSET-12. Risk: two places must never show at once (test the anchor is
+  single-valued per frame); the arrow pool being full falls back to the edge.
+
+Order from here: K5r, K4 (brackets), K6, K7, K8 (new shots: `mark-outside-circle`, `mark-inside-circle`, `mark-end-word`), K9.

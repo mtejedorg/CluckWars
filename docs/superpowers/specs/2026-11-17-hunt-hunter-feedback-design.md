@@ -73,3 +73,16 @@ The build plan is `docs/superpowers/plans/2026-11-17-hunt-hunter-feedback-plan.m
 7. When only the hunter is stunned, no blocker glyph shows; the hex keeps its stunned cross.
 8. The brackets follow the marker onto a hidden target (the marker already tracks it; no new information).
 9. The two buzzes obey the existing "Buzz When Hit" setting.
+
+## 9. Owner revision, 2026-11-17 (after the first real frames): the mark rides the arrow
+
+Maestro: "It is confusing that positions are tracked with arrows and then when mark is on the marker changes. Mark should be integrated in the arrow at the floor, and only appear above head if inside the circle."
+
+This replaces H5a and the off-screen half of H1a(b). The circle is the floor ring round the hunter's own bird on which the rival arrows are painted (`FloorRivalArrows`, radius `FloorRivalArrows.RingRadiusFor`).
+
+- **Target outside the circle** (on screen or not): the target keeps its floor arrow, forced on even when the bird is in view, and the mark is part of that arrow. The arrow is painted larger and in the mark's state colour (seat colour while arming, red when live and blocked, yellow when the pounce is legal), and the marker rides on it as a compact badge at the arrow's tip: count, draining ring, paw, blocker badge, metres chip. Nothing is drawn over the target's head and nothing is pinned to the screen edge.
+- **Target inside the circle**: the marker sits over the target's head as built in K3 (large disc, count, badges, chip). The arrow is gone, as for any rival inside the ring.
+- Crossing the circle uses a small hysteresis so the mark does not flicker between the two places.
+- Fallback only: if the floor ring cannot paint the arrow (pool full, the dev edge-arrow mode, no local bird), the mark rides the edge chevron or the edge pin as before, so a mark is never left with no sign.
+- This is the same pattern the victim already has (the hunter's arrow carries the skull while the hunter is beyond the inner circle).
+- Unchanged: the ground brackets under the target when it is in view (H1a(a)), the hex (H2a), the blocker glyphs (H3a), the end word (H4a), the buzzes (H8a).
