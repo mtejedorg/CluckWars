@@ -240,7 +240,9 @@ namespace CluckWars.UI
             {
                 _chipRed = red;
                 _chipCorner = o.TargetCorner;
-                _distance.style.color = red == 1 ? FeedbackTuning.MarkHuntBlockedColor : PlayerPalette.ForCorner(o.TargetCorner);
+                // Red: a red pill with cream text (the hex far chip's treatment, class backed by MarkHuntBlockedColor); else the ink pill.
+                _distance.EnableInClassList("cw-mark-distance--far", red == 1);
+                _distance.style.color = HuntRules.ChipTextColour(red == 1, PlayerPalette.ForCorner(o.TargetCorner));
             }
             int key = HuntRules.MetresKey(o.MarkerDistance);
             if (key != _shownMetresKey)

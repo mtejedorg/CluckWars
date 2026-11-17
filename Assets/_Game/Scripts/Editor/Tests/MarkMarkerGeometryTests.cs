@@ -7,6 +7,7 @@ using CluckWars.UI;
 using CluckWars.Visuals;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEngine;
 
 namespace CluckWars.Tests
 {
@@ -122,6 +123,39 @@ namespace CluckWars.Tests
                 if (HuntRules.ChipRed(d, range) && d < HuntRules.ChipDecimalBelowMetres - 0.1f)
                     Assert.Greater(float.Parse(HuntRules.MetresText(d), CultureInfo.InvariantCulture), range - 1e-3f, $"red at {d} reads {HuntRules.MetresText(d)}");
             }
+        }
+
+        [Test]
+        public void ChipText_RedIsCream_NearIsReadableSeatColourOnInk()
+        {
+            for (int corner = 0; corner < 4; corner++)
+            {
+                var seat = PlayerPalette.ForCorner(corner);
+                Assert.AreEqual(FeedbackTuning.MarkCream, HuntRules.ChipTextColour(true, seat), $"red chip text is cream (corner {corner})");
+                var near = HuntRules.ChipTextColour(false, seat);
+                Assert.GreaterOrEqual(HuntRules.Contrast(near, FeedbackTuning.MarkInk), HuntRules.ChipMinContrast - 1e-3f,
+                    $"the seat-colour text reads on the ink pill (corner {corner})");
+                if (HuntRules.Contrast(seat, FeedbackTuning.MarkInk) >= HuntRules.ChipMinContrast)
+                    Assert.AreEqual(seat, near, $"a seat colour that already reads is untouched (corner {corner})");
+            }
+            Assert.GreaterOrEqual(HuntRules.Contrast(FeedbackTuning.MarkCream, FeedbackTuning.MarkHuntBlockedColor), 3f, "cream reads on the red pill");
+        }
+
+        [Test]
+        public void Uss_FarChipIsTheRedPill_SameRedAsTheHexChip()
+        {
+            var far = Regex.Match(Rule("cw-mark-distance--far"), @"(?<![\w-])background-color\s*:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)");
+            Assert.IsTrue(far.Success, "the far chip class sets a background colour");
+            var red = FeedbackTuning.MarkHuntBlockedColor;
+            Assert.AreEqual(Mathf.RoundToInt(red.r * 255f), int.Parse(far.Groups[1].Value));
+            Assert.AreEqual(Mathf.RoundToInt(red.g * 255f), int.Parse(far.Groups[2].Value));
+            Assert.AreEqual(Mathf.RoundToInt(red.b * 255f), int.Parse(far.Groups[3].Value));
+            string hex = File.ReadAllText("Assets/UI/Styles/TouchControls.uss");
+            var hm = Regex.Match(hex, @"\.cw-hex-huntfar\s*\{[^}]*background-color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)");
+            Assert.IsTrue(hm.Success);
+            for (int i = 1; i <= 3; i++) Assert.AreEqual(hm.Groups[i].Value, far.Groups[i].Value, "the marker's red pill is the hex far chip's red");
+            string ctl = File.ReadAllText("Assets/_Game/Scripts/UI/MarkHudController.cs");
+            StringAssert.Contains("cw-mark-distance--far", ctl, "the controller toggles the class");
         }
 
         [Test]

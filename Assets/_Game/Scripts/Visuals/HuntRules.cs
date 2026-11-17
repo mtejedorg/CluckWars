@@ -132,6 +132,39 @@ namespace CluckWars.Visuals
         /// <summary>The chip is red while the target is beyond the kill range (the shipped <c>KillRange</c>), the seat colour inside it.</summary>
         public static bool ChipRed(float distance, float killRange) => TooFar(distance, killRange);
 
+        /// <summary>The smallest WCAG contrast ratio the metres chip's text keeps against its ink pill.</summary>
+        public const float ChipMinContrast = 4.5f;
+
+        /// <summary>The metres chip's text colour: cream on the red pill (the same treatment as the Hunt hex's far chip); within reach
+        /// the seat colour on the ink pill, lightened toward cream just far enough to keep <see cref="ChipMinContrast"/> against the
+        /// ink (the dark teal seat would not otherwise).</summary>
+        public static Color ChipTextColour(bool red, Color seatColour)
+        {
+            Color cream = FeedbackTuning.MarkCream;
+            if (red) return cream;
+            Color ink = FeedbackTuning.MarkInk;
+            if (Contrast(seatColour, ink) >= ChipMinContrast) return seatColour;
+            float lo = 0f, hi = 1f;
+            for (int i = 0; i < 12; i++)
+            {
+                float mid = (lo + hi) * 0.5f;
+                if (Contrast(Color.Lerp(seatColour, cream, mid), ink) >= ChipMinContrast) hi = mid; else lo = mid;
+            }
+            return Color.Lerp(seatColour, cream, hi);
+        }
+
+        /// <summary>WCAG contrast ratio (1..21) between two opaque colours.</summary>
+        public static float Contrast(Color a, Color b)
+        {
+            float la = Luminance(a), lb = Luminance(b);
+            return (Mathf.Max(la, lb) + 0.05f) / (Mathf.Min(la, lb) + 0.05f);
+        }
+
+        private static float Luminance(Color c) =>
+            0.2126f * Linear(c.r) + 0.7152f * Linear(c.g) + 0.0722f * Linear(c.b);
+
+        private static float Linear(float v) => v <= 0.04045f ? v / 12.92f : Mathf.Pow((v + 0.055f) / 1.055f, 2.4f);
+
         /// <summary>The marker's one corner badge, priority egg, wall, not stunned. The egg and the wall show from the lock on,
         /// arming included (the mode says so before the blocker does); the star is a live-second reason only (the blocker is None
         /// until armed). Too far has no badge: the red metres chip is its glyph.</summary>

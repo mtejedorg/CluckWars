@@ -123,6 +123,13 @@
     display: none;
 }
 .cw-mark-distance--above { top: -48px; }
+/* Beyond the kill range the pill goes red with cream text (the Hunt hex's far chip, .cw-hex-huntfar): dark red on the ink pill did not
+   read. The red is FeedbackTuning.MarkHuntBlockedColor (a test pins it); the text colour is set inline by HuntRules.ChipTextColour. */
+.cw-mark-distance--far {
+    background-color: rgb(230, 10, 10);
+    border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224);
+    border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+}
 
 /* The victim's hunter-skull badge: 44 px ink disc, 3 px border in the hunter's colour (set by the controller), cream skull. */
 .cw-hunter-skull {
