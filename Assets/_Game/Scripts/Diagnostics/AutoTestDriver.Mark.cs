@@ -13,7 +13,9 @@ namespace CluckWars.Diagnostics
     /// <c>cw_markshots</c> (dev tools): plays Death Marks so their feedback can be photographed, one screenshot per state the
     /// first time it appears. As the Assassin (<c>-cw_perk Assassin_Spoiler</c>): <c>mark-draw</c> (mid-sweep),
     /// <c>mark-hunt-offscreen</c>, <c>mark-onscreen</c>, <c>mark-ambush-ready</c>, <c>mark-kill</c>, <c>mark-walled</c> (later marks
-    /// walk to the target's base and wait for it to be home), <c>mark-end</c> (0.6 s after a mark ends), <c>mark-arming</c> (the
+    /// walk to the target's base and wait for it to be home), <c>mark-end</c> (clean, after the end hold and fade),
+    /// <c>mark-end-word</c> (0.3 s after a Missed or Safe end: the word and the glyph), <c>mark-outside-circle</c> (the marker on the
+    /// target's floor arrow), <c>mark-inside-circle</c> (the marker over the head), <c>mark-arming</c> (the
     /// marker counting down to the arm) and <c>mark-live</c> (just armed). The stun is timed to the arm the way the Spoiler bot
     /// times it (<see cref="BotTactics.NextMarkStep"/>): it must still run when the 3 s arm ends. As anyone else with
     /// <c>-cw_botperks Assassin_Spoiler,Assassin_Spoiler,Assassin_Spoiler</c>: <c>victim-marked</c>, <c>victim-far</c>,
@@ -33,6 +35,8 @@ namespace CluckWars.Diagnostics
         private bool _shotShelled;
         private float _shellHookAt = -10f;
         private bool _shotDraw, _shotOff, _shotOn, _shotAmbush, _shotKill, _shotWalled, _shotEnd;
+        private bool _shotOutside, _shotInside, _shotEndWord, _endLogged;
+        private MarkEndCause _markEndCause;
         private bool _shotVicMarked, _shotVicFar, _shotVicClose, _shotVicInvisible, _shotVicEnd, _shotRound2;
         private bool _shotArming, _shotLive, _shotVicArming, _shotVicLive;
         private float _markLockedAt = -1f, _markEndedAt = -1f;
@@ -82,11 +86,30 @@ namespace CluckWars.Diagnostics
                 Capture(ref _shotRound2, "playagain-clean");
             }
 
-            // A mark just ended (any reason): photograph the clean HUD 0.6 s later.
+            // A mark just ended (any reason). The hunter's end holds the marker with its word and glyph (K1): photograph the word
+            // 0.3 s in, and the clean HUD once the hold and the fade are over. The victim's end has no hold: 0.6 s.
             bool live = o.Role != MarkRole.None && (o.AssassinMarkActive || o.ClockAlpha >= 1f);
-            if (_lastMarkRole != MarkRole.None && !live && _markEndedAt < 0f) _markEndedAt = now;
+            if (_lastMarkRole != MarkRole.None && !live && _markEndedAt < 0f)
+            {
+                _markEndedAt = now;
+                _markEndCause = MarkEndCause.None;
+                _endLogged = false;
+            }
             if (live) _markEndedAt = -1f;
-            if (_markEndedAt > 0f && now - _markEndedAt >= 0.6f)
+            if (_markEndedAt > 0f && o.EndCause != MarkEndCause.None) _markEndCause = o.EndCause;
+            if (_markEndedAt > 0f && _lastMarkRole == MarkRole.Assassin && now - _markEndedAt >= 0.3f)
+            {
+                if (!_endLogged)
+                {
+                    _endLogged = true;
+                    _log.Info(Source, $"AutoTest markshots end cause={_markEndCause}");
+                }
+                if (HuntRules.ShowsEndWord(_markEndCause)) Capture(ref _shotEndWord, "mark-end-word");
+            }
+            float endShotAfter = _lastMarkRole == MarkRole.Assassin
+                ? FeedbackTuning.MarkEndHoldSeconds + FeedbackTuning.MarkEndFadeSeconds + 0.1f
+                : 0.6f;
+            if (_markEndedAt > 0f && now - _markEndedAt >= endShotAfter)
             {
                 if (_lastMarkRole == MarkRole.Assassin && !_shotEnd)
                 {
@@ -128,7 +151,8 @@ namespace CluckWars.Diagnostics
             // One line per change of what the HUD shows, with the execute facts behind it (evidence for every shot).
             string state = Inv($"mode={o.MarkerMode} kill={o.KillHex} lit={o.AmbushLit} ready={exec.KillReady} canKill={exec.CanKillNow} ") +
                            Inv($"stunned={target.CurrentControlState == ControlState.Stunned} selfCast={ControlRules.CanCast(self.CurrentControlState)} ") +
-                           Inv($"walled={PlayerBase.WallBetween(self.transform.position, target.transform.position)} offscreen={MarkHudController.MarkerOffScreenNow}");
+                           Inv($"walled={PlayerBase.WallBetween(self.transform.position, target.transform.position)} offscreen={MarkHudController.MarkerOffScreenNow} ") +
+                           Inv($"anchor={MarkHudController.AnchorNow} blocker={o.Blocker} brackets={HuntBrackets.StateNow}");
             if (state != _lastMarkState)
             {
                 _lastMarkState = state;
@@ -156,6 +180,10 @@ namespace CluckWars.Diagnostics
                 }
             }
 
+            // Where the marker rides (K5r): on the target's floor arrow outside the circle, over its head inside it.
+            if (MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OnArrow && Settled("outside")) Capture(ref _shotOutside, "mark-outside-circle");
+            if (MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OverHead && Settled("inside")) Capture(ref _shotInside, "mark-inside-circle");
+
             bool firstPassDone = _shotOn && _shotAmbush && _shotKill;
             if (o.MarkerMode == MarkMarkerMode.Walled && Settled("walled")) Capture(ref _shotWalled, "mark-walled");
 
@@ -167,14 +195,16 @@ namespace CluckWars.Diagnostics
                 return;
             }
 
-            // Hold still briefly first: the off-screen marker, if the target starts off screen (0.4 s: the mark lasts 4 s, and the Kill still has to be photographed and pressed).
+            // Hold still briefly first: the marker on the floor arrow of a target hidden from the clear viewport (nothing is pinned to the
+            // edge any more), if the target starts there (0.4 s: the mark lasts 4 s, and the Kill still has to be photographed and pressed).
+            bool arrowOffscreen = MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OnArrow && HiddenFromView(target);
             if (!_shotOff && now - _markLockedAt < 0.4f)
             {
                 _autoPlay.SteerOverride = self.transform.position.XZ();
-                if (MarkHudController.MarkerOffScreenNow && Settled("off")) Capture(ref _shotOff, "mark-hunt-offscreen");
+                if (arrowOffscreen && Settled("off")) Capture(ref _shotOff, "mark-hunt-offscreen");
                 return;
             }
-            if (MarkHudController.MarkerOffScreenNow && Settled("off")) Capture(ref _shotOff, "mark-hunt-offscreen");
+            if (arrowOffscreen && Settled("off")) Capture(ref _shotOff, "mark-hunt-offscreen");
 
             _autoPlay.SteerOverride = target.transform.position.XZ();
             if (MarkHudController.MarkerShownNow && !MarkHudController.MarkerOffScreenNow && o.MarkerMode == MarkMarkerMode.Hunt &&
@@ -250,6 +280,14 @@ namespace CluckWars.Diagnostics
         }
 
         // ---- Helpers ---------------------------------------------------------------------------------------------------
+
+        /// <summary>The target's own edge-chevron verdict (<see cref="RivalIndicator.HiddenFromClearViewport"/>): off the frame, or mostly
+        /// under a HUD zone.</summary>
+        private static bool HiddenFromView(ChickenController target)
+        {
+            var indicator = target != null ? target.Indicator() : null;
+            return indicator != null && indicator.HiddenFromClearViewport;
+        }
 
         private void EnsureMarkShotDir()
         {

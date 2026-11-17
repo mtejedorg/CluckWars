@@ -403,5 +403,23 @@ namespace CluckWars.Tests
         [Test]
         public void CwMarkShots_Parses() =>
             Assert.IsTrue(AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_markshots" }).MarkShots);
+
+        [Test]
+        public void MarkShots_KeepEveryShotName_AndAddTheCircleAndEndWordShots_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/Diagnostics/AutoTestDriver.Mark.cs");
+            foreach (var shot in new[]
+                     {
+                         "mark-draw", "mark-hunt-offscreen", "mark-onscreen", "mark-ambush-ready", "mark-kill", "mark-walled", "mark-end", "mark-arming",
+                         "mark-live", "mark-shelled", "victim-marked", "victim-far", "victim-close-visible", "victim-close-invisible", "victim-end",
+                         "victim-arming", "victim-live", "playagain-clean",
+                         "mark-outside-circle", "mark-inside-circle", "mark-end-word",
+                     })
+                StringAssert.Contains($"\"{shot}\"", src, shot);
+            StringAssert.Contains("FeedbackTuning.MarkEndHoldSeconds + FeedbackTuning.MarkEndFadeSeconds + 0.1f", src, "mark-end after the hold and fade");
+            StringAssert.Contains("anchor={MarkHudController.AnchorNow} blocker={o.Blocker} brackets={HuntBrackets.StateNow}", src);
+            StringAssert.Contains("AutoTest markshots end cause=", src);
+            StringAssert.DoesNotContain("MarkerOffScreenNow && Settled(\"off\")", src, "the off-screen shot waits for the arrow, not a pinned marker");
+        }
     }
 }
