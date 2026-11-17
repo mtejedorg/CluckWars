@@ -94,7 +94,7 @@ Maestro: "we are using screen tint colours for the victim, to easily differentia
 Builder's call (mine unless Maestro overrides): **different shape, same colour language**.
 
 - The victim's mood is unchanged (dark vignette for the mark's life, violet and washed-out while the hunter is near, a faint red while the hunter is near and hidden). Its states are about where the hunter is, which means nothing to the hunter, and its darkness and desaturation would cost the hunter the view it needs to chase.
-- The hunter gets an **edge-only** tint: the centre of the screen stays untouched, nothing is desaturated, and the colour is the one the arrow, the brackets and the Hunt hex already use for that state.
+- The hunter gets an **edge-only** tint: the centre of the screen stays untouched, nothing is desaturated, and the colour is the one the ground brackets already use for that state (yellow is also the POUNCE button's and the disc's).
 
 | Hunt state | Screen edge |
 |---|---|
@@ -104,8 +104,13 @@ Builder's call (mine unless Maestro overrides): **different shape, same colour l
 | The pounce is legal | yellow edge (`MarkKillColor`) |
 | The mark ended | fades out with the mark's end fade |
 
-- The red and yellow follow `HuntRules.BracketColour` for the armed states, so the edge, the brackets and the arrow can never disagree.
+- The red and yellow follow `HuntRules.BracketColour` for the armed states, so the edge and the brackets can never disagree. (As built the arrow and the disc follow `HuntRules.MarkerColour`: the target's colour until the pounce is legal, then yellow; they do not turn red in a blocked live second, which section 9 said they would. Open question H15 on the decision page.)
 - The live window is one second, so a colour change crosses in about 0.1 s; the dark edge fades in over the victim's DIM time.
 - No pulse and no flash: nothing to switch off under Reduced Motion.
 - Cost: the blend-only Overlay pass of the existing `MarkScreenFeature` (one full-screen triangle, no colour read) on PC and Mobile; no new renderer feature, no new shader, no post-processing needed.
 - One role at a time: the model's role decides which mood is drawn; a peer is never shown both.
+
+## 11. Evening close, 2026-11-17: what the frames changed, and what is open
+
+- The red edge at 0.30 read as brown corners in the 1200x540 capture: raised to 0.55 (`MarkHuntMoodGlowBlocked`, `cf22b4d1`). Yellow stays 0.40.
+- Open look questions, put to Maestro on the decision page (H10 to H15): the tint's shape (own / same as the victim's), its strength, the colour of MISSED, the badge size on the arrow, the brackets outside the circle, and whether the arrow and disc should turn red in a blocked live second.

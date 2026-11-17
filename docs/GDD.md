@@ -674,7 +674,7 @@ about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills
   goes live and harder when the kill becomes possible (the "Buzz When Hit" setting). The **edge of the Assassin's
   screen** follows the hunt (2026-11-17, Maestro: the victim reads the mark's states from its screen tint, so the
   hunter must too): a dark edge while the mark arms, a **red** edge in the live second while the kill is blocked, a
-  **yellow** edge while the kill is possible, the same colours as the arrow, the brackets and the Hunt hex. Unlike the
+  **yellow** edge while the kill is possible, the same red and yellow as the ground brackets. Unlike the
   victim's mood the centre of the screen stays untouched and nothing is washed out. During a mark only the Stun
   range guide stays on. No banner, no kill range ring, no second clock for the Assassin.
 - **Victim.** A short **MARKED!** toast with a sting; the clock pill reads **LIVE IN 3 / 2 / 1** while the mark arms, then a red **LIVE 1s** that pops and pulses. The screen stays **darkened** (heavier at the edges, nothing
