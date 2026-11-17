@@ -144,6 +144,10 @@ namespace CluckWars.Visuals
         public static float ArrowWidth(float planarDistance, float ringRadius) =>
             ArrowLength(planarDistance, ringRadius) * FeedbackTuning.FloorArrowWidthRatio;
 
+        /// <summary>K5r: the painted size of one arrow relative to its ordinary size: 1, or <see cref="FeedbackTuning.MarkArrowScale"/>
+        /// for the local hunter's marked target (length and width, the mesh is uniformly scaled). Per arrow, never for the pool.</summary>
+        public static float EmphasisScale(bool emphasised) => emphasised ? FeedbackTuning.MarkArrowScale : 1f;
+
         /// <summary>Where the decal's origin goes: its tail centre, ON the ring line at the bearing.</summary>
         public static Vector3 ArrowTail(Vector3 centre, float ringRadius, float bearingDeg) => RingPoint(centre, ringRadius, bearingDeg);
 
@@ -223,6 +227,12 @@ namespace CluckWars.Visuals
         /// 1.66 m of arc: ~21 degrees at 4.48 m, ~27 at 3.58 m. Painted tails on the ring line then never touch.</summary>
         public static float MinSeparationDegrees(float ringRadius) =>
             MinSeparationArc() / Mathf.Max(0.5f, ringRadius) * Mathf.Rad2Deg;
+
+        /// <summary>K5r: the same, while one arrow is painted <paramref name="widestScale"/> times larger (the marked target's): two
+        /// neighbouring tails need the mean of their widths, (1 + scale) / 2 of the ordinary arc, so the emphasised arrow keeps the
+        /// ring's separation from every other rival's arrow. A scale of 1 or less is the ordinary value.</summary>
+        public static float MinSeparationDegrees(float ringRadius, float widestScale) =>
+            MinSeparationDegrees(ringRadius) * 0.5f * (1f + Mathf.Max(1f, widestScale));
 
         /// <summary>The arc (metres along the ring) two neighbouring arrow centres keep.</summary>
         public static float MinSeparationArc() =>

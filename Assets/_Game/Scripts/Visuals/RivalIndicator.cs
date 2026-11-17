@@ -360,6 +360,7 @@ namespace CluckWars.Visuals
             if (cam == null) cam = Camera.main;
 
             HiddenFromClearViewport = false;
+            UpdateMarkCircle(cam);
             if (!ShouldShow(cam, out float opacity, out bool forcedHunter))
             {
                 _wasOnScreen = false;
@@ -368,8 +369,8 @@ namespace CluckWars.Visuals
                 return;
             }
 
-            // The local Assassin's mark: the hunt marker (MarkHudController) is its arrow, so its own floor arrow and edge
-            // chevron stand down while the marker shows. Its ground ring under it stays (it is on screen then).
+            // The local Assassin's mark (K5r): outside the floor circle its floor arrow carries the hunt marker, forced on even
+            // while the bird is in view and emphasised; inside the circle it has no arrow (the marker is over its head).
             bool marked = MarkFeedback.IsMarkedByLocal(_controller);
             var tint = TintFor(_controller.HomeCornerIndex);
 
@@ -411,9 +412,9 @@ namespace CluckWars.Visuals
                 FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity);
                 HideChevron(false, tint, opacity);
             }
-            else if (chevron && marked)
+            else if (marked && ApplyMarkedArrow(chevron, tint, opacity))
             {
-                HideChevron(_wasUnderHud, tint, opacity);
+                // Handled: the emphasised floor arrow, or none inside the circle.
             }
             // A rival that would get a chevron is offered to the floor ring round the local chicken first; if it is represented
             // there, its chevron is suppressed (decision 2a). Edge-arrow dev builds: returns false at once.
@@ -429,6 +430,47 @@ namespace CluckWars.Visuals
             else
             {
                 ShowRing(tint, opacity);
+            }
+        }
+
+        private bool _markInside;
+
+        /// <summary>K5r: whether this rival, as the local hunter's mark, counts as inside the floor circle round the hunter's own
+        /// bird (<see cref="HuntRules.InsideCircle"/>, with its hysteresis). The one value the marker's anchor and the arrow decision
+        /// both read, so the two can never disagree. False for any rival that is not the marked one.</summary>
+        public bool MarkInsideCircle => _markInside;
+
+        private void UpdateMarkCircle(Camera cam)
+        {
+            var local = MatchCamera.Instance != null ? MatchCamera.Instance.LocalChicken : null;
+            if (_controller == null || local == null || !MarkFeedback.IsMarkedByLocal(_controller))
+            {
+                _markInside = false;
+                return;
+            }
+            float distance = FloorArrowRules.PlanarDistance(local.transform.position, transform.position);
+            _markInside = HuntRules.InsideCircle(distance, FloorRivalArrows.RingRadiusFor(cam), _markInside);
+        }
+
+        /// <summary>The marked target's arrow (<see cref="MarkedTargetArrowRules"/>): offers the emphasised floor arrow when it is
+        /// outside the circle. True when handled here; false lets the ordinary chevron / ring rule run (floor ring declined).</summary>
+        private bool ApplyMarkedArrow(bool hiddenFromClearViewport, Color tint, float opacity)
+        {
+            bool outside = !_markInside;
+            bool accepted = MarkedTargetArrowRules.OffersFloorArrow(true, outside) &&
+                            FloorRivalArrows.TryRepresentEmphasised(GetInstanceID(), transform.position, MarkFeedback.MarkArrowTint(), opacity);
+            switch (MarkedTargetArrowRules.Decide(true, outside, hiddenFromClearViewport, accepted))
+            {
+                case MarkedArrowDecision.FloorArrow:
+                    // Off the frame: just the arrow (the ring only under a HUD zone). In view: the ground ring stays too.
+                    if (hiddenFromClearViewport) HideChevron(_wasUnderHud, tint, opacity);
+                    else ShowRing(tint, opacity);
+                    return true;
+                case MarkedArrowDecision.NoArrow:
+                    HideChevron(_wasUnderHud, tint, opacity);
+                    return true;
+                default:
+                    return false;
             }
         }
 

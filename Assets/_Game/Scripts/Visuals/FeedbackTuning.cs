@@ -871,6 +871,19 @@ namespace CluckWars.Visuals
         /// <summary>The victim's hunter-skull badge on the edge chevron fallback: this many chevron sizes inward from its centre.</summary>
         public const float MarkHunterBadgeChevronInset = 0.9f;
 
+        /// <summary>K5r (owner 2026-11-17): the mark rides the target's floor arrow while the target is outside the floor circle.
+        /// The circle's hysteresis (metres: once inside, the target stays inside until it is this far beyond the ring), the
+        /// emphasised arrow's scale on length and width (the pooled arrow mesh is uniformly scaled), the marker's scale as a badge
+        /// on the arrow tip (0.67 of the K3 size, about the old 96 px box), and the clear gap between the arrow tip and the badge's
+        /// visible edge (panel px).</summary>
+        public const float MarkCircleHysteresisMetres = 0.4f;
+        public const float MarkArrowScale = 1.5f;
+        public const float MarkMarkerOnArrowScale = 0.67f;
+        public const float MarkOnArrowGapPx = 8f;
+        /// <summary>The metres chip's centre, panel px from the badge centre, on the vertical side away from the hunter's bird: the
+        /// badge's visible radius (ring centre line + half its ink track, scaled) + a 6 px gap + half the 42 px chip.</summary>
+        public const float MarkOnArrowChipOffsetPx = 71f;
+
         /// <summary>The Death Mark hex while KILL shows: size (multiplied into the controller's per-frame scale; 1.15 is the
         /// cap the hex gaps allow), enter pop from / over, idle pulse amplitude and rate (off under reduced motion).</summary>
         public const float MarkHexKillScale = 1.15f;

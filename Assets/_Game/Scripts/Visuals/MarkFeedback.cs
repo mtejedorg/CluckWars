@@ -60,11 +60,20 @@ namespace CluckWars.Visuals
         /// <summary>The hunter while the local player is marked.</summary>
         public static ChickenController Hunter => _instance != null ? _instance._hunter : null;
 
-        /// <summary>Is <paramref name="chicken"/> the local Assassin's mark, with the hunt marker showing? Its own floor arrow
-        /// and edge chevron stand down then: the marker is its arrow.</summary>
+        /// <summary>Is <paramref name="chicken"/> the local Assassin's mark, with the hunt marker showing? Its floor arrow then
+        /// carries the marker (K5r) while it is outside the circle round the hunter's bird, and is emphasised.</summary>
         public static bool IsMarkedByLocal(ChickenController chicken) =>
             _instance != null && chicken != null && chicken == _instance._target &&
             _instance._model.Current.Role == MarkRole.Assassin && _instance._model.Current.MarkerAlpha > 0f;
+
+        /// <summary>The marked target's arrow colour (K5r): the marker's own state colour, seat colour while arming, red or grey or
+        /// cream by mode, yellow when the pounce is legal (<see cref="HuntRules.MarkerColour"/>).</summary>
+        public static Color MarkArrowTint()
+        {
+            if (_instance == null) return Color.white;
+            var o = _instance._model.Current;
+            return HuntRules.MarkerColour(o.MarkerMode, o.TargetCorner);
+        }
 
         /// <summary>Is <paramref name="chicken"/> the hunter whose arrow must show even while it is invisible (direction only)?</summary>
         public static bool ForcesArrowFor(ChickenController chicken) =>

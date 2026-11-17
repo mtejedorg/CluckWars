@@ -30,9 +30,15 @@ namespace CluckWars.UI
         public static bool MarkerShownNow { get; private set; }
         public static bool MarkerOffScreenNow { get; private set; }
         public static bool HunterBadgeShownNow { get; private set; }
+        /// <summary>Where the marker is anchored this frame (K5r); meaningful while <see cref="MarkerShownNow"/>.</summary>
+        public static MarkAnchor AnchorNow { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => MarkerShownNow = MarkerOffScreenNow = HunterBadgeShownNow = false;
+        private static void ResetStatics()
+        {
+            MarkerShownNow = MarkerOffScreenNow = HunterBadgeShownNow = false;
+            AnchorNow = MarkAnchor.OverHead;
+        }
 
         private ILogService _log;
 
@@ -48,7 +54,8 @@ namespace CluckWars.UI
 
         // Last placement, kept through the end fade when the target is gone.
         private Vector2 _markerPanel;
-        private bool _markerPlaced, _markerOffScreen;
+        private bool _markerPlaced, _markerOffScreen, _markerOnArrow, _chipAbove;
+        private MarkAnchor _anchor;
         private Vector2 _markerBearing = Vector2.down;
         private int _shownMetresKey = -1;
 
@@ -125,6 +132,7 @@ namespace CluckWars.UI
             UpdateHunterSkull(o, cam, panel);
             MarkerShownNow = _marker.style.display == DisplayStyle.Flex;
             MarkerOffScreenNow = MarkerShownNow && _markerOffScreen;
+            AnchorNow = MarkerShownNow ? _anchor : MarkAnchor.OverHead;
             HunterBadgeShownNow = _hunterSkull.style.display == DisplayStyle.Flex;
         }
 
@@ -146,17 +154,33 @@ namespace CluckWars.UI
             }
 
             // Placed only while the mark lives: in the end fade it stays where it was (a respawned target is at its base).
+            // One anchor per frame (K5r): on the target's floor arrow outside the circle, else the K3 placement (over the head, or
+            // pinned to the edge when no arrow is painted).
             var target = MarkFeedback.Target;
-            if (target != null && o.AssassinMarkActive &&
-                MarkerPlacement.Place(cam, panel, target, LocalChicken(), out Vector2 at, out bool off, out Vector2 dir))
+            if (target != null && o.AssassinMarkActive)
             {
-                _markerPanel = at;
-                _markerOffScreen = off;
-                _markerBearing = dir;
-                _markerPlaced = true;
+                _anchor = ResolveAnchor(cam, panel, target, out Vector2 arrowAt, out Vector2 arrowOutward, out Rect you, out bool hasYou);
+                if (_anchor == MarkAnchor.OnArrow)
+                {
+                    _markerPanel = arrowAt;
+                    _markerOnArrow = true;
+                    _markerOffScreen = false;
+                    _markerBearing = Vector2.down;
+                    _chipAbove = MarkerPlacement.OnArrowChipAbove(arrowAt, arrowOutward, panel, hasYou, you);
+                    _markerPlaced = true;
+                }
+                else if (MarkerPlacement.Place(cam, panel, target, LocalChicken(), out Vector2 at, out bool off, out Vector2 dir))
+                {
+                    _markerPanel = at;
+                    _markerOnArrow = false;
+                    _markerOffScreen = off;
+                    _markerBearing = dir;
+                    _markerPlaced = true;
+                }
             }
             bool offScreen = _markerOffScreen;
             Vector2 bearing = _markerBearing;
+            bool onArrow = _markerOnArrow;
             if (!_markerPlaced)
             {
                 UiElements.SetShown(_marker, false);
@@ -168,7 +192,9 @@ namespace CluckWars.UI
             _marker.style.translate = new Translate(_markerPanel.x - boxHalf, _markerPanel.y - boxHalf);
             _marker.style.opacity = o.MarkerAlpha;
 
-            float scale = o.MarkerPop * o.LiveScale;   // the arm pops the marker as the kill goes live
+            float badgeScale = onArrow ? FeedbackTuning.MarkMarkerOnArrowScale : 1f;   // a compact badge of the arrow, no pointer
+            float scale = o.MarkerPop * o.LiveScale * badgeScale;   // the arm pops the marker as the kill goes live
+            UiElements.SetShown(_pointer, !onArrow);
             if (o.MarkerMode == MarkMarkerMode.Kill && !PlayerPreferences.ReducedMotionEnabled)
                 scale *= 1f + FeedbackTuning.MarkMarkerKillPulse * 0.5f *
                          (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.MarkMarkerKillPulseHz * 2f * Mathf.PI));
@@ -208,8 +234,9 @@ namespace CluckWars.UI
             // The metres chip, whenever a mark is shown: above the disc on screen, the inward vertical side off screen. Red while the
             // target is beyond the kill range, else the seat colour. The text is written only when its key changes.
             UiElements.SetShown(_distance, true);
-            _distance.EnableInClassList("cw-mark-distance--above",
-                !offScreen || MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing));
+            bool chipAbove = onArrow ? _chipAbove : !offScreen || MarkerPlacement.DistanceGoesAbove(_markerPanel.y, panel.y, bearing);
+            _distance.EnableInClassList("cw-mark-distance--above", chipAbove);
+            PlaceChip(onArrow, chipAbove, badgeScale);
             int red = HuntRules.ChipRed(o.MarkerDistance, o.KillRange) ? 1 : 0;
             if (red != _chipRed || o.TargetCorner != _chipCorner)
             {
@@ -223,6 +250,59 @@ namespace CluckWars.UI
                 _shownMetresKey = key;
                 _distance.text = HuntRules.ChipText(key);
             }
+        }
+
+        /// <summary>
+        /// The marker's one anchor this frame (<see cref="HuntRules.AnchorFor"/>), and for <see cref="MarkAnchor.OnArrow"/> its badge
+        /// centre just beyond the tip of the target's painted floor arrow (read after <see cref="FloorRivalArrows"/>, the same
+        /// projection the victim's hunter badge uses) with the arrow's on-screen direction. The circle test is the target's own
+        /// indicator's, so the arrow and the marker cannot disagree.
+        /// </summary>
+        private static MarkAnchor ResolveAnchor(Camera cam, Vector2 panel, ChickenController target, out Vector2 centre,
+                                                out Vector2 outward, out Rect you, out bool hasYou)
+        {
+            centre = default;
+            outward = Vector2.up;
+            you = default;
+            hasYou = false;
+            var local = LocalChicken();
+            var indicator = target.Indicator();
+            if (local == null || local == target || indicator == null) return MarkAnchor.EdgeFallback;
+
+            bool arrow = FloorRivalArrows.TryGetArrow(indicator.GetInstanceID(), out Vector3 tail, out Vector3 dir, out float length);
+            float distance = FloorArrowRules.PlanarDistance(local.transform.position, target.transform.position);
+            var anchor = HuntRules.AnchorFor(distance, FloorRivalArrows.RingRadiusFor(cam), indicator.MarkInsideCircle, arrow);
+            if (anchor != MarkAnchor.OnArrow) return anchor;
+
+            Vector3 t = cam.WorldToViewportPoint(tail + dir * length);
+            Vector3 b = cam.WorldToViewportPoint(tail);
+            if (t.z <= 0f || b.z <= 0f) return MarkAnchor.EdgeFallback;   // behind the camera: the edge fallback keeps a sign
+            var tipPanel = new Vector2(t.x * panel.x, (1f - t.y) * panel.y);
+            outward = tipPanel - new Vector2(b.x * panel.x, (1f - b.y) * panel.y);
+
+            var plate = local.Nameplate();
+            hasYou = plate != null && plate.TryGetPlateViewport(cam, out Rect yvp) && Assign(out you, MarkerPlacement.ToPanel(yvp, panel));
+            centre = MarkerPlacement.OnArrowCentre(tipPanel, outward, panel, hasYou, you);
+            return MarkAnchor.OnArrow;
+        }
+
+        private static bool Assign(out Rect r, Rect v) { r = v; return true; }
+
+        /// <summary>The metres chip: on the badge (<see cref="MarkAnchor.OnArrow"/>) it stays at full size inside the 0.67 box and sits
+        /// <see cref="FeedbackTuning.MarkOnArrowChipOffsetPx"/> from the badge centre on the chosen vertical side; otherwise the
+        /// stylesheet's own place.</summary>
+        private void PlaceChip(bool onArrow, bool above, float badgeScale)
+        {
+            if (!onArrow)
+            {
+                _distance.style.scale = StyleKeyword.Null;
+                _distance.style.translate = StyleKeyword.Null;
+                return;
+            }
+            _distance.style.scale = new Scale(new Vector3(1f / badgeScale, 1f / badgeScale, 1f));
+            float basePx = above ? MarkerPlacement.ChipBaseAboveCentrePx : MarkerPlacement.ChipBaseBelowCentrePx;
+            float wantPx = (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx / badgeScale;
+            _distance.style.translate = new Translate(new Length(-50f, LengthUnit.Percent), new Length(wantPx - basePx, LengthUnit.Pixel));
         }
 
         private static ChickenController LocalChicken() => MatchCamera.Instance != null ? MatchCamera.Instance.LocalChicken : null;
@@ -341,6 +421,7 @@ namespace CluckWars.UI
         private void HideAll()
         {
             MarkerShownNow = MarkerOffScreenNow = HunterBadgeShownNow = false;
+            AnchorNow = MarkAnchor.OverHead;
             UiElements.SetShown(_marker, false);
             UiElements.SetShown(_hunterSkull, false);
             _markerPlaced = false;

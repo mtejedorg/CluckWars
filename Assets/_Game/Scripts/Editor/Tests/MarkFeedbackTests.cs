@@ -70,10 +70,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheMarkedRival_LetsTheMarkerBeItsArrow_AndTheHunterArrowIsForced_SourceGuard()
+        public void TheMarkedRival_CarriesTheMarkerOnItsFloorArrow_AndTheHunterArrowIsForced_SourceGuard()
         {
+            // K5r: the marked target's arrow no longer stands down; it is forced and emphasised outside the circle (MarkOnArrowTests).
             string src = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
-            StringAssert.Contains("else if (chevron && marked)", src);
+            StringAssert.Contains("else if (marked && ApplyMarkedArrow(chevron, tint, opacity))", src);
+            StringAssert.Contains("FloorRivalArrows.TryRepresentEmphasised(GetInstanceID(), transform.position, MarkFeedback.MarkArrowTint(), opacity)", src);
             StringAssert.Contains("forcedHunter = MarkFeedback.ForcesArrowFor(_controller);", src);
             StringAssert.DoesNotContain("MarkColor", src);
             StringAssert.DoesNotContain("MarkChevronScale", src);

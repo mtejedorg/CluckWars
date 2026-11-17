@@ -530,10 +530,11 @@ namespace CluckWars.Tests
         public void Source_RivalIndicatorOffersOnlyWhatWouldBeAChevron()
         {
             string src = Read("Assets/_Game/Scripts/Visuals/RivalIndicator.cs");
-            // The Death Mark redesign: the local Assassin's mark offers nothing (the hunt marker is its arrow), and the one
-            // on-screen offer is the victim's invisible hunter beyond the inner circle (direction only, never a ring).
+            // The Death Mark redesign: the local Assassin's mark is offered by the K5r rule only (emphasised, outside the circle, on
+            // screen or not), and the one other on-screen offer is the victim's invisible hunter beyond the inner circle (direction
+            // only, never a ring).
             StringAssert.Contains("else if (chevron && FloorRivalArrows.TryRepresent(GetInstanceID(), transform.position, tint, opacity))", src);
-            StringAssert.Contains("else if (chevron && marked)", src);
+            StringAssert.Contains("else if (marked && ApplyMarkedArrow(chevron, tint, opacity))", src);
             StringAssert.Contains("if (forcedHunter && !chevron)", src);
             int offer = src.IndexOf("FloorRivalArrows.TryRepresent(", System.StringComparison.Ordinal);
             int decide = src.IndexOf("if (!chevron) _wasUnderHud = false;", System.StringComparison.Ordinal);

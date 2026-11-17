@@ -29,6 +29,18 @@ namespace CluckWars.Visuals
         Star = 3,
     }
 
+    /// <summary>Where the hunter's marker is anchored this frame (K5r): exactly one place per frame.</summary>
+    public enum MarkAnchor : byte
+    {
+        /// <summary>Over the target's head: the target is inside the floor circle round the hunter's own bird.</summary>
+        OverHead = 0,
+        /// <summary>A compact badge at the tip of the target's emphasised floor arrow: the target is outside the circle.</summary>
+        OnArrow = 1,
+        /// <summary>Outside the circle but the floor ring paints no arrow for it (pool full, dev edge arrows, no local bird): the
+        /// marker keeps its K3 placement (over the head when in frame, else pinned to the edge).</summary>
+        EdgeFallback = 2,
+    }
+
     /// <summary>Why a hunter's mark ended, from the hunter's own last live frame.</summary>
     public enum MarkEndCause : byte
     {
@@ -140,6 +152,21 @@ namespace CluckWars.Visuals
 
         /// <summary>Whether the end shows the hold, the word and the glyph (a Missed or Safe end).</summary>
         public static bool ShowsEndWord(MarkEndCause cause) => cause == MarkEndCause.Missed || cause == MarkEndCause.Safe;
+
+        /// <summary>Whether the target counts as inside the floor circle: within <paramref name="ringRadius"/>, and once inside it stays
+        /// inside until it is <see cref="FeedbackTuning.MarkCircleHysteresisMetres"/> beyond it, so the mark never flickers between
+        /// the two places at the line.</summary>
+        public static bool InsideCircle(float planarDistance, float ringRadius, bool wasInside) =>
+            planarDistance <= ringRadius + (wasInside ? FeedbackTuning.MarkCircleHysteresisMetres : 0f);
+
+        /// <summary>The marker's one anchor: inside the circle over the head, outside it on the target's floor arrow when one is
+        /// painted, else the edge fallback. <paramref name="ringRadius"/> is <c>FloorRivalArrows.RingRadiusFor</c>, the distance
+        /// is <c>FloorArrowRules.PlanarDistance</c> from the hunter's bird. Idempotent in <paramref name="wasInside"/>: feeding the
+        /// result of <see cref="InsideCircle"/> back in returns the same answer.</summary>
+        public static MarkAnchor AnchorFor(float planarDistance, float ringRadius, bool wasInside, bool arrowAvailable) =>
+            InsideCircle(planarDistance, ringRadius, wasInside) ? MarkAnchor.OverHead
+            : arrowAvailable ? MarkAnchor.OnArrow
+            : MarkAnchor.EdgeFallback;
 
         /// <summary>The hunter marker's colour by mode: yellow KILL, grey wall, cream egg, else the target's seat colour.</summary>
         public static Color MarkerColour(MarkMarkerMode mode, int targetCorner) =>

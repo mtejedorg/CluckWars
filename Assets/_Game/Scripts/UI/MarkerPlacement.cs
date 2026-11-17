@@ -252,6 +252,52 @@ namespace CluckWars.UI
         public static bool DistanceGoesAbove(float centreY, float panelHeight, Vector2 bearing) =>
             bearing.y < 0f || centreY + DistanceBelowExtentPx > panelHeight;
 
+        // ---- On the target's floor arrow (K5r) ---------------------------------------------------------------------------
+
+        /// <summary>The on-arrow badge's visible radius, panel px: the ring's centre line plus half its ink track, at the badge scale.</summary>
+        public static float OnArrowRadiusPx =>
+            (FeedbackTuning.MarkRingRadiusPx + FeedbackTuning.MarkRingTrackWidthPx * 0.5f) * FeedbackTuning.MarkMarkerOnArrowScale;
+
+        /// <summary>The chip's centre from the marker box centre in box px (MarkHud.uss: the 144 px box, chip 42 tall: top -48 above,
+        /// top 152 below).</summary>
+        public const float ChipBaseAboveCentrePx = -99f, ChipBaseBelowCentrePx = 101f;
+
+        /// <summary>The chip's half extents, panel px ("999 m" is ~134 px wide, the pill 42 tall).</summary>
+        public const float ChipHalfWidthPx = 67f, ChipHalfHeightPx = 21f;
+
+        /// <summary>Pure: the badge centre on the arrow's tip, panel px (y down). <paramref name="outward"/> is the arrow's direction
+        /// on screen (panel axes, away from the hunter's bird). The badge's visible edge stands
+        /// <see cref="FeedbackTuning.MarkOnArrowGapPx"/> beyond the tip, slid further outward until it clears the hunter's own "You"
+        /// plate (inflated), then kept whole on the panel.</summary>
+        public static Vector2 OnArrowCentre(Vector2 tip, Vector2 outward, Vector2 panel, bool hasYou, Rect you)
+        {
+            if (outward.sqrMagnitude < 1e-8f) outward = Vector2.up;
+            outward.Normalize();
+            float r = OnArrowRadiusPx;
+            Vector2 at = tip + outward * (FeedbackTuning.MarkOnArrowGapPx + r);
+            if (hasYou) at = SlideOff(at, r, you, outward);
+            return new Vector2(Mathf.Clamp(at.x, r, Mathf.Max(r, panel.x - r)), Mathf.Clamp(at.y, r, Mathf.Max(r, panel.y - r)));
+        }
+
+        /// <summary>Pure: whether the metres chip goes above the on-arrow badge. It takes the vertical side away from the hunter's bird
+        /// (above when the arrow points up the screen), unless that side leaves the panel or lands on the hunter's "You" plate while
+        /// the other side does not.</summary>
+        public static bool OnArrowChipAbove(Vector2 centre, Vector2 outward, Vector2 panel, bool hasYou, Rect you)
+        {
+            bool preferAbove = outward.y < 0f;   // panel y is down: negative = up the screen
+            bool preferred = ChipFits(centre, preferAbove, panel, hasYou, you);
+            return preferred || !ChipFits(centre, !preferAbove, panel, hasYou, you) ? preferAbove : !preferAbove;
+        }
+
+        private static bool ChipFits(Vector2 centre, bool above, Vector2 panel, bool hasYou, Rect you)
+        {
+            float cy = centre.y + (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
+            var chip = Rect.MinMaxRect(centre.x - ChipHalfWidthPx, cy - ChipHalfHeightPx, centre.x + ChipHalfWidthPx, cy + ChipHalfHeightPx);
+            if (chip.yMin < 0f || chip.yMax > panel.y || chip.xMin < 0f || chip.xMax > panel.x) return false;
+            float m = FeedbackTuning.MarkMarkerYouPlateMarginPx;
+            return !hasYou || !chip.Overlaps(Rect.MinMaxRect(you.xMin - m, you.yMin - m, you.xMax + m, you.yMax + m));
+        }
+
         /// <summary>A viewport rect as a panel rect (y down).</summary>
         public static Rect ToPanel(Rect vp, Vector2 panel) =>
             Rect.MinMaxRect(vp.xMin * panel.x, (1f - vp.yMax) * panel.y, vp.xMax * panel.x, (1f - vp.yMin) * panel.y);

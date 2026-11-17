@@ -108,7 +108,18 @@ namespace CluckWars.Visuals
         public static bool TryRepresent(int key, Vector3 rivalPos, Color tint, float opacity)
         {
             if (!Active || _instance == null) return false;
-            return _instance.Accept(key, rivalPos, tint, opacity);
+            return _instance.Accept(key, rivalPos, tint, opacity, false);
+        }
+
+        /// <summary>
+        /// The same offer for the local hunter's marked target (K5r): the one emphasised arrow, painted
+        /// <see cref="FeedbackTuning.MarkArrowScale"/> times larger (length and width) in <paramref name="tint"/> (the marker's state
+        /// colour). The existing pooled mesh and the shared material only; the colours are rewritten only when the tint changes.
+        /// </summary>
+        public static bool TryRepresentEmphasised(int key, Vector3 rivalPos, Color tint, float opacity)
+        {
+            if (!Active || _instance == null) return false;
+            return _instance.Accept(key, rivalPos, tint, opacity, true);
         }
 
         /// <summary>
@@ -139,7 +150,7 @@ namespace CluckWars.Visuals
                 tail = FloorArrowRules.ArrowTail(_instance._centre, _instance._radius, b);
                 tail.y = ArrowY;
                 direction = FloorArrowRules.Direction(b);
-                length = FloorArrowRules.ArrowLength(_instance._distances[i], _instance._radius);
+                length = FloorArrowRules.ArrowLength(_instance._distances[i], _instance._radius) * FloorArrowRules.EmphasisScale(_instance._emphasised[i]);
                 return true;
             }
             return false;
@@ -172,6 +183,7 @@ namespace CluckWars.Visuals
         private readonly float[] _distances = new float[FloorArrowRules.MaxArrows];
         private readonly Color[] _tints = new Color[FloorArrowRules.MaxArrows];
         private readonly float[] _opacities = new float[FloorArrowRules.MaxArrows];
+        private readonly bool[] _emphasised = new bool[FloorArrowRules.MaxArrows];
 
         // This frame's context, resolved once (PrepareFrame).
         private int _preparedFrame = -1;
@@ -328,7 +340,7 @@ namespace CluckWars.Visuals
 
         private void OnDisable() => HideAll();
 
-        private bool Accept(int key, Vector3 rivalPos, Color tint, float opacity)
+        private bool Accept(int key, Vector3 rivalPos, Color tint, float opacity, bool emphasised)
         {
             PrepareFrame();
             if (!_active) return false;
@@ -346,6 +358,7 @@ namespace CluckWars.Visuals
             _distances[i] = distance;
             _tints[i] = tint;
             _opacities[i] = opacity;
+            _emphasised[i] = emphasised;
             return true;
         }
 
@@ -404,7 +417,11 @@ namespace CluckWars.Visuals
             if (!Mathf.Approximately(_ringBuiltRadius, _radius)) SetRingRadius(_radius);
             SetActive(_ringRenderer, true);
 
-            FloorArrowRules.Spread(_bearings, _keys, count, FloorArrowRules.MinSeparationDegrees(_radius), _spread);
+            bool anyEmphasised = false;
+            for (int i = 0; i < count; i++) anyEmphasised |= _emphasised[i];
+            // The emphasised arrow is wider: it keeps the ring's separation from the others by the mean of the two widths.
+            float minSep = FloorArrowRules.MinSeparationDegrees(_radius, anyEmphasised ? FeedbackTuning.MarkArrowScale : 1f);
+            FloorArrowRules.Spread(_bearings, _keys, count, minSep, _spread);
             _paintedCount = count;
             for (int i = 0; i < _arrowRenderers.Length; i++)
             {
@@ -422,7 +439,7 @@ namespace CluckWars.Visuals
             tail.y = ArrowY;
             var t = _arrowRenderers[i].transform;
             t.SetPositionAndRotation(tail, Quaternion.Euler(0f, FloorArrowRules.ArrowYaw(b), 0f));
-            t.localScale = Vector3.one * FloorArrowRules.ArrowLength(_distances[i], _radius);
+            t.localScale = Vector3.one * (FloorArrowRules.ArrowLength(_distances[i], _radius) * FloorArrowRules.EmphasisScale(_emphasised[i]));
 
             Color tint = _tints[i];
             tint.a = Mathf.Clamp01(_opacities[i]);   // the rival's own fade rides in alpha; the paint alphas multiply it
