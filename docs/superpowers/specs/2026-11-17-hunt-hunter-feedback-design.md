@@ -1,0 +1,61 @@
+# Hunt: hunter-side feedback — design (2026-11-17)
+
+Hunt is the UI name of Death Mark (`MarkKillAbilitySO`, `AssassinExecute`, `MarkKill.asset`; GDD §6.4). This document covers what the **hunter** sees. Decision page with the mock-ups: https://claude.ai/artifact/UKj6VChjS8sSpGa2NpaLDT (source: session scratchpad, not in the repo).
+
+## 1. Intent
+
+Maestro, 2026-11-17: "I'm still missing some feedback for death mark. It is clearer for the victim than the killer. Killer must know the state of the ability and who is the target at a glance."
+
+The hunter has one second to pounce (`ArmSeconds` 3 inside `WindowSeconds` 4) on a rival that must be stunned, within `KillRange` 6.2 m, with no home wall between and not in an egg. In that second the hunter's eyes are on the two birds and the thumb is on the hex, so that is where the state has to be.
+
+## 2. What exists today (read from code, 2026-11-17, branch `balance`)
+
+| State | Hunter | Victim |
+|---|---|---|
+| Mark placed | standings row highlight (0.6 s draw), tick and lock sounds, the marker appears | `MARKED!` toast, sting, standings skull |
+| Arming, 3 s | 68 px screen-space disc over the target in its seat colour: digit 3-2-1, draining ring; metres only when off screen; **hex drawn at 0.70 alpha** | pill `LIVE IN {secs}s`, screen dim, cold tint near the hunter, skull badge on the hunter's arrow |
+| Live, pounce not legal | skull replaces the digit, the disc pops, `HUNT!` over the hunter; grey + lock (home wall) or cream + egg (shelled); **no number; hex still 0.70** | pill red `LIVE {secs}s`, pulsing |
+| Live, pounce legal | disc yellow and pulsing; hex `POUNCE`, pulsing; sting | nothing extra |
+| Ended without a pounce | silent 0.3 s fade, 4 s cooldown, no reason | silent 0.3 s fade |
+
+Sources: `MarkPresentationModel` (roles, marker modes, 0.3 s end rule), `MarkHudController` (hunter marker, `Role == Assassin` only), `MatchHudController` (toast, clock, standings), `TouchControlsController.Hud` (`UpdateMarkHexes`, `HexAlphaNoTarget`), `MarkKillAbilitySO.IsUsable` (returns `CanKillNow` while a target is marked, which is why the hex dims).
+
+Gaps: the hex looks switched off during the hunt; no time number once live; the target is identified by one small disc; "not stunned" and "too far" are not shown; every ending looks the same; the hunter's disc wears the skull while the hex wears the paw (D5b); no haptics.
+
+## 3. Goals, non-goals, anti-goals
+
+- **Goals.** At a glance, without reading: (1) which bird is the target, on screen or off; (2) what state the hunt is in and how long is left; (3) what is still missing for the pounce; (4) why a hunt ended.
+- **Non-goals.** No change to anything the victim or bystanders see. No change to timings, ranges, cooldowns, targeting or the kill rules. No new names (D1, D5b: Hunt, HUNT, POUNCE stay). No sound authoring (BL-133).
+- **Anti-goals.** A third place to look (a hunter pill at the top was offered and declined, H6a). New networked state or RPCs for presentation. Cues that other players can see and use to find the hunter or the target.
+
+## 4. Approaches considered
+
+1. **On the target and on the hex (chosen).** The marker and a ground sign carry who and what on the rival; the Hunt hex mirrors the same state under the thumb. Two places, both already where the hunter looks.
+2. **A hunter clock pill mirroring the victim's.** States it in words and names the target, but sits under the round clock, away from the birds, and adds a third place. Declined (H6a).
+3. **Hex only.** Cheapest, but leaves "who" on a 68 px disc. Rejected: the requirement names the target first.
+
+## 5. The design (Maestro's answers: all eight recommended options, 2026-11-17)
+
+Everything below is drawn only on the hunter's own screen, read from replicated state (`MarkedTarget`, `ArmTimer`, `WindowTimer`, `KillReady`, the target's stun / steal-proof / position), with no new `[Networked]` field and no RPC.
+
+- **H1a. The target sign.** (a) Ground brackets around the marked rival in the rival's seat colour (`PlayerPalette.ForCorner`), four arcs, hunter-only, drawn above other ground rings; red in the live second while the pounce is not legal, yellow when it is. (b) The marker disc grows by half (68 → about 100 px; the 96 px box and the pointer scale with it). (c) The distance chip `{m} m` (`mark.distance`) shows whenever a mark is on, not only off screen: red while the target is beyond `KillRange`, the seat colour inside it.
+- **H2a. The Hunt hex.** While a mark is on, the hex is drawn at full alpha (the 0.70 "no target" treatment does not apply to a running hunt) and shows: a dot in the target's seat colour; a ring draining over the mark window; the count, whole seconds while arming (3, 2, 1) and tenths in the live second (`0.8`); and `POUNCE` with the tenths when the pounce is legal. The marker shows the same count (the arm digit already exists; the live second gains the tenths).
+- **H3a. What is missing.** One glyph on the marker and the same glyph on the hex for the condition that blocks the pounce once the mark is live: a star when the target is not stunned; the red metres chip when it is beyond `KillRange`; the existing lock (home wall) and egg (shelled). Priority when several apply: egg, wall, too far, not stunned. The 6.2 m reach is not drawn on the ground.
+- **H4a. Why it ended.** One hunter-only word over the hunter's bird and the reason glyph on the marker for 0.6 s before the usual fade: `MISSED` when the window ran out or the target was lost; `SAFE` (the existing `hud.pop.safe` word) when the mark ended with the target behind its wall or in an egg. A landed pounce keeps today's effects and adds no word. `MISSED` is the only new string.
+- **H5a. Off screen.** The pinned marker stays (larger, per H1) and a short arrow in the target's seat colour leaves the hunter's bird toward it, hunter-only, hidden when the target is on screen.
+- **H6a.** No hunter clock pill.
+- **H7a.** The hunter's marker shows the paw where it shows the skull today; the skull stays on the victim's toast and clock and on the standings.
+- **H8a.** One short haptic buzz when the mark goes live and a stronger one when the pounce becomes legal, through the existing haptics path and setting; no new audio.
+
+## 6. Constraints
+
+- Presentation observes replicated state and stays local (ARCH-EVT-01, ARCH-EVT-05, ARCH-EVT-14); gameplay never calls presentation.
+- Strings are `UiKeys` constants with `UiText.csv` rows (CODE-TEXT-01 to 05); colours and timings live in `FeedbackTuning` / the palette (ARCH-LAY-15, CODE-UI-08).
+- `MarkKillAbilitySO.IsUsable` keeps its meaning for input and bots; only the hex's drawn alpha changes during a hunt.
+- Reduced Motion: pulses and the bracket motion stand down as the existing marker pulse does.
+- The five-assembly layering holds (no upward references).
+- Ending cause must be derivable locally from the last frames of replicated state before the mark ends; if a cause cannot be told apart reliably, fall back to `MISSED`.
+
+## 7. Left to the builder
+
+Exact sizes and stroke widths, the bracket mesh or sprite, where the hex ring and dot sit among the existing hex layers, the haptic durations, the test names. Each item needs a guard test of the pure rule it adds and a `cw_markshots` capture of the hunter's view (`tools/test-session/scenario-pc.ps1 -ExtraArgs '-cw_markshots -cw_perk Assassin_Spoiler'`).
