@@ -82,7 +82,8 @@ Where to look, by kind of question. Spawn `librarian` for a lookup you would oth
 
 **Housekeeping** (overrides for the `housekeeping` skill):
 - MemPalace: file into wing `cluckwars` (lower case, never `CluckWars`), one drawer per decision or lesson, `[LOCKED YYYY-MM-DD] title` format. Rationale and pointers only; never copy file content, never run `mempalace mine` here, never file anything containing a key or token.
-- Structural change, so flag `/graphify . --update`: a `.cs` file added, deleted or moved, an `.asmdef`/`.asmref` change, a new `Scripts/` folder.
+- The graph updates itself: graphify's git hooks (`python -m graphify hook install`, in `.git/hooks`, per clone) re-extract changed code after every commit and checkout, detached, no LLM. If `graph_state.py` still says stale, run `python -m graphify update .` (about 2 minutes).
+- Structural change (what makes the graph stale if the hook did not run): a `.cs` file added, deleted or moved, an `.asmdef`/`.asmref` change, a new `Scripts/` folder. Flag the token-costing `/graphify . --update` only when docs the graph reads changed a lot.
 - Test command: the EditMode suite through `TestRunnerApi` from `script-execute` (polled result file); the MCP `tests-run` times out on the full suite.
 
 ---
