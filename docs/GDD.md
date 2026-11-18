@@ -662,7 +662,8 @@ about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills
   range. **Where it sits follows the rival arrows** (Maestro, same day: "Mark should be integrated in the arrow at the
   floor, and only appear above head if inside the circle"): while the target is outside the floor circle round the
   Assassin's own bird, its floor arrow stays, larger and in the mark's colour, and carries the marker as a compact badge
-  at its tip, in view or not and through Hide; nothing is pinned to the screen edge. Inside the circle the marker sits
+  **on the arrow** (Maestro, 2026-11-18: "over the arrow, not at the tip"; the arrowhead stays visible beyond it), in
+  view or not and through Hide; nothing is pinned to the screen edge. Inside the circle the marker sits
   by the target's head, never over the Assassin's own bird. **Ground brackets** in the target's colour frame the target
   whenever it is in view (red while live and blocked, yellow when the kill is possible). **Yellow** while a kill is
   possible, **grey with a lock** behind a base wall, **cream with a shell** while shelled. The target's standings row
@@ -675,7 +676,12 @@ about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills
   screen** follows the hunt (2026-11-17, Maestro: the victim reads the mark's states from its screen tint, so the
   hunter must too): a dark edge while the mark arms, a **red** edge in the live second while the kill is blocked, a
   **yellow** edge while the kill is possible, the same red and yellow as the ground brackets. Unlike the
-  victim's mood the centre of the screen stays untouched and nothing is washed out. During a mark only the Stun
+  victim's mood the centre of the screen stays untouched and nothing is washed out. **The two birds of a hunt are
+  exempt from the tint** (Maestro, 2026-11-18: "hunter and hunted should be distinguishable from the rest of the
+  chickens"): on the Assassin's screen its own bird and the target, on the marked player's screen its own bird and
+  the Assassin keep their true colour and brightness while everything else is tinted; only a fully visible bird is
+  exempt, so Hide is never given away. MISSED is cream (SAFE stays the neutral grey); the mark's colours are fields
+  of `FeedbackPalette.asset`. During a mark only the Stun
   range guide stays on. No banner, no kill range ring, no second clock for the Assassin.
 - **Victim.** A short **MARKED!** toast with a sting; the clock pill reads **LIVE IN 3 / 2 / 1** while the mark arms, then a red **LIVE 1s** that pops and pulses. The screen stays **darkened** (heavier at the edges, nothing
   over the centre) for the mark's life; the time left sits beside the match clock and its own row shows the skull. With

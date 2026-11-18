@@ -134,4 +134,4 @@ Maestro's answers, verbatim: `h10a(note: Also, for a better feedback, hunter and
 - **What exempt means.** The bird's body is drawn with its true colours and brightness over the tint: no edge colour, no darkness, no violet, no desaturation. Everything else in the world keeps the tint.
 - **It never reveals.** A bird that is hidden (Hide) or fading is not exempt: only a fully visible bird is. The marked player's faint red for a near and hidden hunter is unchanged.
 - **No new information.** Exemption changes how two already-visible birds look, nothing else: no outline through walls, no marker.
-- **Cost.** The two birds are drawn a second time, depth-tested, after the mood pass; nothing when no mark is shown.
+- **Cost and technique (as built, `0702f907`).** A stencil mask: the two birds' body renderers carry rendering-layer bit 8 while exempt, `MarkScreenFeature` draws them into stencil bit 7 before the mood (no colour, no depth write) and both mood passes skip those pixels, so particles and rings in front of a bird are untouched. Nothing is added when nobody is exempt.
