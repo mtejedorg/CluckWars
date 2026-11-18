@@ -114,3 +114,24 @@ Builder's call (mine unless Maestro overrides): **different shape, same colour l
 
 - The red edge at 0.30 read as brown corners in the 1200x540 capture: raised to 0.55 (`MarkHuntMoodGlowBlocked`, `cf22b4d1`). Yellow stays 0.40.
 - Open look questions, put to Maestro on the decision page (H10 to H15): the tint's shape (own / same as the victim's), its strength, the colour of MISSED, the badge size on the arrow, the brackets outside the circle, and whether the arrow and disc should turn red in a blocked live second.
+
+## 12. Owner answers to H10-H15, 2026-11-18
+
+Maestro's answers, verbatim: `h10a(note: Also, for a better feedback, hunter and hunter should be distinguishable from the rest of the chickens e.g. by being inmune or react differently to the tint) h11a h12a(note: However, colors should be defined and easily tuneable in a colors so I think we already have one) h13a(note: I think it should be over the arrow, not at the tip) h14a h15 later(note: I need to see this to decide)`
+
+| | Answer | What it means for the build |
+|---|---|---|
+| H10 | a, with a note | The hunter keeps its own edge-only tint. New: the two birds of a hunt (the hunter and the hunted; "hunter and hunter" read as that) stand out from every other chicken while a mark tints the screen: they are **exempt from the tint**, on the hunter's screen and on the marked player's. Item K13. |
+| H11 | a | Strength stays as built (dark 0.40, red 0.55, yellow 0.40). |
+| H12 | a, with a note | MISSED turns cream. The colour, and the mark's other colours, live in the existing colour config asset (`FeedbackPaletteSO`, ruling D3a of 2026-11-07), not in code. Item K11. Correction of the question's text: SAFE is the palette's neutral grey (`NeutralNoEffectColor`), not cream; it is left as it is. |
+| H13 | a, with a note | The badge keeps its two-thirds size but sits **on the arrow**, not beyond its tip. Item K12. |
+| H14 | a | Brackets whenever the target is on screen, as built. |
+| H15 | later | Maestro needs to see it: a side-by-side of the three options goes on the decision page. No build change until answered. |
+
+### K13 rules (builder's call unless Maestro overrides)
+
+- **Who is exempt.** On the hunter's screen: its own bird and the target. On the marked player's screen: its own bird and the hunter. Nobody else has a tint to be exempt from.
+- **What exempt means.** The bird's body is drawn with its true colours and brightness over the tint: no edge colour, no darkness, no violet, no desaturation. Everything else in the world keeps the tint.
+- **It never reveals.** A bird that is hidden (Hide) or fading is not exempt: only a fully visible bird is. The marked player's faint red for a near and hidden hunter is unchanged.
+- **No new information.** Exemption changes how two already-visible birds look, nothing else: no outline through walls, no marker.
+- **Cost.** The two birds are drawn a second time, depth-tested, after the mood pass; nothing when no mark is shown.

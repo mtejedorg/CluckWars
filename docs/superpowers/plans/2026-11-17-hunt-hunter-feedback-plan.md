@@ -313,3 +313,22 @@ Design §10. One item, after the batch was closed at `c1ffb0ab`.
 - Tests in the existing files: `HuntRulesTests`, `MarkPresentationModelTests`, `MarkScreenEffectTests` (incl. a real render per tier).
 - Captures: `mark-arming` (dark edge), `mark-hunt-*` live (red edge), `mark-kill` (yellow edge), `mark-end-word` (fading).
 - Rules: ARCH-EVT-01 (one model, one observer), CODE-ASSET-12 (tuning in `FeedbackTuning`), no `[Networked]` field, no RPC.
+
+## 7. Revision 2026-11-18 (owner answers H10-H15): K11, K12, K13
+
+Design §12.
+
+### K11 MISSED is cream and the mark's colours live in the palette asset (senior-dev, S)
+- `FeedbackPaletteSO` gains a "Death Mark" header: the pounce yellow, the live / blocked red, the MISSED word colour (cream), the
+  hunter's dark edge and the marked player's dim, cold and red mood colours; initialisers equal to today's literals.
+  `Assets/_Game/Data/FeedbackPalette.asset` carries the same values. `FeedbackTuning`'s mark colours become properties reading
+  `FeedbackPalette.Current`, so no call site changes. `MarkFeedback.EndWordColour(Missed)` reads the new palette colour.
+
+### K12 The badge sits on the arrow (senior-dev, S/M)
+- `MarkerPlacement.OnArrowCentre` centres the badge on the arrow's body instead of beyond its tip, leaving the arrowhead visible;
+  the "You" plate slide, the panel clamp and `SettleOnArrow`'s pill fit stay. Tests in `MarkOnArrowTests` re-stated for the new rule.
+
+### K13 The hunter and the hunted are exempt from the tint (senior-dev, M, rendering)
+- A rendering-layer bit on the two birds' body renderers while a mark tints the local screen; `MarkScreenFeature` draws those
+  renderers again after the mood pass (depth-tested, same materials). Pure rule for who is exempt and when (fully visible only).
+- Captures: hunter side `mark-live-blocked` / `mark-kill` with the target near the edge; victim side `victim-close-visible`.
