@@ -1120,7 +1120,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 ### CODE-DESIGN-01 — Solve stats against the SCT axiom; never hand-tune them
 - Rule: "Never pick a Cluck Wars stat because it 'feels right'." `MoveSpeed`, `CargoCapacity`, `PeckAmount`, `PeckCooldown` are dependent variables solved against the Solo Clear Time axiom (a naked Speedy alone wins in a fixed time via a few base trips; targets in `SctTargets`). To change a stat, run the Oracle; arena geometry, pile footprints, deposit radius and collect reach are inputs: if one changes, re-solve.
 - Why: owner, design-reset thread 2026-07-24: create "a way to test this automatically with a bot"; hand-copied fixtures once hid +20% speed drift.
-- Enforced by: TEST `BalanceOracleTests` (Assets/_Game/Scripts/Editor/Tests/BalanceOracleTests.cs, reads the real assets and `ShippedMap.OracleMap(seat)`, all four seats)
+- Enforced by: TEST `BalanceOracleTests` (Assets/_Game/Scripts/Editor/Tests/BalanceOracleTests.cs, reads the real assets and `ShippedMap.OracleMap(seat)`, all four seats). The dev-tools local balance editor (ARCH-DATA-14, owner ruling 2026-11-18) runs the same SCT check (`BalanceSctCheck`) before a local apply and blocks a failing proposal; that check runs only in the Editor until a baked oracle map exists, and player builds block SCT-relevant edits.
 - Source: M:sct-axiom-is-the-balance-authority.md:11-31; design-reset thread 2026-07-24 (owner)
 - Status: CURRENT
 

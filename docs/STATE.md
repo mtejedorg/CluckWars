@@ -6,6 +6,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🛠 2026-11-19 - Dev build stamp, Settings version label, local dev balance editor (`balance`, not pushed)
+
+- **Dev stamp:** dev-tools builds show `<version>+<build number>` bottom-right on every screen (`DevBuildStamp`, UXML in `Resources/Dev/`). The plain `v0.1` is gone from the main menu; production shows the version only at the bottom of the Settings sheet.
+- **Local balance editor** (dev-tools builds only, opened from the main menu dev row): edits balance on that device through `BalanceBook` with a Local origin, stored in `<persistentDataPath>/balance/local.json`, applied only while the apply window is open (otherwise "applies next launch"). COPY puts the schema-1 publish JSON on the clipboard to publish later with `/balance publish dev`. No credential, no network, no UGS write. Maestro's ruling 2026-11-18: a narrow exception to ARCH-DATA-14.
+- **SCT check** runs `BalanceOracle` on cloned SOs and blocks a failing proposal, **Editor only**: player dev builds have no map data, so edits to class stats, passives, Peck and MatchConfig are blocked there (an `OracleMapSO` bake was offered and not taken).
+- **Verified:** compile OK; EditMode suite 3896/3898 on the first full run, the two failures (an `is PeckAbilitySO` rule hit in `BalanceSctCheck`, fixed; a `MarkScreenEffectTests` render test, passed on rerun) then passed in a 78-test rerun of the affected classes. **Not verified:** the full suite after the fix, the on-screen look of the stamp and panel on PC and Pixel 10 Pro, COPY on Android, a local apply showing the new `bal=`.
+
+---
+
 ## 🎯 2026-11-17 - Hunt hunter-side feedback (batch K, decisions H1-H8)
 
 Maestro, 17 Nov: "It is clearer for the victim than the killer. Killer must know the state of the ability and who is the target at a glance." He chose all eight recommended options on the decision page https://claude.ai/artifact/UKj6VChjS8sSpGa2NpaLDT. Design (binding): `docs/superpowers/specs/2026-11-17-hunt-hunter-feedback-design.md`; plan: `docs/superpowers/plans/2026-11-17-hunt-hunter-feedback-plan.md` (K1-K9).
