@@ -80,6 +80,9 @@ namespace CluckWars.Visuals
         public static bool ForcesArrowFor(ChickenController chicken) =>
             _instance != null && chicken != null && chicken == _instance._hunter && _instance._model.Current.ForceShowHunter;
 
+        /// <summary>How many birds are exempt from the Death Mark tint on this screen right now (K13; the diagnostics line reads it).</summary>
+        public static int ExemptCount => MarkScreenEffect.ExemptCount;
+
         /// <summary>Immediate off for everything (scene unload, disable, destroy). Static so a test can drive it.</summary>
         public static void ClearPresentation()
         {
@@ -105,7 +108,9 @@ namespace CluckWars.Visuals
         private readonly MarkPresentationModel _model = new MarkPresentationModel();
         private readonly List<MarkChicken> _snapshot = new List<MarkChicken>(8);
         private readonly List<ChickenController> _snapshotRefs = new List<ChickenController>(8);
-        private ChickenController _target, _hunter, _localHunter;
+        private ChickenController _target, _hunter, _localHunter, _local;
+        private readonly ChickenVisuals[] _exempt = new ChickenVisuals[2];   // K13: the birds currently marked tint-exempt (own, other)
+        private bool _missingVisualsReported;
         private HuntBrackets _brackets;
         private long _shownHunterId;
         private float _introLastSeenAt = float.NegativeInfinity;
@@ -140,8 +145,9 @@ namespace CluckWars.Visuals
         private void HardClear()
         {
             _model.Reset();
-            _target = _hunter = _localHunter = null;
+            _target = _hunter = _localHunter = _local = null;
             _shownHunterId = 0;
+            ClearExemption();
             MarkScreenEffect.Clear();
             if (_brackets != null) _brackets.Hide();
         }
@@ -149,9 +155,10 @@ namespace CluckWars.Visuals
         private void Update()
         {
             var o = _model.Step(Gather(), Time.unscaledDeltaTime);
-            if (o.Role == MarkRole.None) _target = _hunter = _localHunter = null;
+            if (o.Role == MarkRole.None) _target = _hunter = _localHunter = _local = null;
             MarkScreenEffect.Set(o.Dim, o.Cold, o.Red);
             MarkScreenEffect.SetHunt(o.HuntEdge, o.HuntGlowColour, o.HuntGlow);
+            UpdateTintExemption(o.Role);
             DriveBrackets(in o);
             if (o.Events != MarkEvents.None) PlayStings(o);
             if ((o.Events & MarkEvents.Ended) != 0 && _localHunter != null) SpawnEndWord(o.EndCause);
@@ -159,6 +166,65 @@ namespace CluckWars.Visuals
             if (ShowsHuntPop(o) && _localHunter != null)
                 FloatingCombatText.Spawn(_localHunter, _localHunter.PopAnchor(),
                     UiText.Get(UiKeys.HudPopHunt), FeedbackPalette.Current.Accent(AccentKey.Hunt));
+        }
+
+        // ---- Tint exemption (K13) ------------------------------------------------------------------------------------------
+
+        /// <summary>Marks the two birds of the hunt (own + target on the hunter's screen, own + hunter on the victim's) as exempt from the
+        /// tint while the mood is drawn, as <see cref="HuntRules.TintExemptFor"/> decides, and tells the feature how many there are.
+        /// Runs every frame: the rule is re-asked, a bird that stopped being fully visible (Hide, fade, removal, despawn) is released
+        /// that same frame, and a re-enabled bird is marked again.</summary>
+        private void UpdateTintExemption(MarkRole role)
+        {
+            ChickenVisuals own = null, other = null;
+            var ex = default(HuntRules.TintExemption);
+            if (role == MarkRole.Assassin || role == MarkRole.Victim)
+            {
+                var targetBird = role == MarkRole.Assassin ? _target : null;
+                var hunterBird = role == MarkRole.Victim ? _hunter : null;
+                var ownV = VisibilityOf(_local, out var ownVisuals);
+                var targetV = VisibilityOf(targetBird, out var targetVisuals);
+                var hunterV = VisibilityOf(hunterBird, out var hunterVisuals);
+                ex = HuntRules.TintExemptFor(role, MarkScreenEffect.ActivePass != MarkScreenPass.None, ownV, targetV, hunterV);
+                if (ex.Own) own = ownVisuals;
+                if (ex.Target) other = targetVisuals;
+                else if (ex.Hunter) other = hunterVisuals;
+            }
+            SetExempt(_exempt, 0, own);
+            SetExempt(_exempt, 1, other);
+            MarkScreenEffect.SetExemptCount((own != null ? 1 : 0) + (other != null ? 1 : 0));
+        }
+
+        /// <summary>Slot <paramref name="index"/> of <paramref name="slots"/> now holds <paramref name="want"/>: the bird it held is released
+        /// when it changed, the new one is marked. Static and public so a test drives it without a scene.</summary>
+        public static void SetExempt(ChickenVisuals[] slots, int index, ChickenVisuals want)
+        {
+            var old = slots[index];
+            if (old != null && old != want) old.SetTintExempt(false);
+            slots[index] = want;
+            if (want != null) want.SetTintExempt(true);   // idempotent: also re-marks a bird that was disabled and enabled again
+        }
+
+        private void ClearExemption()
+        {
+            SetExempt(_exempt, 0, null);
+            SetExempt(_exempt, 1, null);
+            MarkScreenEffect.SetExemptCount(0);
+        }
+
+        /// <summary>What the local player can see of <paramref name="c"/>, by the project's own tests; its body owner is returned in
+        /// <paramref name="visuals"/>. A bird without a <see cref="ChickenVisuals"/> is not present (a wiring bug, reported once).</summary>
+        private HuntRules.BirdVisibility VisibilityOf(ChickenController c, out ChickenVisuals visuals)
+        {
+            visuals = null;
+            if (c == null) return default;
+            if (!c.TryGetComponent(out visuals))
+            {
+                ReportOnce(ref _missingVisualsReported, $"{c.name} has no ChickenVisuals: it cannot be exempt from the Death Mark tint (prefab wiring).");
+                return default;
+            }
+            bool faded = ControlStateVFX.IsFadedOpacity(c.VisualOpacity) || visuals.ShellConcealment > 0f;
+            return new HuntRules.BirdVisibility(true, HiddenVisibilityRules.IsHiddenFor(c), faded, c.Combat != null && c.Combat.IsRemoved);
         }
 
         /// <summary>The hunter's ground brackets round the marked target (K4): only while this peer's local Assassin owns the mark
@@ -249,6 +315,7 @@ namespace CluckWars.Visuals
             var hunter = _snapshotRefs[r.Hunter];
             var target = _snapshotRefs[r.Target];
             var local = _snapshotRefs[r.Local];
+            _local = local;
             var exec = hunter.Execute;
             var runner = hunter.Runner;
 

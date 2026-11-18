@@ -26,6 +26,8 @@ namespace CluckWars.Tests
         private const string GameScene = "Assets/_Game/Scenes/Game.unity";
         private const string MapScene = "Assets/_Game/Scenes/Map.unity";
         private const int W = 960, H = 540;
+        /// <summary>The frame-to-frame noise the real-render tests already allow (mean absolute difference, 0..255).</summary>
+        private const float FrameNoise = 0.5f;
 
         private string _originalScenePath;
         private int _originalQuality;
@@ -159,9 +161,12 @@ namespace CluckWars.Tests
             var mat = new Material(shader);
             try
             {
-                Assert.AreEqual(2, mat.passCount);
+                Assert.AreEqual(3, mat.passCount);   // K13 added the exempt mask as a third pass; the first two keep their indices
                 Assert.AreEqual(MarkScreenFeature.OverlayPassIndex, mat.FindPass("CW Mark Mood Overlay"));
                 Assert.AreEqual(MarkScreenFeature.GradedPassIndex, mat.FindPass("CW Mark Mood Graded"));
+                Assert.AreEqual(MarkScreenFeature.MaskPassIndex, mat.FindPass("CW Mark Mood Exempt Mask"));
+                Assert.AreEqual(FeedbackTuning.MarkExemptStencilValue, mat.GetFloat("_CW_MarkExemptRef"),
+                    "the shader's default stencil value is the tuning constant");
             }
             finally { UnityEngine.Object.DestroyImmediate(mat); }
         }
@@ -323,6 +328,170 @@ namespace CluckWars.Tests
             for (int i = 0; i < a.Length; i++)
                 sum += Mathf.Abs(a[i].r - b[i].r) + Mathf.Abs(a[i].g - b[i].g) + Mathf.Abs(a[i].b - b[i].b);
             return (float)(sum / (3.0 * a.Length));
+        }
+
+        // ---- Exempt birds (K13) ---------------------------------------------------------------------------------------
+
+        /// <summary>The shader's tint coverage at a screen point (its MoodLayer alpha), from the same uniforms the feature sets.</summary>
+        private static float MoodCoverage(Vector2 uv, Vector4 shape, Vector4 red, Vector4 grade)
+        {
+            float r = (uv - new Vector2(0.5f, 0.5f)).magnitude * 1.41421356f;
+            float t = Mathf.Clamp01((r - shape.z) * shape.w);
+            t = t * t * (3f - 2f * t);
+            float darkA = Mathf.Lerp(shape.x, shape.y, t);
+            float redA = red.w * Mathf.Lerp(grade.y, 1f, t);
+            return 1f - (1f - darkA) * (1f - redA);
+        }
+
+        private static Vector3 Patch(Color32[] px, Vector2Int at) => Mean(px, new RectInt(at.x - 4, at.y - 4, 8, 8));
+
+        /// <summary>A bright, flat object the camera sees in front of the arena; <paramref name="exempt"/> puts the exempt layer bit on it.</summary>
+        private static GameObject ExemptProbe(Camera cam, Vector2 viewport, float size, Color colour, bool exempt)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = exempt ? "__ExemptMarked" : "__ExemptUnmarked";
+            UnityEngine.Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.transform.position = cam.ViewportToWorldPoint(new Vector3(viewport.x, viewport.y, Mathf.Max(cam.nearClipPlane, 0f) + 3f));
+            go.transform.localScale = Vector3.one * size;
+            var r = go.GetComponent<MeshRenderer>();
+            r.sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = colour };
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            if (exempt) r.renderingLayerMask |= FeedbackTuning.MarkExemptRenderingLayer;
+            return go;
+        }
+
+        /// <summary>The hunter's glow ("hunt") or the victim's full dim + cold ("victim", the Graded path), one tier.</summary>
+        [TestCase("PC", "hunt")]
+        [TestCase("PC", "victim")]
+        [TestCase("Mobile", "hunt")]
+        [TestCase("Mobile", "victim")]
+        public void RealRender_ExemptBird_KeepsItsTrueColour_EverythingElseStaysTinted(string tier, string mood)
+        {
+            ShaderUtil.allowAsyncCompilation = false;
+            int level = Array.IndexOf(QualitySettings.names, tier);
+            Assert.GreaterOrEqual(level, 0, $"no '{tier}' quality level");
+            EditorSceneManager.OpenScene(GameScene, OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Additive);
+            SceneManager.SetActiveScene(SceneManager.GetSceneByPath(GameScene));
+            QualitySettings.SetQualityLevel(level, true);
+            var rp = GraphicsSettings.currentRenderPipeline;
+            Assert.IsNotNull(rp, tier);
+
+            var matchCam = UnityEngine.Object.FindFirstObjectByType<MatchCamera>(FindObjectsInactive.Include);
+            Assert.IsNotNull(matchCam, "Game.unity has no MatchCamera");
+            var mc = new SerializedObject(matchCam);
+            float pitch = mc.FindProperty("_pitch").floatValue, distance = mc.FindProperty("_distance").floatValue;
+            float ortho = mc.FindProperty("_orthoSize").floatValue;
+
+            var camGo = new GameObject("__ExemptTestCam");
+            RenderTexture rt = null;
+            GameObject marked = null, unmarked = null;
+            try
+            {
+                var cam = camGo.AddComponent<Camera>();
+                cam.enabled = false;
+                var data = camGo.AddComponent<UniversalAdditionalCameraData>();
+                data.renderPostProcessing = RenderTierPolicy.PostProcessingFor(rp);
+                cam.orthographic = true;
+                cam.orthographicSize = ortho;
+                cam.nearClipPlane = mc.FindProperty("_nearClipPlane").floatValue;
+                cam.farClipPlane = 1000f;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = mc.FindProperty("_backgroundColor").colorValue;
+                var rot = Quaternion.Euler(pitch, 225f, 0f);
+                cam.transform.SetPositionAndRotation(-(rot * Vector3.forward) * distance, rot);
+
+                int msaa = 1;
+                var msaaProp = rp.GetType().GetProperty("msaaSampleCount");
+                if (msaaProp != null) msaa = Mathf.Max(1, Convert.ToInt32(msaaProp.GetValue(rp)));
+                rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = msaa };
+                cam.targetTexture = rt;
+                cam.aspect = (float)W / H;
+
+                // Two bright objects near opposite screen corners, where both moods are strong; one carries the exempt bit.
+                Vector2 markedVp = new Vector2(0.07f, 0.12f), unmarkedVp = new Vector2(0.93f, 0.88f), emptyVp = new Vector2(0.07f, 0.88f);
+                var colour = new Color(0.9f, 0.45f, 0.1f);
+                marked = ExemptProbe(cam, markedVp, ortho * 0.3f, colour, exempt: true);
+                unmarked = ExemptProbe(cam, unmarkedVp, ortho * 0.3f, colour, exempt: false);
+                Vector2Int Pix(Vector2 vp) => new Vector2Int(Mathf.RoundToInt(vp.x * W), Mathf.RoundToInt(vp.y * H));
+                Vector2Int markedPx = Pix(markedVp), unmarkedPx = Pix(unmarkedVp), emptyPx = Pix(emptyVp);
+
+                MarkScreenEffect.RenderOutsidePlayMode = true;
+                void SetMood()
+                {
+                    MarkScreenEffect.Clear();
+                    if (mood == "hunt") MarkScreenEffect.SetHunt(1f, FeedbackTuning.MarkKillColor, FeedbackTuning.MarkHuntMoodGlowPounce);
+                    else MarkScreenEffect.Set(1f, 1f, 0f);
+                }
+                Color32[] Shot(bool tinted, int exempt)
+                {
+                    MarkScreenEffect.Clear();
+                    if (tinted) SetMood();
+                    MarkScreenEffect.SetExemptCount(exempt);
+                    cam.targetTexture = rt;
+                    cam.Render();
+                    cam.targetTexture = null;
+                    var prev = RenderTexture.active;
+                    RenderTexture.active = rt;
+                    var t = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+                    t.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                    t.Apply();
+                    RenderTexture.active = prev;
+                    var px = t.GetPixels32();
+                    UnityEngine.Object.DestroyImmediate(t);
+                    cam.targetTexture = rt;
+                    return px;
+                }
+
+                var untinted = Shot(false, 0);
+                var withExempt = Shot(true, 1);       // the mark is on and one bird is exempt
+                var noExemption = Shot(true, 0);      // the mark is on, nobody exempt: how the tint rendered before K13
+
+                // The coverage the tint has at each probe, from the shader's own uniforms.
+                SetMood();
+                var hunt = MarkScreenEffect.HuntCurrent;
+                MarkScreenEffect.Uniforms(MarkScreenEffect.Current, hunt.Edge, hunt.Colour, hunt.Glow, out _, out var shape, out var red, out var grade);
+                float markedA = MoodCoverage(markedVp, shape, red, grade), unmarkedA = MoodCoverage(unmarkedVp, shape, red, grade);
+                string ctx = $"[{tier}/{mood}] coverage marked {markedA:0.00} unmarked {unmarkedA:0.00}; untinted {Patch(untinted, markedPx)} / {Patch(untinted, unmarkedPx)}";
+                TestContext.WriteLine(ctx);
+                Assert.Greater(markedA, 0.2f, "the probe sits where the tint is strong " + ctx);
+                Assert.Greater(Lum(Patch(untinted, markedPx)), 20f, "probe not visible " + ctx);
+
+                // The exempt object: its true colour, within the frame noise of the untinted render.
+                var exemptRect = new RectInt(markedPx.x - 4, markedPx.y - 4, 8, 8);
+                Assert.Less(RectDiff(untinted, withExempt, exemptRect), FrameNoise, "the exempt bird must keep its true colour " + ctx);
+                // Without the exemption the same pixels ARE tinted (so the test can tell the two apart).
+                Assert.Greater(RectDiff(untinted, noExemption, exemptRect), 8f * FrameNoise, "baseline tint missing " + ctx);
+                if (mood == "victim")
+                    Assert.Less(Lum(Patch(noExemption, markedPx)), Lum(Patch(untinted, markedPx)) * (1f - 0.5f * markedA), "baseline dim missing " + ctx);
+
+                // The unmarked object and the empty background are tinted exactly as without the exemption.
+                var unmarkedRect = new RectInt(unmarkedPx.x - 4, unmarkedPx.y - 4, 8, 8);
+                var emptyRect = new RectInt(emptyPx.x - 4, emptyPx.y - 4, 8, 8);
+                Assert.Less(RectDiff(noExemption, withExempt, unmarkedRect), FrameNoise, "the unmarked object keeps the tint " + ctx);
+                Assert.Less(RectDiff(noExemption, withExempt, emptyRect), FrameNoise, "the background keeps the tint " + ctx);
+                Assert.Greater(RectDiff(untinted, withExempt, unmarkedRect), 8f * FrameNoise, "unmarked object not tinted " + ctx);
+                if (mood == "victim")
+                    Assert.Less(Lum(Patch(withExempt, unmarkedPx)), Lum(Patch(untinted, unmarkedPx)) * (1f - 0.5f * unmarkedA), "unmarked object not dimmed " + ctx);
+                if (mood == "victim")
+                    Assert.Less(Sat(Patch(withExempt, unmarkedPx)), Sat(Patch(untinted, unmarkedPx)) * (1f - 0.5f * grade.x),
+                        "the Graded path must still desaturate the unmarked object " + ctx);
+
+                // With no marked object the render is today's: drop the bit and ask for an exemption anyway.
+                marked.GetComponent<MeshRenderer>().renderingLayerMask = 1u;
+                var nothingMarked = Shot(true, 1);
+                Assert.Less(MeanDiff(noExemption, nothingMarked), FrameNoise, "with no marked renderer the render must equal the unexempted one " + ctx);
+            }
+            finally
+            {
+                MarkScreenEffect.Clear();
+                MarkScreenEffect.RenderOutsidePlayMode = false;
+                if (marked != null) UnityEngine.Object.DestroyImmediate(marked);
+                if (unmarked != null) UnityEngine.Object.DestroyImmediate(unmarked);
+                if (rt != null) { rt.Release(); UnityEngine.Object.DestroyImmediate(rt); }
+                UnityEngine.Object.DestroyImmediate(camGo);
+            }
         }
 
         // ---- The hunter's screen edge (K10) ---------------------------------------------------------------------------

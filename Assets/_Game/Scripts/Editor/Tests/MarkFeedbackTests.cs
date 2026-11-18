@@ -477,6 +477,112 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void TintExempt_MarksTheBodyRenderersOnly_KeepsEveryOtherLayerBit_AndIsIdempotent()
+        {
+            var v = ExemptBird("__exempt_a", layerMask: 1u | 4u);
+            try
+            {
+                v.SetTintExempt(true);
+                Assert.IsTrue(v.IsTintExempt);
+                Assert.AreEqual(1u | 4u | FeedbackTuning.MarkExemptRenderingLayer, ExemptMask(v), "adds the bit, keeps the others");
+                v.SetTintExempt(true);
+                Assert.AreEqual(1u | 4u | FeedbackTuning.MarkExemptRenderingLayer, ExemptMask(v), "a second call changes nothing");
+                v.SetTintExempt(false);
+                Assert.IsFalse(v.IsTintExempt);
+                Assert.AreEqual(1u | 4u, ExemptMask(v), "off restores the original mask");
+                v.SetTintExempt(false);
+                Assert.AreEqual(1u | 4u, ExemptMask(v), "a second off changes nothing");
+            }
+            finally { Object.DestroyImmediate(v.gameObject); }
+        }
+
+        private static ChickenVisuals ExemptBird(string name, uint layerMask = 1u)
+        {
+            var go = new GameObject(name);
+            var mesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            mesh.transform.SetParent(go.transform);
+            mesh.GetComponent<MeshRenderer>().renderingLayerMask = layerMask;
+            var v = go.AddComponent<ChickenVisuals>();
+            v.SetModelRoot(mesh.transform);
+            return v;
+        }
+
+        private static uint ExemptMask(ChickenVisuals v) => v.TintedRenderers[0].renderingLayerMask;
+
+        [Test]
+        public void TintExempt_ANewModelCarriesTheMarkOver_AndTheOldOneIsHandedBackUnmarked()
+        {
+            var v = ExemptBird("__exempt_b");
+            var next = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            try
+            {
+                var old = v.TintedRenderers[0];
+                v.SetTintExempt(true);
+                v.SetModelRoot(next.transform);
+                Assert.AreEqual(1u, old.renderingLayerMask);
+                Assert.AreEqual(1u | FeedbackTuning.MarkExemptRenderingLayer, ExemptMask(v));
+                Assert.IsTrue(v.IsTintExempt);
+            }
+            finally { Object.DestroyImmediate(next); Object.DestroyImmediate(v.gameObject); }
+        }
+
+        [Test]
+        public void TintExempt_FollowsTheSlots_ReleasesTheOldBird_AndClearPresentationSwitchesItOff()
+        {
+            var a = ExemptBird("__exempt_c1");
+            var b = ExemptBird("__exempt_c2");
+            var slots = new ChickenVisuals[2];
+            try
+            {
+                MarkFeedback.SetExempt(slots, 0, a);
+                MarkFeedback.SetExempt(slots, 1, b);
+                Assert.IsTrue(a.IsTintExempt);
+                Assert.IsTrue(b.IsTintExempt);
+                MarkFeedback.SetExempt(slots, 1, null);
+                Assert.IsFalse(b.IsTintExempt, "a bird the rule dropped is released");
+                Assert.IsTrue(a.IsTintExempt);
+                MarkFeedback.SetExempt(slots, 0, b);
+                Assert.IsFalse(a.IsTintExempt, "replaced in its slot: released");
+                Assert.IsTrue(b.IsTintExempt);
+                MarkFeedback.SetExempt(slots, 0, null);
+                Assert.AreEqual(1u, ExemptMask(a));
+                Assert.AreEqual(1u, ExemptMask(b));
+            }
+            finally { Object.DestroyImmediate(a.gameObject); Object.DestroyImmediate(b.gameObject); }
+
+            MarkScreenEffect.SetExemptCount(2);
+            MarkFeedback.ClearPresentation();
+            Assert.AreEqual(0, MarkScreenEffect.ExemptCount, "scene unload / ClearPresentation switches the exemption count off");
+        }
+
+        [Test]
+        public void TintExempt_IsAppliedFromTheRule_AndClearedByHardClear_SourceGuard()
+        {
+            string src = Read("Assets/_Game/Scripts/Visuals/MarkFeedback.cs");
+            StringAssert.Contains("HuntRules.TintExemptFor(role, MarkScreenEffect.ActivePass != MarkScreenPass.None, ownV, targetV, hunterV)", src);
+            StringAssert.Contains("UpdateTintExemption(o.Role);", src);
+            StringAssert.Contains("            ClearExemption();", src);
+            StringAssert.Contains("HiddenVisibilityRules.IsHiddenFor(c)", src);
+            StringAssert.Contains("ControlStateVFX.IsFadedOpacity(c.VisualOpacity)", src);
+            StringAssert.Contains("MarkExemptRenderingLayer", Read("Assets/_Game/Scripts/Visuals/ChickenVisuals.cs"));
+            StringAssert.Contains("exempt={MarkFeedback.ExemptCount}", Read("Assets/_Game/Scripts/Diagnostics/AutoTestDriver.Mark.cs"));
+        }
+
+        [Test]
+        public void TintExempt_LayerAndStencilBits_AreFreeEverywhereElse()
+        {
+            // Rendering layer: bit 0 stays the default every renderer has; nothing else in the project uses a higher one.
+            uint layer = FeedbackTuning.MarkExemptRenderingLayer;
+            Assert.AreEqual(0u, layer & 1u);
+            Assert.IsTrue(Mathf.IsPowerOfTwo((int)layer));
+            // Stencil: FenceFadeLit bit 0, the mound mark bit 3, URP cross-fade LOD bits 2-3, URP deferred lighting bits 4-6.
+            int stencil = FeedbackTuning.MarkExemptStencilValue;
+            Assert.IsTrue(Mathf.IsPowerOfTwo(stencil));
+            const int fenceFade = 1, moundMark = 8, crossFadeLod = 4 | 8, deferredLighting = 0x70;
+            Assert.AreEqual(0, stencil & (fenceFade | moundMark | crossFadeLod | deferredLighting));
+        }
+
+        [Test]
         public void CwMarkShots_Parses() =>
             Assert.IsTrue(AutoTestConfig.FromCommandLine(new[] { "x.exe", "-cw_markshots" }).MarkShots);
 

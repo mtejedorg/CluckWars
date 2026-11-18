@@ -4,9 +4,20 @@
 //   alpha kept. Used whenever cold01 is ~0 — costs one blended full-screen triangle, merges into the native render pass.
 // Pass 1 "Graded":  reads a copy of the scene colour (_BlitTexture), desaturates it by the COLD amount, then applies the
 //   same layer. Opaque output. Used only while cold01 > 0.
+// Pass 2 "Exempt Mask" (K13): not a full-screen pass. Drawn through DrawingSettings.overrideMaterial over the renderers that carry
+//   FeedbackTuning.MarkExemptRenderingLayer (the hunt's two birds): no colour, no depth write, depth-tested (so only the visible
+//   part of a bird), and it sets one stencil bit. Passes 0 and 1 then skip every pixel carrying that bit, so the bird keeps its
+//   untinted colour. Object-space vertex transform only, so skinned meshes work (the skinning happens before the vertex stage).
 // All values are uniforms set per frame by MarkScreenFeature from FeedbackTuning; nothing is tuned in this file.
 Shader "Cluck Wars/Mark Mood"
 {
+    Properties
+    {
+        // The stencil bit (value) of the exempt birds. MarkScreenFeature overwrites it from FeedbackTuning.MarkExemptStencilValue;
+        // the default is the same value so the material is right even before that.
+        _CW_MarkExemptRef ("Exempt stencil bit", Float) = 128
+    }
+
     SubShader
     {
         Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" }
@@ -46,6 +57,13 @@ Shader "Cluck Wars/Mark Mood"
         Pass
         {
             Name "CW Mark Mood Overlay"
+            // Skips the exempt birds' pixels (only has an effect while a depth-stencil is bound, i.e. while a bird is exempt).
+            Stencil
+            {
+                Ref [_CW_MarkExemptRef]
+                ReadMask [_CW_MarkExemptRef]
+                Comp NotEqual
+            }
             // Colour: premultiplied over. Alpha: keep the destination's.
             Blend One OneMinusSrcAlpha, Zero One
 
@@ -65,6 +83,13 @@ Shader "Cluck Wars/Mark Mood"
         {
             Name "CW Mark Mood Graded"
             Blend Off
+            // Skipped pixels keep the untinted scene colour already in the target.
+            Stencil
+            {
+                Ref [_CW_MarkExemptRef]
+                ReadMask [_CW_MarkExemptRef]
+                Comp NotEqual
+            }
 
             HLSLPROGRAM
             #pragma vertex Vert
@@ -81,6 +106,51 @@ Shader "Cluck Wars/Mark Mood"
                 half4 layer = MoodLayer(uv);
                 scene.rgb = scene.rgb * (1.0 - layer.a) + layer.rgb;
                 return scene;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "CW Mark Mood Exempt Mask"
+            ColorMask 0
+            ZWrite Off
+            ZTest LEqual
+            Cull Off
+            // A hair toward the camera: this vertex path is not bit-identical to the Lit shader's, and the bird's own depth is in the buffer.
+            Offset -1, -1
+            Stencil
+            {
+                Ref [_CW_MarkExemptRef]
+                WriteMask [_CW_MarkExemptRef]
+                Comp Always
+                Pass Replace
+            }
+
+            HLSLPROGRAM
+            #pragma vertex VertMask
+            #pragma fragment FragMask
+
+            struct AttributesMask
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct VaryingsMask
+            {
+                float4 positionCS : SV_POSITION;
+            };
+
+            VaryingsMask VertMask(AttributesMask input)
+            {
+                VaryingsMask output;
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                return output;
+            }
+
+            half4 FragMask(VaryingsMask input) : SV_Target
+            {
+                return 0;
             }
             ENDHLSL
         }

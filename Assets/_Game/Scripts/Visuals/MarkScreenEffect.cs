@@ -35,6 +35,7 @@ namespace CluckWars.Visuals
         private static Vector3 _current;
         private static float _huntEdge, _huntGlow;
         private static Color _huntColour;
+        private static int _exemptCount;
 
         /// <summary>Last applied weights (x = dim01, y = cold01, z = red01), clamped to [0, 1].</summary>
         public static Vector3 Current => _current;
@@ -44,6 +45,10 @@ namespace CluckWars.Visuals
 
         /// <summary>Last applied hunt mood: the dark edge weight, the glow alpha and the glow colour.</summary>
         public static (float Edge, float Glow, Color Colour) HuntCurrent => (_huntEdge, _huntGlow, _huntColour);
+
+        /// <summary>How many birds are exempt from the tint right now (K13): 0 to 2, set by <c>MarkFeedback</c>. The feature draws the stencil
+        /// mask only while it is above 0; with 0 the passes are exactly what they were before the exemption existed.</summary>
+        public static int ExemptCount => _exemptCount;
 
         /// <summary>
         /// Lets an Editor capture tool render the effect outside Play mode. Reset on SubsystemRegistration; never set it
@@ -69,12 +74,16 @@ namespace CluckWars.Visuals
             _huntColour = glowColour;
         }
 
+        /// <summary>The number of exempt birds this frame (K13), clamped to [0, 2].</summary>
+        public static void SetExemptCount(int count) => _exemptCount = count < 0 ? 0 : (count > 2 ? 2 : count);
+
         /// <summary>Immediate off, both moods (scene unload, match end safety net).</summary>
         public static void Clear()
         {
             _current = Vector3.zero;
             _huntEdge = _huntGlow = 0f;
             _huntColour = Color.clear;
+            _exemptCount = 0;
         }
 
         /// <summary>Pass selection, pure: None when every weight is under <see cref="FeedbackTuning.MarkMoodOffEpsilon"/>,
@@ -149,6 +158,7 @@ namespace CluckWars.Visuals
         private static void ResetStatics()
         {
             _current = Vector3.zero;
+            _exemptCount = 0;
             RenderOutsidePlayMode = false;
             SceneManager.sceneUnloaded -= OnSceneUnloaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;

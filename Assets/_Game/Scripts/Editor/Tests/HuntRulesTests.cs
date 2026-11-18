@@ -150,5 +150,63 @@ namespace CluckWars.Tests
             }
             Assert.AreNotEqual(HuntRules.ScreenTintColour(HuntScreenTint.Blocked, 0), HuntRules.ScreenTintColour(HuntScreenTint.Pounce, 0));
         }
+
+        // ---- K13: who is exempt from the Death Mark tint --------------------------------------------------------------
+
+        private static readonly HuntRules.BirdVisibility Seen = HuntRules.BirdVisibility.Visible;
+        private static readonly HuntRules.BirdVisibility Hidden = new HuntRules.BirdVisibility(true, true, false, false);
+        private static readonly HuntRules.BirdVisibility Faded = new HuntRules.BirdVisibility(true, false, true, false);
+        private static readonly HuntRules.BirdVisibility Removed = new HuntRules.BirdVisibility(true, false, false, true);
+        private static readonly HuntRules.BirdVisibility Gone = default;
+
+        [Test]
+        public void TintExempt_HuntersScreen_IsItsOwnBirdAndTheTarget()
+        {
+            var e = HuntRules.TintExemptFor(MarkRole.Assassin, true, Seen, Seen, Seen);
+            Assert.IsTrue(e.Own);
+            Assert.IsTrue(e.Target);
+            Assert.IsFalse(e.Hunter, "the hunter slot belongs to the marked player's screen");
+            Assert.AreEqual(2, e.Count);
+        }
+
+        [Test]
+        public void TintExempt_VictimsScreen_IsItsOwnBirdAndTheHunter()
+        {
+            var e = HuntRules.TintExemptFor(MarkRole.Victim, true, Seen, Seen, Seen);
+            Assert.IsTrue(e.Own);
+            Assert.IsTrue(e.Hunter);
+            Assert.IsFalse(e.Target, "the target slot belongs to the hunter's screen");
+            Assert.AreEqual(2, e.Count);
+        }
+
+        [TestCase(MarkRole.None)]
+        [TestCase(MarkRole.ThirdParty)]
+        public void TintExempt_AnyOtherRole_ExemptsNobody(MarkRole role) =>
+            Assert.AreEqual(0, HuntRules.TintExemptFor(role, true, Seen, Seen, Seen).Count);
+
+        [TestCase(MarkRole.Assassin)]
+        [TestCase(MarkRole.Victim)]
+        [TestCase(MarkRole.None)]
+        public void TintExempt_MoodNotDrawn_ExemptsNobody(MarkRole role) =>
+            Assert.AreEqual(0, HuntRules.TintExemptFor(role, false, Seen, Seen, Seen).Count);
+
+        [Test]
+        public void TintExempt_OnlyAFullyVisibleBirdIsExempt_HiddenFadedRemovedOrGoneNever()
+        {
+            foreach (var role in new[] { MarkRole.Assassin, MarkRole.Victim })
+            foreach (var bad in new[] { Hidden, Faded, Removed, Gone })
+            {
+                Assert.IsFalse(bad.FullyVisible);
+                var own = HuntRules.TintExemptFor(role, true, bad, Seen, Seen);
+                Assert.IsFalse(own.Own, $"{role}: own bird not fully visible");
+                Assert.AreEqual(1, own.Count, $"{role}: the other bird is judged on its own");
+                var other = HuntRules.TintExemptFor(role, true, Seen, bad, bad);
+                Assert.IsTrue(other.Own);
+                Assert.IsFalse(other.Target, $"{role}");
+                Assert.IsFalse(other.Hunter, $"{role}");
+                Assert.AreEqual(1, other.Count);
+            }
+            Assert.IsTrue(Seen.FullyVisible);
+        }
     }
 }

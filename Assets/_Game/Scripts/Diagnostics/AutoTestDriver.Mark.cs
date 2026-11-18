@@ -153,7 +153,7 @@ namespace CluckWars.Diagnostics
                            Inv($"stunned={target.CurrentControlState == ControlState.Stunned} selfCast={ControlRules.CanCast(self.CurrentControlState)} ") +
                            Inv($"walled={PlayerBase.WallBetween(self.transform.position, target.transform.position)} offscreen={MarkHudController.MarkerOffScreenNow} ") +
                            Inv($"anchor={MarkHudController.AnchorNow} blocker={o.Blocker} brackets={HuntBrackets.StateNow} ") +
-                           Inv($"tint={o.HuntTint} edge={o.HuntEdge:0.00} glow={o.HuntGlow:0.00}");
+                           Inv($"tint={o.HuntTint} edge={o.HuntEdge:0.00} glow={o.HuntGlow:0.00} exempt={MarkFeedback.ExemptCount}");
             if (state != _lastMarkState)
             {
                 _lastMarkState = state;

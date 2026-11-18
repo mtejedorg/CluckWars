@@ -257,5 +257,37 @@ namespace CluckWars.Visuals
             tint == HuntScreenTint.Blocked ? BracketColour(true, false, targetCorner)
             : tint == HuntScreenTint.Pounce ? BracketColour(true, true, targetCorner)
             : Color.clear;
+
+        /// <summary>The exempt-from-tint answer (K13): which of the three birds keep their true colours under the Death Mark tint.</summary>
+        public readonly struct TintExemption
+        {
+            public readonly bool Own, Target, Hunter;
+            public TintExemption(bool own, bool target, bool hunter) { Own = own; Target = target; Hunter = hunter; }
+            public int Count => (Own ? 1 : 0) + (Target ? 1 : 0) + (Hunter ? 1 : 0);
+        }
+
+        /// <summary>What the local player can see of one bird, from the project's own tests: hidden (<c>HiddenVisibilityRules.IsHiddenFor</c>),
+        /// faded (<c>ControlStateVFX.IsFadedOpacity</c>, or the Egg Shell conceal), removed (<c>ChickenCombat.IsRemoved</c>).
+        /// <see cref="Present"/> is false for a bird that does not exist (despawned, no hunt role).</summary>
+        public readonly struct BirdVisibility
+        {
+            public readonly bool Present, Hidden, Faded, Removed;
+            public BirdVisibility(bool present, bool hidden, bool faded, bool removed)
+            { Present = present; Hidden = hidden; Faded = faded; Removed = removed; }
+            /// <summary>A bird only exempt when it is fully there: present, not hidden, not faded, not removed.</summary>
+            public bool FullyVisible => Present && !Hidden && !Faded && !Removed;
+            public static BirdVisibility Visible => new BirdVisibility(true, false, false, false);
+        }
+
+        /// <summary>Which birds are exempt from the tint on the local screen. The hunter's screen (Assassin): its own bird and the target.
+        /// The marked player's screen (Victim): its own bird and the hunter. Any other role, or the mood not drawn: nobody. A bird that is
+        /// not fully visible is never exempt, so exemption can show nothing the local player could not already see.</summary>
+        public static TintExemption TintExemptFor(MarkRole role, bool moodDrawn, BirdVisibility own, BirdVisibility target, BirdVisibility hunter)
+        {
+            if (!moodDrawn) return default;
+            if (role == MarkRole.Assassin) return new TintExemption(own.FullyVisible, target.FullyVisible, false);
+            if (role == MarkRole.Victim) return new TintExemption(own.FullyVisible, false, hunter.FullyVisible);
+            return default;
+        }
     }
 }

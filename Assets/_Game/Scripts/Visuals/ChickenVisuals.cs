@@ -69,6 +69,7 @@ namespace CluckWars.Visuals
         private float _shellConceal;
         private Renderer[] _hiddenRenderers;   // non-null exactly while the body renderers are forced off
         private bool[]     _savedEnabled;
+        private Renderer[] _exemptRenderers;   // non-null exactly while the body renderers carry the tint-exempt layer bit
 
         private MaterialPropertyBlock _propertyBlock;
         private Color _currentTint = Color.white;
@@ -102,6 +103,41 @@ namespace CluckWars.Visuals
 
         /// <summary>True while the body renderers are switched off because the bird is sealed inside its egg.</summary>
         public bool IsBodyHidden => _hiddenRenderers != null;
+
+        /// <summary>True while the body renderers carry <see cref="FeedbackTuning.MarkExemptRenderingLayer"/> (test/diagnostic seam).</summary>
+        public bool IsTintExempt => _exemptRenderers != null;
+
+        /// <summary>
+        /// K13: marks this bird's body (the same renderer set the ghost fade and the class tint use, never the ring, indicators,
+        /// nameplate or cargo) so <c>MarkScreenFeature</c> keeps the Death Mark tint off it. Adds the rendering-layer bit
+        /// <see cref="FeedbackTuning.MarkExemptRenderingLayer"/> to each renderer and leaves every other bit as it was; turning it
+        /// off removes only that bit. Idempotent, allocation-free when nothing changes, local presentation only.
+        /// </summary>
+        public void SetTintExempt(bool on)
+        {
+            if (on == (_exemptRenderers != null)) return;
+            if (!on) { ClearTintExempt(); return; }
+            var renderers = _renderers;
+            if (renderers == null) return;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var r = renderers[i];
+                if (r != null) r.renderingLayerMask |= FeedbackTuning.MarkExemptRenderingLayer;
+            }
+            _exemptRenderers = renderers;
+        }
+
+        private void ClearTintExempt()
+        {
+            var marked = _exemptRenderers;
+            if (marked == null) return;
+            _exemptRenderers = null;
+            for (int i = 0; i < marked.Length; i++)
+            {
+                var r = marked[i];
+                if (r != null) r.renderingLayerMask &= ~FeedbackTuning.MarkExemptRenderingLayer;
+            }
+        }
 
         /// <summary>
         /// The Egg Shell's conceal ramp (<c>ChickenShellVisuals</c>): 0 draws the bird normally, 1 removes it entirely.
@@ -183,7 +219,10 @@ namespace CluckWars.Visuals
             RestoreOriginalMaterials();
             // Hand the old set its own enabled flags back too, then re-seal the new set below if the bird is still in its egg.
             ShowBodyRenderers();
+            bool wasExempt = _exemptRenderers != null;
+            ClearTintExempt();
             _renderers = modelRoot.GetComponentsInChildren<Renderer>(includeInactive: true);
+            if (wasExempt) SetTintExempt(true);
             ApplySealedState();
             // Re-apply whatever colour was last in effect so a model attached after a tint /
             // opacity / dead-state change does not spawn in default white.
@@ -322,7 +361,13 @@ namespace CluckWars.Visuals
             return obj != null && obj.IsValid && _controller.HasInputAuthority;
         }
 
-        private void OnDestroy() => RestoreOriginalMaterials();
+        private void OnDisable() => ClearTintExempt();
+
+        private void OnDestroy()
+        {
+            ClearTintExempt();
+            RestoreOriginalMaterials();
+        }
 
         private void PushColor(Color color)
         {

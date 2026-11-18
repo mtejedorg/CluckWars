@@ -946,6 +946,18 @@ namespace CluckWars.Visuals
         /// cold under it and the cheap blend-only pass is used instead of the colour-reading one.</summary>
         public const float MarkMoodOffEpsilon = 1f / 255f;
 
+        // ---- Hunt tint exemption (K13) -------------------------------------------------------------------------------
+        // While a Death Mark tints the local screen, the two birds of that hunt keep their true colours. Their body renderers
+        // get this rendering-layer bit (ChickenVisuals.SetTintExempt); MarkScreenFeature draws exactly those renderers into the
+        // stencil bit below, and both mood passes skip pixels carrying it.
+        /// <summary>Rendering-layer bit added to an exempt bird's body renderers (bit 0 stays: the default layer). Bits in use
+        /// elsewhere in the project: bit 0 only (every prefab and scene renderer; light layers and decal layers are off).</summary>
+        public const uint MarkExemptRenderingLayer = 1u << 8;
+        /// <summary>Stencil bit (value) the exempt birds write and the mood skips. Taken by nobody: FenceFadeLit uses bit 0, the
+        /// food-pile mound mark bit 3, URP's cross-fade LOD bits 2 and 3 and its deferred lighting bits 4 to 6 (neither tier
+        /// is Deferred); a nested UI mask would reach bit 7 only at its eighth level.</summary>
+        public const int MarkExemptStencilValue = 1 << 7;
+
         // ---- Hunt screen edge (the hunter's side of the Death Mark screen mood) ---------------------------------------
         // The local Assassin's edge-only tint, drawn by the same pass as the victim's mood: the centre of the screen is
         // untouched and nothing is desaturated. Dark while the mark arms, then the brackets' red or yellow (HuntRules).
