@@ -118,6 +118,9 @@ def fnv1a32(text):
 
 
 def expected_hash(delta):
+    # BalanceBook: a delta with no assets and no kits is empty and reads as the baseline, whatever its schema or note.
+    if not (delta.get("assets") or delta.get("kits")):
+        return BASELINE_HASH
     c = canonical(delta)
     return fnv1a32(c) if c is not None else None
 

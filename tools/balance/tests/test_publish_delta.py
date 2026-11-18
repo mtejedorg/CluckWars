@@ -19,6 +19,10 @@ def run(argv, http, environ=ENVIRON, validate=OK, history=None):
 
 
 class HashTests(unittest.TestCase):
+    def test_empty_delta_with_schema_or_note_is_the_baseline(self):
+        self.assertEqual(pd.expected_hash({}), "5465b825")
+        self.assertEqual(pd.expected_hash({"schema": 1, "note": "x"}), "5465b825")
+
     def test_baseline_is_the_hash_of_empty_delta(self):
         self.assertEqual(pd.fnv1a32("{}"), "5465b825")
 
