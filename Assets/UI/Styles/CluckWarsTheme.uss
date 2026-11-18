@@ -509,16 +509,6 @@
     color: rgb(254, 245, 224);
 }
 
-/* Build stamp. Bottom-left, deliberately quiet — it exists so a tester can say
-   which build a bug came from, not to be read during play. */
-.cw-menu-build {
-    position: absolute; left: 28px; bottom: 20px;
-    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
-    font-size: 28px; letter-spacing: 1px;
-    color: rgba(254, 245, 224, 0.7);
-    -unity-text-outline-width: 1px; -unity-text-outline-color: rgb(42, 26, 12);
-}
-
 
 /* ============================================================================
    PHASE 1 STRUCTURE (2026-10-06): shared page chrome + page transitions

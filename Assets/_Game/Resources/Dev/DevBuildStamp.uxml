@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/_Game/Resources/Dev/DevBuildStamp.uss" />
+
+    <!-- Dev-tools builds only (DevBuildStamp, Diagnostics): the full version at the bottom-right of every screen. The text
+         is filled from UiKeys.DevBuildStamp at runtime; nothing here takes a tap. -->
+    <ui:VisualElement name="StampRoot" class="cw-devstamp-root" picking-mode="Ignore">
+        <ui:Label name="BuildStamp" text="" class="cw-devstamp" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

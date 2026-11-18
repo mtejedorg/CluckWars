@@ -295,6 +295,16 @@ namespace CluckWars.Installers
                     : "Balance: UGS_DISABLED build; running the shipped assets.");
             }
 
+            // Dev-tools builds only: the local override (the balance editor's apply / reset / stored file). Applied after the
+            // cache so it wins this launch; the refresher then caches the remote delta without applying it. A production
+            // build never constructs it, and its store and the book's local entry points gate on DevTools again.
+            if (devTools)
+            {
+                var local = new BalanceLocalOverride(book, new BalanceLocalStore(Application.persistentDataPath), cache, log);
+                local.ApplyAtBoot();
+                Container.Bind<BalanceLocalOverride>().FromInstance(local).AsSingle();
+            }
+
             Container.BindInterfacesTo<BalanceRefresher>()
                 .FromMethod(ctx => new BalanceRefresher(book, ctx.Container.Resolve<IBalanceSource>(), log, cache))
                 .AsSingle()
@@ -304,7 +314,9 @@ namespace CluckWars.Installers
         /// <summary>
         /// The dev-tools probes, each on its own object under the ProjectContext (so they live across scene loads):
         /// PerfProbe (Perf), SyncHeartbeat (Sync), VisualProbe (Visual), the auto-test driver (AutoTest) and the
-        /// spawner that puts the DebugHud into the Game scene. All read-only toward gameplay.
+        /// spawner that puts the DebugHud into the Game scene, the DevBuildStamp (version+build at the bottom of every
+        /// screen) and the DevBalanceEditor (local balance edits; it changes numbers only through BalanceBook's dev-tools path).
+        /// The probes are read-only toward gameplay.
         /// </summary>
         private void InstallDiagnostics()
         {
@@ -319,6 +331,9 @@ namespace CluckWars.Installers
             Container.Bind<MenuShotsDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.MenuShots").AsSingle().NonLazy();
             Container.Bind<AutoTestDriver>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.AutoTest").AsSingle().NonLazy();
             Container.Bind<DebugHudSpawner>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.DebugHud").AsSingle().NonLazy();
+            Container.Bind<DevBuildStamp>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.BuildStamp").AsSingle().NonLazy();
+            // The local balance editor (opened from the Developer Mode row of the main menu through IDevBalanceEditor).
+            Container.BindInterfacesAndSelfTo<DevBalanceEditor>().FromNewComponentOnNewGameObject().WithGameObjectName("Diagnostics.BalanceEditor").AsSingle().NonLazy();
         }
     }
 }

@@ -1,0 +1,14 @@
+/* Dev build stamp: bottom-right, under the touch hexes (their rings end 75 px above the edge), clear of the desktop hex
+   strip (bottom centre), the joystick and the menu build stamp (bottom-left). 30 px keeps it over the 30 px menu / 28 px
+   HUD font floor of the UI layout probe. */
+.cw-devstamp-root {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    flex-direction: column; justify-content: flex-end; align-items: flex-end;
+}
+.cw-devstamp {
+    margin-right: 12px; margin-bottom: 6px;
+    font-size: 30px; letter-spacing: 1px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    color: rgba(254, 245, 224, 0.6);
+    -unity-text-outline-width: 1px; -unity-text-outline-color: rgb(42, 26, 12);
+}

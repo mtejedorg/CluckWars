@@ -200,6 +200,8 @@ namespace CluckWars.Tests
             "Assets/_Game/Scripts/UI/MatchHud.cs",
             "Assets/_Game/Scripts/Visuals/ChickenNameplate.cs",
             "Assets/_Game/Scripts/Abilities/PassiveAbilitySO.cs",
+            "Assets/_Game/Scripts/Diagnostics/DevBalanceEditor.cs",
+            "Assets/_Game/Scripts/Diagnostics/DevBuildStamp.cs",
         };
 
         private static IEnumerable<string> AllCodeFiles() =>

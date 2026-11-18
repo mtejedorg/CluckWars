@@ -92,12 +92,12 @@
                  will fight. -->
             <ui:VisualElement name="DevRow" class="cw-menu-secondary-row" style="display: none;">
                 <ui:Button name="AbilityLabBtn" text="@btn.abilityLab" class="cw-btn cw-btn--wood cw-menu-secondary" />
+                <ui:Button name="BalanceEditorBtn" text="@btn.balanceEditor" class="cw-btn cw-btn--wood cw-menu-secondary" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Build stamp — during a test session you otherwise cannot tell which
-             build is on the device. Filled by MenuUiController. -->
-        <ui:Label name="BuildStamp" text="" class="cw-menu-build" picking-mode="Ignore" />
+        <!-- No version stamp here: production shows none (owner, 2026-11-18). Dev-tools builds draw the full
+             version at the bottom-right of every screen (DevBuildStamp, Diagnostics). -->
 
         <!-- Settings gear (wood nav button, top-right). The gear is a sprite (Icons/Glyph_Gear.png;
              Phase 2: no emoji glyphs in menus); the tooltip is its accessible name
@@ -183,6 +183,7 @@
                         </ui:VisualElement>
                         <ui:Toggle name="DeveloperModeToggle" class="cw-opt-toggle" />
                     </ui:VisualElement>
+                    <ui:Label name="AboutVersion" text="" picking-mode="Ignore" class="cw-setting-toggle-row__desc" />
                 </ui:ScrollView>
             </ui:VisualElement>
         </ui:VisualElement>

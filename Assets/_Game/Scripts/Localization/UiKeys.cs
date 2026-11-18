@@ -21,6 +21,8 @@ namespace CluckWars.Localization
         public const string MainSubtitle = "main.subtitle";
         public const string MainSoloHint = "main.soloHint";
         [UiArgs("version")] public const string MainBuild = "main.build";
+        /// <summary>Dev-tools builds only: the full version at the bottom of every screen (<c>DevBuildStamp</c>).</summary>
+        [UiArgs("version", "build")] public const string DevBuildStamp = "dev.buildStamp";
         public const string BtnPlaySolo = "btn.playSolo";
         public const string BtnHost = "btn.host";
         public const string BtnJoin = "btn.join";
@@ -321,6 +323,54 @@ namespace CluckWars.Localization
         public const string DisconnectRejoinFailed = "disconnect.rejoinFailed";
         public const string BtnRejoin = "btn.rejoin";
         public const string BtnBackToMenu = "btn.backToMenu";
+
+        // ---- Dev-tools balance editor (Diagnostics DevBalanceEditor; opened from the Developer Mode row of the main menu) ----
+        public const string BtnBalanceEditor = "btn.balanceEditor";
+        public const string DevBalanceTitle = "dev.balance.title";
+        public const string DevBalanceClose = "dev.balance.close";
+        public const string DevBalanceFilter = "dev.balance.filter";
+        [UiArgs("hash", "origin", "window")] public const string DevBalanceState = "dev.balance.state";
+        public const string DevBalanceWindowOpen = "dev.balance.window.open";
+        public const string DevBalanceWindowClosed = "dev.balance.window.closed";
+        public const string DevBalanceColField = "dev.balance.colField";
+        public const string DevBalanceColShipped = "dev.balance.colShipped";
+        public const string DevBalanceColNow = "dev.balance.colNow";
+        public const string DevBalanceColNew = "dev.balance.colNew";
+        [UiArgs("asset", "group")] public const string DevBalanceGroup = "dev.balance.group";
+        public const string DevBalanceGroupClass = "dev.balance.group.class";
+        public const string DevBalanceGroupSpecialization = "dev.balance.group.specialization";
+        public const string DevBalanceGroupAbility = "dev.balance.group.ability";
+        public const string DevBalanceGroupMatch = "dev.balance.group.match";
+        public const string DevBalanceCheck = "dev.balance.check";
+        public const string DevBalanceApply = "dev.balance.apply";
+        public const string DevBalanceApplyLater = "dev.balance.applyLater";
+        public const string DevBalanceReset = "dev.balance.reset";
+        public const string DevBalanceCopy = "dev.balance.copy";
+        public const string DevBalanceDeltaTitle = "dev.balance.deltaTitle";
+        public const string DevBalanceStatusIdle = "dev.balance.status.idle";
+        [UiArgs("list")] public const string DevBalanceStatusProblems = "dev.balance.status.problems";
+        [UiArgs("reason")] public const string DevBalanceStatusRefused = "dev.balance.status.refused";
+        public const string DevBalanceStatusNoChange = "dev.balance.status.noChange";
+        [UiArgs("count", "list")] public const string DevBalanceStatusChanges = "dev.balance.status.changes";
+        [UiArgs("list")] public const string DevBalanceStatusIgnored = "dev.balance.status.ignored";
+        public const string DevBalanceSctOk = "dev.balance.sct.ok";
+        [UiArgs("reason")] public const string DevBalanceSctSkipped = "dev.balance.sct.skipped";
+        [UiArgs("reason")] public const string DevBalanceSctUnavailable = "dev.balance.sct.unavailable";
+        public const string DevBalanceSctFailed = "dev.balance.sct.failed";
+        [UiArgs("label", "seconds", "trips", "target", "targetTrips", "seat")] public const string DevBalanceSctLine = "dev.balance.sct.line";
+        [UiArgs("label", "seat")] public const string DevBalanceSctLineNotReached = "dev.balance.sct.lineNotReached";
+        [UiArgs("label", "problem")] public const string DevBalanceSctProblem = "dev.balance.sct.problem";
+        [UiArgs("hash")] public const string DevBalanceResultApplied = "dev.balance.result.applied";
+        [UiArgs("hash")] public const string DevBalanceResultStored = "dev.balance.result.stored";
+        [UiArgs("reason")] public const string DevBalanceResultRefused = "dev.balance.result.refused";
+        public const string DevBalanceResultNotAllowed = "dev.balance.result.notAllowed";
+        [UiArgs("hash", "origin")] public const string DevBalanceResultCleared = "dev.balance.result.cleared";
+        [UiArgs("hash")] public const string DevBalanceResultClearedLater = "dev.balance.result.clearedLater";
+        [UiArgs("hash")] public const string DevBalanceCopied = "dev.balance.copied";
+        public const string DevBalanceCopyFailed = "dev.balance.copyFailed";
+        public const string DevBalanceStatusStale = "dev.balance.status.stale";
+        [UiArgs("hash")] public const string DevBalancePending = "dev.balance.pending";
+        [UiArgs("reason")] public const string DevBalanceUnavailable = "dev.balance.unavailable";
 
     }
 }

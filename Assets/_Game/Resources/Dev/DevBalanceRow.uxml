@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- One field of the dev-tools balance editor (DevBalanceEditor, Diagnostics): field name, shipped value, value now, and
+         the input that fits the field (number text, toggle or enum dropdown; code shows one of the three). Styled by
+         DevBalanceEditor.uss, which the editor document loads. Values are data, filled by code. -->
+    <ui:VisualElement name="Row" class="cw-bal-row">
+        <ui:Label name="FieldName" text="" class="cw-bal-cell cw-bal-cell--name" />
+        <ui:Label name="Shipped" text="" class="cw-bal-cell cw-bal-cell--val" />
+        <ui:Label name="Current" text="" class="cw-bal-cell cw-bal-cell--val" />
+        <ui:TextField name="NumberInput" class="cw-bal-input" />
+        <ui:Toggle name="BoolInput" class="cw-bal-input" />
+        <ui:DropdownField name="EnumInput" class="cw-bal-input" />
+    </ui:VisualElement>
+</ui:UXML>

@@ -64,6 +64,7 @@ namespace CluckWars.UI
         private MenuAudio                _audio = MenuAudio.Silent();
         private IInputProvider           _input;
         private IAudioService            _audioService;   // the volume sliders; null = the sliders only persist
+        private CluckWars.Diagnostics.IDevBalanceEditor _devBalanceEditor; // dev-tools builds only; null hides the Balance Editor button
 
         // ---- Runtime state ----------------------------------------------------
         private VisualElement _root;
@@ -198,7 +199,8 @@ namespace CluckWars.UI
             [InjectOptional] MatchConfigSO matchConfig,
             [InjectOptional] MenuAudio audio,
             [InjectOptional] IInputProvider input,
-            [InjectOptional] IAudioService audioService)
+            [InjectOptional] IAudioService audioService,
+            [InjectOptional] CluckWars.Diagnostics.IDevBalanceEditor devBalanceEditor)
         {
             _selection       = selection;
             _log             = log;
@@ -210,6 +212,7 @@ namespace CluckWars.UI
             _audio           = audio ?? MenuAudio.Silent();
             _input           = input;
             _audioService    = audioService;
+            _devBalanceEditor = devBalanceEditor;
         }
 
         private void Awake()
@@ -509,11 +512,8 @@ namespace CluckWars.UI
             Bind<Button>(_mainMenu, "HostBtn", b => b.clicked += () => ChooseMode(SessionMode.Host));
             Bind<Button>(_mainMenu, "JoinBtn", b => b.clicked += () => ChooseMode(SessionMode.Join));
             Bind<Button>(_mainMenu, "AbilityLabBtn", b => b.clicked += OpenAbilityLab);
+            Bind<Button>(_mainMenu, "BalanceEditorBtn", b => b.clicked += OpenBalanceEditor);
             Bind<Button>(_mainMenu, "PlayAgainBtn", b => b.clicked += OnPlayAgainFromMenu);
-
-            // Build stamp — a tester reporting a bug from a device otherwise has no
-            // way to say which build produced it.
-            Bind<Label>(_mainMenu, "BuildStamp", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
 
             BuildSettingsSheet();
             BuildDisconnectSheet();

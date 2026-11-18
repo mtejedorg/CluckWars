@@ -98,6 +98,14 @@ namespace CluckWars.Balance
 
             WriteCache(verdict.IsEmpty ? null : json);
 
+            // A dev-tools local override outranks the remote delta this launch (the cache above still keeps it for Reset
+            // and for the next launch); the owner sees this line instead of a silent switch of numbers.
+            if (_book.Origin == BalanceOrigin.Local)
+            {
+                _log.Info(BalanceBook.Source, $"Balance {verdict.Hash} from {_source.Name} cached, NOT applied: a local override (bal={_book.Hash}) is in force this launch.");
+                return;
+            }
+
             if (verdict.Hash == _book.Hash)
             {
                 _log.Info(BalanceBook.Source, $"Balance from {_source.Name} unchanged: bal={_book.Label} ({_book.Origin}).");

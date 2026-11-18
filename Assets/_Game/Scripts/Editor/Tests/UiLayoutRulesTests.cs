@@ -210,8 +210,8 @@ namespace CluckWars.Tests
             Assert.IsTrue(UiLayoutRules.BelowFontFloor(21f, 28f), "a 28 px hex label at 0.75 scale");
             Assert.IsFalse(UiLayoutRules.BelowFontFloor(30f, 30f));
 
-            Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-menu-build", null, 28f), "the build stamp may sit at 28 px");
-            Assert.IsNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-menu-build", null, 24f), "but never under its entry's floor");
+            Assert.IsNotNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-slot-box__num", null, 28f), "the slot number badge may sit at 28 px");
+            Assert.IsNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-slot-box__num", null, 24f), "but never under its entry's floor");
             Assert.IsNull(UiLayoutAllowList.Find(UiRule.U4, s => s == ".cw-btn", null, 28f), "a button label is load-bearing");
         }
 

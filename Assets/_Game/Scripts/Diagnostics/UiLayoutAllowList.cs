@@ -51,8 +51,6 @@ namespace CluckWars.Diagnostics
                 "podium names ellipsize on the 4-plate draw podium (spec §1.6)"),
 
             // ---- U4: menu captions on the 28 px HUD floor rather than the 30 px menu floor ------------------------------
-            new UiAllowEntry(UiRule.U4, ".cw-menu-build", null, 28f,
-                "build stamp: a tester's reference, deliberately quiet (CluckWarsTheme.uss .cw-menu-build)"),
             new UiAllowEntry(UiRule.U4, ".cw-ability-mono", null, 28f,
                 "monogram fallback shown only for an ability without icon art (AbilityIconStyle)"),
             new UiAllowEntry(UiRule.U4, ".cw-slot-box__num", null, 28f,

@@ -3,6 +3,7 @@ main.title,CLUCK WARS
 main.subtitle,4-PLAYER FARMYARD FREE-FOR-ALL
 main.soloHint,Solo: you vs 3 CPU chickens.
 main.build,v{version}
+dev.buildStamp,{version}+{build}
 btn.playSolo,PLAY SOLO
 btn.host,HOST GAME
 btn.join,JOIN GAME
@@ -259,3 +260,52 @@ disconnect.rejoining,Rejoining…
 disconnect.rejoinFailed,The match is over or full.
 btn.rejoin,REJOIN
 btn.backToMenu,BACK TO MENU
+btn.balanceEditor,BALANCE EDITOR
+dev.balance.title,BALANCE EDITOR: this device only
+dev.balance.close,CLOSE
+dev.balance.filter,Filter by asset or field
+dev.balance.state,bal={hash} ({origin}). {window}
+dev.balance.window.open,The apply window is open: APPLY works now.
+dev.balance.window.closed,A lobby or match started: a change applies next launch.
+dev.balance.colField,FIELD
+dev.balance.colShipped,SHIPPED
+dev.balance.colNow,NOW
+dev.balance.colNew,NEW
+dev.balance.group,{asset} ({group})
+dev.balance.group.class,class
+dev.balance.group.specialization,specialization
+dev.balance.group.ability,ability
+dev.balance.group.match,match
+dev.balance.check,CHECK
+dev.balance.apply,APPLY HERE
+dev.balance.applyLater,STORE FOR NEXT LAUNCH
+dev.balance.reset,RESET TO REMOTE
+dev.balance.copy,COPY DELTA
+dev.balance.deltaTitle,Delta in force. Copy it and publish with /balance publish dev on the PC.
+dev.balance.status.idle,Edit a value then press CHECK.
+dev.balance.status.problems,"Fix these first:
+{list}"
+dev.balance.status.refused,Refused. Nothing applies: {reason}
+dev.balance.status.noChange,No difference from the shipped assets. APPLY clears the local override.
+dev.balance.status.changes,"{count} change(s):
+{list}"
+dev.balance.status.ignored,"Ignored:
+{list}"
+dev.balance.sct.ok,SCT axiom holds.
+dev.balance.sct.skipped,SCT check not needed: {reason}.
+dev.balance.sct.unavailable,"SCT check could not run, so APPLY is blocked: {reason}."
+dev.balance.sct.failed,SCT axiom broken. APPLY is blocked:
+dev.balance.sct.line,{label}: {seconds} s and {trips} trips on seat {seat} (target {target} s and {targetTrips} trips)
+dev.balance.sct.lineNotReached,{label}: never banks the target on seat {seat}
+dev.balance.sct.problem,{label}: {problem}
+dev.balance.result.applied,Applied here: bal={hash}. Stored on this device.
+dev.balance.result.stored,Stored: bal={hash} applies next launch.
+dev.balance.result.refused,Not applied: {reason}
+dev.balance.result.notAllowed,Dev tools are off: nothing done.
+dev.balance.result.cleared,Local override deleted. Running bal={hash} ({origin}).
+dev.balance.result.clearedLater,Local override deleted. bal={hash} keeps running until next launch.
+dev.balance.copied,Copied bal={hash} to the clipboard.
+dev.balance.copyFailed,No clipboard here. Select the text below or read the log line.
+dev.balance.unavailable,The balance editor is unavailable: {reason}
+dev.balance.status.stale,The balance in force changed since CHECK. Press CHECK again.
+dev.balance.pending,Pending next launch: bal={hash}.

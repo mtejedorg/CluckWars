@@ -19,6 +19,11 @@ namespace CluckWars.Balance
         Cache = 1,
         /// <summary>A delta fetched from the live-ops source this launch.</summary>
         Remote = 2,
+        /// <summary>
+        /// A delta applied on this device by the dev-tools balance editor (<see cref="BalanceBook.ApplyLocal"/>), from the
+        /// editor or from its local file at boot. Dev-tools builds only (ARCH-DATA-14, owner ruling 2026-11-18).
+        /// </summary>
+        Local = 3,
     }
 
     /// <summary>What <see cref="BalanceBook.Evaluate"/> decided about one delta.</summary>
@@ -106,7 +111,7 @@ namespace CluckWars.Balance
     /// computed per chicken at spawn, after the window has closed. <c>AbilityTargeting.Mode</c>, the only value pushed
     /// into a static at install, comes from a deny-listed field.</para>
     /// </remarks>
-    public sealed class BalanceBook : IDisposable
+    public sealed partial class BalanceBook : IDisposable
     {
         public const string Source = "Balance";
         /// <summary>The newest delta schema this build reads. A newer one is ignored whole ("update the app").</summary>
@@ -479,6 +484,8 @@ namespace CluckWars.Balance
         public bool Apply(BalanceVerdict verdict, BalanceOrigin origin)
         {
             if (verdict == null || !verdict.IsAccepted) return false;
+            // The single enforcement point of the local path: whatever calls Apply, a Local origin needs dev tools.
+            if (origin == BalanceOrigin.Local && !CheckLocalAllowed("local apply")) return false;
             if (_disposed) { _log.Warn(Source, "Balance apply after dispose ignored."); return false; }
             if (!ApplyWindowOpen)
             {
@@ -694,8 +701,12 @@ namespace CluckWars.Balance
             return string.Join(",", names);
         }
 
-        /// <summary>Canonical JSON of an accepted verdict: sorted keys, invariant numbers, no whitespace, note left out.</summary>
-        private static string Canonicalize(BalanceVerdict v)
+        /// <summary>
+        /// Canonical JSON of an accepted verdict: sorted keys, invariant numbers, no whitespace, note left out. With
+        /// <paramref name="publish"/> an enum field is written as its member name instead of its number: the form
+        /// <c>make_delta.py</c> accepts (it refuses a numeric enum). Both read back to the same canonical form and hash.
+        /// </summary>
+        private static string Canonicalize(BalanceVerdict v, bool publish = false)
         {
             var sb = new StringBuilder("{");
             bool any = false;
@@ -707,7 +718,8 @@ namespace CluckWars.Balance
                 for (int i = 0; i < assets.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    sb.Append(BalanceJson.Quote(assets[i].Name)).Append(':').Append(PartialJson(assets[i].Tokens));
+                    sb.Append(BalanceJson.Quote(assets[i].Name)).Append(':')
+                      .Append(publish ? PublishTokens(assets[i]) : PartialJson(assets[i].Tokens));
                 }
                 sb.Append('}');
                 any = true;
@@ -735,6 +747,51 @@ namespace CluckWars.Balance
             if (any) sb.Append(',');
             sb.Append("\"schema\":").Append(v.Schema.ToString(CultureInfo.InvariantCulture));
             return sb.Append('}').ToString();
+        }
+
+        private static string PublishTokens(BalanceVerdict.AssetChange change)
+        {
+            var tokens = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var kv in change.Tokens) tokens[kv.Key] = PublishToken(change.Asset, kv.Key, kv.Value);
+            return PartialJson(tokens);
+        }
+
+        /// <summary>An enum field's numeric token as its quoted member name (when the number is a defined member); other tokens unchanged.</summary>
+        private static string PublishToken(ScriptableObject asset, string field, string token)
+        {
+            var f = FindField(asset.GetType(), field);
+            if (f != null && f.FieldType.IsEnum
+                && long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out long n))
+            {
+                object value = Enum.ToObject(f.FieldType, n);
+                if (Enum.IsDefined(f.FieldType, value)) return BalanceJson.Quote(Enum.GetName(f.FieldType, value));
+            }
+            return token;
+        }
+
+        /// <summary>
+        /// A throwaway copy of <paramref name="original"/> as it would read with <paramref name="verdict"/> applied over the
+        /// SHIPPED assets (not over what is applied now): the oracle check reads proposed values from it without touching
+        /// the live asset or this book's snapshots. The caller destroys the copy.
+        /// </summary>
+        public T Preview<T>(T original, BalanceVerdict verdict) where T : ScriptableObject
+        {
+            var copy = UnityEngine.Object.Instantiate(original);
+            try
+            {
+                if (_snapshots.TryGetValue(original, out var snap)) JsonUtility.FromJsonOverwrite(snap.Json, copy);
+                if (verdict != null)
+                    foreach (var change in verdict.Assets)
+                        if (change.Asset == original) JsonUtility.FromJsonOverwrite(PartialJson(change.Tokens), copy);
+                return copy;
+            }
+            catch
+            {
+                // The caller never receives the copy, so it cannot destroy it: do it here, then let the error surface.
+                if (Application.isPlaying) UnityEngine.Object.Destroy(copy);
+                else UnityEngine.Object.DestroyImmediate(copy);
+                throw;
+            }
         }
 
         /// <summary>FNV-1a 32-bit over the UTF-8 bytes of <paramref name="canonical"/>, as 8 lowercase hex digits.</summary>

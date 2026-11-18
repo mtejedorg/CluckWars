@@ -1,0 +1,56 @@
+/* Dev-tools balance editor (DevBalanceEditor). A full-screen scrim with one panel; every font is 28 px or more so the UI
+   layout probe's HUD floor holds. Display is driven from C# (none until opened): no display rule for the root here. */
+.cw-bal-root {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(20, 12, 6, 0.82);
+    justify-content: center; align-items: center;
+}
+.cw-bal-panel {
+    flex-grow: 1; align-self: stretch;
+    margin: 24px; padding: 20px;
+    background-color: rgb(58, 40, 24);
+    border-radius: 18px;
+    border-width: 3px; border-color: rgb(42, 26, 12);
+}
+.cw-bal-head { flex-direction: row; justify-content: space-between; align-items: center; }
+.cw-bal-title {
+    font-size: 36px; letter-spacing: 1px; flex-shrink: 1;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    color: rgb(254, 245, 224);
+}
+.cw-bal-line {
+    font-size: 28px; white-space: normal; margin-top: 6px; margin-bottom: 6px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    color: rgb(254, 245, 224);
+}
+.cw-bal-caption {
+    font-size: 28px; margin-top: 8px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    color: rgba(254, 245, 224, 0.75);
+}
+.cw-bal-btn {
+    font-size: 28px; min-height: 64px; min-width: 120px; margin: 4px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+}
+.cw-bal-actions { flex-direction: row; flex-wrap: wrap; margin-top: 8px; }
+.cw-bal-actions .cw-bal-btn:disabled { opacity: 0.4; }
+
+.cw-bal-filter { margin-top: 4px; }
+.cw-bal-filter .unity-base-text-field__input, .cw-bal-input .unity-base-text-field__input, .cw-bal-delta .unity-base-text-field__input { font-size: 28px; min-height: 52px; }
+.cw-bal-list { flex-grow: 1; flex-shrink: 1; min-height: 240px; margin-top: 6px; background-color: rgba(0, 0, 0, 0.25); }
+.cw-bal-report { max-height: 260px; min-height: 90px; flex-shrink: 0; background-color: rgba(0, 0, 0, 0.25); margin-top: 6px; padding: 6px; }
+.cw-bal-delta { margin-top: 4px; min-height: 130px; max-height: 190px; }
+
+.cw-bal-row { flex-direction: row; align-items: center; min-height: 60px; padding-left: 6px; padding-right: 6px; }
+.cw-bal-row--head { min-height: 40px; margin-top: 6px; }
+.cw-bal-row--changed .cw-bal-cell--val { color: rgb(255, 214, 120); }
+.cw-bal-row--edited { background-color: rgba(120, 200, 120, 0.22); }
+.cw-bal-cell {
+    font-size: 28px; overflow: hidden; white-space: nowrap;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/Nunito-Bold.ttf");
+    color: rgb(254, 245, 224);
+}
+.cw-bal-cell--name { flex-grow: 1; flex-shrink: 1; flex-basis: 0; min-width: 120px; }
+.cw-bal-cell--val { width: 150px; flex-shrink: 0; }
+.cw-bal-cell--input { width: 200px; flex-shrink: 0; }
+.cw-bal-input { width: 200px; flex-shrink: 0; margin: 0; }

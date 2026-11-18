@@ -171,6 +171,8 @@ namespace CluckWars.UI
             }
 
             Bind<Button>(_mainMenu, "SettingsBtn", b => b.clicked += OpenSettings);
+            // About: the only place the player-facing version shows (production included); the dev stamp is separate.
+            Bind<Label>(_settingsSheet, "AboutVersion", l => l.text = UiText.Format(UiKeys.MainBuild, ("version", Application.version)));
             Bind<Button>(_settingsSheet, "SettingsCloseBtn", b => { b.clicked += CloseSettings; BackCue(b); });
             // A tap on the dimmed scrim (outside the panel) closes too; taps inside the panel
             // bubble up here with a different target and are ignored.
@@ -396,6 +398,9 @@ namespace CluckWars.UI
         {
             Bind<VisualElement>(_mainMenu, "DevRow", r =>
                 UiElements.SetShown(r, DevToolsAvailable && PlayerPreferences.DeveloperModeEnabled));
+            // The balance editor exists only where the Diagnostics layer bound it (dev-tools builds): no binding, no button.
+            Bind<Button>(_mainMenu, "BalanceEditorBtn", b =>
+                UiElements.SetShown(b, DevToolsAvailable && _devBalanceEditor != null));
         }
 
         /// <summary>
@@ -430,6 +435,17 @@ namespace CluckWars.UI
 
             _log?.Info(Source, "Opening the Ability Lab.");
             UnityEngine.SceneManagement.SceneManager.LoadScene(AbilityLabSceneName);
+        }
+
+        /// <summary>Opens the dev-tools balance editor over the menu (same gates as <see cref="OpenAbilityLab"/>).</summary>
+        private void OpenBalanceEditor()
+        {
+            if (!DevToolsAvailable || !PlayerPreferences.DeveloperModeEnabled || _devBalanceEditor == null)
+            {
+                _log?.Warn(Source, "Balance editor requested without Developer Mode or dev tools. Ignoring.");
+                return;
+            }
+            _devBalanceEditor.Open();
         }
 
 

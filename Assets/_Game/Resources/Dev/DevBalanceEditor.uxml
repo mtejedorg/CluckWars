@@ -1,0 +1,41 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/_Game/Resources/Dev/DevBalanceEditor.uss" />
+
+    <!-- Dev-tools builds only (DevBalanceEditor, Diagnostics): edit balance values on THIS device, check them against the
+         SCT axiom, apply them locally, copy the delta to publish from the PC. Text is "@key" (UiText.csv, dev.balance.*) or
+         filled by code; the field rows come from DevBalanceRow.uxml. -->
+    <ui:VisualElement name="BalanceRoot" class="cw-bal-root">
+        <ui:VisualElement name="Panel" class="cw-bal-panel">
+            <ui:VisualElement class="cw-bal-head">
+                <ui:Label name="Title" text="@dev.balance.title" class="cw-bal-title" />
+                <ui:Button name="CloseBtn" text="@dev.balance.close" class="cw-bal-btn" />
+            </ui:VisualElement>
+            <ui:Label name="StateLine" text="" class="cw-bal-line" />
+
+            <ui:Label text="@dev.balance.filter" class="cw-bal-caption" />
+            <ui:TextField name="Filter" class="cw-bal-filter" />
+
+            <ui:VisualElement class="cw-bal-row cw-bal-row--head">
+                <ui:Label text="@dev.balance.colField" class="cw-bal-cell cw-bal-cell--name" />
+                <ui:Label text="@dev.balance.colShipped" class="cw-bal-cell cw-bal-cell--val" />
+                <ui:Label text="@dev.balance.colNow" class="cw-bal-cell cw-bal-cell--val" />
+                <ui:Label text="@dev.balance.colNew" class="cw-bal-cell cw-bal-cell--input" />
+            </ui:VisualElement>
+            <ui:ScrollView name="List" class="cw-bal-list" />
+
+            <ui:ScrollView name="ReportScroll" class="cw-bal-report">
+                <ui:Label name="Report" text="" class="cw-bal-line" />
+            </ui:ScrollView>
+
+            <ui:VisualElement class="cw-bal-actions">
+                <ui:Button name="CheckBtn" text="@dev.balance.check" class="cw-bal-btn" />
+                <ui:Button name="ApplyBtn" text="@dev.balance.apply" class="cw-bal-btn" />
+                <ui:Button name="ResetBtn" text="@dev.balance.reset" class="cw-bal-btn" />
+                <ui:Button name="CopyBtn" text="@dev.balance.copy" class="cw-bal-btn" />
+            </ui:VisualElement>
+
+            <ui:Label text="@dev.balance.deltaTitle" class="cw-bal-caption" />
+            <ui:TextField name="DeltaText" class="cw-bal-delta" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
