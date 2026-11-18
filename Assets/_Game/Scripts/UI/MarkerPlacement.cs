@@ -359,16 +359,20 @@ namespace CluckWars.UI
         /// <summary>The chip's half extents, panel px ("999 m" is ~134 px wide, the pill 42 tall).</summary>
         public const float ChipHalfWidthPx = 67f, ChipHalfHeightPx = 21f;
 
-        /// <summary>Pure: the badge centre on the arrow's tip, panel px (y down). <paramref name="outward"/> is the arrow's direction
-        /// on screen (panel axes, away from the hunter's bird). The badge's visible edge stands
-        /// <see cref="FeedbackTuning.MarkOnArrowGapPx"/> beyond the tip, slid further outward until it clears the hunter's own "You"
-        /// plate (inflated), then kept whole on the panel.</summary>
-        public static Vector2 OnArrowCentre(Vector2 tip, Vector2 outward, Vector2 panel, bool hasYou, Rect you)
+        /// <summary>Pure: the badge centre ON the arrow, panel px (y down), from the arrow's <paramref name="tail"/> and
+        /// <paramref name="tip"/> projected to the panel (the outward direction is tail to tip). The centre is the middle of the
+        /// tail-to-tip segment, moved toward the tail only as far as needed to leave
+        /// <see cref="FeedbackTuning.MarkOnArrowHeadVisiblePx"/> of the arrow showing beyond the badge's edge on the tip side (on the
+        /// tail when the arrow is too short for that); then slid outward until it clears the hunter's own "You" plate (inflated),
+        /// then kept whole on the panel.</summary>
+        public static Vector2 OnArrowCentre(Vector2 tail, Vector2 tip, Vector2 panel, bool hasYou, Rect you)
         {
-            if (outward.sqrMagnitude < 1e-8f) outward = Vector2.up;
-            outward.Normalize();
+            Vector2 axis = tip - tail;
+            float length = axis.magnitude;
+            Vector2 outward = length < 1e-4f ? Vector2.up : axis / length;
             float r = OnArrowRadiusPx;
-            Vector2 at = tip + outward * (FeedbackTuning.MarkOnArrowGapPx + r);
+            float along = Mathf.Min(length * 0.5f, Mathf.Max(0f, length - FeedbackTuning.MarkOnArrowHeadVisiblePx - r));
+            Vector2 at = tail + outward * along;
             if (hasYou) at = SlideOff(at, r, you, outward);
             return new Vector2(Mathf.Clamp(at.x, r, Mathf.Max(r, panel.x - r)), Mathf.Clamp(at.y, r, Mathf.Max(r, panel.y - r)));
         }

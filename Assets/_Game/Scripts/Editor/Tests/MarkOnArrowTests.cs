@@ -9,7 +9,7 @@ namespace CluckWars.Tests
     /// <summary>
     /// K5r (owner 2026-11-17: the mark is integrated in the arrow at the floor, and only appears above the head inside the circle):
     /// the anchor rule with its hysteresis, the marked target's arrow decision, the emphasised arrow, and the badge placed
-    /// beyond the arrow's tip. Radii and sizes come from <see cref="FloorArrowRules"/> and <see cref="FeedbackTuning"/>, never literals.
+    /// on the arrow's body (K12). Radii and sizes come from <see cref="FloorArrowRules"/> and <see cref="FeedbackTuning"/>, never literals.
     /// </summary>
     public sealed class MarkOnArrowTests
     {
@@ -248,19 +248,67 @@ namespace CluckWars.Tests
 
         private static readonly Vector2 Panel = new Vector2(1920f, 1080f);
 
-        [TestCase(1f, 0f)]
-        [TestCase(-1f, 0f)]
-        [TestCase(0f, -1f)]
-        [TestCase(0f, 1f)]
-        [TestCase(0.7f, -0.7f)]
-        public void OnArrow_BadgeSitsBeyondTheTip_OnTheOutwardSide(float ox, float oy)
+        /// <summary>A typical emphasised arrow's length on the panel, px (the K12 estimate: 2 m to 2.5 m of floor at 43 to 86 px/m).</summary>
+        private const float ArrowPx = 200f;
+
+        private static readonly Vector2[] EightDirections =
         {
-            var tip = new Vector2(960f, 540f);
-            var outward = new Vector2(ox, oy).normalized;
-            Vector2 c = MarkerPlacement.OnArrowCentre(tip, outward, Panel, false, default);
-            float beyond = Vector2.Dot(c - tip, outward);
-            Assert.AreEqual(FeedbackTuning.MarkOnArrowGapPx + MarkerPlacement.OnArrowRadiusPx, beyond, 0.01f, "the gap past the tip, then the badge");
-            Assert.AreEqual(0f, Vector2.Dot(c - tip, new Vector2(-outward.y, outward.x)), 0.01f, "on the arrow's own axis");
+            new Vector2(1f, 0f), new Vector2(-1f, 0f), new Vector2(0f, 1f), new Vector2(0f, -1f),
+            new Vector2(1f, 1f).normalized, new Vector2(-1f, 1f).normalized, new Vector2(1f, -1f).normalized, new Vector2(-1f, -1f).normalized,
+        };
+
+        /// <summary>The on-arrow centre for an arrow of <paramref name="length"/> px ending at <paramref name="tip"/>, pointing
+        /// <paramref name="outward"/> (the tail is behind the tip).</summary>
+        private static Vector2 Centre(Vector2 tip, Vector2 outward, Vector2 panel, bool hasYou, Rect you, float length = ArrowPx) =>
+            MarkerPlacement.OnArrowCentre(tip - outward.normalized * length, tip, panel, hasYou, you);
+
+        [Test]
+        public void OnArrow_CentreIsOnTheTailToTipSegment_NotBeyondTheTip_InEightDirections()
+        {
+            var tail = new Vector2(960f, 540f);
+            foreach (var d in EightDirections)
+            {
+                var tip = tail + d * 300f;
+                Vector2 c = MarkerPlacement.OnArrowCentre(tail, tip, Panel, false, default);
+                float along = Vector2.Dot(c - tail, d);
+                Assert.AreEqual(0f, Vector2.Dot(c - tail, new Vector2(-d.y, d.x)), 0.01f, $"on the arrow's own axis {d}");
+                Assert.That(along, Is.InRange(0f, 300f), $"between the tail and the tip, not beyond it {d}");
+                Assert.AreEqual(150f, along, 0.01f, $"a long arrow: the middle of the segment {d}");
+            }
+        }
+
+        [Test]
+        public void OnArrow_LeavesTheHeadVisibleBeyondTheBadge_WhenTheArrowIsLongEnough()
+        {
+            float r = MarkerPlacement.OnArrowRadiusPx, head = FeedbackTuning.MarkOnArrowHeadVisiblePx;
+            var tail = new Vector2(960f, 540f);
+            foreach (var d in EightDirections)
+                for (float length = r + head; length <= 400f; length += 7f)
+                {
+                    var tip = tail + d * length;
+                    Vector2 c = MarkerPlacement.OnArrowCentre(tail, tip, Panel, false, default);
+                    float along = Vector2.Dot(c - tail, d);
+                    float visible = length - (along + r);
+                    string what = $"dir {d} length {length}";
+                    Assert.GreaterOrEqual(visible, head - 1e-3f, "the head shows beyond the badge: " + what);
+                    Assert.GreaterOrEqual(along, -1e-3f, "never behind the tail: " + what);
+                    Assert.LessOrEqual(along, length * 0.5f + 1e-3f, "never past the middle: " + what);
+                    // Moved toward the tail only as far as needed: either the middle, or exactly the head's worth is left.
+                    Assert.IsTrue(Mathf.Approximately(along, length * 0.5f) || Mathf.Abs(visible - head) < 1e-2f, "no further than needed: " + what);
+                }
+        }
+
+        [Test]
+        public void OnArrow_ShortArrow_PutsTheCentreOnTheTail()
+        {
+            float r = MarkerPlacement.OnArrowRadiusPx, head = FeedbackTuning.MarkOnArrowHeadVisiblePx;
+            var tail = new Vector2(960f, 540f);
+            foreach (var d in EightDirections)
+                foreach (float length in new[] { 0f, 10f, r + head - 0.5f })
+                {
+                    Vector2 c = MarkerPlacement.OnArrowCentre(tail, tail + d * length, Panel, false, default);
+                    Assert.AreEqual(0f, Vector2.Distance(c, tail), 0.01f, $"dir {d} length {length}: the badge stays on the tail");
+                }
         }
 
         [Test]
@@ -269,19 +317,20 @@ namespace CluckWars.Tests
             // The "You" plate sits right where an arrow pointing up from the bird would put its badge.
             var tip = new Vector2(960f, 420f);
             var outward = new Vector2(0f, -1f);   // up the screen (panel y is down)
-            var plate = Rect.MinMaxRect(860f, 330f, 1060f, 380f);
-            Vector2 c = MarkerPlacement.OnArrowCentre(tip, outward, Panel, true, plate);
+            var tail = tip - outward * ArrowPx;
+            var plate = Rect.MinMaxRect(860f, 470f, 1060f, 520f);   // over the middle of the arrow, where the badge now sits
+            Vector2 c = MarkerPlacement.OnArrowCentre(tail, tip, Panel, true, plate);
             float r = MarkerPlacement.OnArrowRadiusPx, m = FeedbackTuning.MarkMarkerYouPlateMarginPx;
             var badge = Rect.MinMaxRect(c.x - r, c.y - r, c.x + r, c.y + r);
             Assert.IsFalse(badge.Overlaps(Rect.MinMaxRect(plate.xMin - m, plate.yMin - m, plate.xMax + m, plate.yMax + m)), "off the plate");
-            Assert.Less(c.y, tip.y, "still on the outward side of the tip");
+            Assert.Less(c.y, tail.y, "still on the outward side of the tail");
         }
 
         [Test]
         public void OnArrow_StaysWholeOnThePanel()
         {
             float r = MarkerPlacement.OnArrowRadiusPx;
-            Vector2 c = MarkerPlacement.OnArrowCentre(new Vector2(Panel.x - 2f, 4f), new Vector2(1f, -1f), Panel, false, default);
+            Vector2 c = Centre(new Vector2(Panel.x - 2f, 4f), new Vector2(1f, -1f), Panel, false, default);
             Assert.LessOrEqual(c.x, Panel.x - r + 1e-3f);
             Assert.GreaterOrEqual(c.y, r - 1e-3f);
         }
@@ -316,7 +365,7 @@ namespace CluckWars.Tests
                 foreach (var outward in new[] { Vector2.up, Vector2.down, Vector2.left, Vector2.right, new Vector2(1f, 1f), new Vector2(-1f, -1f) })
                 {
                     var plate = Rect.MinMaxRect(w * 0.5f - 60f, h * 0.5f - 20f, w * 0.5f + 60f, h * 0.5f + 20f);
-                    Vector2 c0 = MarkerPlacement.OnArrowCentre(tip, outward, panel, plateOn, plate);
+                    Vector2 c0 = Centre(tip, outward, panel, plateOn, plate);
                     Vector2 c = MarkerPlacement.SettleOnArrow(c0, outward, panel, plateOn, plate, out bool above);
                     string what = $"tip {tip} outward {outward} plate {plateOn} -> {c}, chip {(above ? "above" : "below")}";
                     var badge = Rect.MinMaxRect(c.x - r, c.y - r, c.x + r, c.y + r);
@@ -333,7 +382,7 @@ namespace CluckWars.Tests
         {
             var panel = new Vector2(2133f, 960f);
             var tip = new Vector2(1260f, 890f);   // the 175412 run: the chip was 946..987 on a 960 panel
-            Vector2 c0 = MarkerPlacement.OnArrowCentre(tip, Vector2.down, panel, false, default);
+            Vector2 c0 = Centre(tip, Vector2.down, panel, false, default);
             Vector2 c = MarkerPlacement.SettleOnArrow(c0, Vector2.down, panel, false, default, out bool above);
             float cy = c.y + (above ? -1f : 1f) * FeedbackTuning.MarkOnArrowChipOffsetPx;
             Assert.LessOrEqual(cy + MarkerPlacement.ChipHalfHeightPx, panel.y);
@@ -369,7 +418,7 @@ namespace CluckWars.Tests
             foreach (var outward in new[] { Vector2.up, Vector2.down, new Vector2(1f, 1f), new Vector2(-1f, -1f) })
             {
                 var tip = new Vector2(1300f, ty);
-                Vector2 c = MarkerPlacement.SettleOnArrow(MarkerPlacement.OnArrowCentre(tip, outward, panel, false, default), outward, panel, false, default, out bool above);
+                Vector2 c = MarkerPlacement.SettleOnArrow(Centre(tip, outward, panel, false, default), outward, panel, false, default, out bool above);
                 float boxTop = c.y - MarkerPlacement.MarkerBoxHalfPx;
                 float layoutTop = boxTop + MarkerPlacement.ChipTopPx(true, above, FeedbackTuning.MarkMarkerOnArrowScale);
                 string what = $"tip y {ty} outward {outward} chip {(above ? "above" : "below")} layout top {layoutTop}";

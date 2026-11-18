@@ -874,8 +874,7 @@ namespace CluckWars.Visuals
         /// <summary>K5r (owner 2026-11-17): the mark rides the target's floor arrow while the target is outside the floor circle.
         /// The circle's hysteresis (metres: once inside, the target stays inside until it is this far beyond the ring), the
         /// emphasised arrow's scale on length and width (the pooled arrow mesh is uniformly scaled), the marker's scale as a badge
-        /// on the arrow tip (0.67 of the K3 size, about the old 96 px box), and the clear gap between the arrow tip and the badge's
-        /// visible edge (panel px).</summary>
+        /// on the arrow (0.67 of the K3 size, about the old 96 px box).</summary>
         public const float MarkCircleHysteresisMetres = 0.4f;
         public const float MarkArrowScale = 1.5f;
         public const float MarkMarkerOnArrowScale = 0.67f;
@@ -896,7 +895,9 @@ namespace CluckWars.Visuals
         public const int HuntBracketSortingOrder = 4;
         /// <summary>The ink of the outline's alpha share (the stroke itself is fully opaque).</summary>
         public const float HuntBracketInkAlpha = 0.9f;
-        public const float MarkOnArrowGapPx = 8f;
+        /// <summary>The on-arrow badge sits on the arrow's body; at least this much of the arrow's length (panel px) shows beyond the
+        /// badge's edge on the tip side, so the head still reads as an arrow.</summary>
+        public const float MarkOnArrowHeadVisiblePx = 22f;
         /// <summary>The metres chip's centre, panel px from the badge centre, on the vertical side away from the hunter's bird: the
         /// badge's visible radius (ring centre line + half its ink track, scaled) + a 6 px gap + half the 42 px chip.</summary>
         public const float MarkOnArrowChipOffsetPx = 71f;

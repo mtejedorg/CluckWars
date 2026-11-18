@@ -278,11 +278,12 @@ namespace CluckWars.UI
             Vector3 b = cam.WorldToViewportPoint(tail);
             if (t.z <= 0f || b.z <= 0f) return MarkAnchor.EdgeFallback;   // behind the camera: the edge fallback keeps a sign
             var tipPanel = new Vector2(t.x * panel.x, (1f - t.y) * panel.y);
-            outward = tipPanel - new Vector2(b.x * panel.x, (1f - b.y) * panel.y);
+            var tailPanel = new Vector2(b.x * panel.x, (1f - b.y) * panel.y);
+            outward = tipPanel - tailPanel;
 
             var plate = local.Nameplate();
             hasYou = plate != null && plate.TryGetPlateViewport(cam, out Rect yvp) && Assign(out you, MarkerPlacement.ToPanel(yvp, panel));
-            centre = MarkerPlacement.OnArrowCentre(tipPanel, outward, panel, hasYou, you);
+            centre = MarkerPlacement.OnArrowCentre(tailPanel, tipPanel, panel, hasYou, you);
             return MarkAnchor.OnArrow;
         }
 
