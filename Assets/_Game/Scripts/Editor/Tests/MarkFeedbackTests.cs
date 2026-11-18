@@ -142,10 +142,11 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void EndWordColour_SafeIsNeutralGrey_MissedIsHuntAccent()
+        public void EndWordColour_SafeIsNeutralGrey_MissedIsThePalettesCream()
         {
             Assert.AreEqual(FeedbackTuning.NeutralNoEffectColor, MarkFeedback.EndWordColour(MarkEndCause.Safe), "the grey HitFeedback gives SAFE");
-            Assert.AreEqual(FeedbackPalette.Current.Accent(AccentKey.Hunt), MarkFeedback.EndWordColour(MarkEndCause.Missed));
+            Assert.AreEqual(FeedbackPalette.Current.MarkMissedColor, MarkFeedback.EndWordColour(MarkEndCause.Missed));
+            Assert.AreNotEqual(FeedbackPalette.Current.Accent(AccentKey.Hunt), MarkFeedback.EndWordColour(MarkEndCause.Missed), "MISSED is no longer the Hunt accent");
         }
 
         [Test]

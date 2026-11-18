@@ -101,7 +101,7 @@ namespace CluckWars.Visuals
 
         /// <summary>
         /// The shader uniforms for both moods. When every victim weight is under <see cref="FeedbackTuning.MarkMoodOffEpsilon"/>
-        /// and the hunt mood is not, the same four vectors carry the hunter's edge: dark = the DIM colour, shape = (0, edge x
+        /// and the hunt mood is not, the same four vectors carry the hunter's edge: dark = the hunter-edge colour, shape = (0, edge x
         /// <see cref="FeedbackTuning.MarkHuntMoodEdge"/>, hunt inner, 1 / (outer - inner)), the tint slot = (glow colour, glow alpha),
         /// grade = (0, glow centre share). The victim's mood wins if both are set.
         /// </summary>
@@ -112,8 +112,8 @@ namespace CluckWars.Visuals
             bool victimOff = weights.x < eps && weights.y < eps && weights.z < eps;
             if (victimOff && (huntEdge >= eps || huntGlow >= eps))
             {
-                var dim = FeedbackTuning.MarkMoodDimColour;
-                dark = new Vector4(dim.r, dim.g, dim.b, 1f);
+                var edge = FeedbackTuning.MarkHunterEdgeColour;
+                dark = new Vector4(edge.r, edge.g, edge.b, 1f);
                 float huntSpan = Mathf.Max(1e-4f, FeedbackTuning.MarkMoodVignetteOuter - FeedbackTuning.MarkHuntMoodVignetteInner);
                 shape = new Vector4(0f, Clamp01(huntEdge) * FeedbackTuning.MarkHuntMoodEdge, FeedbackTuning.MarkHuntMoodVignetteInner, 1f / huntSpan);
                 red = new Vector4(huntColour.r, huntColour.g, huntColour.b, Clamp01(huntGlow));

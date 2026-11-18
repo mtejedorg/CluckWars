@@ -737,7 +737,7 @@ namespace CluckWars.Visuals
         // Maestro's 2026-11 redesign. Every timing below is the model's; the UI controllers only draw its outputs.
 
         /// <summary>Kill-ready: the hunt marker and the Death Mark hex turn this colour (#FFEB1A).</summary>
-        public static readonly Color MarkKillColor = new Color(1f, 0.92f, 0.1f, 1f);
+        public static Color MarkKillColor => FeedbackPalette.Current.MarkPounceColor;
         /// <summary>The marker's disc and the skull's ink (#140A1A).</summary>
         public static readonly Color MarkInk = new Color(0.08f, 0.04f, 0.1f, 1f);
         /// <summary>The victim's toast and clock plates (#B80D1A).</summary>
@@ -837,7 +837,7 @@ namespace CluckWars.Visuals
         public const float MarkLivePulse = 0.12f;
         public const float MarkLivePulseHz = 4f;
         /// <summary>The standings skull's tint once the kill is live (the screen mood's red), and its ink tint before.</summary>
-        public static readonly Color MarkSkullLiveColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public static Color MarkSkullLiveColor => FeedbackPalette.Current.MarkLiveColor;
         /// <summary>The hunt's "not legal yet" red (live second, pounce blocked): the skull's live red, one home.</summary>
         public static Color MarkHuntBlockedColor => MarkSkullLiveColor;
         public static readonly Color MarkSkullInkColor = new Color(22f / 255f, 16f / 255f, 28f / 255f, 1f);
@@ -924,16 +924,20 @@ namespace CluckWars.Visuals
         public const float MarkMoodVignetteInner = 0.22f;
         public const float MarkMoodVignetteOuter = 1.0f;
         /// <summary>DIM: the darkness colour with the Assassin far away (near-black, a hint of violet).</summary>
-        public static readonly Color MarkMoodDimColour = new Color(0.03f, 0.015f, 0.05f, 1f);
+        public static Color MarkMoodDimColour => FeedbackPalette.Current.MarkVictimDimColor;
+        /// <summary>The hunter's screen edge: the dark colour of the hunt mood (tuned apart from the victim's dim).</summary>
+        public static Color MarkHunterEdgeColour => FeedbackPalette.Current.MarkHunterEdgeColor;
+        /// <summary>The MISSED word's colour (cream by default, K11).</summary>
+        public static Color MarkMissedColor => FeedbackPalette.Current.MarkMissedColor;
         /// <summary>COLD: the darkness turns this deep violet as cold01 rises. Kept dark (luma ~0.1) so the edge stays
         /// darkness, not a violet fog: a lighter violet (0.22, 0.09, 0.46) read brighter than plain DIM in the 960x540 proof.</summary>
-        public static readonly Color MarkMoodColdColour = new Color(0.13f, 0.05f, 0.28f, 1f);
+        public static Color MarkMoodColdColour => FeedbackPalette.Current.MarkVictimColdColor;
         /// <summary>COLD: extra darkness alpha added at the edge at cold01 = 1 (the walls close in a little).</summary>
         public const float MarkMoodColdEdgeBoost = 0.08f;
         /// <summary>COLD: share of the scene's colour removed at cold01 = 1 (0 = untouched, 1 = greyscale).</summary>
         public const float MarkMoodColdDesaturation = 0.6f;
         /// <summary>RED: the tint colour, and its alpha at the edge at red01 = 1 (~7%: felt more than seen).</summary>
-        public static readonly Color MarkMoodRedColour = new Color(0.9f, 0.04f, 0.04f, 1f);
+        public static Color MarkMoodRedColour => FeedbackPalette.Current.MarkVictimRedColor;
         public const float MarkMoodRedAmount = 0.07f;
         /// <summary>RED: centre alpha as a share of the edge alpha (it lives inside the darkness, fainter in the middle).</summary>
         public const float MarkMoodRedCentreShare = 0.4f;

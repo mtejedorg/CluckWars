@@ -134,6 +134,59 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ShippedPalette_DeathMarkColours_AreTheBuiltInDefaults()
+        {
+            // K11 moves the Death Mark colours into the asset; the shipped values are the literals they were.
+            var p = Shipped();
+            var d = FeedbackPaletteSO.BuiltInDefaults();
+            Assert.AreEqual(d.MarkPounceColor, p.MarkPounceColor);
+            Assert.AreEqual(d.MarkLiveColor, p.MarkLiveColor);
+            Assert.AreEqual(d.MarkMissedColor, p.MarkMissedColor);
+            Assert.AreEqual(d.MarkHunterEdgeColor, p.MarkHunterEdgeColor);
+            Assert.AreEqual(d.MarkVictimDimColor, p.MarkVictimDimColor);
+            Assert.AreEqual(d.MarkVictimColdColor, p.MarkVictimColdColor);
+            Assert.AreEqual(d.MarkVictimRedColor, p.MarkVictimRedColor);
+            Assert.AreEqual(d.CreamColor, d.MarkMissedColor, "MISSED is cream by default");
+        }
+
+        [Test]
+        public void BoundPalette_DrivesTheDeathMarkColours()
+        {
+            var previous = FeedbackPalette.Current;
+            var probe = ScriptableObject.CreateInstance<FeedbackPaletteSO>();
+            try
+            {
+                probe.MarkPounceColor = new Color(0.11f, 0.21f, 0.31f, 1f);
+                probe.MarkLiveColor = new Color(0.12f, 0.22f, 0.32f, 1f);
+                probe.MarkMissedColor = new Color(0.13f, 0.23f, 0.33f, 1f);
+                probe.MarkHunterEdgeColor = new Color(0.14f, 0.24f, 0.34f, 1f);
+                probe.MarkVictimDimColor = new Color(0.15f, 0.25f, 0.35f, 1f);
+                probe.MarkVictimColdColor = new Color(0.16f, 0.26f, 0.36f, 1f);
+                probe.MarkVictimRedColor = new Color(0.17f, 0.27f, 0.37f, 1f);
+                FeedbackPalette.Current = probe;
+                Assert.AreEqual(probe.MarkPounceColor, FeedbackTuning.MarkKillColor);
+                Assert.AreEqual(probe.MarkLiveColor, FeedbackTuning.MarkHuntBlockedColor);
+                Assert.AreEqual(probe.MarkLiveColor, FeedbackTuning.MarkSkullLiveColor);
+                Assert.AreEqual(probe.MarkMissedColor, FeedbackTuning.MarkMissedColor);
+                Assert.AreEqual(probe.MarkHunterEdgeColor, FeedbackTuning.MarkHunterEdgeColour);
+                Assert.AreEqual(probe.MarkVictimDimColor, FeedbackTuning.MarkMoodDimColour);
+                Assert.AreEqual(probe.MarkVictimColdColor, FeedbackTuning.MarkMoodColdColour);
+                Assert.AreEqual(probe.MarkVictimRedColor, FeedbackTuning.MarkMoodRedColour);
+                Assert.AreEqual(probe.MarkMissedColor, MarkFeedback.EndWordColour(MarkEndCause.Missed));
+                // The hunt mood's dark colour is the hunter-edge colour, the victim's is the dim: tuned apart.
+                MarkScreenEffect.Uniforms(Vector3.zero, 1f, Color.white, 1f, out var dark, out _, out _, out _);
+                Assert.AreEqual(probe.MarkHunterEdgeColor.g, dark.y, 1e-5f);
+                MarkScreenEffect.Uniforms(new Vector3(1f, 0f, 0f), 0f, Color.clear, 0f, out var victim, out _, out _, out _);
+                Assert.AreEqual(probe.MarkVictimDimColor.g, victim.y, 1e-5f);
+            }
+            finally
+            {
+                FeedbackPalette.Current = previous;
+                Object.DestroyImmediate(probe);
+            }
+        }
+
+        [Test]
         public void BuiltInDefaults_AreEachActiveAbilitysPrePaletteLiteral()
         {
             // With no palette bound nothing changes: each keyed ability's default accent is the literal it carried before.

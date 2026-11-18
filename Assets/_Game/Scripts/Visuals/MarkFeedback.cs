@@ -197,9 +197,9 @@ namespace CluckWars.Visuals
             : cause == MarkEndCause.Safe ? UiKeys.HudPopSafe
             : null;
 
-        /// <summary>MISSED in the Hunt accent (as HUNT!), SAFE in the neutral no-effect grey <see cref="HitFeedback"/> gives it.</summary>
+        /// <summary>MISSED in the palette's cream (K11), SAFE in the neutral no-effect grey <see cref="HitFeedback"/> gives it.</summary>
         public static Color EndWordColour(MarkEndCause cause) =>
-            cause == MarkEndCause.Safe ? FeedbackTuning.NeutralNoEffectColor : FeedbackPalette.Current.Accent(AccentKey.Hunt);
+            cause == MarkEndCause.Safe ? FeedbackTuning.NeutralNoEffectColor : FeedbackTuning.MarkMissedColor;
 
         /// <summary>The end word over the local hunter's own bird, on its owner's screen only (<see cref="FloatingCombatText.SpawnSelfPop"/>).</summary>
         private void SpawnEndWord(MarkEndCause cause)

@@ -31,3 +31,10 @@ MonoBehaviour:
   PeckAccent: {r: 0.92, g: 0.66, b: 0.2, a: 1}
   HuntAccent: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   SlowBurstAccent: {r: 0.35, g: 0.82, b: 0.45, a: 1}
+  MarkPounceColor: {r: 1, g: 0.92, b: 0.1, a: 1}
+  MarkLiveColor: {r: 0.9, g: 0.04, b: 0.04, a: 1}
+  MarkMissedColor: {r: 0.996, g: 0.961, b: 0.878, a: 1}
+  MarkHunterEdgeColor: {r: 0.03, g: 0.015, b: 0.05, a: 1}
+  MarkVictimDimColor: {r: 0.03, g: 0.015, b: 0.05, a: 1}
+  MarkVictimColdColor: {r: 0.13, g: 0.05, b: 0.28, a: 1}
+  MarkVictimRedColor: {r: 0.9, g: 0.04, b: 0.04, a: 1}

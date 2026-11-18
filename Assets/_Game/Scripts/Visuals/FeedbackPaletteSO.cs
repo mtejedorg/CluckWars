@@ -47,6 +47,22 @@ namespace CluckWars.Visuals
         [Tooltip("The instant Slow's accent; Slow Area keeps SlowAccent.")]
         public Color SlowBurstAccent = new Color(0.35f, 0.82f, 0.45f, 1f);
 
+        [Header("Death Mark")]
+        [Tooltip("The hunt marker, brackets and Death Mark hex when the pounce is legal (#FFEB1A).")]
+        public Color MarkPounceColor = new Color(1f, 0.92f, 0.1f, 1f);
+        [Tooltip("The live / blocked red: the standings skull once the kill is live, and the hunt's \"not legal yet\" marker and brackets.")]
+        public Color MarkLiveColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+        [Tooltip("The MISSED word the hunter reads when a mark ends (K11: cream, equal to CreamColor).")]
+        public Color MarkMissedColor = new Color(0.996f, 0.961f, 0.878f, 1f);
+        [Tooltip("The hunter's screen edge (the hunt mood's dark colour).")]
+        public Color MarkHunterEdgeColor = new Color(0.03f, 0.015f, 0.05f, 1f);
+        [Tooltip("The marked player's dim: the darkness colour with the Assassin far away.")]
+        public Color MarkVictimDimColor = new Color(0.03f, 0.015f, 0.05f, 1f);
+        [Tooltip("The marked player's cold violet: the darkness turns this as the Assassin closes in. Keep it dark.")]
+        public Color MarkVictimColdColor = new Color(0.13f, 0.05f, 0.28f, 1f);
+        [Tooltip("The marked player's red tint at the screen edge.")]
+        public Color MarkVictimRedColor = new Color(0.9f, 0.04f, 0.04f, 1f);
+
         /// <summary>The accent for <paramref name="key"/>. <see cref="AccentKey.Custom"/> has no palette colour
         /// (the ability's own literal applies), so asking for it is a caller bug and throws.</summary>
         public Color Accent(AccentKey key) => key switch
