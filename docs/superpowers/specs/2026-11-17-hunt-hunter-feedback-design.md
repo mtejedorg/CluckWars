@@ -126,7 +126,7 @@ Maestro's answers, verbatim: `h10a(note: Also, for a better feedback, hunter and
 | H12 | a, with a note | MISSED turns cream. The colour, and the mark's other colours, live in the existing colour config asset (`FeedbackPaletteSO`, ruling D3a of 2026-11-07), not in code. Item K11. Correction of the question's text: SAFE is the palette's neutral grey (`NeutralNoEffectColor`), not cream; it is left as it is. |
 | H13 | a, with a note | The badge keeps its two-thirds size but sits **on the arrow**, not beyond its tip. Item K12. |
 | H14 | a | Brackets whenever the target is on screen, as built. |
-| H15 | later | Maestro needs to see it: a side-by-side of the three options goes on the decision page. No build change until answered. |
+| H15 | later, then a | Maestro needed to see it; after the side-by-side on the decision page (18 Nov): "Just leave it as is and note in /backlog". The arrow and the disc keep the target's colour until the pounce is legal. Revisit after playtest feedback: BL-190. |
 
 ### K13 rules (builder's call unless Maestro overrides)
 
