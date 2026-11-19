@@ -1,0 +1,13 @@
+{
+  "useMarkdownLinks": true,
+  "newLinkFormat": "relative",
+  "alwaysUpdateLinks": false,
+  "attachmentFolderPath": "docs/attachments",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "docs",
+  "userIgnoreFilters": [
+    "Library/", "Logs/", "Builds/", "Captures/", "graphify-out/", "Assets/",
+    "Packages/", "ProjectSettings/", "UserSettings/", "Design/", "art-src/",
+    "tools/", ".claude/", "Temp/", "obj/"
+  ]
+}

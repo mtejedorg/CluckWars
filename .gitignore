@@ -187,3 +187,10 @@ Assets/Resources/PerformanceTestRun*
 # Python bytecode (tools/docs, tools/test-session helpers)
 __pycache__/
 *.pyc
+
+# Obsidian (per-machine state; app.json, core-plugins.json, appearance.json are committed)
+.obsidian/workspace*.json
+.obsidian/cache/
+.obsidian/graph.json
+.obsidian/plugins/*/data.json
+.trash/
