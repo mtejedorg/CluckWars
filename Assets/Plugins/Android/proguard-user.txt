@@ -1,0 +1,10 @@
+# R8 keep rules for the Play bundle (BL-182). Unity adds its own proguard-unity.txt;
+# these cover what Unity services and Java plugins reach by reflection or JNI.
+# The game code is IL2CPP (native), so R8 only shrinks and renames the Java layer.
+-keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
+-keep class com.unity3d.** { *; }
+-keep class com.unity.** { *; }
+-keep class com.google.androidgamesdk.** { *; }
+-keep class com.google.games.bridge.** { *; }
+-dontwarn com.unity3d.**
+-dontwarn com.google.**
