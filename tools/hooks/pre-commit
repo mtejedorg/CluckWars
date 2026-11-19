@@ -1,0 +1,11 @@
+#!/bin/sh
+# Cluck Wars: on develop only, stamps the build number into BUILD_NUMBER and stages it, so every develop commit
+# (and merge commit, via the pre-merge-commit copy of this script) carries its own number.
+# Number = two-digit UTC year + minute of that year (6 digits), same rule as CluckWarsBuildMenu.BuildNumber.
+# Only develop ever changes the file, so merges between branches never conflict on it.
+# Install per clone: sh tools/hooks/install.sh
+[ "$(git symbolic-ref --short -q HEAD)" = "develop" ] || exit 0
+y=$(date -u +%y); doy=$(date -u +%j); h=$(date -u +%H); m=$(date -u +%M)
+n=$(( 10#$y * 1000000 + (10#$doy - 1) * 1440 + 10#$h * 60 + 10#$m ))
+printf '%s\n' "$n" > BUILD_NUMBER
+git add -- BUILD_NUMBER

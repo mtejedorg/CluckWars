@@ -260,8 +260,9 @@ namespace CluckWars.EditorTools
         // ---- Build number (Maestro, 2026-11-14) ---------------------------------
 
         /// <summary>
-        /// The build number: two-digit UTC year, then the minute of that year zero-padded to six digits, so always 8
-        /// digits (2026-11-14 13:05 UTC → <c>26457265</c>). One number per build run, the same in the git tag
+        /// The build number for a moment: two-digit UTC year, then the minute of that year zero-padded to six digits, so always 8
+        /// digits (2026-11-14 13:05 UTC → <c>26457265</c>). The moment is the HEAD commit's time, see
+        /// <see cref="BuildNumberForCommit"/>. One number per build run, the same in the git tag
         /// (<c>v&lt;version&gt;+&lt;number&gt;</c>), the Android versionCode and the in-game build info. A leap year's
         /// last minute is 527039, so it stays far below <see cref="MaxPlayVersionCode"/> until 2099. Pure so a test pins it.
         /// </summary>
@@ -270,6 +271,47 @@ namespace CluckWars.EditorTools
             var u = utcNow.ToUniversalTime();
             int minuteOfYear = (u.DayOfYear - 1) * 1440 + u.Hour * 60 + u.Minute;
             return (u.Year % 100) * 1_000_000 + minuteOfYear;
+        }
+
+        /// <summary>True for exactly eight digits (the YY + minute-of-year shape). Pure so a test pins it.</summary>
+        public static bool TryParseBuildNumber(string text, out int number)
+        {
+            number = 0;
+            var t = text?.Trim();
+            return t != null && t.Length == 8 &&
+                   int.TryParse(t, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out number);
+        }
+
+        /// <summary>
+        /// The build number of a commit (Maestro, 2026-11-19): <see cref="BuildNumber"/> of the commit's committer time,
+        /// so the number names the state of the project, not the moment of the build. Building the same commit again,
+        /// on any day, gives the same number. <paramref name="committerUnixSeconds"/> is git's <c>%ct</c>; when it does
+        /// not parse (git missing, no commits) the number falls back to <paramref name="fallbackUtc"/>. Pure so a test pins it.
+        /// </summary>
+        public static int BuildNumberForCommit(string committerUnixSeconds, DateTime fallbackUtc)
+        {
+            if (long.TryParse(committerUnixSeconds?.Trim(), System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out long seconds) && seconds > 0)
+                return BuildNumber(DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime);
+            return BuildNumber(fallbackUtc);
+        }
+
+        /// <summary>
+        /// The build number of the commit checked out now: the one committed in <c>BUILD_NUMBER</c> (stamped by
+        /// <c>tools/hooks/pre-commit</c>), else HEAD's commit time, else (warning) the clock.
+        /// </summary>
+        internal static int HeadBuildNumber()
+        {
+            try
+            {
+                var file = Path.Combine(Directory.GetParent(Application.dataPath)?.FullName ?? ".", "BUILD_NUMBER");
+                if (File.Exists(file) && TryParseBuildNumber(File.ReadAllText(file), out int committed)) return committed;
+            }
+            catch (IOException e) { Debug.LogWarning($"{LogTag} Build number: BUILD_NUMBER unreadable ({e.Message}); using the HEAD commit time."); }
+            var output = BuildInfoWriter.RunGit("log -1 --format=%ct HEAD", out var error);
+            if (output == null)
+                Debug.LogWarning($"{LogTag} Build number: could not read the HEAD commit time ({error}); using the current time, so this number does not identify the commit.");
+            return BuildNumberForCommit(output, DateTime.UtcNow);
         }
 
         /// <summary>
@@ -289,8 +331,8 @@ namespace CluckWars.EditorTools
         // Set for the duration of one menu run, so every target in it (Build All: Windows and Android) shares one number.
         private static int _runBuildNumber;
 
-        /// <summary>This run's build number; a build started outside a menu run gets the current minute's.</summary>
-        internal static int CurrentBuildNumber => _runBuildNumber != 0 ? _runBuildNumber : BuildNumber(DateTime.UtcNow);
+        /// <summary>This run's build number; a build started outside a menu run gets HEAD's.</summary>
+        internal static int CurrentBuildNumber => _runBuildNumber != 0 ? _runBuildNumber : HeadBuildNumber();
 
         /// <summary>
         /// Runs one menu entry under a single build number, then prints the tag line as the run's last line when
@@ -298,7 +340,7 @@ namespace CluckWars.EditorTools
         /// </summary>
         private static void WithBuildNumber(Func<bool> run)
         {
-            int number = BuildNumber(DateTime.UtcNow);
+            int number = HeadBuildNumber();
             _runBuildNumber = number;
             bool built;
             try

@@ -51,6 +51,32 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void BuildNumberForCommit_IsTheCommitMinute_NotTheBuildMinute()
+        {
+            // 2026-11-14 13:05:54 UTC = 1794661554; the fallback (a different day) must be ignored.
+            long unix = new DateTimeOffset(Utc(2026, 11, 14, 13, 5, 54)).ToUnixTimeSeconds();
+            Assert.AreEqual(26457265, CluckWarsBuildMenu.BuildNumberForCommit(unix + "\n", Utc(2030, 1, 1)));
+        }
+
+        [Test]
+        public void BuildNumberForCommit_FallsBackWhenGitGaveNothing()
+        {
+            Assert.AreEqual(CluckWarsBuildMenu.BuildNumber(Utc(2026, 11, 19, 10, 0)),
+                CluckWarsBuildMenu.BuildNumberForCommit(null, Utc(2026, 11, 19, 10, 0)));
+            Assert.AreEqual(CluckWarsBuildMenu.BuildNumber(Utc(2026, 11, 19, 10, 0)),
+                CluckWarsBuildMenu.BuildNumberForCommit("not a number", Utc(2026, 11, 19, 10, 0)));
+        }
+
+        [Test]
+        public void TryParseBuildNumber_AcceptsExactlyEightDigits()
+        {
+            Assert.IsTrue(CluckWarsBuildMenu.TryParseBuildNumber("26457265\n", out int n));
+            Assert.AreEqual(26457265, n);
+            foreach (var bad in new[] { null, "", "2645726", "264572650", "2645726x", "-6457265" })
+                Assert.IsFalse(CluckWarsBuildMenu.TryParseBuildNumber(bad, out _), bad ?? "null");
+        }
+
+        [Test]
         public void BuildNumber_OutranksEveryOldMinutesSinceEpochCode()
         {
             // The old rule stamped minutes since 2026-01-01 (at most 525600 in 2026), so Play still sees an update.

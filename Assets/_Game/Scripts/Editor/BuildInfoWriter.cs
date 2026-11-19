@@ -27,7 +27,7 @@ namespace CluckWars.EditorTools
 
         /// <summary>
         /// Set by <c>CluckWarsBuildMenu</c> to its run's build number, so every target of one run stamps the same one.
-        /// 0 (a build started outside the menu) means the current minute's <see cref="CluckWarsBuildMenu.BuildNumber"/>.
+        /// 0 (a build started outside the menu) means HEAD's <see cref="CluckWarsBuildMenu.HeadBuildNumber"/>.
         /// </summary>
         public static int BuildNumberForNextBuild;
 
@@ -45,7 +45,7 @@ namespace CluckWars.EditorTools
                 dirty = !string.IsNullOrWhiteSpace(status),
                 builtUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
                 devTools = devTools,
-                buildNumber = BuildNumberForNextBuild != 0 ? BuildNumberForNextBuild : CluckWarsBuildMenu.BuildNumber(DateTime.UtcNow),
+                buildNumber = BuildNumberForNextBuild != 0 ? BuildNumberForNextBuild : CluckWarsBuildMenu.HeadBuildNumber(),
             };
             if (string.IsNullOrEmpty(data.sha))
             {
@@ -73,7 +73,7 @@ namespace CluckWars.EditorTools
         }
 
         /// <summary>Runs git in the project root; null (with the reason) when git is missing or fails.</summary>
-        private static string RunGit(string args, out string error)
+        internal static string RunGit(string args, out string error)
         {
             error = null;
             try
