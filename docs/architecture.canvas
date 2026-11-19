@@ -1,0 +1,216 @@
+{
+  "nodes": [
+    {
+      "id": "claude",
+      "type": "file",
+      "file": "CLAUDE.md",
+      "x": 0,
+      "y": -420,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "arch",
+      "type": "file",
+      "file": "docs/ARCHITECTURE.md",
+      "x": 160,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "rules",
+      "type": "file",
+      "file": "docs/ARCHITECTURE_RULES.md",
+      "x": 480,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "code",
+      "type": "file",
+      "file": "docs/CODE_RULES.md",
+      "x": 800,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "conv",
+      "type": "file",
+      "file": "docs/CONVENTIONS.md",
+      "x": 160,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "fs",
+      "type": "file",
+      "file": "docs/FILE_STRUCTURE.md",
+      "x": 480,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "state",
+      "type": "file",
+      "file": "docs/STATE.md",
+      "x": -800,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "test",
+      "type": "file",
+      "file": "docs/TESTING.md",
+      "x": 800,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "gdd",
+      "type": "file",
+      "file": "docs/GDD.md",
+      "x": -800,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "tdd",
+      "type": "file",
+      "file": "docs/TDD.md",
+      "x": -480,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "art",
+      "type": "file",
+      "file": "docs/ART.md",
+      "x": -160,
+      "y": 180,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "bl",
+      "type": "file",
+      "file": "docs/BACKLOG.md",
+      "x": -480,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "road",
+      "type": "file",
+      "file": "docs/ROADMAP.md",
+      "x": -160,
+      "y": -120,
+      "width": 280,
+      "height": 100
+    },
+    {
+      "id": "t1",
+      "type": "text",
+      "text": "**Architecture map** - how the docs fit together. Entry point is CLAUDE.md; STATE is the live snapshot; rules docs carry stable IDs and say what enforces them.",
+      "x": -800,
+      "y": -420,
+      "width": 560,
+      "height": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "claude-state",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "state",
+      "toSide": "top"
+    },
+    {
+      "id": "claude-bl",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "bl",
+      "toSide": "top"
+    },
+    {
+      "id": "claude-road",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "road",
+      "toSide": "top"
+    },
+    {
+      "id": "claude-arch",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "arch",
+      "toSide": "top"
+    },
+    {
+      "id": "claude-rules",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "rules",
+      "toSide": "top"
+    },
+    {
+      "id": "claude-code",
+      "fromNode": "claude",
+      "fromSide": "bottom",
+      "toNode": "code",
+      "toSide": "top"
+    },
+    {
+      "id": "arch-conv",
+      "fromNode": "arch",
+      "fromSide": "bottom",
+      "toNode": "conv",
+      "toSide": "top"
+    },
+    {
+      "id": "rules-fs",
+      "fromNode": "rules",
+      "fromSide": "bottom",
+      "toNode": "fs",
+      "toSide": "top"
+    },
+    {
+      "id": "code-test",
+      "fromNode": "code",
+      "fromSide": "bottom",
+      "toNode": "test",
+      "toSide": "top"
+    },
+    {
+      "id": "state-gdd",
+      "fromNode": "state",
+      "fromSide": "bottom",
+      "toNode": "gdd",
+      "toSide": "top"
+    },
+    {
+      "id": "bl-tdd",
+      "fromNode": "bl",
+      "fromSide": "bottom",
+      "toNode": "tdd",
+      "toSide": "top"
+    },
+    {
+      "id": "road-art",
+      "fromNode": "road",
+      "fromSide": "bottom",
+      "toNode": "art",
+      "toSide": "top"
+    }
+  ]
+}

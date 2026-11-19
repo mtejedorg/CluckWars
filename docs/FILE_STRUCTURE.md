@@ -1,3 +1,8 @@
+---
+status: live
+owner: Maestro
+type: file-structure
+---
 # File structure
 
 What lives where in the Cluck Wars repository, which assembly owns it, and where a new thing goes.
@@ -535,6 +540,12 @@ dated record of one session, decision or plan, not updated afterwards; **stale**
 | `docs/diagnostics/2026-07-24-comfyui-sdpa-patch.md` | ComfyUI diagnostic | snapshot |
 | `docs/reviews/2026-08-02-map-geometry.md` | Map geometry panel review | snapshot |
 | `docs/site/` | The interactive mechanics site (`index.html`, `mechanics.html`, `tech.html`, `style.css`, `phone.js`, `portfolio.json`, `assets/`); deployed by `.github/workflows/pages.yml` | living (`CLAUDE.md` step 6) |
+| `docs/OBSIDIAN.md` | Obsidian start-here guide | living |
+| `docs/DASHBOARD.md` | Link dashboard, no copied numbers | living |
+| `docs/docs.base` | Obsidian Base: docs by status | living |
+| `docs/architecture.canvas` | Obsidian canvas: how the main docs fit together | living |
+| `docs/notion-import/` | Notion pages archived 2026-11-20, history only, never a source of numbers | snapshot |
+| `docs/attachments/` | Images pasted through Obsidian; design images live beside their docs | living |
 
 ### 7.3 Other top-level content
 

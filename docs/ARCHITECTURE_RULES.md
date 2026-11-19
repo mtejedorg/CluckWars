@@ -1,3 +1,8 @@
+---
+status: live
+owner: Maestro
+type: rules
+---
 # Cluck Wars — Architecture Rules
 
 Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Committed code only: every path, line number, test and type named below was read at that commit with `git show b7c2616e:<path>` / `git grep b7c2616e`.

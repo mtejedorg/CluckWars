@@ -1,3 +1,8 @@
+---
+status: live
+owner: Maestro
+type: backlog
+---
 # Backlog
 <!-- backlog-skill -->
 One line per item: `- [ ] ID P0-P3 type | text`. Open = `[ ]`, done = `[x]`. Never delete lines (IDs are never reused).
@@ -198,3 +203,5 @@ Types: bug task idea decision debt.
 - [ ] BL-193 P3 idea | Protect global-metadata.dat / IL2CPP output - encrypt or custom loader; breaks symbolication workflow; only if the game gains a competitive economy (BL-182 option D) [+2026-11-19]
 - [ ] BL-194 P3 decision | Third-party obfuscator evaluation - paid dependency, high Fusion weaving/Zenject risk; revisit with ranked play or real-money economy; needs owner sign-off (BL-182 option E) [+2026-11-19]
 - [ ] BL-195 P3 decision | Server Mode for authority (Shared Mode client-side balance delta gap) - Shared Mode puts authority on a player device; obfuscation cannot fix it; post-funding roadmap item (refs: docs/ROADMAP.md) [+2026-11-19]
+- [ ] BL-196 P3 task | Obsidian first-open check in the UI - confirm app.json settings (wikilinks off, relative links, auto-update links off, attachments docs/attachments, excluded folders), that docs/docs.base opens as a table, that docs/STATE.md (880 KB) does not hang, and image resize syntax (refs: docs/OBSIDIAN.md) [+2026-11-20] [test: Open the repo root as a vault in Obsidian; follow the checklist in docs/OBSIDIAN.md 'Not confirmed yet' -> every setting matches app.json, docs.base shows a table, STATE.md opens without hanging]
+- [ ] BL-197 P2 decision | Trash the five migrated Notion pages - hub Cluck Wars, GDD v0.3, TDD v0.1, Art Direction v0.1, Classes (Current); only after Maestro confirms the parity report and the exact list in chat; trash, not permanent delete; the four unrelated private Notion pages stay untouched (refs: docs/notion-import/README.md) [+2026-11-20]

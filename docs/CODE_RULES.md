@@ -1,3 +1,8 @@
+---
+status: live
+owner: Maestro
+type: rules
+---
 # Cluck Wars Code Rules
 
 Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Committed code only: every path, line, test and type named here was read with `git show b7c2616e:<path>` or found with `git grep b7c2616e`. The next commit, `f6309c3e`, changes only `docs/BACKLOG.md` (it adds BL-162 and BL-163, which this document cites).
