@@ -6,6 +6,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🌿 2026-11-19 - Branches: develop = balance, progression parked (Maestro)
+
+- `develop` now points at the tip of `balance` (`e177474a`), local and origin (forced with a lease pinned to the old tip `f9a72a3e`). The old `develop` (progression slices 0-4 merged as `c74e5903`, plus the 16 site/docs commits on top) is kept as `feature/progression`, pushed to origin at `f9a72a3e`; nothing was lost (0 commits missing, checked). `main` untouched (`384cfa6e`, 6 ahead and 2 behind origin).
+- **Next:** human test BL-124, then `balance` into `main` (BL-163, closes PR 3), then fast-forward `develop` to `main`. There is no rebase of `develop` any more: read the older "rebase `develop` onto `main`" lines below as this. Progression returns by merging `feature/progression`; its `ability.egg_shell` unlock key must then be dropped or remapped (Egg Shell is out of the registry).
+
+---
+
 ## 🛠 2026-11-19 - Dev build stamp, Settings version label, local dev balance editor (`balance`, not pushed)
 
 - **Dev stamp:** dev-tools builds show `<version>+<build number>` bottom-right on every screen (`DevBuildStamp`, UXML in `Resources/Dev/`). The plain `v0.1` is gone from the main menu; production shows the version only at the bottom of the Settings sheet.
@@ -126,7 +133,7 @@ Builds for the alpha playtest (BL-124), from `balance` at `ef72450d`, production
 
 ## 🌿 2026-11-14 - `simplify-abilities` merged into `balance` (BL-162); the branch is deleted
 
-`balance` was fast-forwarded from `907869a0` to `ca3a8d51` (everything that was on `simplify-abilities`, no conflicts) and `simplify-abilities` was deleted (it never had a remote branch). **Work now continues on `balance`.** The entries below still name `simplify-abilities`: read that as `balance`. `balance` is 258 commits ahead of `origin/balance` and not pushed. Next: the human test (BL-124) on fresh builds (the Nov 11 builds predate the Slow split), then `balance` into `main` (BL-163, closes PR 3), then rebase `develop` onto `main`.
+`balance` was fast-forwarded from `907869a0` to `ca3a8d51` (everything that was on `simplify-abilities`, no conflicts) and `simplify-abilities` was deleted (it never had a remote branch). **Work now continues on `balance`.** The entries below still name `simplify-abilities`: read that as `balance`. `balance` is 258 commits ahead of `origin/balance` and not pushed. Next: the human test (BL-124) on fresh builds (the Nov 11 builds predate the Slow split), then `balance` into `main` (BL-163, closes PR 3), then fast-forward `develop` to `main` (superseded 2026-11-19: `develop` = `balance`, no rebase).
 
 Correction to the Slow split entry below: the icons were changed afterwards (`7e47445d`). The instant Slow keeps the plain snail; Slow Area now shows the snail inside a disc.
 

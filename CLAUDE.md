@@ -212,6 +212,12 @@ Full diagnostic playbook: `docs/TESTING.md`.
 
 ---
 
+## Branches
+
+Since 2026-11-19 (Maestro): `develop` is the same commit as `balance`, locally and on origin. `main` is the released playtest build and stays as it is until `balance` has passed the human test (BL-124); then `balance` is merged into `main` (BL-163) and `develop` is fast-forwarded to `main`. The old `develop`, which carried the progression merge (slices 0-4) and the site and docs commits, lives on `feature/progression` (origin, tip `f9a72a3e`) and returns later by merging it into the then-current branch. Fixes for the released build branch from `main`; everything else works on `balance`/`develop`. Never rebase or force-push `develop` without Maestro saying so.
+
+---
+
 ## Latest tag
 
 `v0.1+26458919` and `v0.1+26458925` — the v0.1 alpha playtest builds, cut from `balance` (package `com.wugnar.games.wars.cluck`). Tags are `v<semver>+<build number>`; `git describe --tags --abbrev=0` gives the newest. `simplify-abilities` was merged into `balance` and deleted on 2026-11-14. See `docs/STATE.md` and `docs/RELEASE_NOTES_v0.1.md`.
