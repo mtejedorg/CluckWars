@@ -28,10 +28,16 @@ The Android build forces:
 
 ### Build number and tag
 
-Every build run gets one **build number**: the two-digit UTC year, then the minute of that year
-zero-padded to six digits, always 8 digits (2026-11-14 13:05 UTC is `26457265`; 2026-01-01 00:00 is
-`26000000`). `CluckWarsBuildMenu.BuildNumber` computes it once per menu run, so in `Windows + Android`
-both builds share it. The same number is:
+The **build number** names a commit, not a build moment (Maestro, 2026-11-19): the two-digit UTC year,
+then the minute of that year zero-padded to six digits, always 8 digits (2026-11-14 13:05 UTC is
+`26457265`; 2026-01-01 00:00 is `26000000`). It is committed in the repo-root `BUILD_NUMBER` file, which the
+`tools/hooks/pre-commit` hook (also installed as `pre-merge-commit`) rewrites on every commit and merge on
+`develop` only; other branches never touch it, so merges do not conflict on it. Install per clone with
+`sh tools/hooks/install.sh`. Building a commit again, any day, gives the same number.
+`CluckWarsBuildMenu.HeadBuildNumber` reads the file once per menu run (fallback: HEAD's commit time, then
+the clock with a warning), so in `Windows + Android` both builds share it. Caveats: cherry-picks and
+rebases do not run the hook, so those commits keep their source's number; a dirty tree builds with its last
+commit's number (the build info's `+dirty` tells them apart). The same number is:
 
 - the Android **versionCode** of every Android build (sideload `.apk` and Play `.aab`), set for the
   build only; ProjectSettings keeps `AndroidBundleVersionCode: 1`. If ProjectSettings ever holds a code

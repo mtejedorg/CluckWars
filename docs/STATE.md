@@ -6,6 +6,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔢 2026-11-19 - Build number identifies the commit (`848cebbd`, `develop`, not pushed)
+
+- Maestro's rule: the build number names the state of the project, so rebuilding a commit gives the same number, still `YY` + minute of year. It is committed in `BUILD_NUMBER`, stamped by `tools/hooks/pre-commit` (and `pre-merge-commit`) on `develop` only; install per clone with `sh tools/hooks/install.sh` (done in this clone). `CluckWarsBuildMenu.HeadBuildNumber` reads it, falling back to HEAD's commit time. Details and caveats: `docs/TESTING.md`, "Build number and tag".
+- Builds 26464306 / 26464309 / 26464316 made earlier today used the old build-time rule and have no matching commit number.
+- **Not verified:** the new `PlayStoreBuildTests` cases (no Editor connection this session), a real build reading `BUILD_NUMBER`, a merge commit on `develop` stamping it. `docs/FILE_STRUCTURE.md` does not list `tools/hooks/` yet (librarian owns it).
+
+---
+
 ## 🔒 2026-11-19 - Play bundle: R8 minify on, mapping and native symbols (BL-182, `develop`, not committed)
 
 - Decision (Maestro): the right level for a kids' alpha with server-side validation is R8 plus symbols, nothing heavier. Changed: `AndroidMinifyRelease: 1` and `useCustomProguardFile: 1` in `ProjectSettings.asset`, new `Assets/Plugins/Android/proguard-user.txt` (keep rules for `com.unity3d.*`, `com.unity.*`, Android games bridges). Not done, noted for later: BL-192 stripping tuning, BL-193 metadata protection, BL-194 third-party obfuscator, BL-195 Server Mode.
