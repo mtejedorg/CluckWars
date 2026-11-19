@@ -6,6 +6,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🔒 2026-11-19 - Play bundle: R8 minify on, mapping and native symbols (BL-182, `develop`, not committed)
+
+- Decision (Maestro): the right level for a kids' alpha with server-side validation is R8 plus symbols, nothing heavier. Changed: `AndroidMinifyRelease: 1` and `useCustomProguardFile: 1` in `ProjectSettings.asset`, new `Assets/Plugins/Android/proguard-user.txt` (keep rules for `com.unity3d.*`, `com.unity.*`, Android games bridges). Not done, noted for later: BL-192 stripping tuning, BL-193 metadata protection, BL-194 third-party obfuscator, BL-195 Server Mode.
+- **Verified:** batch `BuildPlayStore` build 26464436 succeeded: `_mapping.txt` (R8 8.10.21, 2.8 MB) written and embedded in the `.aab` as `proguard.map`; `classes.dex` 6.4 MB to 1.1 MB; `*-IL2CPP.symbols.zip` has 7 `.sym` files; same build number on all three. EditMode suite batch run 3900/3901; the one failure, `MarkScreenEffectTests.RealRender_DimColdRed...("PC")` (known render flake), passed in a class rerun 24/24.
+- **Not verified:** the bundle on a device (no phone on adb), the Play Console warnings clearing, the `.apk` path (not rebuilt, now also minified). BL-182 stays "done, awaiting test".
+
+---
+
 ## 🌿 2026-11-19 - Branches: develop = balance, progression parked (Maestro)
 
 - `develop` now points at the tip of `balance` (`e177474a`), local and origin (forced with a lease pinned to the old tip `f9a72a3e`). The old `develop` (progression slices 0-4 merged as `c74e5903`, plus the 16 site/docs commits on top) is kept as `feature/progression`, pushed to origin at `f9a72a3e`; nothing was lost (0 commits missing, checked). `main` untouched (`384cfa6e`, 6 ahead and 2 behind origin).
