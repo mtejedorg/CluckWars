@@ -20,6 +20,7 @@ namespace CluckWars.EditorTools
         public const string MenuPath = "Cluck Wars/Balance/Oracle/Report";
         public const string RecordMenuPath = "Cluck Wars/Balance/Oracle/Record baseline (keep prices)";
         public const string AcceptMenuPath = "Cluck Wars/Balance/Oracle/Accept as balanced (recompute prices)";
+        public const string SweepMenuPath = "Cluck Wars/Balance/Oracle/Sweep food";
         public const string ReferencePath = "Assets/_Game/Data/Balance/OracleReference.asset";
         public const string NoteArgument = "-oracleNote";
         private const string DefaultRecordNote = "baseline recorded from the menu";
@@ -31,6 +32,37 @@ namespace CluckWars.EditorTools
 
         /// <summary>Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.ReportBatch</c>. A failure is logged and rethrown so the Editor exits non-zero.</summary>
         public static void ReportBatch() => InBatch("The oracle report failed.", () => Write());
+
+        [MenuItem(SweepMenuPath, priority = 64)]
+        private static void SweepFoodFromMenu() => SweepFood();
+
+        /// <summary>Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.SweepFoodBatch</c>. Read-only: writes <c>Captures/oracle/sweep-food-*.md</c> and <c>.json</c>.</summary>
+        public static void SweepFoodBatch() => InBatch("The food sweep failed.", () => SweepFood());
+
+        /// <summary>Runs <see cref="OracleSweep.DefaultCandidates"/> over the shipped assets and returns the two file paths written; no asset is changed.</summary>
+        public static (string json, string markdown) SweepFood()
+        {
+            var inputs = Inputs();
+            var rows = OracleSweep.Food(inputs, OracleSweep.DefaultCandidates, LoadReference().Offsets());
+            string hash = BalanceBook.BaselineHash;
+
+            string dir = OutputDirectory();
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            string json = Path.Combine(dir, $"sweep-food-{stamp}.json");
+            string md = Path.Combine(dir, $"sweep-food-{stamp}.md");
+            File.WriteAllText(json, OracleSweep.ToJson(rows, hash, inputs.Map.SceneFingerprint));
+            File.WriteAllText(md, OracleSweep.ToMarkdown(rows, hash, inputs.Map.SceneFingerprint));
+
+            new UnityLogService(LogLevel.Info).Info(Source, $"Oracle food sweep written: {md} and {json} ({rows.Count} setups).");
+            return (json, md);
+        }
+
+        private static string OutputDirectory()
+        {
+            string dir = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Captures", "oracle");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
 
         [MenuItem(RecordMenuPath, priority = 62)]
         private static void RecordFromMenu()
@@ -100,9 +132,7 @@ namespace CluckWars.EditorTools
             var report = OracleRunner.Run(Inputs(), reference.Offsets());
             report.PricesNote = reference.PricesText();
 
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string dir = Path.Combine(projectRoot, "Captures", "oracle");
-            Directory.CreateDirectory(dir);
+            string dir = OutputDirectory();
             string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             string json = Path.Combine(dir, $"report-{stamp}.json");
             string md = Path.Combine(dir, $"report-{stamp}.md");
