@@ -21,6 +21,18 @@ Design `docs/superpowers/specs/2026-11-20-balance-oracle-v2-design.md`, plan `do
 - **Not verified:** the oracle menus and the note wizard in a live Editor (only batch paths ran); the local balance editor's CHECK text on screen; `ProjectContext.prefab` `_oracleMap` wiring was added in YAML, confirm it in the Inspector. Render tests (15) fail under `-nographics` and were last seen green with graphics at task 6.
 - **Not started:** task 8 (flat execute bounty, mark weighted toward the leader, Leader Bounty event removed), 9 (solver), 10 (docs: GDD 2.1, compendium `#sct` / `#data`, rules docs by `librarian`, Kit Lab refresh). Then the Peck cast in the game, the abstract match simulator (part 2) and real-game bot runs (part 3).
 
+## 🎯 2026-11-20 - Controls batch verified in the live Editor; site captures retaken (`develop`)
+
+- **Suite:** full EditMode batch run WITH graphics: 3990/3990 (the 19 earlier failures were the `-nographics` render tests plus the Oracle work in flight).
+- **Live Editor checks** (`tools/ui_capture/capture_controls_20261120.py`, `f25428fe`; captures in `Captures/controls-20261120/`, untracked), all PASS:
+  - The touch HUD in landscape and portrait (slot geometry, the AUTO tag on Peck only).
+  - Scheme A arrows inverted T, scheme B Q W E R row, pad Y/X/A/B inverted T.
+  - The Settings Keyboard row switching the strip.
+  - Simulated input through real Input System devices: keys of both schemes and digits, 16/16; Peck tap and 0.5 s toggle; pad A/Y/B/X and shoulders, 8/8; Start opens the Leave sheet and B closes it without casting slot 3 (BL-202); L3 cancels with no cooldown.
+- **Still needs hardware:** BL-202 on a real pad and BL-205 on the Pixel 10 Pro (both awaiting test).
+- **BL-204 (`8a92cfd3`):** the five site captures were retaken from the current build, with alt texts and captions updated; site artifact v24. The lobby shows the class flavour names (Brawler, Saboteur, Hit & Run) while Gear Up shows the specialization (e.g. Relentless).
+- **Left uncommitted:** opening the Editor filled `projectName` and `organizationId` in `ProjectSettings.asset`; that is for Maestro to decide.
+
 ## 🎯 2026-11-20 - Controls batch follow-ups: BL-199/200/201/203 closed, BL-202 fixed in code (`develop`)
 
 - **BL-200 (`f57272ab`):** the dead explicit-aim decode is gone from the simulation (`AimQuantizer`, `AbilityAimForward` `explicitAim`, the `ChickenController` aim branch, `ChickenMovement.Tick` `faceOverride`); `ApplyAimForFire` is now `ApplySoftLockForFire`. Fire direction is unchanged (facing or soft-lock). Kept: `PlayerNetworkInput.Aim` (struct unchanged) and `ChickenController.CastAim` (always zero now; removing it touches `AbilityBaseSO.GatherTargets`).
