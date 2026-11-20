@@ -55,42 +55,41 @@
 
   <section id="final10">
     <h2>The last 10 seconds</h2>
-    <!-- Source: docs/GDD.md §2 (comeback event; MatchConfig.ComebackEventSecondsLeft = 10) -->
-    <p>Once per round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the match authority rolls one of four events. The HUD shows "FINAL 10!" over its name.</p>
+    <!-- Source: docs/GDD.md §2 (comeback event; MatchConfig.ComebackEventSecondsLeft = 10; three events in ComebackRules.Events) -->
+    <p>Once per round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the match authority rolls one of three events. The HUD shows "FINAL 10!" over its name.</p>
     <div class="tw">
       <table>
         <thead><tr><th>Event</th><th>Effect</th></tr></thead>
         <tbody>
           <tr><td>Golden Pile</td><td>A 25-food pile appears near the centre.</td></tr>
           <tr><td>Underdog Surge</td><td>The lowest-banked chicken moves ×1.4.</td></tr>
-          <tr><td>Bounty on the Leader</td><td>Executing the top-banked chicken pays ×2.</td></tr>
           <tr><td>Restock</td><td>Every pile gets +10, up to its maximum.</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="small muted">Golden Pile and Restock add food beyond the 80-food budget described below. The design document calls this a deliberate late-match exception.</p>
+    <p class="small muted">Golden Pile and Restock add food beyond the 140-food budget described below. The design document calls this a deliberate late-match exception. A fourth event, Bounty on the Leader, was removed: the leader is now favoured by the Hunt mark instead.</p>
   </section>
 
   <section id="sct">
     <h2>The Solo Clear Time axiom</h2>
     <!-- Source: docs/GDD.md §2.1 -->
-    <p>The balance rule: a naked chicken (no abilities, no passive), alone on the full map and farming greedily, banks the win target in a fixed time, in a fixed number of base trips. Every class stat is solved against that target instead of tuned by feel. Speedy moves at 12.15, not because it feels right, but because Speedy has to clear in 30 seconds.</p>
+    <p>The balance rule: a naked chicken (no abilities, no passive), alone on the full map and farming greedily, banks the win target in a fixed time, in a fixed number of base trips. Every class stat is measured against that target instead of tuned by feel. Speedy moves at 12.15, not because it feels right, but because Speedy has to clear in 30 seconds.</p>
     <div class="tw">
       <table>
-        <thead><tr><th>Class</th><th class="num">Solo Clear Time</th><th class="num">Trips</th><th>Strategy</th></tr></thead>
+        <thead><tr><th>Class</th><th class="num">Design target</th><th class="num">Trips</th><th class="num">Oracle: seconds to 40</th><th>Strategy</th></tr></thead>
         <tbody>
           <!-- Source: docs/GDD.md §2.1 class table -->
-          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td>Throughput: many small loads, roams wide</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td>Payload: one huge sweep, barely returns</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td>The ability class: mid stats, leans on the kit</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">40 s</td><td class="num">4</td><td>Denial: never farms, robs and executes</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td class="num">22.3 to 22.9</td><td>Throughput: many small loads, roams wide</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td class="num">18.0 to 18.6</td><td>Payload: one huge sweep, barely returns</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td class="num">24.1 to 24.8</td><td>The ability class: mid stats, leans on the kit</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">40 s</td><td class="num">4</td><td class="num">does not forage</td><td>Denial: never farms, robs and executes</td></tr>
         </tbody>
       </table>
     </div>
-    <!-- Source: docs/GDD.md §2.1 (trips formula, tolerance bands, Balance Oracle) -->
-    <p>Trips are the win target divided by cargo capacity, rounded up. A pure-C# simulator called the Balance Oracle runs the greedy farming policy on the real pile coordinates and checks each class against its target from all four seats. The design band is ±1.5 s. A tighter ±0.5 s guard applies to the shipped asset values.</p>
-    <!-- Source: docs/GDD.md §2.1 (total map food 80 = 2x win) -->
-    <p>The map holds 80 food, twice the win target, so two players could in theory max out by farming alone. That is why combat exists: it buys time, and stealing is the only mechanic that turns a won fight directly into food.</p>
+    <!-- Source: docs/GDD.md §2.1 (trips formula, Balance Oracle v2); oracle column: Captures/oracle/report-20261120-140431.md, seat means of the kits of each class on their best route, each kit against three plain Warriors, nobody fighting -->
+    <p>Trips are the win target divided by cargo capacity, rounded up. The design target is the original goal for each class. The Balance Oracle is a pure-C# simulator that plays four-chicken matches on the real map and reports, for every kit, how much food it banks and how fast it reaches 40. It reports and proposes values; it never blocks a change. It is a guide, not a gate: the designer's own tuning is recorded and the oracle learns from it. A kit counts as balanced when it wins 20 to 30 % of mixed four-player matches and the same holds for its class. The match simulator that measures that comes later; today the oracle measures the food economy.</p>
+    <!-- Source: Assets/_Game/Data/MatchConfig.asset (PersonalPileFood 10, ContestedPileFood 15, CentrePileFood 40; 4 x 10 + 4 x 15 + 40 = 140) -->
+    <p>The map holds 140 food, three and a half times the win target, but your own pile plus one contested pile is not enough to win and your own pile plus two contested piles is. Several players could in theory max out by farming alone. That is why combat exists: it buys time, and stealing is the only mechanic that turns a won fight directly into food.</p>
   </section>
 
   <section id="roster">
@@ -178,12 +177,12 @@
   <section id="deathmark">
     <h2>Hunt: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute (shown as Hunt; its internal name is Death Mark) is the only hard removal in the game. Only the Spoiler, one of the two Sneaky specializations, has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Hunt on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
+    <p>The Assassin's execute (shown as Hunt; its internal name is Death Mark) is the only hard removal in the game. Only the Spoiler, one of the two Sneaky specializations, has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin, and likelier again for the rival with the most banked food; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Hunt on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
         <tbody>
-          <tr><td>Mark</td><td>First press marks a living rival anywhere on the map, likelier one far from its own base. The target can see the mark.</td><td>Reach your base in time: no ability crosses a base wall.</td></tr>
+          <tr><td>Mark</td><td>First press marks a living rival anywhere on the map, likelier one far from its own base or banked high. The target can see the mark.</td><td>Reach your base in time: no ability crosses a base wall.</td></tr>
           <tr><td>Hunt</td><td>The Assassin has 4 seconds to find it and close in. The mark arms after 3 s: a Kill is only possible in the last 1.0 s.</td><td>Escape: stay out of reach until the timer runs out, or walk home (a victim within about 21 to 29 m of home is safe).</td></tr>
           <tr><td>Stun</td><td>The marked target must be stunned when the Kill lands, from any source (a stun that began before the arm and is still running counts). Stun lasts 1.3 s (Slippery too), 0.845 s on Bulwark.</td><td>Don't get stunned.</td></tr>
           <tr><td>Kill</td><td>Press again in the last second, within 6.2 m, while the target is stunned, not shelled, and the Assassin is not stunned.</td><td>&mdash;</td></tr>
@@ -191,7 +190,7 @@
       </table>
     </div>
     <p>No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time. An Egg Shell's egg (the last 2 of its 3 seconds) makes you unkillable and unstunnable; its first-second walk does not. Stun reach (5.4 m) plus kill range (6.2 m) is 11.6 m.</p>
-    <p>On success the victim's whole cargo moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Hunt takes a reduced cooldown (4 s) so the Assassin can re-mark quickly; after a kill it is 8 s, so a round holds at most four kills.</p>
+    <p>On success the victim's whole cargo plus a flat 5 food bounty, the same for every victim, moves to the Assassin as a bounty bag that ignores the capacity limit. The bag can be stolen like any other load: a steal takes the beak first, then the bag. The victim is out for 3 seconds, then respawns at its own base with no cargo; its cooldowns keep running. If the execute fails, Hunt takes a reduced cooldown (4 s) so the Assassin can re-mark quickly; after a kill it is 8 s, so a round holds at most four kills.</p>
     <p>What each player sees: the Assassin gets one marker in the target's own colour, holding the count (3, 2, 1, then tenths in the live second), a draining ring, the paw, a badge for what still blocks the kill (a star when the target is not stunned, a lock behind its base wall, an egg when shelled) and the distance, which turns into a red pill beyond 6.2 m. While the target is outside the circle of rival arrows round the Assassin's own bird, the marker rides on that target's arrow, which grows and takes the mark's colour; inside the circle it sits by the target's head. Brackets on the ground frame the target whenever it is in view. The Hunt button mirrors all of it (the target's colour dot, the draining ring, the count, the blocker badge) and turns into a big yellow POUNCE with the tenths exactly while a kill is possible. There is a skull on the target's standings row, a HUNT! pop over the Assassin the moment the kill goes live, a buzz at that moment and a stronger one when the kill becomes possible, and the word MISSED or SAFE if the hunt ends without a kill. The edge of the Assassin's screen follows the hunt as well: dark while the mark arms, red in the live second while the kill is blocked, yellow while the kill is possible; the middle of the screen stays clear. While a mark tints a screen, the two birds of that hunt (the Assassin and its target) keep their true colours on it, so they stand out from every other chicken; a hidden bird is never given away by this. The marked player gets a MARKED! warning, a darkened screen for as long as the mark lasts, a clock pill reading LIVE IN 3s, 2s, 1s while the mark arms and then a red, pulsing LIVE 1s, and a skull on the Assassin's arrow; when the Assassin is close the darkness turns cold violet. Everyone else sees only the skull on the standings, which turns red and pulses when the mark goes live. A sting plays at the arm for each role.</p>
   </section>
 
@@ -266,18 +265,18 @@
   <section id="map">
     <h2>Piles, walls and jumps</h2>
     <h3>Tiered piles</h3>
-    <!-- Source: docs/GDD.md §3.2 -->
+    <!-- Source: Assets/_Game/Data/MatchConfig.asset (PersonalPileFood, ContestedPileFood, CentrePileFood) -->
     <div class="tw">
       <table>
         <thead><tr><th>Tier</th><th class="num">Piles</th><th class="num">Food each</th><th class="num">Total</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td>T1 doorstep</td><td class="num">4</td><td class="num">5</td><td class="num">20</td><td>Safe income near your base</td></tr>
-          <tr><td>T2 contested</td><td class="num">4</td><td class="num">10</td><td class="num">40</td><td>Equidistant from two bases</td></tr>
-          <tr><td>T3 centre</td><td class="num">1</td><td class="num">20</td><td class="num">20</td><td>The prize</td></tr>
+          <tr><td>T1 doorstep</td><td class="num">4</td><td class="num">10</td><td class="num">40</td><td>Safe income near your base</td></tr>
+          <tr><td>T2 contested</td><td class="num">4</td><td class="num">15</td><td class="num">60</td><td>Equidistant from two bases</td></tr>
+          <tr><td>T3 centre</td><td class="num">1</td><td class="num">40</td><td class="num">40</td><td>The prize</td></tr>
         </tbody>
       </table>
     </div>
-    <p>That is 80 food in total, twice the win target. Piles do not respawn, so banked food leaves circulation and the pot visibly shrinks as the match goes on.</p>
+    <p>That is 140 food in total. The amounts are match data that a balance update can change. Piles do not respawn, so banked food leaves circulation and the pot visibly shrinks as the match goes on.</p>
 
     <h3>Walls</h3>
     <!-- Source: docs/GDD.md §3.4 -->

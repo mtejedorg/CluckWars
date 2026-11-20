@@ -7,7 +7,7 @@
 **Changelog v0.4 — the core redesign.** Deleted HP and damage entirely; combat is now
 **control + steal**. Introduced the **Solo Clear Time (SCT) axiom** — every stat is
 *derived* from a per-class clear-time target, not hand-tuned. Win target 150→**40**, match
-3-min→**45 s**. Tiered map food budget (**80 = 2× win**) with pinwheel walls. New Assassin
+3-min→**45 s**. Tiered map food budget (**140**, since 2026-11-20; 80 = 2× win before) with pinwheel walls. New Assassin
 **Death Mark execute** (the only hard removal). Ability pool split into **Steal / Control /
 Defense / Utility** with an `AllowedClasses`-gated model (shared / class-only / pre-equip-only). Targeting collapsed to
 **self-centred or directional** (one exception: Death Mark). Full rationale in
@@ -65,13 +65,14 @@ PICK class + passive + abilities → SPAWN at your base corner → farm the tier
 
 **Comeback event — the last 10 s** (`MatchConfig.ComebackEventSecondsLeft` = 10). Once per
 round, when 10 playable seconds are left (never during the 3-2-1-GO intro), the authority rolls
-one of four events and the HUD shows **"FINAL 10!"** over its name: **Golden Pile** (a 25-food
-pile near the centre), **Underdog Surge** (the lowest-banked chicken moves ×1.4), **Bounty on the
-Leader** (executing the top-banked chicken pays ×`LeaderExecuteBountyMultiplier` = ×2) or
-**Restock** (every pile +10, up to its max). All four end with the round: PLAY AGAIN despawns the
-golden pile and clears the surge / bounty flags. It used to be a hard-coded T-60 s, which in a
+one of three events and the HUD shows **"FINAL 10!"** over its name: **Golden Pile** (a 25-food
+pile near the centre), **Underdog Surge** (the lowest-banked chicken moves ×1.4) or
+**Restock** (every pile +10, up to its max). All three end with the round: PLAY AGAIN despawns the
+golden pile and clears the surge flag. A fourth event, Bounty on the Leader (execute pays ×2 on the
+top-banked chicken), was removed on 2026-11-20 (Maestro, D7b): an event that only matters to the
+Assassin makes no sense; the leader is now favoured by the mark pick instead (§6.4). The event used to be a hard-coded T-60 s, which in a
 45 s match fired at GO; round-2 decision 2 (2026-10-07) moved it to the last 10 s. Note: Golden
-Pile and Restock add food beyond the §3.2 budget of 80 — a deliberate late-match exception.
+Pile and Restock add food beyond the §3.2 budget of 140 — a deliberate late-match exception.
 
 **No death.** There is no HP and no damage. A chicken is never "killed" except by the
 Assassin's execute (§6.4), which removes it for 3 s and respawns it empty at its own base. Every other
@@ -83,19 +84,30 @@ grind someone down.
 > A **naked** chicken (no abilities, no passive), **alone** on the full map, farming
 > greedily, banks the win target in a fixed **time** via a fixed number of **base trips**.
 
-Every stat is a *dependent variable* solved against SCT — we don't pick `MoveSpeed` because
-9 feels nice, we pick it because Speedy must clear in 30 s. This is verified automatically
-by the **Balance Oracle** (a pure-C# simulator, `Assets/_Game/Scripts/Balance/`) which
-runs the greedy policy on the real pile coordinates and asserts each class lands within
-a tolerance of its target, from all four seats. Two bands: **±1.5 s is the design band** (what
-a design must land inside; `SctTargets.DefaultToleranceSeconds`), and **±0.5 s is the
-shipped-asset drift guard** applied to the real `.asset` values on the real map
-(`SctTargets.ShippedAssetToleranceSeconds`) — the wide band let a +5 % corner distance stay green; if the shipped values drift past ±0.5 s, re-solve them, never widen the guard. Travel is **reach-aware**: a chicken does not walk
-to a pile's centre or a base's centre, so each leg is
-`max(0, centre distance − r_from − r_to)`, where a base's radius is its deposit radius
-(`PlayerBase._depositRadius`, 2.5 m) and a pile's is its oval's radius toward the other end
-plus the peck reach (`FoodPile._collectReach`, 1.0 m). The nearest pile is still chosen
-centre-to-centre. Walls and detours are not modelled.
+Every stat is a *dependent variable* measured against SCT — we don't pick `MoveSpeed` because
+9 feels nice, we pick it because Speedy must clear in 30 s. Since 2026-11-20 this is measured by
+**Balance Oracle v2** (`Assets/_Game/Scripts/Balance/`, menus under `Cluck Wars/Balance/Oracle/`),
+which **reports and proposes; it never blocks a change**. The old pass/fail SCT gate (±1.5 s design
+band, ±0.5 s drift guard) and `BalanceOracle` were deleted. The oracle simulates four-chicken
+matches on the shipped map (baked from the scene into `OracleMapSO`), every kit against three plain
+Warriors, with the wall-aware walk distance between places in `OracleMapSO`. It reports per kit the food banked at 45 s with
+the goal switched off, the seconds to 40, and the range over the four seats; with a Golden Pile and
+with a Restock too. Nobody fights in it: no steals, stuns or executes.
+
+**The oracle is a guide, not the law (Maestro, 2026-11-20).** It reports and learns from his manual
+tunings: *Record baseline* stores what the shipped assets measure and keeps the kits' prices
+(offsets in seconds; the Warrior kits +5 s today, the rest 0); *Accept as balanced* recomputes the
+prices so every kit's result is equal. The only oracle test that can fail is the drift guard
+`OracleReferenceTests.Measured_EqualsTheAcceptedReference`: the numbers moved away from the accepted
+reference, so either accept the new numbers or undo the change. **"Balanced"** means both (Maestro,
+design spec 8c, D5a and D5b): each of the 8 kits wins 20 to 30 % of mixed four-player matches, AND
+the same statistic holds per class. The match simulator that measures this is part 2 (BL-207); today
+the oracle measures the economy only. The solver aims four plain Warriors' banked food at 28 to 36
+(`bandLow`, `bandHigh` of its problem file) and the kits' results at each other. The *Solve* menu proposes free values as a schema-1 balance delta and never
+applies it.
+
+The targets below are the original SCT design intent, kept for the identity of each class; the
+oracle report, not this table, says where the shipped assets are.
 
 | Class | SCT | Trips | Strategy |
 |---|---|---|---|
@@ -104,9 +116,9 @@ centre-to-centre. Walls and detours are not modelled.
 | **Warrior** | 35 s | 3 | The ability class — mid stats, leans on his kit |
 | **Assassin** | 40 s | 4 | Denial — never actually farms; robs and executes |
 
-`WinTarget = 40 · TotalMapFood = 80 (= 2× win) · trips = ceil(WinTarget / CargoCapacity)`.
+`WinTarget = 40 · TotalMapFood = 140 (§3.2; was 80 = 2× win) · trips = ceil(WinTarget / CargoCapacity)`.
 
-At 2× supply, two players *could* max out by pure farming — so combat's job is to **buy
+At 3.5× supply, two players *could* max out by pure farming — so combat's job is to **buy
 time**, and **steal** is the only mechanic that converts a won fight directly into food.
 
 ---
@@ -166,13 +178,18 @@ procedurally at runtime, which is what a future randomised map would use.
 Only *static* geometry is baked. Player bases and food piles stay runtime `Runner.Spawn`s —
 they are `NetworkObject`s and Fusion must own their spawning.
 
-### 3.2 Tiered food budget (total = 80 = 2× win)
+### 3.2 Tiered food budget (total = 140; pile food is balance data)
 
 | Tier | Count | Food each | Σ | Role |
 |---|---|---|---|---|
-| **T1 — doorstep** | 4 (one per base) | 5 | 20 | Safe income, ~8 m off your mouth |
-| **T2 — contested** | 4 (edge midpoints) | 10 | 40 | Equidistant from two bases — contested arrival is the default |
-| **T3 — centre** | 1 | 20 | 20 | The prize, and the wall protecting it (§3.6) |
+| **T1 — doorstep** | 4 (one per base) | 10 | 40 | Safe income, ~8 m off your mouth |
+| **T2 — contested** | 4 (edge midpoints) | 15 | 60 | Equidistant from two bases — contested arrival is the default |
+| **T3 — centre** | 1 | 40 | 40 | The prize, and the wall protecting it (§3.6) |
+
+Since 2026-11-20 the three amounts are fields of `MatchConfig.asset` (`PersonalPileFood`,
+`ContestedPileFood`, `CentrePileFood`), not constants of the map generator; a balance delta can move
+them. The rules they must keep (`FoodRules`): your own pile plus one contested pile is **not** enough
+to win, your own pile plus two contested piles is. (The old 5 / 10 / 20, total 80, broke the second.)
 
 **Piles do not respawn or regenerate** — banked food leaves circulation, so the pot
 visibly shrinks and the late game gets desperate on its own. Fatty's winning route (a
@@ -450,13 +467,13 @@ There is **no HP and no Resistance** — durability is expressed through *contro
 > (no longer exactly scale-invariant: the reach-aware legs subtract fixed 2.5 m / 1.0 m radii that
 > do not scale with the arena)
 > and both moved by the same factor. The table above previously still listed the pre-rescale
-> 7.5 / 9.0; the authority is `Assets/_Game/Data/Classes/*.asset`, solved against
-> `BalanceOracle`, never this table.
+> 7.5 / 9.0; the authority is `Assets/_Game/Data/Classes/*.asset`, measured with the Balance Oracle
+> report (§2.1), never this table. The SCT column is the original design target, not a gate.
 
 **The load-bearing detail:** Speedy and Assassin share cargo (10), and until 2026-11-05 shared Move Speed too (12.15; the
-Assassin is 11.1 since Maestro's 2026-11-05 ruling, legal because his target is SCT-exempt), but they
+Assassin is 11.1 since Maestro's 2026-11-05 ruling, legal because he does not forage), but they
 target 30 s vs 40 s — the gap is that Speedy forages (Peck every 0.71 s) and the Assassin
-cannot forage at all (his 40 s target is exempt from the farming axiom, `SctTargets.Exempt`). The
+cannot forage at all (the oracle report has no farming number for him: "does not forage"). The
 Assassin is a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he
 denies instead of collects.
 
@@ -530,7 +547,7 @@ check claims against a ceiling, the stun and slow ceilings are multiplied by the
 the shipped passives (stun ceiling 1.3 x 1.3 = 1.69 s). Relentless's Oracle result is 34.98 s / 3 trips.
 **Featherfoot** (Speedy) lost Quick Drop and gained a permanent banking rate instead. It shipped at 1.5x (Oracle 28.54 s / 4 trips,
 1.46 s under the Speedy target 30 s); Maestro had it tuned to **1.1x** the same day, which lands on the target
-(29.62 s / 4 trips on all seats, inside +-0.5 s), so Featherfoot has no `SpecSctTargets` exception. The naked Speedy
+(29.62 s / 4 trips on all seats, inside +-0.5 s), so Featherfoot needed no exception (the SCT gate that asked for one was removed on 2026-11-20). The naked Speedy
 run is 30.02 s, so any bonus above about 1.13x leaves the target. Assassin/Thief remain amplified only by their own passive.
 
 **Visual identity (per-specialization colour/model) is designed, not shipped.**
@@ -629,6 +646,8 @@ only rival (no time release; reset each round). The Assassin then finds it, stun
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (4 s);
 a kill 8 s (10 s until 2026-11-05, 15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
+**Leader-weighted pick (Maestro, 2026-11-20, D7b).** The flat bounty gives no reason to hunt the leader, so the pick does: the rival with the most banked food (every rival tied for it) has its score multiplied by `LeaderPickWeight` (`MarkKill.asset`, range 1 to 4, 2 is a placeholder, BL-210); everyone else counts 1. It sits next to the two weights below and does not replace them: a leader at home still scores 0 (`MarkPickRules.LeaderWeight`, `Score`).
+
 **Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 4 s and
 the pick favours birds far from home and, softly, far from the Assassin: each candidate rolls `roll * w * w * a`. `w` is its planar
 distance to its own base over the longest base-to-base distance (the diagonal, read from the live bases, 61.7 m), clamped to 0..1.
@@ -649,7 +668,7 @@ at 49.2 is past the end; it was 3 kills at 5 s / 10 s); any miss costs 8 s. **St
 and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 11.1 x 0.18 = 5.99 m (6.56 m at the old 12.15 speed; the reach figures below predate both changes). **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 8.39 m (9.19 m at 12.15), under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
 29-36% of marks. **D5 (changed twice on 2026-11-05):** Egg Shell is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
-plus `ExecuteBounty` 5, doubled on the leader only during the rare LeaderBounty event). `MatchConfig.SpoilerBounty` 15 is read by no
+plus the flat `ExecuteBounty` 5, the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
 code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
 about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
 
@@ -1116,8 +1135,8 @@ variation is a configurable layer, never a code fork.
 
 Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 
-- **Balance Oracle** — shipped. Pure-C# SCT simulator + target harness (`Assets/_Game/
-  Scripts/Balance/`), EditMode-tested.
+- **Balance Oracle** — v2 shipped 2026-11-20 (§2.1): farming simulation, report, sweep and solver
+  (`Assets/_Game/Scripts/Balance/`); it reports, it does not gate. The v1 SCT gate was deleted.
 - **Map & walls** — shipped. Tiered 80-food budget, pinwheel walls on `ObstacleClass`,
   centre pile no longer permanent/regenerating (fixed supply).
 - **Combat** — shipped. HP/damage pipeline deleted; `ControlState`/`ControlRules` ladder;

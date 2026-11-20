@@ -508,6 +508,19 @@ All scripts are Python 3, stdlib only, run with `python -I` from the repo root. 
 | `publish_delta.py publish delta.json [--env dev\|production] [--apply] [--confirm-production]` | re-validates through `make_delta.py`, prints env, delta, expected `bal=` and the diff against what is published; `--apply` publishes to UGS Remote Config key `balance` (JSON type), reads it back, writes `tools/balance/history/<UTC>-<env>.json` + `latest-<env>.json`. Also `fetch --env dev\|production` and `rollback <history file>`. Production needs `--confirm-production` (a human flag) |
 | `apply_delta.py delta.json [--apply]` | promotes a tested delta into the shipped `.asset` files (scalar lines and `Kit:` guids only; refuses enum-by-name fields and files with uncommitted changes) |
 
+**The Balance Oracle reports; it does not gate.** Since 2026-11-20 the old `BalanceOracle` and its SCT pass/fail gate are gone, and no oracle result stops a delta or a publish. Measure a change before it goes out; a delta bypasses the tests that run on the assets, so the report is the check. The only oracle test that can fail is the drift guard `OracleReferenceTests.Measured_EqualsTheAcceptedReference` (accept the new numbers or undo the change). Output goes to `Captures/oracle/` (git-ignored). The six menus sit under `Cluck Wars/Balance/Oracle/`, each with a batch method for `-executeMethod`:
+
+| Menu | Batch method (`CluckWars.EditorTools.`) | What |
+|---|---|---|
+| Bake map | `OracleMapBaker.BakeBatch` | bakes `OracleMapSO` from the scene |
+| Report | `OracleMenu.ReportBatch` | `report-<UTC>.md/.json`: every kit against three plain Warriors |
+| Record baseline (keep prices) | `OracleMenu.RecordBatch -oracleNote "why"` | stores what the assets measure in the reference; keeps the prices |
+| Accept as balanced (recompute prices) | `OracleMenu.AcceptBatch -oracleNote "why"` | stores it and recomputes every kit's price |
+| Sweep food | `OracleMenu.SweepFoodBatch` | `sweep-food-<UTC>.md/.json`: ten pile setups, read-only |
+| Solve | `OracleMenu.SolveBatch` | reads `Captures/oracle/problem.json`, writes `proposal-<UTC>.md/.json` with a schema-1 delta; applies nothing |
+
+Leave Play mode first (Solve refuses in Play mode). `-cw_timescale` (above, solo dev builds) is for runs of the real game at speed; the oracle itself does not need it.
+
 `publish_delta.py` reads `UGS_SERVICE_KEY_ID`, `UGS_SERVICE_SECRET`, `UGS_PROJECT_ID` (and optionally `UGS_ENV_DEV_ID` / `UGS_ENV_PRODUCTION_ID`) from the environment only. After a publish, start a build and check `bal=<hash>` in the Session log line or the F1 HUD matches the hash the tool printed; publish to `dev` first, production only as its own deliberate step. Tests: `python -I -m unittest discover -s tools/balance/tests -t tools/balance/tests` (fake HTTP, temporary copies of the Data folder; no network, no writes to `Assets/`). The `/balance` user skill drives all of this.
 
 Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= lateJoin= reducedMotion=`, `GET READY held Xs`; `ArenaReadiness` `Render tier: rp= quality= post= haze=`; `Reveal` `first-use hitspark|invisibility|fencehole|telegraph frame=N` (once per scene load); `Fusion` join / leave / master change / shutdown with `cover= revealed= state=`.
@@ -525,6 +538,7 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
 | `cw_devmode 1` | Developer Mode on |
 | `cw_profile NAME` | Unity Services authentication profile (A-Z a-z 0-9 - _, max 30; other characters dropped). Give each EXE on one PC its own (`-cw_profile client2`): they otherwise share one anonymous identity and the second join fails with "player is already a member of the lobby". Unset: default profile |
+| `cw_timescale N` | simulation speed of a **solo** match (dev tools only; 1 to 20, clamped; shared matches ignore it). Clean log up to x5; x10 and x20 run but trip the round-start invariant probes, and banked food per seat differs between speeds (cause not proven) |
 | `cw_hud 1` / `cw_hud 2` | overlay at boot: 1 = compact one-line strip (FPS \| p95 \| hitches \| Visual \| RTT, top-left, translucent; leaves the match HUD visible), 2 = full panel |
 
 Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:
