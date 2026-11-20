@@ -19,6 +19,13 @@ Added `docs/DASHBOARD.md` (links only, no copied numbers), `docs/docs.base` (doc
 
 The four Notion pages (GDD v0.3, TDD v0.1, Art Direction v0.1, Classes) were migrated verbatim into `docs/` as `GDD-v0.3.md`, `TDD-v0.1.md`, `ART-v0.1.md` and `CLASSES-2026-08-24.md`, `status: archived`, banners naming the live replacement. They are stale and never a source of numbers. They were briefly in `docs/notion-import/` and dropped, then restored here on Maestro's call (no separate Notion folder). The Notion originals are in Notion Trash for 30 days (BL-197). The repo is public: they go public when `develop` is pushed, and commit `4a957c65` also holds them. The graphify ignore lines live in the per-clone `.graphifyignore`, which is itself gitignored. Open check in the Obsidian UI: BL-196.
 
+## 🧠 2026-11-20 - Automatic MemPalace capture without hooks (workflow, not game code)
+
+- Decision (Maestro, after a Fable review): MemPalace's own Claude Code hooks are not used; a daily no-LLM sweep (`MemPalaceRawSweep`) fills a separate raw palace and a weekly propose-only agent (`mempalace-weekly-curation`) drafts drawers for sessions that skipped `/housekeeping`. Rules: root `CLAUDE.md` "Knowledge routing and housekeeping", skill step 2e2. `cleanupPeriodDays` set to 3650.
+- **Verified:** sweep into the raw palace (8 and 745 drawers from two transcripts, idempotent, curated palace untouched at 440 drawers, 2.8 s per MB). **Not verified:** the full 2.7 GB first sweep (running), the first weekly run (Monday), whether archiving a session fires any hook. The main palace shows a recurring "HNSW drift" quarantine on open (older drift folders since May); not caused by this work, search still works.
+
+---
+
 ## 🔢 2026-11-19 - Build number identifies the commit (`848cebbd`, `develop`, not pushed)
 
 - Maestro's rule: the build number names the state of the project, so rebuilding a commit gives the same number, still `YY` + minute of year. It is committed in `BUILD_NUMBER`, stamped by `tools/hooks/pre-commit` (and `pre-merge-commit`) on `develop` only; install per clone with `sh tools/hooks/install.sh` (done in this clone). `CluckWarsBuildMenu.HeadBuildNumber` reads it, falling back to HEAD's commit time. Details and caveats: `docs/TESTING.md`, "Build number and tag".
