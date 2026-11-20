@@ -46,7 +46,7 @@
           <!-- Source: .claude/CLAUDE.md ("UXML/USS only for menu UI"), docs/ART.md (USS styles) -->
           <tr><td>Menu UI</td><td>UI Toolkit (UXML and USS)</td></tr>
           <!-- Source: docs/TDD.md §9.1 -->
-          <tr><td>Platforms</td><td>Windows (primary development target) and Android. iOS after the demo.</td></tr>
+          <tr><td>Platforms</td><td>Windows (primary development target) and Android. An iOS Xcode export is supported but switched off for now.</td></tr>
         </tbody>
       </table>
     </div>
@@ -65,7 +65,7 @@
     <h2>Self-injection for networked objects</h2>
     <!-- Source: docs/TDD.md §3.4 -->
     <p>Two kinds of object skip Zenject's normal scene injection. The Bootstrap scene has no scene context, and Fusion's <code>Runner.Spawn</code> creates networked objects outside Zenject's lifecycle. Both inject themselves from the project context:</p>
-    <pre><code>if (_log == null) ProjectContext.Instance.Container.Inject(this);</code></pre>
+    <pre><code>SelfInject.Ensure(this, _log != null);</code></pre>
     <p>The guard must not check <code>ProjectContext.HasInstance</code>. That property is false until something reads <code>.Instance</code> for the first time, and reading <code>.Instance</code> is what loads it.</p>
   </section>
 
@@ -77,7 +77,7 @@
     <p>Class stats are not tuned by hand. Each is solved against a Solo Clear Time target, and the Balance Oracle checks it. The Oracle is a pure-C# simulator. It runs a greedy farming policy on the real pile coordinates, takes reach into account when it measures each leg of a trip, and asserts that every class lands within tolerance of its target from all four seats. It is covered by EditMode tests. The mechanics page explains the axiom and its tolerance bands.</p>
     <figure>
       <img src="assets/loadout.jpg" width="1280" height="720" loading="lazy" alt="Capture of the loadout screen titled Gear Up. Four ability slots run along the top, with Sneaky Steal marked as a starter. Below, a shared Any Bird section and an Assassin Only section list abilities tagged Steal, Control, Utility or Defense. A purple Assassin stands in the middle.">
-      <figcaption>Capture of the loadout screen. Abilities are data: each card is built from an ability asset, tagged by category and by the class allowed to equip it.</figcaption>
+      <figcaption>Capture of the loadout screen from an older build, when abilities were picked freely (each specialization now has a fixed kit). Abilities are data: each card is built from an ability asset, tagged by category and by the class allowed to equip it.</figcaption>
     </figure>
   </section>
 
@@ -96,13 +96,13 @@
   <section id="workflow">
     <h2>How it is built</h2>
     <!-- Source: .claude/CLAUDE.md (agent table, tools in scope), file names in .claude/agents/ -->
-    <p>Cluck Wars is built solo with AI coding agents. Claude Code works through the agents defined in <code>.claude/agents</code>: <code>code-architect</code> for planning and review, <code>senior-dev</code> for implementation, <code>qa-reviewer</code> and <code>tester</code>, and specialists for UI, UX, mechanics, level design, 2D and 3D art, VFX, shaders, the render pipeline, audio and narrative. A Unity MCP bridge (AI Game Developer) lets the agents inspect scenes, edit components, take screenshots and run the EditMode tests in the Editor. Larger multi-file changes can also go through Antigravity, using a skill called <code>cravify</code>.</p>
+    <p>Cluck Wars is built solo with AI coding agents. Claude Code works through the agents defined in <code>.claude/agents</code>: <code>code-architect</code> for planning and review, <code>senior-dev</code> for implementation, <code>qa-reviewer</code> and <code>tester</code>, and specialists for UI, UX, mechanics, level design, 2D and 3D art, VFX, shaders, the render pipeline, audio and narrative. A Unity MCP bridge (AI Game Developer) lets the agents inspect scenes, edit components, take screenshots and run the EditMode tests in the Editor.</p>
   </section>
 </main>
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Cluck Wars. Figures on this page come from docs/TDD.md and docs/GDD.md in the repository. Where the two disagree, the GDD wins.</p>
+    <p>Cluck Wars. Figures on this page come from docs/TDD.md and docs/GDD.md in the repository. Where they disagree with the code or the shipped data, the code and data win.</p>
     <p><a href="https://github.com/mtejedorg/CluckWars">github.com/mtejedorg/CluckWars</a></p>
   </div>
 </footer>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cluck Wars: Mechanics</title>
-<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 10 abilities.">
+<meta name="description" content="How Cluck Wars plays: the 45-second loop, the Solo Clear Time balance axiom, four classes, the steal formula, the control ladder and the 11 abilities.">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -24,7 +24,7 @@
 <main class="wrap">
   <div class="hero">
     <h1>Mechanics</h1>
-    <p class="lede">How a match plays, and why the numbers are what they are. Everything here is read from the game design document (v0.4) in the repository.</p>
+    <p class="lede">How a match plays, and why the numbers are what they are. Numbers are read from the shipped game data; the reasoning comes from the game design document in the repository.</p>
   </div>
   <ul class="toc" aria-label="On this page">
     <li><a href="#loop">Loop and win</a></li>
@@ -49,7 +49,7 @@
     <p>The stored tie-break order is food, then KOs, then the lower corner index. Players are never told a coin flip decided anything. If food is level at the top and KOs do not settle it, the end screen reads "TIED AT THE TOP!" and every tied first-place bird is crowned. If KOs settle it, the banner stays "{name} WINS!" with "Tied 1st · won on KOs".</p>
     <figure>
       <img src="assets/lobby.jpg" width="1280" height="720" loading="lazy" alt="Capture of the lobby screen, titled The Coop. A strip of house rules reads time 0:45, goal 40 food, mode free-for-all, arena Sunny Farm. Four chickens stand on numbered platforms, each with a player card showing class and four ability icons.">
-      <figcaption>Capture of the lobby. The house rules strip shows the time (0:45) and the goal (40 food).</figcaption>
+      <figcaption>Capture of the lobby (from a build before the 2026-11-20 controls change; new captures are pending). The house rules strip shows the time (0:45) and the goal (40 food).</figcaption>
     </figure>
   </section>
 
@@ -118,9 +118,9 @@
         <thead><tr><th>Class</th><th>Specialization</th><th>Passive</th><th>Kit</th></tr></thead>
         <tbody>
           <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Steal 3 s, Stun 5.25 s, Jump 1.5 s)</td><td>Peck, Jump, Stun, Steal</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow aura 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Speed, Slow, Steal</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Speed, Slow, Steal</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>You bank food 10% faster; immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Shove</td></tr>
-          <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (the Slow aura holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (Slow Area holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Egg Shell, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Slow Area, Egg Shell, Steal</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Hunt, Jump, Hide, Stun</td></tr>
@@ -166,8 +166,8 @@
       <table>
         <thead><tr><th>State</th><th>Move</th><th>Cast abilities</th><th>Collect</th><th>Source</th></tr></thead>
         <tbody>
-          <tr><td>Slowed</td><td>reduced</td><td>yes</td><td>yes</td><td>collision, pile, the Slow aura</td></tr>
-          <tr><td>Stuck</td><td>no</td><td>yes</td><td>no</td><td>none in the current 10</td></tr>
+          <tr><td>Slowed</td><td>reduced</td><td>yes</td><td>yes</td><td>collision, pile, Slow, Slow Area</td></tr>
+          <tr><td>Stuck</td><td>no</td><td>yes</td><td>no</td><td>none in the current 11</td></tr>
           <tr><td>Stunned</td><td>no</td><td>no</td><td>no</td><td>the Stun ability (1.3 s)</td></tr>
         </tbody>
       </table>
@@ -178,7 +178,7 @@
   <section id="deathmark">
     <h2>Hunt: one button, two presses</h2>
     <!-- Source: docs/GDD.md §6.4 -->
-    <p>The Assassin's execute (shown as Hunt; its internal name is Death Mark) is the only hard removal in the game. Only the Assassin specialization has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Hunt on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
+    <p>The Assassin's execute (shown as Hunt; its internal name is Death Mark) is the only hard removal in the game. Only the Spoiler, one of the two Sneaky specializations, has it, in the first of the four ability slots. The press marks a rival anywhere on the map for 4 s, picked at random but likelier the farther it is from its own base and, softly, from the Assassin; the Assassin must find it, stun it and press again within 6.2 m, in the last second of the mark. Each round opens with Hunt on a 4 s cooldown. No ability crosses a claimed base wall, so a bird at home cannot be reached and the mark can run out.</p>
     <div class="tw wide">
       <table>
         <thead><tr><th>Stage</th><th>Condition</th><th>Counterplay</th></tr></thead>
@@ -196,13 +196,13 @@
   </section>
 
   <section id="abilities">
-    <h2>The 10 abilities</h2>
+    <h2>The 11 abilities</h2>
     <!-- Source: docs/GDD.md §7.2 (pool and cooldowns), §6.1 (range-only targeting) -->
     <p>Simplified on 2026-11-05: one ability per job, with plain names. Every targeted ability hits every rival within its radius of you, by distance only: there is no cone and no aiming at a single rival. Nineteen older moves are retired (Quick Drop's banking bonus is now a permanent Featherfoot passive). Each player has four active slots, filled by the kit of the chosen specialization. Cooldowns are the shipped values, before passives.</p>
 
     <div class="chips" id="chips" role="group" aria-label="Filter abilities by who can use them" hidden>
-      <button type="button" class="chip" data-f="all" aria-pressed="true">All 10</button>
-      <button type="button" class="chip" data-f="everyone" aria-pressed="false">Everyone 7</button>
+      <button type="button" class="chip" data-f="all" aria-pressed="true">All 11</button>
+      <button type="button" class="chip" data-f="everyone" aria-pressed="false">Everyone 8</button>
       <button type="button" class="chip" data-f="limited" aria-pressed="false">Limited 3</button>
     </div>
 
@@ -214,8 +214,9 @@
           <tr data-c="everyone"><td>Stun <span class="tag t-shared">Everyone</span></td><td class="num">7 s</td><td>Stuns every rival within 5.4 m for 1.3 s.</td></tr>
           <tr data-c="everyone"><td>Shove <span class="tag t-shared">Everyone</span></td><td class="num">5 s</td><td>Shoves every rival within 5.4 m away.</td></tr>
           <tr data-c="everyone"><td>Slow <span class="tag t-shared">Everyone</span></td><td class="num">6 s</td><td>Slows every rival within 6.48 m to 55% speed for 3 s.</td></tr>
+          <tr data-c="everyone"><td>Slow Area <span class="tag t-shared">Everyone</span></td><td class="num">7 s</td><td>For 5 s, every rival within 6.48 m of you moves at 55% speed while it stays inside.</td></tr>
           <tr data-c="everyone"><td>Speed <span class="tag t-shared">Everyone</span></td><td class="num">4 s</td><td>A 1.5 s sprint at 1.3&times; movement speed.</td></tr>
-          <tr data-c="everyone"><td>Egg Shell <span class="tag t-shared">Everyone</span></td><td class="num">8 s</td><td>Walk, then egg, on one press. First second: walk at half speed and slows (the Slow aura included) do not work, but a stun, a shove, a steal or a kill still lands. Then an egg for 2 s that starts by itself: you cannot move, and nobody can rob, kill, stun, slow or shove you. Press again to stop; using another move ends the egg. Cooldown from the cast.</td></tr>
+          <tr data-c="everyone"><td>Egg Shell <span class="tag t-shared">Everyone</span></td><td class="num">8 s</td><td>Walk, then egg, on one press. First second: walk at half speed and slows (Slow Area included) do not work, but a stun, a shove, a steal or a kill still lands. Then an egg for 2 s that starts by itself: you cannot move, and nobody can rob, kill, stun, slow or shove you. Press again to stop; using another move ends the egg. Cooldown from the cast.</td></tr>
           <tr data-c="everyone"><td>Hide <span class="tag t-shared">Everyone</span></td><td class="num">4.5 s</td><td>Fades you to a ghostly outline for 2 s. Using a move breaks it.</td></tr>
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">2 s</td><td>A quick dash forward, straight over walls (3&times; speed for 0.18 s: about 6 m for Sneaky, 5.5 m for Warrior).</td></tr>
@@ -233,7 +234,7 @@
         <tbody>
           <tr><td>Low</td><td class="num">1 to 3 s</td><td>Jump</td></tr>
           <tr><td>Medium</td><td class="num">4 to 6 s</td><td>Steal, Speed, Hide, Shove, Slow, Hunt after a miss</td></tr>
-          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Egg Shell, Hunt after a kill</td></tr>
+          <tr><td>High</td><td class="num">7 to 8 s</td><td>Stun, Slow Area, Egg Shell, Hunt after a kill</td></tr>
         </tbody>
       </table>
     </div>
@@ -241,7 +242,7 @@
   </section>
 
   <section id="casting">
-    <h2>Hold to aim, release to use</h2>
+    <h2>Hold to preview, release to use</h2>
     <!-- Source: docs/GDD.md §10.1 -->
     <p>An ability always fires on release, never on press. The moment you press, your own screen shows the move's true area on the ground and marks every chicken inside it. What is marked is exactly what gets hit: with range-only targeting that is every rival inside a circle around you.</p>
     <p>Past about 125 ms the hold becomes a commitment. Rivals see a wind-up glow at your feet, though not your area, and you keep moving at full speed. Nothing aims: no device has an aim control, so a move fires along your facing, or at the soft-lock target on touch.</p>
@@ -258,7 +259,7 @@
     </ul>
     <figure>
       <img src="assets/hold.jpg" width="1200" height="675" loading="lazy" alt="Capture of a yellow chicken with a wedge-shaped aim outline drawn on the grass. A red rival chicken stands beside it and a rival nameplate floats above. Ability buttons are at the right, a scoreboard at top left and the timer reads 00:22. A white debug guide rectangle frames part of the screen.">
-      <figcaption>Capture of an ability aim outline on the ground with a rival nearby (taken before range-only targeting, when some moves were wedge-shaped).</figcaption>
+      <figcaption>Capture of an ability aim outline on the ground with a rival nearby (taken before range-only targeting, when some moves were wedge-shaped, and before the 2026-11-20 controls change: the button layout is no longer current).</figcaption>
     </figure>
   </section>
 
@@ -307,7 +308,7 @@
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Cluck Wars. Figures on this page come from docs/GDD.md (v0.4) in the repository.</p>
+    <p>Cluck Wars. Numbers on this page are read from the shipped game data; the reasoning comes from docs/GDD.md in the repository.</p>
     <p><a href="https://github.com/mtejedorg/CluckWars">github.com/mtejedorg/CluckWars</a></p>
   </div>
 </footer>
