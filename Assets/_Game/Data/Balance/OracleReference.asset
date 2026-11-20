@@ -13,24 +13,24 @@ MonoBehaviour:
   m_Name: OracleReference
   m_EditorClassIdentifier: 
   AcceptedOn: 2026-11-20
-  Note: v1 targets carried over
-  MapFingerprint: 7a329c5d5cc00014
+  Note: food 10 / 15 / 40 (D1b)
+  MapFingerprint: be5e5449aca95e44
   Entries:
   - Label: Speedy_Slippery
-    BestBanked: 19.99999
-    OffsetSeconds: 0
+    BestBanked: 39.999935
+    OffsetSeconds: 3.9375448
   - Label: Speedy_Featherfoot
-    BestBanked: 23
-    OffsetSeconds: 0
+    BestBanked: 40.000046
+    OffsetSeconds: 3.9374096
   - Label: Fatty_Hoarder
-    BestBanked: 35.0000038
-    OffsetSeconds: 0
+    BestBanked: 49.999977
+    OffsetSeconds: -5.85001
   - Label: Fatty_Bulwark
-    BestBanked: 35.0000038
-    OffsetSeconds: 0
+    BestBanked: 50.99996
+    OffsetSeconds: -6.6176453
   - Label: Warrior_Relentless
-    BestBanked: 23.9999771
-    OffsetSeconds: 5
+    BestBanked: 39.99993
+    OffsetSeconds: 3.9375498
   - Label: Warrior_Bully
-    BestBanked: 22.99998
-    OffsetSeconds: 5
+    BestBanked: 39.99993
+    OffsetSeconds: 3.9375498

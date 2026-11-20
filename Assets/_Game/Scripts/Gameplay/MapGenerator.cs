@@ -94,20 +94,12 @@ namespace CluckWars.Gameplay
         [Min(2f)]
         [SerializeField] private float _baseCornerDistance = 25.65f;
 
-        [Header("Food piles (GDD §3: center + personal + contested islands)")]
-        [Tooltip("Initial food in the central pile — large, high risk, high reward (GDD §3: 20).")]
-        [Min(5f)]
-        [SerializeField] private float _centerPileAmount = 20f;
-
+        [Header("Food piles (GDD §3: center + personal + contested islands; the AMOUNTS live in MatchConfigSO)")]
         [Tooltip("Full world X,Z footprint of the centre island at 100% fill. Shrunk 35% from the original 12x10: piles are solid NavMesh-carving blockers, and at the old sizes they covered 25% of the 38x38 arena floor, which left chases nowhere to happen. See the 2026-08-13 Peck/four-slot spec. HELD at its absolute size through the 2026-08-14 x1.35 arena rescale (Maestro: 'don't increase the Pile size for now, but save the value just in case') — the x1.35 value is 10.53 x 8.78.")]
         [SerializeField] private Vector2 _centerPileFootprint = new Vector2(7.8f, 6.5f);
 
         [Tooltip("Make the center pile permanent (ADR 0003 Decision 2b): it can never be drained below its floor and slowly regenerates, so it stays a solid obstacle and the one contested resource of the late game. Floor and regen rate are tuned on the FoodPile prefab.")]
         [SerializeField] private bool _centerPileIsPermanent = false;
-
-        [Tooltip("Food in each player's personal doorstep island (T1 = 5 food).")]
-        [Min(0f)]
-        [SerializeField] private float _personalPileAmount = 5f;
 
         [Tooltip("Full world X,Z footprint of each personal island at 100% fill. Shrunk 35% from the original 5.5x4.6 — see _centerPileFootprint. HELD through the 2026-08-14 x1.35 arena rescale; the x1.35 value is 4.86 x 4.05.")]
         [SerializeField] private Vector2 _personalPileFootprint = new Vector2(3.6f, 3.0f);
@@ -115,10 +107,6 @@ namespace CluckWars.Gameplay
         [Tooltip("Personal island position = Lerp(corner, center, inset). 0.35 puts it a few units in front of the base, toward the action.")]
         [Range(0.2f, 0.6f)]
         [SerializeField] private float _personalPileInset = 0.3673f;
-
-        [Tooltip("Food in each contested island between adjacent player pairs (T2 = 10 food).")]
-        [Min(0f)]
-        [SerializeField] private float _contestedPileAmount = 10f;
 
         [Tooltip("Full world X,Z footprint of each contested island at 100% fill. Shrunk 35% from the original 6.5x5.4 — see _centerPileFootprint. HELD through the 2026-08-14 x1.35 arena rescale; the x1.35 value is 5.67 x 4.73.")]
         [SerializeField] private Vector2 _contestedPileFootprint = new Vector2(4.2f, 3.5f);
@@ -135,6 +123,7 @@ namespace CluckWars.Gameplay
         private PrefabRegistrySO _prefabRegistry;
         private ISessionSelectionService _selection;
         private ILogService _log;
+        private MatchConfigSO _matchConfig;
         private Vector3[] _spawnPoints;
         private bool _runnerHandled;
 
@@ -150,12 +139,13 @@ namespace CluckWars.Gameplay
         public int ExpectedPileCount => _corners != null ? 1 + 2 * _corners.Length : 0;
 
         [Inject]
-        public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ISessionSelectionService selection, ILogService log)
+        public void Construct(INetworkService network, PrefabRegistrySO prefabRegistry, ISessionSelectionService selection, ILogService log, MatchConfigSO matchConfig)
         {
             _network = network;
             _prefabRegistry = prefabRegistry;
             _selection = selection;
             _log = log;
+            _matchConfig = matchConfig;
         }
 
         private NetworkObject ResolveBasePrefab()
@@ -921,6 +911,14 @@ namespace CluckWars.Gameplay
                 _log?.Warn(Source, "FoodPile prefab not assigned (neither PrefabRegistry.FoodPile nor legacy slot) — skipping pile spawn.");
                 return;
             }
+            if (_matchConfig == null)
+            {
+                _log?.Error(Source, "MatchConfigSO not injected; the pile amounts live there, so no piles spawn.");
+                return;
+            }
+            float centreFood = _matchConfig.CentrePileFood;
+            float personalFood = _matchConfig.PersonalPileFood;
+            float contestedFood = _matchConfig.ContestedPileFood;
 
             // GDD §3 layout — three strategic options per player:
             //   Secure:  personal island near own base (low yield, safe).
@@ -936,19 +934,19 @@ namespace CluckWars.Gameplay
 
             var loggedCoords = new System.Text.StringBuilder();
             loggedCoords.AppendLine("--- ORACLE PILE COORDINATES ---");
-            loggedCoords.AppendLine($"Center: (0.00, 0.00) | Food: {_centerPileAmount:0.00}");
+            loggedCoords.AppendLine($"Center: (0.00, 0.00) | Food: {centreFood:0.00}");
 
             // Center pile — bigger Amount + bigger visual. Never moves, and (ADR 0003
             // Decision 2b) never fully drains: the outer piles are consumed away over the
             // match, so the centre is what the endgame converges on.
-            SpawnPile(runner, pilePrefab, Vector3.zero, 0f, _centerPileAmount, _centerPileFootprint, _centerPileIsPermanent, centre: true);
+            SpawnPile(runner, pilePrefab, Vector3.zero, 0f, centreFood, _centerPileFootprint, _centerPileIsPermanent, centre: true);
 
             // Personal doorstep islands — 4 piles on the corner diagonals.
             for (int i = 0; i < _corners.Length; i++)
             {
                 var pos = OuterPilePosition(PersonalPileNominal(_corners[i], _personalPileInset), personalNudge, i);
-                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), _personalPileAmount, _personalPileFootprint);
-                loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_personalPileAmount:0.00}");
+                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), personalFood, _personalPileFootprint);
+                loggedCoords.AppendLine($"Personal {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {personalFood:0.00}");
             }
 
             // Contested islands — 4 piles on the edge midpoints.
@@ -957,18 +955,18 @@ namespace CluckWars.Gameplay
                 var pos = OuterPilePosition(
                     ContestedPileNominal(_corners[i], _corners[(i + 1) % _corners.Length], _contestedEdgeInset),
                     contestedNudge, i);
-                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), _contestedPileAmount, _contestedPileFootprint);
-                loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {_contestedPileAmount:0.00}");
+                SpawnPile(runner, pilePrefab, pos, PileFootprintShape.RadialLongAxisYaw(pos), contestedFood, _contestedPileFootprint);
+                loggedCoords.AppendLine($"Contested {i}: ({pos.x:F2}, {pos.z:F2}) | Food: {contestedFood:0.00}");
             }
             loggedCoords.AppendLine("-------------------------------");
             _log?.Info(Source, loggedCoords.ToString());
 
-            _log?.Info(Source, $"Spawned GDD layout: center ({_centerPileAmount}" +
+            _log?.Info(Source, $"Spawned GDD layout: center ({centreFood}" +
                 $"{(_centerPileIsPermanent ? ", permanent" : "")}, " +
                 $"{_centerPileFootprint.x:0.#}×{_centerPileFootprint.y:0.#}) + " +
-                $"4 personal ({_personalPileAmount}, {_personalPileFootprint.x:0.#}×{_personalPileFootprint.y:0.#}) + " +
-                $"4 contested ({_contestedPileAmount}, {_contestedPileFootprint.x:0.#}×{_contestedPileFootprint.y:0.#}) piles. " +
-                $"Starting food = {_centerPileAmount + 4f * (_personalPileAmount + _contestedPileAmount):0}" +
+                $"4 personal ({personalFood}, {_personalPileFootprint.x:0.#}×{_personalPileFootprint.y:0.#}) + " +
+                $"4 contested ({contestedFood}, {_contestedPileFootprint.x:0.#}×{_contestedPileFootprint.y:0.#}) piles. " +
+                $"Starting food = {centreFood + 4f * (personalFood + contestedFood):0}" +
                 $"{(_centerPileIsPermanent ? " (+ centre regen)" : "")}.");
         }
 

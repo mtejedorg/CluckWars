@@ -288,7 +288,7 @@ namespace CluckWars.Tests
             var stamped = System.Text.RegularExpressions.Regex.Matches(src, @"SpawnPile\([^;]*centre:\s*true");
             Assert.AreEqual(1, stamped.Count, "exactly one SpawnPile call passes centre: true");
             StringAssert.Contains("Vector3.zero", stamped[0].Value, "and it is the arena-centre spawn");
-            StringAssert.Contains("_centerPileAmount", stamped[0].Value);
+            StringAssert.Contains("centreFood", stamped[0].Value);
             StringAssert.Contains("pile.IsCentre = centre;", src, "the flag is stamped in onBeforeSpawned (valid from tick zero on every peer)");
             Assert.IsNotNull(typeof(FoodPile).GetProperty(nameof(FoodPile.IsCentre)).GetCustomAttributes(typeof(Fusion.NetworkedAttribute), false).FirstOrDefault(), "[Networked]");
         }

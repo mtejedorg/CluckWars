@@ -92,6 +92,9 @@ namespace CluckWars.Tests
         // ---- the nine piles + the Oracle map -------------------------------------------------
 
         /// <summary>One shipped pile: name, centre, oval yaw/footprint and starting food.</summary>
+        /// <summary>The shipped match config: where the pile amounts live since D1b.</summary>
+        public static MatchConfigSO Config => TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+
         public struct PileSpec
         {
             public string Name;
@@ -108,20 +111,20 @@ namespace CluckWars.Tests
             var piles = new List<PileSpec>
             {
                 new PileSpec { Name = "Center", Pos = Vector3.zero, Yaw = 0f, Footprint = CentrePileFootprint,
-                               Food = TestAssets.SceneFloat("_centerPileAmount") },
+                               Food = Config.CentrePileFood },
             };
             for (int i = 0; i < 4; i++)
             {
                 var p = MapGenerator.OuterPilePosition(MapGenerator.PersonalPileNominal(corners[i], PersonalPileInset), personalNudge, i);
                 piles.Add(new PileSpec { Name = $"Personal{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
-                                         Footprint = PersonalPileFootprint, Food = TestAssets.SceneFloat("_personalPileAmount") });
+                                         Footprint = PersonalPileFootprint, Food = Config.PersonalPileFood });
             }
             for (int i = 0; i < 4; i++)
             {
                 var p = MapGenerator.OuterPilePosition(
                     MapGenerator.ContestedPileNominal(corners[i], corners[(i + 1) % 4], ContestedEdgeInset), contestedNudge, i);
                 piles.Add(new PileSpec { Name = $"Contested{i}", Pos = p, Yaw = PileFootprintShape.RadialLongAxisYaw(p),
-                                         Footprint = ContestedPileFootprint, Food = TestAssets.SceneFloat("_contestedPileAmount") });
+                                         Footprint = ContestedPileFootprint, Food = Config.ContestedPileFood });
             }
             return piles;
         }

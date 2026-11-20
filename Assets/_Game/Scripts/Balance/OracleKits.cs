@@ -20,7 +20,7 @@ namespace CluckWars.Balance
         public AbilityRegistrySO Abilities;
         public ChickenClassRegistrySO Classes;
         public MatchConfigSO Match;
-        /// <summary>Pile food to use instead of the amounts baked into <see cref="Map"/> (what a test or a proposal sets).</summary>
+        /// <summary>Pile food to use instead of the amounts in <see cref="Match"/> (what a test or a proposal sets).</summary>
         public OracleFood? FoodOverride;
     }
 
@@ -60,13 +60,17 @@ namespace CluckWars.Balance
                 return Build(scope, inputs, StandardLabel, ChickenClass.Warrior, null, Array.Empty<AbilityBaseSO>(), scope.Of(inputs.Match), FindPeck(inputs.Abilities));
         }
 
-        /// <summary>Starting food per pile kind: the override when set, else the amounts baked into the map.</summary>
+        /// <summary>Starting food per pile kind: the override when set, else the amounts in the match config (as the verdict would have them).</summary>
         public static OracleFood Food(OracleInputs inputs)
         {
             if (inputs == null) throw new ArgumentNullException(nameof(inputs));
             if (inputs.FoodOverride.HasValue) return inputs.FoodOverride.Value;
-            if (inputs.Map == null) throw new ArgumentException("OracleInputs.Map is required to read the pile food (or set FoodOverride).", nameof(inputs));
-            return new OracleFood { Personal = inputs.Map.PersonalFood, Contested = inputs.Map.ContestedFood, Centre = inputs.Map.CentreFood };
+            Require(inputs, needMap: false, needAbilities: false);
+            using (var scope = new CopyScope(inputs))
+            {
+                var match = scope.Of(inputs.Match);
+                return new OracleFood { Personal = match.PersonalPileFood, Contested = match.ContestedPileFood, Centre = match.CentrePileFood };
+            }
         }
 
         /// <summary>The match rules of one run: win target, clock and event window from the match config, the event amounts and pile slow from the game's own constants.</summary>

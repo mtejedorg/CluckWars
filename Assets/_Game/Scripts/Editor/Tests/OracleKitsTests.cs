@@ -192,13 +192,13 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Food_IsTheOverrideElseTheBakedMap()
+        public void Food_IsTheOverrideElseTheMatchConfig()
         {
             var baked = OracleKits.Food(Inputs());
-            Assert.AreEqual(_map.PersonalFood, baked.Personal);
-            Assert.AreEqual(_map.ContestedFood, baked.Contested);
-            Assert.AreEqual(_map.CentreFood, baked.Centre);
-            Assert.Greater(baked.Personal, 0f, $"the map carries no pile food: run {OracleMapBaker.MenuPath}");
+            Assert.AreEqual(_match.PersonalPileFood, baked.Personal);
+            Assert.AreEqual(_match.ContestedPileFood, baked.Contested);
+            Assert.AreEqual(_match.CentrePileFood, baked.Centre);
+            Assert.Greater(baked.Personal, 0f, "the match config carries no pile food");
 
             var inputs = Inputs();
             inputs.FoodOverride = new OracleFood { Personal = baked.Personal + 1f, Contested = baked.Contested + 2f, Centre = baked.Centre + 3f };

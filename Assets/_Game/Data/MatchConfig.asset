@@ -21,6 +21,9 @@ MonoBehaviour:
   DepositRatePerSecond: 9
   ComebackEventSecondsLeft: 10
   BaseKeepOutRadius: 2.5
+  PersonalPileFood: 10
+  ContestedPileFood: 15
+  CentrePileFood: 40
   LoadoutMode: 0
   TargetingMode: 0
   TickRate: 30

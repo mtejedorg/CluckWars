@@ -570,13 +570,10 @@ MonoBehaviour:
   _scatterClearance: 2
   _obstaclePlacementAttempts: 80
   _baseCornerDistance: 25.65
-  _centerPileAmount: 20
   _centerPileFootprint: {x: 7.8, y: 6.5}
   _centerPileIsPermanent: 0
-  _personalPileAmount: 5
   _personalPileFootprint: {x: 3.6, y: 3}
   _personalPileInset: 0.3673
-  _contestedPileAmount: 10
   _contestedPileFootprint: {x: 4.2, y: 3.5}
   _contestedEdgeInset: 0.7895
   _pilePositionJitter: 0

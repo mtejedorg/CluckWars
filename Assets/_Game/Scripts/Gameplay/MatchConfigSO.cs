@@ -51,6 +51,17 @@ namespace CluckWars.Gameplay
                  "the map keeps it passable: BaseKeepOutTests checks the real layout.")]
         [Min(0f)] public float BaseKeepOutRadius = 2.5f;
 
+        [Header("Pile food")]
+        [Tooltip("Food in each player's own pile next to their base. Keep it so that this plus ONE contested pile is " +
+                 "not enough to win, and this plus TWO contested piles is (FoodRules checks both).")]
+        [Min(0)] public float PersonalPileFood = 10f;
+
+        [Tooltip("Food in each of the four piles between two neighbouring players.")]
+        [Min(0)] public float ContestedPileFood = 15f;
+
+        [Tooltip("Food in the one pile in the middle of the arena. The prize worth fighting over.")]
+        [Min(0)] public float CentrePileFood = 40f;
+
         [Header("Loadouts")]
         [Tooltip("Fixed: every specialization plays its authored kit (the balance baseline; players and bots). " +
                  "Free: the old hand-picked loadouts, unchanged. One switch, read by the spawner, GEAR UP and LastSetup.")]

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using CluckWars.Balance;
 using CluckWars.EditorTools;
+using CluckWars.Gameplay;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -380,8 +381,11 @@ namespace CluckWars.Tests
             return map;
         }
 
-        private static OracleFood MapFood(OracleMapSO map) =>
-            new OracleFood { Personal = map.PersonalFood, Contested = map.ContestedFood, Centre = map.CentreFood };
+        private static OracleFood MapFood(OracleMapSO map)
+        {
+            var match = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            return new OracleFood { Personal = match.PersonalPileFood, Contested = match.ContestedPileFood, Centre = match.CentrePileFood };
+        }
 
         [Test]
         public void TieBreak_IsRelativeToTheSeat()

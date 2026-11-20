@@ -421,9 +421,6 @@ namespace CluckWars.Tests
         /// </summary>
         private static Vector2 SceneVector2(string fieldName) => TestAssets.SceneVector2(fieldName);
 
-        /// <summary>Scalar counterpart of <see cref="SceneVector2"/>.</summary>
-        private static float SceneFloat(string fieldName) => TestAssets.SceneFloat(fieldName);
-
         // ---- Match economy ------------------------------------------------------
 
         [Test]
@@ -494,36 +491,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void PersonalPile_CannotFillEvenTheSmallestCargo_InOneVisit()
+        public void PersonalPile_AloneCannotWinTheMatch()
         {
-            // Design intent (Maestro, 2026-07-24): the personal pile is safe but weak — a
-            // trickle nobody contests, not a farm. If it could fill any class's cargo in
-            // one visit, staying home would be a viable strategy and the whole point of the
-            // outward-routing pillar (contested/centre piles as the real yield) collapses.
-            float personalAmount = SceneFloat("_personalPileAmount");
-            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir);
-            Assert.IsNotEmpty(stats, "No ChickenStatsSO assets found.");
-
-            float smallestCargo = stats.Min(s => s.CargoCapacity);
-            Assert.Less(personalAmount, smallestCargo,
-                $"Personal pile carries {personalAmount} food, but the smallest cargo capacity in the " +
-                $"roster is {smallestCargo} — that class (or any larger-cargo class) can fill up from " +
-                "the 'safe' pile alone, which defeats the point of it being weak.");
-        }
-
-        [Test]
-        public void MapPiles_MatchesTieredBudgetTotaling80()
-        {
-            float personal = SceneFloat("_personalPileAmount");
-            float contested = SceneFloat("_contestedPileAmount");
-            float center = SceneFloat("_centerPileAmount");
-
-            Assert.AreEqual(5f, personal, "Personal pile amount default must be 5.");
-            Assert.AreEqual(10f, contested, "Contested pile amount default must be 10.");
-            Assert.AreEqual(20f, center, "Center pile amount default must be 20.");
-
-            float total = (4 * personal) + (4 * contested) + center;
-            Assert.AreEqual(80f, total, "Total food in the map budget must equal 80.");
+            // Design intent (Maestro, 2026-07-24, restated for D1b on 2026-11-20): the personal pile is safe but
+            // not a farm - staying home must not win. The old form compared it with the smallest cargo (5 food
+            // against 10); D1b made it 10, equal to the Speedy's cargo, so the guard now speaks about the
+            // match. FoodRulesTests holds the finer rule (own pile + one contested pile is not enough), and
+            // the old "budget totals 80" test went with the scene fields: the amounts are balance data now.
+            var cfg = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            Assert.Less(cfg.PersonalPileFood, cfg.FoodTargetToWin,
+                $"The personal pile carries {cfg.PersonalPileFood} food and the win target is {cfg.FoodTargetToWin}: staying home would win.");
         }
 
         [Test]

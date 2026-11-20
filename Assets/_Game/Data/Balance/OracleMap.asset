@@ -99,9 +99,6 @@ MonoBehaviour:
   WallHalfWidth: 0.83000004
   BaseRadius: 2.5
   CollectReach: 1
-  PersonalFood: 5
-  ContestedFood: 10
-  CentreFood: 20
   WalkLegs:
   - 0
   - 15.620029
@@ -442,4 +439,4 @@ MonoBehaviour:
   - 56.666782
   - 38.605
   - 0
-  SceneFingerprint: 7a329c5d5cc00014
+  SceneFingerprint: be5e5449aca95e44
