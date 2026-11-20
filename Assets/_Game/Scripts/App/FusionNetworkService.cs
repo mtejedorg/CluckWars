@@ -41,6 +41,10 @@ namespace CluckWars.Networking
         // OnInput, so no press is ever lost regardless of frame/tick alignment.
         private bool _pendingAbility1, _pendingAbility2, _pendingAbility3, _pendingAbility4, _pendingAbilityCancel;
 
+        private bool _timeScaled;
+        private float _scaledTo = 1f;
+        private float _savedMaxDeltaTime;
+
         public bool IsRunning => _runner != null && _runner.IsRunning;
         public bool IsReady => _ready && IsRunning;
         private bool _ready;
@@ -88,6 +92,21 @@ namespace CluckWars.Networking
             // etc.), causing duplicate chicken spawns and double bot registration.
             // Fusion registers existing NetworkObjects in the active scene
             // automatically without needing an explicit SceneRef here.
+            // cw_timescale (dev tools, solo only): the runner gets its own copy of the config with scaled simulation time;
+            // NetworkProjectConfig.fusion on disk stays unscaled. Every other mode ignores the flag.
+            NetworkProjectConfig runnerConfig = null;
+            float requestedScale = CluckWars.Diagnostics.DevTools.Available ? CluckWars.Diagnostics.AutoTestArgs.Read(_log).TimeScale : 1f;
+            float timeScale = mode == GameMode.Single ? requestedScale : 1f;
+            if (mode != GameMode.Single && requestedScale > 1f)
+                _log?.Info(Source, $"cw_timescale ignored: only solo (GameMode.Single) matches can run scaled time, this is {mode}.");
+            if (timeScale > 1f)
+            {
+                runnerConfig = NetworkProjectConfig.Deserialize(NetworkProjectConfig.Serialize(NetworkProjectConfig.Global));
+                // The JSON round trip drops the prefab table (every Spawn then fails "baked with a guid ... failed to be translated").
+                runnerConfig.PrefabTable = NetworkProjectConfig.Global.PrefabTable;
+                runnerConfig.Simulation.SimulationUpdateTimeMode = SimulationConfig.SimulationTimeMode.DeltaTime;
+            }
+
             int maxPlayers = _matchConfig != null ? Mathf.Clamp(_matchConfig.MaxPlayers, 1, 16) : 4;
             var result = await _runner.StartGame(new StartGameArgs
             {
@@ -95,12 +114,24 @@ namespace CluckWars.Networking
                 SessionName = sessionName,
                 SceneManager = sceneManager,
                 PlayerCount = maxPlayers,
+                Config = runnerConfig,
             });
 
             if (result.Ok)
             {
                 _log?.Info(Source, $"StartGame OK. LocalPlayer={_runner.LocalPlayer}, MaxPlayers={maxPlayers}, IsSharedModeMasterClient={_runner.IsSharedModeMasterClient}.");
                 _ready = true;
+                if (timeScale > 1f)
+                {
+                    // Scaled simulation time follows Time.deltaTime; Unity caps it at maximumDeltaTime, so raise the cap
+                    // to the scale or the clock would fall behind at high speeds.
+                    _savedMaxDeltaTime = Time.maximumDeltaTime;
+                    Time.maximumDeltaTime = Mathf.Max(Time.maximumDeltaTime, 0.1f * timeScale);
+                    Time.timeScale = timeScale;
+                    _timeScaled = true;
+                    _scaledTo = timeScale;
+                    _log?.Info(Source, $"cw_timescale: solo simulation at x{timeScale:0.##}.");
+                }
                 OnRunnerReady?.Invoke(_runner);
             }
             else
@@ -111,6 +142,16 @@ namespace CluckWars.Networking
                 _runner = null;
             }
         }
+
+        private void RestoreTimeScale()
+        {
+            if (!_timeScaled) return;
+            _timeScaled = false;
+            Time.timeScale = 1f;
+            Time.maximumDeltaTime = _savedMaxDeltaTime;
+        }
+
+        private void OnDestroy() => RestoreTimeScale();
 
         public async Task ShutdownAsync()
         {
@@ -126,6 +167,9 @@ namespace CluckWars.Networking
         // next OnInput tick. Movement is continuous and stays read live in OnInput.
         private void Update()
         {
+            // The execute hit-stop (HitStopDriver) ends by writing timeScale = 1; under cw_timescale that would drop the
+            // whole run back to real time, so a plain 1 is put back to the flag's value (a dip below 1 is left alone).
+            if (_timeScaled && Mathf.Approximately(Time.timeScale, 1f)) Time.timeScale = _scaledTo;
             TickNetDiagnostics();
             if (_inputProvider == null) return;
 
@@ -136,14 +180,64 @@ namespace CluckWars.Networking
                 _pendingAbility3 = false;
                 _pendingAbility4 = false;
                 _pendingAbilityCancel = false;
+                _peckHold = default;
+                _peckEdgeSeen = false;
                 return;
             }
 
-            if (_inputProvider.GetAbility1Pressed()) _pendingAbility1 = true;
-            if (_inputProvider.GetAbility2Pressed()) _pendingAbility2 = true;
-            if (_inputProvider.GetAbility3Pressed()) _pendingAbility3 = true;
-            if (_inputProvider.GetAbility4Pressed()) _pendingAbility4 = true;
-            if (_inputProvider.GetAbilityCancelPressed()) _pendingAbilityCancel = true;
+            // The slot holding Peck does not send its raw press: a tap pecks on release and a long press flips Auto-Peck
+            // (PeckLongPressRules), so its press edge is fed to the gate instead of the latch. Every getter is still read.
+            int peckSlot = LocalPeckSlot();
+            bool p1 = _inputProvider.GetAbility1Pressed();
+            bool p2 = _inputProvider.GetAbility2Pressed();
+            bool p3 = _inputProvider.GetAbility3Pressed();
+            bool p4 = _inputProvider.GetAbility4Pressed();
+            bool cancel = _inputProvider.GetAbilityCancelPressed();
+            if (p1 && peckSlot != 0) _pendingAbility1 = true;
+            if (p2 && peckSlot != 1) _pendingAbility2 = true;
+            if (p3 && peckSlot != 2) _pendingAbility3 = true;
+            if (p4 && peckSlot != 3) _pendingAbility4 = true;
+            if (cancel) _pendingAbilityCancel = true;
+            StepPeckPress(peckSlot, peckSlot switch { 0 => p1, 1 => p2, 2 => p3, 3 => p4, _ => false }, cancel);
+        }
+
+        // Peck press gate state (local to this client; the preference it flips is local too).
+        private PeckHoldState _peckHold;
+        private bool _peckEdgeSeen;
+
+        /// <summary>Slot of the local bird holding Peck (asked of its ability controller), or -1 (Spoiler and Thief have none).</summary>
+        private static int LocalPeckSlot()
+        {
+            var local = ChickenController.Local;
+            var abilities = local != null ? local.Abilities : null;
+            return abilities != null ? abilities.FindPeckSlot() : AbilityController.InvalidSlot;
+        }
+
+        /// <summary>
+        /// One frame of the Peck slot's gate: a tap latches one press for the next input tick, a long press flips Auto-Peck once.
+        /// A press edge that only OnInput saw (<see cref="_peckEdgeSeen"/>) counts as "down" too, so a tap shorter than a frame is not lost.
+        /// </summary>
+        private void StepPeckPress(int peckSlot, bool pressEdge, bool cancel)
+        {
+            bool down = peckSlot >= 0 && (pressEdge || _peckEdgeSeen || _inputProvider.GetAbilityHeld(peckSlot));
+            _peckEdgeSeen = false;
+            switch (PeckLongPressRules.Step(ref _peckHold, peckSlot >= 0, down, cancel, Time.unscaledDeltaTime))
+            {
+                case PeckPressAction.FirePeck:
+                    switch (peckSlot)
+                    {
+                        case 0: _pendingAbility1 = true; break;
+                        case 1: _pendingAbility2 = true; break;
+                        case 2: _pendingAbility3 = true; break;
+                        case 3: _pendingAbility4 = true; break;
+                    }
+                    break;
+                case PeckPressAction.ToggleAutoPeck:
+                    bool on = !CluckWars.Settings.PlayerPreferences.AutoPeckEnabled;
+                    CluckWars.Settings.PlayerPreferences.AutoPeckEnabled = on;
+                    _log?.Info(Source, $"Auto-Peck {(on ? "on" : "off")} (long press on the Peck slot).");
+                    break;
+            }
         }
 
         void INetworkRunnerCallbacks.OnInput(NetworkRunner runner, NetworkInput input)
@@ -155,6 +249,8 @@ namespace CluckWars.Networking
             if (LeaveSheetState.IsOpen)
             {
                 _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = _pendingAbility4 = _pendingAbilityCancel = false;
+                _peckHold = default;
+                _peckEdgeSeen = false;
                 var cancelOnly = new NetworkButtons();
                 cancelOnly.Set((int)InputButton.AbilityCancel, true);
                 input.Set(new PlayerNetworkInput { Buttons = cancelOnly });
@@ -172,19 +268,24 @@ namespace CluckWars.Networking
             var buttons = new NetworkButtons();
             // Consume the latch OR a same-frame live press (covers either Update/OnInput
             // ordering), then clear so each press activates exactly once.
-            if (_pendingAbility1 || _inputProvider.GetAbility1Pressed()) buttons.Set((int)InputButton.Ability1, true);
-            if (_pendingAbility2 || _inputProvider.GetAbility2Pressed()) buttons.Set((int)InputButton.Ability2, true);
-            if (_pendingAbility3 || _inputProvider.GetAbility3Pressed()) buttons.Set((int)InputButton.Ability3, true);
-            if (_pendingAbility4 || _inputProvider.GetAbility4Pressed()) buttons.Set((int)InputButton.Ability4, true);
+            // The Peck slot's own press edge goes to the gate (StepPeckPress), never straight to the buffer; its hold bit is not sent either.
+            int peckSlot = LocalPeckSlot();
+            bool live1 = _inputProvider.GetAbility1Pressed(), live2 = _inputProvider.GetAbility2Pressed();
+            bool live3 = _inputProvider.GetAbility3Pressed(), live4 = _inputProvider.GetAbility4Pressed();
+            if ((peckSlot == 0 && live1) || (peckSlot == 1 && live2) || (peckSlot == 2 && live3) || (peckSlot == 3 && live4)) _peckEdgeSeen = true;
+            if (_pendingAbility1 || (live1 && peckSlot != 0)) buttons.Set((int)InputButton.Ability1, true);
+            if (_pendingAbility2 || (live2 && peckSlot != 1)) buttons.Set((int)InputButton.Ability2, true);
+            if (_pendingAbility3 || (live3 && peckSlot != 2)) buttons.Set((int)InputButton.Ability3, true);
+            if (_pendingAbility4 || (live4 && peckSlot != 3)) buttons.Set((int)InputButton.Ability4, true);
             if (_pendingAbilityCancel || _inputProvider.GetAbilityCancelPressed()) buttons.Set((int)InputButton.AbilityCancel, true);
             _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = _pendingAbility4 = _pendingAbilityCancel = false;
 
             // Hold state is level-triggered and read live every tick — no latch, since a
             // hold spans many ticks by definition (unlike the one-shot presses above).
-            if (_inputProvider.GetAbilityHeld(0)) buttons.Set((int)InputButton.AbilityHold1, true);
-            if (_inputProvider.GetAbilityHeld(1)) buttons.Set((int)InputButton.AbilityHold2, true);
-            if (_inputProvider.GetAbilityHeld(2)) buttons.Set((int)InputButton.AbilityHold3, true);
-            if (_inputProvider.GetAbilityHeld(3)) buttons.Set((int)InputButton.AbilityHold4, true);
+            if (_inputProvider.GetAbilityHeld(0) && peckSlot != 0) buttons.Set((int)InputButton.AbilityHold1, true);
+            if (_inputProvider.GetAbilityHeld(1) && peckSlot != 1) buttons.Set((int)InputButton.AbilityHold2, true);
+            if (_inputProvider.GetAbilityHeld(2) && peckSlot != 2) buttons.Set((int)InputButton.AbilityHold3, true);
+            if (_inputProvider.GetAbilityHeld(3) && peckSlot != 3) buttons.Set((int)InputButton.AbilityHold4, true);
 
             // Level-triggered preferences, re-sent every tick so the state authority decides on them (A6, A8).
             if (CluckWars.Settings.PlayerPreferences.AutoPeckEnabled) buttons.Set((int)InputButton.AutoPeck, true);
@@ -287,6 +388,7 @@ namespace CluckWars.Networking
         {
             _log?.Info(Source, $"OnShutdown: reason={shutdownReason} {DescribeMoment()}.");
             _ready = false;
+            RestoreTimeScale();
             OnShutdown?.Invoke(shutdownReason);
             var sceneManager = GetComponent<NetworkSceneManagerDefault>();
             if (sceneManager != null)
