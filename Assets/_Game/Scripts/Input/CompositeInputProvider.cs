@@ -109,7 +109,7 @@ namespace CluckWars.Input
         {
             get
             {
-                int idx = MostRecentProvider(requireAim: false, groundY: 0f);
+                int idx = MostRecentProvider();
                 // A provider that has never been used is not "the device in hand".
                 return idx >= 0 && !float.IsNegativeInfinity(_providers[idx].LastActiveTime)
                     ? _providers[idx].Device
@@ -128,20 +128,12 @@ namespace CluckWars.Input
             }
         }
 
-        /// <summary>The aim of the most recently used provider that has one (a resting mouse does not beat a stick in use).</summary>
-        public AimInput GetAim(float groundY)
-        {
-            int idx = MostRecentProvider(requireAim: true, groundY);
-            return idx >= 0 ? _providers[idx].GetAim(groundY) : AimInput.None;
-        }
-
-        private int MostRecentProvider(bool requireAim, float groundY)
+        private int MostRecentProvider()
         {
             int best = -1;
             float bestTime = float.NegativeInfinity;
             for (int i = 0; i < _providers.Length; i++)
             {
-                if (requireAim && _providers[i].GetAim(groundY).Kind == AimInputKind.None) continue;
                 float t = _providers[i].LastActiveTime;
                 if (best < 0 || t > bestTime || (t == bestTime && TiePriority(_providers[i].Device) > TiePriority(_providers[best].Device)))
                 {

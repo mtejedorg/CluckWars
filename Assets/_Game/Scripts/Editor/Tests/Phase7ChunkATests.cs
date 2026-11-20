@@ -12,7 +12,7 @@ using UnityEngine;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// Phase 7 chunk A (round-4 bugs 5, 6, 9, 12, 15): Android Back vs the HUD layout, the mouse-aim latch, pad B as
+    /// Phase 7 chunk A (round-4 bugs 5, 6, 9, 12, 15): Android Back vs the HUD layout, the mouse aim removal, pad B as
     /// back, invariant-culture HUD numbers, and the ability input seams.
     /// </summary>
     public sealed class Phase7ChunkATests
@@ -48,40 +48,18 @@ namespace CluckWars.Tests
             StringAssert.Contains("DesktopInputRules.KeyDownIsActivity", Read("Assets/_Game/Scripts/Input/KeyboardInputProvider.cs"));
         }
 
-        // ---- 6: mouse aim does not latch ------------------------------------------------------------------
-
-        private const float Never = float.NegativeInfinity;
+        // ---- 6: the mouse does not aim (item 5, 2026-11-20) -----------------------------------------------
 
         [Test]
-        public void MouseAim_IsOff_BeforeTheCursorEverMoved()
+        public void KeyboardProvider_HasNoMouseAim_ButKeepsMouseActivityAndRightClickCancel()
         {
-            Assert.IsFalse(DesktopInputRules.MouseAimActive(10f, Never, Never));
-            Assert.IsFalse(DesktopInputRules.MouseAimActive(10f, Never, 9f));
-        }
-
-        [Test]
-        public void MouseAim_IsLive_ForAFewSecondsAfterTheCursorMoves()
-        {
-            Assert.IsTrue(DesktopInputRules.MouseAimActive(10f, 9f, 9.5f), "1 s ago, keys in use");
-            Assert.IsTrue(DesktopInputRules.MouseAimActive(10.5f, 9f, 10f), "exactly the idle limit");
-        }
-
-        [Test]
-        public void MouseAim_Drops_WhenTheCursorIsParkedAndKeysAreUsed()
-        {
-            Assert.IsFalse(DesktopInputRules.MouseAimActive(20f, 9f, 19f));
-        }
-
-        [Test]
-        public void MouseAim_Returns_WhenTheCursorMovesAgain()
-        {
-            Assert.IsTrue(DesktopInputRules.MouseAimActive(20f, 19.9f, 19f));
-        }
-
-        [Test]
-        public void MouseAim_Stays_ForAMouseOnlyPlayerWhoNeverTouchesMovementKeys()
-        {
-            Assert.IsTrue(DesktopInputRules.MouseAimActive(60f, 9f, Never));
+            string src = Read("Assets/_Game/Scripts/Input/KeyboardInputProvider.cs");
+            StringAssert.DoesNotContain("GetAim", src);
+            StringAssert.DoesNotContain("_lastMouseMoveTime", src);
+            StringAssert.DoesNotContain("Camera.main", src);
+            StringAssert.DoesNotContain("ScreenPointToRay", src);
+            StringAssert.Contains("mouse.delta.ReadValue()", src, "A cursor move still counts as device activity.");
+            StringAssert.Contains("mouse.rightButton.wasPressedThisFrame", src, "Right click still cancels a hold.");
         }
 
         // ---- 9: pad B is back, Start opens the sheet -------------------------------------------------------

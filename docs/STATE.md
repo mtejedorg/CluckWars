@@ -11,6 +11,10 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-20 - No aiming on PC or pad (controls batch item 5, `develop`, uncommitted)
+
+Keyboard/mouse and gamepad no longer aim, exactly like touch. Removed: `IInputProvider.GetAim`, `AimInput` / `AimInputKind`, `KeyboardInputProvider` mouse aim, `GamepadInputProvider` right-stick aim + `StickAimFilter`, `CompositeInputProvider` aim selection, `AimRules.Resolve` / `TryRayToGround`, `DesktopInputRules.MouseAimActive`, `AimQuantizer.Encode/Snap`, the telegraph's explicit-aim read. `FusionNetworkService.OnInput` no longer writes `PlayerNetworkInput.Aim` (stays 0, the touch value; the struct is unchanged). The mouse still counts as device activity and right click still cancels a hold; the right stick no longer counts as pad activity. Still in the simulation (not removed, no client sends a non-zero byte any more): `AimQuantizer.Decode` and the explicit-aim branches in `AbilityController` / `ChickenController` / `AbilityAimForward` / `AbilityBaseSO` (candidate for a later cleanup). `tools/ui_capture/capture_phase6_chunk5.py` injects a fake `AimInput` and is obsolete. No Maestro prefab steps.
+
 ## 📓 2026-11-20 - Obsidian vault at the repo root; Notion pages migrated into docs/ (`develop`, not pushed)
 
 Obsidian is an optional reader for the docs; nothing depends on it. Guide: `docs/OBSIDIAN.md`. Vault root is the repo root, links stay standard relative markdown (no wikilinks), no community plugins. Tracked: `.obsidian/app.json`, `core-plugins.json`, `appearance.json` only; workspace, cache and graph files are gitignored. `app.json` hides `Library/`, `Assets/`, `Builds/` and similar from search and graph.

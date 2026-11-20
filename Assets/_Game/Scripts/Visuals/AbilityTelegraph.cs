@@ -629,41 +629,22 @@ namespace CluckWars.Visuals
             UpdateMarks(ability);
         }
 
-        // Phase 6 chunk 5 (A7): the aim the local player is holding right now, from the input provider (mouse cursor /
-        // right stick), snapped to the same byte the state authority will receive so the preview is exactly the cast.
-        // Zero = no aim, draw along the bird's heading. Local only; nothing here is networked.
-        private Vector3 _aimDirection;
-
-        // Phase 7 B3: the direction the release will use (explicit aim, else the touch / pad soft-lock pick, else the
-        // facing), from the same function the state authority calls at fire time. The shape, the marks and the pip use it.
+        // Phase 7 B3: the direction the release will use (the touch / pad soft-lock pick, else the facing), from the
+        // same function the state authority calls at fire time. The shape, the marks and the pip use it. There is no
+        // explicit aim on any device: every client casts along its facing or its soft-lock pick.
         private Vector3 _previewForward;
         private bool _previewAimed;
         private readonly Vector2[] _softLockScratch = new Vector2[8];
 
         private void ResolveLocalAim(AbilityBaseSO ability)
         {
-            _aimDirection = Vector3.zero;
-            Vector2 explicitAim = ResolveExplicitAim(ability);
-            if (explicitAim != Vector2.zero) _aimDirection = new Vector3(explicitAim.x, 0f, explicitAim.y);
-
-            _previewForward = ResolvePreviewForward(ability, explicitAim, out _previewAimed);
+            _previewForward = ResolvePreviewForward(ability, out _previewAimed);
         }
 
-        /// <summary>The mouse cursor / right stick aim for <paramref name="ability"/> in world XZ, snapped to the byte the
-        /// state authority receives; zero when the device gives none or the move does not use aim.</summary>
-        private Vector2 ResolveExplicitAim(AbilityBaseSO ability)
-        {
-            if (_input == null || ability == null || !ability.UsesAim) return Vector2.zero;
-
-            var pos = _controller.transform.position;
-            float yaw = MatchCamera.Instance != null ? MatchCamera.Instance.CurrentYaw : 0f;
-            return AimQuantizer.Snap(AimRules.Resolve(_input.GetAim(pos.y), pos, yaw));
-        }
-
-        private Vector3 ResolvePreviewForward(AbilityBaseSO ability, Vector2 explicitAim, out bool aimed)
+        private Vector3 ResolvePreviewForward(AbilityBaseSO ability, out bool aimed)
         {
             float half = _input != null ? AimSoftLock.HalfAngleFor(_input.Device) : 0f;
-            return AbilityAimForward.Resolve(ability, _controller, explicitAim, half, _softLockScratch, out aimed);
+            return AbilityAimForward.Resolve(ability, _controller, Vector2.zero, half, _softLockScratch, out aimed);
         }
 
         /// <summary>
@@ -673,7 +654,7 @@ namespace CluckWars.Visuals
         public Vector3 FireForward(AbilityBaseSO ability)
         {
             if (ability == null) return _controller != null ? _controller.transform.forward : Vector3.forward;
-            return ResolvePreviewForward(ability, ResolveExplicitAim(ability), out _);
+            return ResolvePreviewForward(ability, out _);
         }
 
         /// <summary>
@@ -742,7 +723,6 @@ namespace CluckWars.Visuals
         {
             if (Active == this) Active = null;
             ChargingAbility = null;
-            _aimDirection = Vector3.zero;
             _previewAimed = false;
 
             _observedSlot = 0;
@@ -906,9 +886,9 @@ namespace CluckWars.Visuals
             if (_pollTimer > 0f) return;
             _pollTimer = FeedbackTuning.TargetScanPollHz > 0f ? 1f / FeedbackTuning.TargetScanPollHz : 0.1f;
 
-            // Rotating shapes are scanned along the resolved forward (incl. the soft-lock pick); a single-target pick by
-            // angle only ever uses the explicit aim, exactly as the cast does.
-            ability.GatherTargets(_controller, _gathered, _previewAimed ? _previewForward : _aimDirection);
+            // Rotating shapes are scanned along the resolved forward (incl. the soft-lock pick); with no soft-lock pick
+            // a single-target pick has no explicit aim, exactly as the cast.
+            ability.GatherTargets(_controller, _gathered, _previewAimed ? _previewForward : Vector3.zero);
 
             _markedCount = 0;
             var all = ChickenController.ActiveControllers;

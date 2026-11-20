@@ -9,7 +9,7 @@ namespace CluckWars.Gameplay
     /// The state authority uses it at fire time (<see cref="AbilityController"/>); the ground preview, the dashed /
     /// solid state, the target brackets and the HUD's in-range pip all use it before the release, so what the player
     /// is shown is the shape the move will actually take.
-    /// <para>Order: the resolved explicit aim (mouse / right stick, already snapped to the aim byte), else the
+    /// <para>Order: the resolved explicit aim (the aim byte; no current client sends one), else the
     /// touch / pad soft-lock pick (<see cref="AimSoftLock"/>), else the bird's facing.</para>
     /// </summary>
     public static class AbilityAimForward

@@ -5,7 +5,7 @@ using UnityEngine.InputSystem.LowLevel;
 namespace CluckWars.Input
 {
     /// <summary>
-    /// Gamepad input (Phase 6 chunk 5, A8). Left stick moves, right stick aims, and the four ability slots sit on the
+    /// Gamepad input (Phase 6 chunk 5, A8). Left stick moves (the right stick does nothing: no aim, as on touch), and the four ability slots sit on the
     /// shoulders and triggers (the face buttons fight the right stick). B cancels a hold (and backs out of menus, the Leave sheet and the podium), Start opens the Leave sheet.
     /// </summary>
     /// <remarks>
@@ -18,8 +18,6 @@ namespace CluckWars.Input
     /// </para>
     /// <para>
     /// <b>Movement</b> uses <see cref="JoystickRules"/>' 0.12 dead zone and rescaled ramp, the same as the touch stick.
-    /// <b>Aim</b> is the right stick through <see cref="StickAimFilter"/> (dead zone 0.25, outer 0.95, 150 ms hold),
-    /// returned in the same camera-relative space as movement.
     /// </para>
     /// </remarks>
     public sealed class GamepadInputProvider : IInputProvider
@@ -39,7 +37,6 @@ namespace CluckWars.Input
         /// <summary>Start opens the Leave sheet in a match.</summary>
         public const GamepadButton BackButton = GamepadButton.Start;
 
-        private readonly StickAimFilter _aimFilter = new StickAimFilter();
         private float _lastActiveTime = float.NegativeInfinity;
         private int _polledFrame = -1;
 
@@ -58,15 +55,6 @@ namespace CluckWars.Input
         {
             var gp = Gamepad.current;
             return gp == null ? Vector2.zero : JoystickRules.ApplyDeadZone(gp.leftStick.ReadValue());
-        }
-
-        public AimInput GetAim(float groundY)
-        {
-            var gp = Gamepad.current;
-            if (gp == null) return AimInput.None;
-
-            var aim = _aimFilter.Update(gp.rightStick.ReadValue(), Time.unscaledTime);
-            return aim == Vector2.zero ? AimInput.None : AimInput.FromStick(aim);
         }
 
         public bool GetAbility1Pressed() => Pressed(0);
@@ -109,7 +97,7 @@ namespace CluckWars.Input
             return gp != null && slot >= 0 && slot < AbilityButtons.Length && gp[AbilityButtons[slot]].wasPressedThisFrame;
         }
 
-        /// <summary>Once per frame: stamps activity when a stick leaves its dead zone or a mapped button is down.</summary>
+        /// <summary>Once per frame: stamps activity when the left stick leaves its dead zone or a mapped button is down.</summary>
         private void Poll()
         {
             int frame = Time.frameCount;
@@ -120,7 +108,6 @@ namespace CluckWars.Input
             if (gp == null) return;
 
             bool active = gp.leftStick.ReadValue().magnitude > JoystickRules.DeadZone ||
-                          gp.rightStick.ReadValue().magnitude > StickAimFilter.DeadZone ||
                           gp[CancelButton].isPressed || gp[BackButton].isPressed;
             for (int slot = 0; slot < AbilityButtons.Length && !active; slot++)
                 active = gp[AbilityButtons[slot]].isPressed;

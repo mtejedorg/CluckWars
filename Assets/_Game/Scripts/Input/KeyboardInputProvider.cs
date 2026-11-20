@@ -5,7 +5,8 @@ namespace CluckWars.Input
 {
     /// <summary>
     /// Standalone-Windows input. WASD = movement; every ability slot answers to
-    /// <b>three</b> keys — a letter, a digit and an arrow.
+    /// <b>three</b> keys — a letter, a digit and an arrow. There is no aim: the mouse only counts as device activity and
+    /// its right button cancels a hold, so abilities cast along the facing exactly as on touch.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -50,10 +51,6 @@ namespace CluckWars.Input
     /// </remarks>
     public sealed class KeyboardInputProvider : IInputProvider
     {
-        // Phase 6 chunk 5 (A7): mouse aim. The cursor only aims once it has actually moved (and stops after an idle spell while WASD is in use), so a mouse parked in the
-        // window by a keyboard-only player never hijacks the facing.
-        private float _lastMouseMoveTime = float.NegativeInfinity;
-        private float _lastMoveKeyTime = float.NegativeInfinity;
         private float _lastActiveTime = float.NegativeInfinity;
         private int _polledFrame = -1;
 
@@ -68,31 +65,7 @@ namespace CluckWars.Input
             }
         }
 
-        /// <summary>
-        /// A ground point under the cursor: a ray from <c>Camera.main</c> through the cursor onto the plane
-        /// y = <paramref name="groundY"/>. None while the cursor is outside the window, before the mouse has moved,
-        /// or when no camera / ground hit exists. The bird-relative direction (and the 0.5 m dead radius) is resolved
-        /// by <see cref="AimRules.Resolve"/>.
-        /// </summary>
-        public AimInput GetAim(float groundY)
-        {
-            Poll();
-            var mouse = Mouse.current;
-            if (!DesktopInputRules.MouseAimActive(Time.unscaledTime, _lastMouseMoveTime, _lastMoveKeyTime) || mouse == null || !Application.isFocused) return AimInput.None;
-
-            Vector2 cursor = mouse.position.ReadValue();
-            if (cursor.x < 0f || cursor.y < 0f || cursor.x >= Screen.width || cursor.y >= Screen.height)
-                return AimInput.None;
-
-            var cam = Camera.main;
-            if (cam == null) return AimInput.None;
-
-            return AimRules.TryRayToGround(cam.ScreenPointToRay(cursor), groundY, out var hit)
-                ? AimInput.FromGroundPoint(hit)
-                : AimInput.None;
-        }
-
-        /// <summary>Once per frame: stamps activity and arms the mouse aim on the first real cursor movement.</summary>
+        /// <summary>Once per frame: stamps activity (a key, a cursor move or a mouse button) for device selection.</summary>
         private void Poll()
         {
             int frame = Time.frameCount;
@@ -102,15 +75,10 @@ namespace CluckWars.Input
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             bool mouseMoved = mouse != null && mouse.delta.ReadValue().sqrMagnitude > 0.01f;
-            float now = Time.unscaledTime;
-            if (mouseMoved) _lastMouseMoveTime = now;
-            if (kb != null && (kb.wKey.isPressed || kb.aKey.isPressed || kb.sKey.isPressed || kb.dKey.isPressed))
-                _lastMoveKeyTime = now;
-
             bool keyDown = kb != null && DesktopInputRules.KeyDownIsActivity(
                 kb.anyKey.isPressed, kb.escapeKey.isPressed, PressedKeyCount(kb), Application.isMobilePlatform);
             bool mouseButton = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
-            if (mouseMoved || keyDown || mouseButton) _lastActiveTime = now;
+            if (mouseMoved || keyDown || mouseButton) _lastActiveTime = Time.unscaledTime;
         }
 
         /// <summary>Keys down, counted only when Escape is one of them on a phone (the one case the rule needs it).</summary>

@@ -1044,7 +1044,7 @@ namespace CluckWars.Gameplay
             if (GetInput<PlayerNetworkInput>(out var input))
             {
                 // A held ability previews, it never stops the bird: the stick always walks. Aiming a directional move with
-                // the mouse / right stick faces the aim while the bird strafes; with no aim given the stick steers both, so
+                // an explicit aim byte (none is sent today) faces the aim while the bird strafes; with no aim given the stick steers both, so
                 // on a single stick moving is how you aim.
                 var aiming = AimRotatingAbility();
                 Vector2? face = aiming != null && aiming.RotatesToAim && input.Aim != 0

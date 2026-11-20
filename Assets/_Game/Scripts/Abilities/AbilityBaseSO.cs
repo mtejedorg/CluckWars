@@ -560,7 +560,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual bool FollowsMovementNotAim => false;
 
-        /// <summary>Does the aim (mouse / right stick / pad magnetism / touch soft-lock) steer this move? Directional shapes
+        /// <summary>Does the aim (explicit aim byte / pad magnetism / touch soft-lock) steer this move? Directional shapes
         /// and single-target picks do; self shapes, auras and <see cref="FollowsMovementNotAim"/> moves do not.</summary>
         public bool UsesAim => !FollowsMovementNotAim && AimShape switch
         {
@@ -915,7 +915,7 @@ namespace CluckWars.Abilities
             // OnActivate implementations that already rely on it.
             if (AimShape == AbilityAimShape.SingleTarget && buffer.Count > 1)
             {
-                // With an explicit aim (mouse / right stick) the pick is the target nearest the aim DIRECTION; the
+                // With an explicit aim byte (no current client sends one) the pick is the target nearest the aim DIRECTION; the
                 // nearest-first order above is the tie-break, so aim 0 and equal angles keep today's behaviour.
                 int keep = aimed ? SmallestAngleIndex(caster, buffer, aimDirection) : 0;
                 if (keep > 0) buffer[0] = buffer[keep];

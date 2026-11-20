@@ -60,24 +60,16 @@ namespace CluckWars.Input
         /// </summary>
         bool IsAbilityCancelArmed();
 
-        // ---- Phase 6 chunk 5 (A7): aim and device identity. Default members, so a provider with no aim
-        // (touch, a test fake) needs no code and behaves exactly as before.
+        // ---- Phase 6 chunk 5 (A7): device identity. Default members, so a provider that has neither (a test fake)
+        // needs no code. There is no aim on any device: abilities cast along the facing or the soft-lock pick.
 
-        /// <summary>Which device family this provider reads. Used to pick the aim assist that device gets.</summary>
+        /// <summary>Which device family this provider reads. Used to pick the soft-lock magnetism that device gets.</summary>
         InputDeviceKind Device => InputDeviceKind.None;
 
         /// <summary>
-        /// <c>Time.unscaledTime</c> of this provider's most recent real use (a key, a stick past its dead zone, a
+        /// <c>Time.unscaledTime</c> of this provider's most recent real use (a key, the left stick past its dead zone, a
         /// finger down), or negative infinity. The composite uses it to pick the most recently used device.
         /// </summary>
         float LastActiveTime => float.NegativeInfinity;
-
-        /// <summary>
-        /// Where the player wants to aim right now: a stick direction, a ground point under the mouse
-        /// (<paramref name="groundY"/> is the height of the plane the cursor ray is cast onto, the local bird's y), or
-        /// none, meaning "use facing". Level-triggered and side-effect free apart from filter state, so it is safe to
-        /// read from the telegraph every frame and from <c>OnInput</c> every tick.
-        /// </summary>
-        AimInput GetAim(float groundY) => AimInput.None;
     }
 }

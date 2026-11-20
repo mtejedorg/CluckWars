@@ -53,7 +53,7 @@ namespace CluckWars.Tests
             // Source guard: the copies this replaced each scanned for HasInputAuthority with a different filter.
             foreach (string file in new[]
                      {
-                         "Visuals/MatchCamera.cs", "Input/TouchControlsController.cs", "App/FusionNetworkService.cs",
+                         "Visuals/MatchCamera.cs", "Input/TouchControlsController.cs",
                          "UI/MatchHud.cs", "UI/MatchHudController.cs", "UI/MatchOverlaysController.cs", "UI/DebugHud.cs",
                          "Diagnostics/AutoTestDriver.cs", "Diagnostics/PerfProbe.cs",
                      })
@@ -62,8 +62,8 @@ namespace CluckWars.Tests
                 StringAssert.DoesNotContain("FindObjectsByType<ChickenController>", src, file);
                 StringAssert.Contains("ChickenController.Local", src, file);
             }
-            StringAssert.Contains("ChickenController.LocalDriven", File.ReadAllText("Assets/_Game/Scripts/App/FusionNetworkService.cs"),
-                "the aim byte belongs to a human-driven chicken");
+            // FusionNetworkService no longer looks up the local chicken at all (it only did so to resolve the aim byte).
+            StringAssert.DoesNotContain("FindObjectsByType<ChickenController>", File.ReadAllText("Assets/_Game/Scripts/App/FusionNetworkService.cs"));
         }
     }
 }

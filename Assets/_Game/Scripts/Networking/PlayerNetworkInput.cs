@@ -13,8 +13,8 @@ namespace CluckWars.Networking
         public NetworkButtons Buttons;
 
         /// <summary>Phase 6 chunk 5 (A7): quantised world-XZ aim direction, see <c>CluckWars.Input.AimQuantizer</c>.
-        /// 0 = no aim, the move uses the bird's facing (today's behaviour); 1..255 = a direction. Resolved on the local
-        /// client from the mouse / right stick and applied by the state authority at fire time only.</summary>
+        /// 0 = no aim, the move uses the bird's facing; 1..255 = a direction. Every client writes 0 (no device
+        /// aims: PC and pad act like touch); the state authority still decodes and applies a non-zero byte at fire time.</summary>
         public byte Aim;
     }
 

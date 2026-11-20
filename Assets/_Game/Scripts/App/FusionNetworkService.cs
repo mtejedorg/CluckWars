@@ -190,16 +190,8 @@ namespace CluckWars.Networking
             if (CluckWars.Settings.PlayerPreferences.AutoPeckEnabled) buttons.Set((int)InputButton.AutoPeck, true);
             if (CluckWars.Settings.PlayerPreferences.QuickMovesEnabled) buttons.Set((int)InputButton.QuickMoves, true);
 
-            // Phase 6 chunk 5 (A7): the aim byte, and which device the soft-lock magnetism should treat this input as.
-            // Resolved here, on the local client, from the device; the state authority only ever sees the byte and bits.
-            var localBird = FindLocalChicken();
-            byte aim = 0;
-            if (localBird != null)
-            {
-                var birdPos = localBird.transform.position;
-                var aimWorld = AimRules.Resolve(_inputProvider.GetAim(birdPos.y), birdPos, cameraYaw);
-                aim = AimQuantizer.Encode(aimWorld);
-            }
+            // Which device the soft-lock magnetism should treat this input as. No device sends an aim: the Aim byte stays 0
+            // ("use facing") on every client, exactly what a touch client has always sent.
             switch (_inputProvider.Device)
             {
                 case InputDeviceKind.Touch: buttons.Set((int)InputButton.SoftLockTouch, true); break;
@@ -210,7 +202,6 @@ namespace CluckWars.Networking
             {
                 Movement = worldMovement,
                 Buttons = buttons,
-                Aim = aim,
             });
 
             // Verbose-only because this fires every simulation tick (32 Hz). Gated by IsEnabled
@@ -220,9 +211,6 @@ namespace CluckWars.Networking
                 _log.Verbose(Source, $"OnInput tick: move={movement}, a1={buttons.IsSet((int)InputButton.Ability1)}, a2={buttons.IsSet((int)InputButton.Ability2)}, a3={buttons.IsSet((int)InputButton.Ability3)}.");
             }
         }
-
-        /// <summary>The chicken this client drives (input authority, not a bot), or null before it spawns.</summary>
-        private static ChickenController FindLocalChicken() => ChickenController.LocalDriven;
 
         // ---------- Test-session network diagnostics (item 8) ----------
         // Breadcrumbs (always): join / leave / master change / shutdown, each with the cover and match state at that moment.

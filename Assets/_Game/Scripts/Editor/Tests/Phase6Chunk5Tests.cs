@@ -14,7 +14,7 @@ using UnityEngine.InputSystem.LowLevel;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// Phase 6 chunk 5: the aim byte (A7), right-stick shaping, touch / pad magnetism, the gamepad binding table and
+    /// Phase 6 chunk 5: the aim byte decode (A7), touch / pad magnetism, the gamepad binding table and
     /// "Quick Moves" (A8). Pure layer plus source guards for the wiring that needs a runner.
     /// </summary>
     public sealed class Phase6Chunk5Tests
@@ -34,141 +34,57 @@ namespace CluckWars.Tests
 
         private static readonly bool[] All = { true, true, true, true };
 
-        // ---- Aim quantiser ---------------------------------------------------------------------
+        // ---- Aim byte --------------------------------------------------------------------------------
 
         [Test]
-        public void Aim_ZeroIsReserved_NoDirectionEverEncodesToIt()
+        public void Aim_ZeroIsReserved_AndDecodesToNoDirection()
         {
-            Assert.AreEqual(0, AimQuantizer.Encode(Vector2.zero), "No aim encodes as 0.");
             Assert.AreEqual(Vector2.zero, AimQuantizer.Decode(0));
-
-            for (int deg = 0; deg < 3600; deg++)
-            {
-                float rad = deg * 0.1f * Mathf.Deg2Rad;
-                byte b = AimQuantizer.Encode(new Vector2(Mathf.Sin(rad), Mathf.Cos(rad)));
-                Assert.GreaterOrEqual(b, 1, $"{deg * 0.1f} degrees encoded as the reserved 0.");
-            }
         }
 
         [Test]
-        public void Aim_RoundTrip_ErrorIsAtMostHalfAStep()
-        {
-            float worst = 0f;
-            for (int deg = 0; deg < 7200; deg++)
-            {
-                float rad = deg * 0.05f * Mathf.Deg2Rad;
-                var dir = new Vector2(Mathf.Sin(rad), Mathf.Cos(rad));
-                float err = Vector2.Angle(dir, AimQuantizer.Decode(AimQuantizer.Encode(dir)));
-                worst = Mathf.Max(worst, err);
-            }
-            Assert.LessOrEqual(worst, AimQuantizer.StepDegrees * 0.5f + 0.01f,
-                $"Worst round-trip error {worst:0.000} deg exceeds half a step ({AimQuantizer.StepDegrees * 0.5f:0.000}).");
-        }
-
-        [Test]
-        public void Aim_CardinalDirections_AreExactAndSnapIsIdempotent()
+        public void Aim_EveryNonZeroByteDecodesToADistinctUnitVector_ByteOneIsNorth()
         {
             // 0 deg is +Z (north), 90 deg is +X: the same convention the movement vector uses (x, z).
-            Assert.AreEqual(1, AimQuantizer.Encode(new Vector2(0f, 1f)));
             Vector2 north = AimQuantizer.Decode(1);
             Assert.AreEqual(0f, north.x, 1e-5f);
             Assert.AreEqual(1f, north.y, 1e-5f);
 
-            var d = new Vector2(0.3f, -0.8f).normalized;
-            var once = AimQuantizer.Snap(d);
-            var twice = AimQuantizer.Snap(once);
-            Assert.AreEqual(AimQuantizer.Encode(once), AimQuantizer.Encode(twice));
-            Assert.AreEqual(1f, once.magnitude, 1e-4f);
-        }
-
-        [Test]
-        public void Aim_EveryByteDecodesToADistinctUnitVector()
-        {
-            var seen = new HashSet<byte>();
+            var seen = new HashSet<Vector2>();
             for (int b = 1; b <= 255; b++)
             {
                 var v = AimQuantizer.Decode((byte)b);
                 Assert.AreEqual(1f, v.magnitude, 1e-4f);
-                Assert.AreEqual((byte)b, AimQuantizer.Encode(v), $"Byte {b} must be its own fixed point.");
-                Assert.IsTrue(seen.Add(AimQuantizer.Encode(v)));
+                Assert.IsTrue(seen.Add(new Vector2(Mathf.Round(v.x * 1e4f), Mathf.Round(v.y * 1e4f))), $"Byte {b} repeats a direction.");
             }
             Assert.AreEqual(255, seen.Count);
         }
 
-        // ---- Right stick -----------------------------------------------------------------------
+        // ---- No device aims (item 5, 2026-11-20) -----------------------------------------------------
 
         [Test]
-        public void RightStick_InsideDeadZone_IsNoAim()
+        public void NoDeviceAims_PcAndPadActLikeTouch_TheWireAimByteIsAlwaysZero()
         {
-            var f = new StickAimFilter();
-            Assert.AreEqual(Vector2.zero, f.Update(new Vector2(0.24f, 0f), 1f));
-            Assert.AreEqual(Vector2.zero, f.Update(new Vector2(0f, -0.25f), 2f), "The dead zone edge itself is still dead.");
+            Assert.IsNull(typeof(IInputProvider).GetMethod("GetAim"), "IInputProvider has no aim member.");
+            Assert.IsNull(typeof(CompositeInputProvider).GetMethod("GetAim"));
+            Assert.IsNull(typeof(KeyboardInputProvider).GetMethod("GetAim"));
+            Assert.IsNull(typeof(GamepadInputProvider).GetMethod("GetAim"));
+
+            string net = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
+            StringAssert.DoesNotContain("Aim =", net, "FusionNetworkService leaves the aim byte at 0, as a touch client always did.");
+            StringAssert.DoesNotContain("AimQuantizer", net);
+            StringAssert.DoesNotContain("GetAim", net);
+
+            string pad = Read("Assets/_Game/Scripts/Input/GamepadInputProvider.cs");
+            StringAssert.DoesNotContain("rightStick", pad, "The right stick does nothing.");
+            StringAssert.DoesNotContain("GetAim", pad);
         }
 
         [Test]
-        public void RightStick_OuterZone_RescalesToFullAtNinetyFivePercent()
-        {
-            var f = new StickAimFilter();
-            Assert.AreEqual(1f, f.Update(new Vector2(0.95f, 0f), 1f).magnitude, 1e-4f, "0.95 reads as full deflection.");
-            Assert.AreEqual(1f, f.Update(new Vector2(1f, 0f), 1.1f).magnitude, 1e-4f, "Past 0.95 is clamped.");
-            // Halfway up the ramp: (0.6 - 0.25) / (0.95 - 0.25) = 0.5.
-            Assert.AreEqual(0.5f, f.Update(new Vector2(0f, 0.6f), 1.2f).magnitude, 1e-4f);
-            // Direction is preserved.
-            var v = f.Update(new Vector2(-0.5f, 0f), 1.3f);
-            Assert.Less(v.x, 0f);
-            Assert.AreEqual(0f, v.y, 1e-5f);
-        }
-
-        [Test]
-        public void RightStick_HoldsLastAimFor150ms_ThenDrops()
-        {
-            var f = new StickAimFilter();
-            var live = f.Update(new Vector2(0f, 1f), 10f);
-            Assert.AreNotEqual(Vector2.zero, live);
-
-            Assert.AreEqual(live, f.Update(Vector2.zero, 10.10f), "100 ms after release the aim is still held.");
-            Assert.AreEqual(live, f.Update(Vector2.zero, 10.15f), "Exactly 150 ms is still inside the hold.");
-            Assert.AreEqual(Vector2.zero, f.Update(Vector2.zero, 10.16f), "After 150 ms it drops to no aim.");
-            Assert.AreEqual(Vector2.zero, f.Update(Vector2.zero, 10.10f + 5f), "And stays dropped.");
-        }
-
-        [Test]
-        public void RightStick_HoldRestartsWhenTheStickMovesAgain_AndIsIdempotentPerTime()
-        {
-            var f = new StickAimFilter();
-            f.Update(new Vector2(1f, 0f), 1f);
-            var held = f.Update(Vector2.zero, 1.05f);
-            Assert.AreEqual(held, f.Update(Vector2.zero, 1.05f), "Reading twice at the same time changes nothing.");
-
-            f.Update(new Vector2(0f, 1f), 1.10f);
-            Assert.AreNotEqual(Vector2.zero, f.Update(Vector2.zero, 1.20f), "A fresh deflection restarts the 150 ms.");
-            Assert.AreEqual(Vector2.zero, f.Update(Vector2.zero, 1.30f));
-        }
-
-        // ---- Mouse and stick resolution -------------------------------------------------------------
-
-        [Test]
-        public void Mouse_UnderHalfAMetreFromTheBird_IsFacing()
-        {
-            var bird = new Vector3(3f, 0f, 4f);
-            Assert.AreEqual(Vector2.zero, AimRules.Resolve(AimInput.FromGroundPoint(bird + new Vector3(0.49f, 0f, 0f)), bird, 0f));
-            var far = AimRules.Resolve(AimInput.FromGroundPoint(bird + new Vector3(0f, 0f, 2f)), bird, 0f);
-            Assert.AreEqual(0f, far.x, 1e-5f);
-            Assert.AreEqual(1f, far.y, 1e-5f);
-        }
-
-        [Test]
-        public void Aim_None_ResolvesToFacing()
-        {
-            Assert.AreEqual(Vector2.zero, AimRules.Resolve(AimInput.None, Vector3.zero, 45f));
-            Assert.AreEqual(Vector2.zero, AimRules.Resolve(AimInput.FromStick(Vector2.zero), Vector3.zero, 45f));
-        }
-
-        [Test]
-        public void Stick_AimUsesTheSameCameraRotationAsMovement()
+        public void Stick_ToWorld_UsesTheSameCameraRotationAsMovement()
         {
             // Camera yaw 0: stick up is world +Z.
-            var up = AimRules.Resolve(AimInput.FromStick(new Vector2(0f, 1f)), Vector3.zero, 0f);
+            var up = AimRules.StickToWorld(new Vector2(0f, 1f), 0f);
             Assert.AreEqual(0f, up.x, 1e-5f);
             Assert.AreEqual(1f, up.y, 1e-5f);
 
@@ -183,18 +99,6 @@ namespace CluckWars.Tests
                 Assert.AreEqual(legacy.x, AimRules.StickToWorld(stick, yawDeg).x, 1e-6f);
                 Assert.AreEqual(legacy.y, AimRules.StickToWorld(stick, yawDeg).y, 1e-6f);
             }
-        }
-
-        [Test]
-        public void Ray_HitsTheGroundPlane_AtTheBirdsHeight()
-        {
-            var ray = new Ray(new Vector3(0f, 10f, 0f), new Vector3(0f, -1f, 1f).normalized);
-            Assert.IsTrue(AimRules.TryRayToGround(ray, 2f, out var hit));
-            Assert.AreEqual(2f, hit.y, 1e-4f);
-            Assert.AreEqual(8f, hit.z, 1e-3f);
-
-            Assert.IsFalse(AimRules.TryRayToGround(new Ray(Vector3.zero, Vector3.right), 0f, out _), "A level ray never hits.");
-            Assert.IsFalse(AimRules.TryRayToGround(new Ray(Vector3.zero, Vector3.up), -5f, out _), "A plane behind the ray is a miss.");
         }
 
         // ---- Magnetism and angle picks ----------------------------------------------------------------
@@ -427,7 +331,6 @@ namespace CluckWars.Tests
         {
             public InputDeviceKind Kind;
             public float Active = float.NegativeInfinity;
-            public AimInput Aim = AimInput.None;
             public Vector2 GetMovement() => Vector2.zero;
             public bool GetAbility1Pressed() => false;
             public bool GetAbility2Pressed() => false;
@@ -439,27 +342,6 @@ namespace CluckWars.Tests
             public bool IsAbilityCancelArmed() => false;
             public InputDeviceKind Device => Kind;
             public float LastActiveTime => Active;
-            public AimInput GetAim(float groundY) => Aim;
-        }
-
-        [Test]
-        public void Composite_AimComesFromTheMostRecentlyUsedDeviceThatHasOne()
-        {
-            var mouse = new FakeDevice { Kind = InputDeviceKind.KeyboardMouse, Active = 5f, Aim = AimInput.FromGroundPoint(new Vector3(1, 0, 1)) };
-            var pad = new FakeDevice { Kind = InputDeviceKind.Gamepad, Active = 9f, Aim = AimInput.FromStick(Vector2.up) };
-            Assert.AreEqual(AimInputKind.Direction, new CompositeInputProvider(mouse, pad).GetAim(0f).Kind, "The pad was used last.");
-
-            pad.Active = 2f;
-            Assert.AreEqual(AimInputKind.GroundPoint, new CompositeInputProvider(mouse, pad).GetAim(0f).Kind, "Now the mouse was.");
-
-            pad.Active = 99f;
-            pad.Aim = AimInput.None;
-            Assert.AreEqual(AimInputKind.GroundPoint, new CompositeInputProvider(mouse, pad).GetAim(0f).Kind,
-                "A device with no aim never hides another's.");
-
-            mouse.Aim = AimInput.None;
-            Assert.AreEqual(AimInputKind.None, new CompositeInputProvider(mouse, pad).GetAim(0f).Kind);
-            Assert.AreEqual(AimInputKind.None, new CompositeInputProvider().GetAim(0f).Kind);
         }
 
         [Test]
@@ -477,10 +359,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ProvidersWithoutAim_NeedNoCode_DefaultMembersMeanNoAimNoDevice()
+        public void ProvidersWithoutADevice_NeedNoCode_DefaultMembersMeanNoDevice()
         {
             IInputProvider bare = new BareProvider();
-            Assert.AreEqual(AimInputKind.None, bare.GetAim(0f).Kind);
             Assert.AreEqual(InputDeviceKind.None, bare.Device);
             Assert.IsTrue(float.IsNegativeInfinity(bare.LastActiveTime));
         }
@@ -546,8 +427,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("new GamepadInputProvider()", Read("Assets/_Game/Scripts/Installers/ProjectInstaller.cs"));
 
             string net = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
-            StringAssert.Contains("Aim = aim", net);
-            StringAssert.Contains("InputButton.QuickMoves", net);
+                        StringAssert.Contains("InputButton.QuickMoves", net);
             StringAssert.Contains("InputButton.SoftLockTouch", net);
             StringAssert.Contains("InputButton.SoftLockPad", net);
         }
