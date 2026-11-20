@@ -180,7 +180,7 @@ After adding the config and **restarting Claude Code**:
 > ⚠️ **There are no menu keyboard shortcuts.** The old `1-4 / S / H / J / SPACE` bindings
 > belonged to the procedural-UGUI `CharacterSelectController`, which was **deleted** in the
 > UI Toolkit migration. `MenuUiController` never reimplemented them. **Navigate the menus by
-> clicking.** (In-game keys — WASD, Q/E/R, F1, F2 — are unaffected and still work.)
+> clicking.** (In-game keys are unaffected and still work: WASD or the arrows to move, the slot keys of the chosen Settings > Keyboard scheme (A: Down / Up / Right / Left arrows; B: Q W R E; digits 1-4 in both), F1, F2. A gamepad has A / Y / B / X and RB / RT / LB / LT on slots 1-4, L3 cancels, Start opens the Leave sheet.)
 
 ### Solo (PC or Android)
 
@@ -690,7 +690,7 @@ F1 toggles the Debug HUD for live state; F2 shows the balance panel.
 
 ### T2 — Intro input latch (Stage I.3 edge case)
 
-During the 3-2-1 countdown, **mash Q / E / R and the touch ability hexes**.
+During the 3-2-1 countdown, **mash the four slot keys (Scheme A arrows, or Q / W / R / E on Scheme B) and the touch ability hexes**.
 
 **Pass:** nothing fires on match frame one — no `[Ability]` activation logs until
 after `GO!`. A cast landing at t=0 means the latch-clear regressed.

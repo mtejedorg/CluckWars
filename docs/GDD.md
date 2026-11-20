@@ -491,14 +491,16 @@ current, shipped state.
 
 | Class | Specialization | Passive | Kit (slot order) |
 |---|---|---|---|
-| **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Steal 3 s, Stun 5.25 s, Jump 1.5 s) | Peck, **Steal**, **Stun**, **Jump** |
-| | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Steal**, **Slow**, **Speed** |
+| **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Steal 3 s, Stun 5.25 s, Jump 1.5 s) | Peck, **Jump**, **Stun**, **Steal** |
+| | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Speed**, **Slow**, **Steal** |
 | **Speedy** | The Anxious (Featherfoot) | You bank food 10% faster (`DepositRateMultiplier` 1.1, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Shove** |
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
-| **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Shove**, **Egg Shell** |
-| | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Egg Shell**, **Slow**, **Steal** |
-| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Hunt**, **Stun**, **Jump**, **Hide** |
-| | The Thief | Every steal takes 1.6x more | **Steal**, **Hide**, **Jump**, **Slow** |
+| **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Egg Shell**, **Shove** |
+| | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Slow Area**, **Egg Shell**, **Steal** |
+| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Hunt**, **Jump**, **Hide**, **Stun** |
+| | The Thief | Every steal takes 1.6x more | **Steal**, **Jump**, **Hide**, **Slow Area** |
+
+**Slot roles (Maestro, 2026-11-20).** The kits above are listed in slot order, and the order is a rule: slot 1 is the **income** move (Peck; Hunt for the Spoiler, Steal for the Thief), slot 2 **movement** (the Fatty's second attack instead), slot 3 the **flex** move (defence or self utility, or a second attack; the least used), slot 4 the **main attack**, the combo partner of slot 1. The touch hexes are tilted to match (ART.md section 6.7). `FixedKitTests.ShippedKits_HaveTheExactSlotOrder` pins the eight orders and `EveryKit_FollowsTheSlotRoles` the roles (BL-156).
 
 The old signatures (Scrap, Headbutt, Ground Quake, Sneaky Steal) are retired (2026-11-05). The class shows as Sneaky; in code it is still `ChickenClass.Assassin`.
 The Spoiler passive asset's display name is "Assassin".
@@ -940,12 +942,12 @@ the same `WouldAffect` predicate). Release = use it.
 |---|---|---|
 | **Your preview** | shown from the press frame | shown |
 | **Wind-up glow rivals can see** | none | ramps up at your feet (hidden while you are invisible) |
-| **Movement** | full speed | full speed: an explicit aim faces you while you strafe; with one stick, moving is how you aim |
+| **Movement** | full speed | full speed; nothing aims, so moving is how you aim |
 
 Rivals see only the glow at your feet — a wind-up tell, not your area. That asymmetry is
 deliberate: counterplay ("he's charging something, disengage") without a solved puzzle.
 
-**The preview is honest (Phase 7).** The ground shape, the dashed / solid state, the target marks and the gold in-range pip on the hex all use the direction the release will use: your explicit aim (mouse / right stick), else the touch soft-lock pick, else your facing. While a move is held it is drawn as a bold cream-filled shape (about 25%) with an ink under-stroke, and the other range guides dim, so it reads on grass.
+**The preview is honest (Phase 7).** The ground shape, the dashed / solid state, the target marks and the gold in-range pip on the hex all use the direction the release will use: the soft-lock pick, else your facing (no device sends an explicit aim any more). While a move is held it is drawn as a bold cream-filled shape (about 25%) with an ink under-stroke, and the other range guides dim, so it reads on grass.
 
 **No target is not illegal.** A move that needs a rival in range and has nobody in range
 shows a **cream dashed ring** (a legal state: you may still release). The red-grey wash is
@@ -962,7 +964,7 @@ applies to quick taps too. A fizzle does not turn the bird (it keeps its heading
 | Touch | Drag your thumb to the screen edge. A cancel zone is drawn along the edges as soon as the hold passes the tap threshold (dim), bright on the edge you approach. It arms within 36 dp of a physical edge and disarms past 44 dp. While armed the hex icon dims to 40% under an ink-outlined X, the preview goes grey and dashed, and the phone gives a 15 ms tick. Release while armed = cancel. |
 | Touch, involuntary | A system edge gesture or a lost finger cancels and never fires. |
 | Keyboard / mouse | **Esc** or **right mouse button**. |
-| Gamepad | **B**. |
+| Gamepad | **L3** (click the left stick). **B is slot 3** in a match and cancels nothing. |
 
 **Switching.** Pressing another slot's key while holding one switches the hold to the new
 slot (the old one is dropped with no fire and no cooldown). When nothing is held yet, the
@@ -971,31 +973,42 @@ lowest held slot claims the gesture.
 **Quick Moves (setting, off by default).** The move fires the moment you press, with no
 preview and no hold.
 
-**Aiming (twin-stick).** Directional shapes (jump; the cone / forward circle / capsule shapes only under `TargetingMode` Shaped) turn the
+**Aiming (none on any device, 2026-11-20).** Mouse aim and right-stick aim were removed: PC and pad play exactly like touch, the aim byte on the wire is always 0, and the direction is your facing (or the soft-lock pick). The right stick does nothing. What follows is how a move uses that direction. Directional shapes (jump; the cone / forward circle / capsule shapes only under `TargetingMode` Shaped) turn the
 bird toward your aim when the move fires. Under the default RangeOnly every targeted move is a caster-centred circle and ignores
 aim. Single-target moves keep their heading and pick
 the rival closest to your aim (nearest as tie-break). Self, aura and no-shape moves ignore
 aim. Dashes (Speed, Jump) follow your movement, not
 your aim.
 
-| Device | Aim |
+| Device | Direction |
 |---|---|
-| Mouse | the ground point under the cursor, live for 1.5 s after the cursor moves; once it has sat idle that long and you steer with WASD, aim falls back to your facing (a cursor that has never moved does not hijack a keyboard player) |
-| Gamepad | right stick: dead zone 0.25, outer 0.95, 150 ms hold; with no aim given, a soft-lock of +-12 deg |
-| Touch | no explicit aim; soft-lock snaps to the rival with the smallest angle to your facing, within +-30 deg; farther than that, the move fizzles |
+| Keyboard / mouse | your facing; no magnetism |
+| Gamepad | your facing; a soft-lock of +-12 deg |
+| Touch | soft-lock snaps to the rival with the smallest angle to your facing, within +-30 deg; farther than that, the move fizzles |
 
-**Gamepad bindings:** left stick move · right stick aim · RB / RT / LB / LT = slots 1 / 2 /
-3 / 4 · B = cancel a hold, and Back in menus, the Leave sheet and the podium · Start = pause (the only button that opens the Leave sheet mid-match). **Keyboard:** WASD move; Q / E / R /
-F (also 1-4 or the arrow keys) = slots 1-4; Esc or right mouse cancels.
+**Slot roles on the controls (2026-11-20).** Slot 1 income, 2 movement, 3 flex, 4 main attack (kits table, section 5.3). Every device lays its four slots out to say so.
+
+**Gamepad bindings:** left stick moves, the right stick does nothing · **A / Y / B / X = slots 1 / 2 / 3 / 4** (A bottom, Y top, B right, X left); RB / RT / LB / LT = slots 1 / 2 / 3 / 4 as before · **L3** (click the left stick) cancels a hold · **Start** opens the Leave sheet mid-match and leaves the waiting room · **B** backs out only outside a match (menu pages, an open Leave sheet, the podium): in a match it is slot 3 and never opens the sheet or leaves the waiting room.
+
+**Keyboard bindings.** Two schemes, a two-button "Keyboard" row in Settings (hidden on phones), live with no restart, saved in `PlayerPreferences.KeyboardSchemeChoice`:
+
+| | Move | Slots 1 / 2 / 3 / 4 | Strip |
+|---|---|---|---|
+| **Scheme A, "WASD + arrows"** (default) | W A S D | Down / Up / Right / Left arrow | inverted T: slot 2 on top; 4, 1, 3 along the bottom |
+| **Scheme B, "Arrows + QWER"** | arrow keys | Q / W / R / E | one row Q W E R (slots 1, 2, 4, 3) |
+
+Digits 1-4 also fire slots 1-4 in both schemes. Esc and the right mouse button cancel a hold in both.
+
+**Peck is exempt from "press previews, release casts" (Maestro, 2026-11-20).** Peck has no range preview, so on whichever slot holds Peck (slot 1 in six of the eight kits; the Spoiler and the Thief carry none) a **tap pecks when it ends**, and a **hold of 0.5 s** (`PeckLongPressRules.PeckLongPressSeconds`) **flips Auto-Peck once**; the release after the flip pecks nothing. A cancel before the release (Esc, right mouse, L3, the touch edge band) kills the press. The same on every device. While Auto-Peck is on, an **AUTO** tag sits on the Peck hex (touch arc and strip). The Peck hex never hides, wherever the kit puts it.
 
 **Desktop and pad HUD.** With a keyboard, mouse or gamepad the hexes become an
 **information strip** at the bottom centre (scale 0.75, not clickable): each hex carries its
-key badge (Q / E / R / F, or RB / RT / LB / LT on pad), the cooldown number (tenths under 1 s)
-and the in-range pip. A held key scales its hex. The last device you touched decides the
+key badge (a drawn arrow for Scheme A, Q / W / E / R for Scheme B, A / Y / B / X on pad), the cooldown number (tenths under 1 s)
+and the in-range pip. The strip reads like the keys: an inverted T for Scheme A and the pad, one row for Scheme B. A held key scales its hex. The last device you touched decides the
 layout; any finger on a touchscreen brings the thumb layout back.
 
 **Hold hint.** A one-line hint above the cluster teaches the gesture for your device
-("Hold to see the reach · Let go to use it · B to cancel" on pad). It shows for your first 5 holds, then
+("Hold to see the reach · Let go to use it · Click the left stick to cancel" on pad). It shows for your first 5 holds, then
 never again, and not with Quick Moves.
 
 **Peck chain.** A Peck that succeeds with no move input keeps pecking by itself until the

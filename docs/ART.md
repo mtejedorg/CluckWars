@@ -595,7 +595,7 @@ cooldown / drain clips are inset to match.
 | Cancel armed | cream X over the held hex; cream glow strip on the screen edge (`#EdgeGlow*`) |
 | Fizzle | 0.3 s cream slash flash with an ink border, the hex bump, an `Fx_Whiff` puff (scale 0.6 to 1.35 and fade) |
 
-The cluster is laid on a 270 px (about 115 dp) arc around slot 1 for thumb reach. The match board on
+The cluster is laid to the slot roles (2026-11-20; section 6.7 has the numbers) around slot 1 for thumb reach, nothing further than 125 dp from it. The match board on
 the touch layout shows the leader and you (all four on tap and in the last 10 s).
 
 ### 6.7 Touch Controls — MOBA Layout (Mobile)
@@ -616,9 +616,12 @@ Controls follow a **MOBA arc pattern** (Wild Rift / Mobile Legends style). There
 
 | Control | Shape | Size | Anchored pos (from bottom-right) | Notes |
 |---|---|---|---|---|
-| Ability 1 | Hexagon (glossy) | 150 | (−170, 170) | Primary thumb anchor. Slot badge `1`. Tinted with equipped `AccentColor`. |
-| Ability 2 | Hexagon (glossy) | 150 | (−210, 360) | Arc above-left. Slot badge `2`. Radial cooldown + seconds number. |
-| Ability 3 ★ | Hexagon (glossy) | 150 | (−410, 270) | **Assassin only** — hidden when slot 2 is empty. Gold `★` slot badge (Combo). |
+| Ability 1 | Hexagon (glossy) | 150 | (−170, 170) | Income slot, in the corner where the thumb rests. Slot badge `1`. Tinted with equipped `AccentColor`. |
+| Ability 2 | Hexagon (glossy) | 150 | (−188, 360) | Movement slot, above slot 1 and a touch left. Slot badge `2`. Radial cooldown + seconds number. |
+| Ability 3 | Hexagon (glossy) | 150 | (−377, 377) | Flex slot, ON the 45° diagonal through slot 1, furthest out (293 px, 124.6 dp). |
+| Ability 4 | Hexagon (glossy) | 150 | (−360, 188) | Main attack, the mirror image of slot 2 across that diagonal at the same distance (191 px, 5.4° off the horizontal axis). |
+
+Landscape centres are measured from the bottom-right corner (x leftwards, y up). The tilt is small on purpose: a bigger one pushes slot 3 past the 125 dp reach or into slots 2 and 4. **Portrait** is an exact 180 px grid, no tilt (the 749 px panel leaves no room): centres a1 (155,170), a4 (335,170), a2 (155,350), a3 (335,350), the a2 / a3 row at bottom 275 (5 px up so slots 2 and 4 are equidistant from slot 1). The old arc (270 px radius, 40° apart, slot 3 Assassin-only) is gone: every kit has four slots and the Peck hex never hides.
 
 **Left-hand joystick:**
 
@@ -641,22 +644,25 @@ not buttons.
 | Position | bottom centre of the screen |
 | Hexes | scale x0.75 (a 40 px badge becomes 30 px), `PickingMode.Ignore` (not clickable) |
 | Joystick | hidden |
-| Badges | RB / RT / LB / LT on pad = slots 1-4; Q / E / R / F on keyboard. Badge text is at least 28 px on the panel, derived from the real binding tables |
+| Layout | Scheme A (default) and pad: an inverted T, slot 2 on top, slots 4, 1, 3 along the bottom. Scheme B: one row Q W E R (slots 1, 2, 4, 3) |
+| Badges | Pad: A / Y / B / X = slots 1-4 (RB / RT / LB / LT also fire them). Keyboard Scheme A: arrows Down / Up / Right / Left, drawn as one rotated sprite (`Assets/_Game/Art/UI/Atoms/HudArrowUp.png`) because the HUD font has no arrow glyphs; Scheme B: Q / W / R / E. Badge text is at least 28 px on the panel, derived from the real binding tables |
+| Auto-Peck | an **AUTO** pill (cream with an ink rim, 28 px text, `.cw-hex-autotag`) across the bottom of the Peck hex while Auto-Peck is on, touch and strip alike |
 | Cooldown | a number on the hex, tenths of a second under 1 s |
 | In range | the same gold pip as on touch |
 | Held | a held key or trigger scales its hex like a touch hold |
-| Cancel | B on pad, Esc / right mouse on keyboard (no on-screen cancel control) |
-| Back | Start on pad (Esc on keyboard) opens the Leave sheet; with a move held it only cancels the move |
+| Cancel | L3 on pad, Esc / right mouse on keyboard (no on-screen cancel control) |
+| Back | Start on pad (Esc on keyboard) opens the Leave sheet; with a move held it only cancels the move. B on pad backs out of menus, the sheet and the podium only; in a match it is slot 3 |
 
 | Input | Action |
 |---|---|
 | Left stick | move |
-| Right stick | aim (dead zone 0.25, outer 0.95, 150 ms hold) |
-| RB / RT / LB / LT | slots 1 / 2 / 3 / 4: hold to aim, release to use |
-| B | cancel a held move |
+| Right stick | nothing (no aiming on any device since 2026-11-20) |
+| A / Y / B / X, also RB / RT / LB / LT | slots 1 / 2 / 3 / 4: hold to see the reach, release to use (a Peck slot: tap pecks, hold 0.5 s toggles Auto-Peck) |
+| L3 (left stick click) | cancel a held move |
 | Start | Back / Leave sheet |
+| B | menu back only (in a match it is slot 3) |
 
-Hold hint copy (shown for the first 5 holds, `UiText.csv` `hud.hint.hold.pad`): "Hold to see the reach · Let go to use it · B to cancel" Keyboard copy: "Hold to see the reach · Let go to use it · Esc to cancel" Menu navigation hint (`hint.console`): "←→ Select · A Confirm · LB/RB Tab".
+Hold hint copy (shown for the first 5 holds, `UiText.csv` `hud.hint.hold.pad`): "Hold to see the reach · Let go to use it · Click the left stick to cancel" Keyboard copy: "Hold to see the reach · Let go to use it · Esc to cancel" Menu navigation hint (`hint.console`): "←→ Select · A Confirm · LB/RB Tab".
 
 Not verified on a real gamepad yet (unit tests and fakes only).
 

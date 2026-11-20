@@ -541,9 +541,9 @@ Photon Fusion 2 in Shared Mode: each peer is state authority over its own chicke
 - Status: PARTIAL
 
 ### ARCH-NET-18 — Read every input provider every tick; never read a press getter for diagnostics
-- Rule: `CompositeInputProvider` reads every provider every tick instead of short-circuiting. The ability press getters are one-shot: diagnostics must not read them, because that consumes the latch and swallows the cast `FusionNetworkService` was about to send. Watch `GetAbilityHeld(slot)` instead.
+- Rule: `CompositeInputProvider` reads every provider every tick instead of short-circuiting. The ability press getters are one-shot: diagnostics must not read them, because that consumes the latch and swallows the cast `FusionNetworkService` was about to send. Watch `GetAbilityHeld(slot)` instead. Since 2026-11-20 `FusionNetworkService` gates the Peck slot's press through `PeckLongPressRules` (a tap sends on release, a long press flips Auto-Peck instead), but still reads every getter every tick, so the gate sits after the read, never in place of it.
 - Why: edge-triggered presses must not leak into the next tick or be eaten by a probe.
-- Enforced by: TEST `ServicesAndInputTests.Composite_ReadsEveryProvider_EvenAfterOneAlreadyReturnedTrue`; CONVENTION for diagnostics
+- Enforced by: TEST `ServicesAndInputTests.Composite_ReadsEveryProvider_EvenAfterOneAlreadyReturnedTrue`, `PeckLongPressTests.TheNetworkInputPath_RoutesThePeckSlotThroughTheGate` (Tests/PeckLongPressTests.cs:221); CONVENTION for diagnostics
 - Audit check: `git grep -nE "GetAbility[0-9]?Pressed|Ability[0-9]Pressed" -- Assets/_Game/Scripts/Diagnostics Assets/_Game/Scripts/AbilityLab` must print nothing.
 - Source: docs/TESTING.md:212, docs/TESTING.md:374-379
 - Status: PARTIAL
@@ -657,7 +657,7 @@ Presentation (visuals, animation, audio, HUD) learns about gameplay by reading r
 ### ARCH-EVT-12 — Find the local chicken through ChickenController.Local, never by scanning for input authority
 - Rule: "The chicken this peer drives" is `ChickenController.Local` (`LocalDriven` for device input, which is never a bot), resolved by the pure `LocalChickenRules.Pick`. "Do not scan for `HasInputAuthority`: a Doppelganger decoy shares its caster's."
 - Why: a decoy was taken for the local chicken by range guides, the HUD and touch controls.
-- Enforced by: TEST `LocalChickenRulesTests.NoCopyOfTheRule_ScansTheSceneForInputAuthority` (Tests/LocalChickenRulesTests.cs:51; nine listed files), `LocalChickenRulesTests.ADecoyThatSharesInputAuthority_IsSkipped_WhicheverComesFirst`; CONVENTION for files outside the list
+- Enforced by: TEST `LocalChickenRulesTests.NoCopyOfTheRule_ScansTheSceneForInputAuthority` (Tests/LocalChickenRulesTests.cs:51; eight listed files; `FusionNetworkService` left the list on 2026-11-20 because it no longer resolves the local chicken at all), `LocalChickenRulesTests.ADecoyThatSharesInputAuthority_IsSkipped_WhicheverComesFirst`; CONVENTION for files outside the list
 - Audit check: `git grep -n "HasInputAuthority" -- Assets/_Game/Scripts ':!Assets/_Game/Scripts/Editor'`. No hit may be a "which chicken is mine" loop over chickens. `ArenaReadinessDriver` is the one documented exception (docs/STATE.md:172).
 - Source: docs/CONVENTIONS.md:19, docs/STATE.md:172; rule set B.6
 - Status: PARTIAL

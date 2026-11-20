@@ -71,7 +71,7 @@ arena into a solved puzzle.
 > **Phase 6 (2026-10) changes to this section.** The preview is now **instant and
 > local** (from the press frame, not after the hold threshold); "no target" is a
 > legal state drawn as a cream dashed ring, not a refusal; the cancel gesture is the
-> screen edge (touch), Esc / right mouse (keyboard) or B (pad); a target-gated move
+> screen edge (touch), Esc / right mouse (keyboard) or L3 (pad; B is slot 3 since 2026-11-20); a target-gated move
 > released with nobody in range fizzles. Items below are marked where they changed.
 
 While the ability button is held:
@@ -99,9 +99,8 @@ While the ability button is held:
 3. **Aim rotation** — **a hold never stops the chicken** (Maestro, 2026-10-31; it used to
    turn the stick into facing, which froze the bird). Once the hold passes
    `TapHoldThresholdSeconds`, for directional abilities (cone / forward-offset / capsule /
-   jump), an explicit aim (mouse, right stick) faces the bird while the movement stick
-   strafes it; with no aim given (touch, single stick, keyboard only) the stick steers both,
-   so moving is how you aim. Caster-centred shapes (self-circle, aura, single-target) are
+   jump), **no device sends an explicit aim any more** (mouse and right-stick aim were removed
+   2026-11-20), so the stick steers both and moving is how you aim. Caster-centred shapes (self-circle, aura, single-target) are
    rotation-invariant and need neither. The predicate is
    `AbilityBaseSO.IsDirectionalAim`, written as an *exclusion* list so a newly added
    shape is directional by default (a harmless wrong answer) rather than silently
@@ -115,7 +114,7 @@ While the ability button is held:
    dashed cream, and releasing is a fizzle (§3.3).
 6. **Cancel gesture** — **Phase 6:** drag the thumb to the screen edge (arms within 36 dp
    of a physical edge, disarms past 44 dp; **Phase 7:** the zone is drawn as soon as the hold
-   passes the tap threshold, see §11.7), Esc or right mouse on keyboard, B on pad.
+   passes the tap threshold, see §11.7), Esc or right mouse on keyboard, L3 on pad.
    System edge gestures and a lost finger cancel and never fire. Feedback while armed:
    see §11.
 
@@ -580,7 +579,7 @@ HUD stylesheets; the player rules are in `docs/GDD.md` §10.1.
   is inside that slot's shape and the slot is not on cooldown (same 10 Hz verdict that makes
   the ground guide "hot"). 0.2 s scale pop, none under Reduced Motion.
 - **Desktop and pad.** The hexes become a non-clickable information strip with key badges
-  (Q / E / R / F, RB / RT / LB / LT), a cooldown number and the pip; see ART.md §6.8.
+  (a drawn arrow or Q W R E on keyboard by scheme, A / Y / B / X on pad), a cooldown number and the pip; an AUTO tag on the Peck hex while Auto-Peck is on; see ART.md §6.8.
 
 ### 11.2 Range guides
 Always-on ground outline per equipped slot (`AbilitySlotOverlay`): line width 0.06 with an ink
@@ -628,8 +627,8 @@ on the grass mean.
 
 ### 12.2 Honest preview forward
 The ground shape, the dashed / solid state, the target brackets and the hex's in-range pip use
-one direction (`AbilityAimForward`): the resolved explicit aim (mouse / right stick), else the
-touch soft-lock pick, else the bird's facing; it is also what the cast uses on release. A
+one direction (`AbilityAimForward`): the soft-lock pick, else the bird's facing (no explicit
+aim since 2026-11-20); it is also what the cast uses on release. A
 fizzle does not rotate the bird. The pip also hides on any real refusal and while the slot is
 re-arming, and a slot that is already running is not offered a preview.
 

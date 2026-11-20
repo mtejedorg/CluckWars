@@ -1177,9 +1177,9 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Status: CURRENT
 
 ### CODE-DESIGN-08 — Pressing previews the range, releasing casts; holding never freezes the chicken
-- Rule: Pressing an ability always shows its range until release; release casts; never block an ability because nothing is in range (no target is not illegal); holding never stops the chicken; a cancel must exist and be visible.
+- Rule: Pressing an ability always shows its range until release; release casts; never block an ability because nothing is in range (no target is not illegal); holding never stops the chicken; a cancel must exist and be visible. Since 2026-11-20 no device aims: PC and pad act like touch (the wire aim byte is always 0, a cast goes along facing or the soft-lock pick; the mouse is only activity and right click cancels), a pad hold is cancelled with L3 (B is slot 3 in a match and backs out only outside one), and keyboard cancel is Esc or right click. The one exemption is the slot holding Peck, which has no range preview: a tap pecks on release and a hold of `PeckLongPressRules.PeckLongPressSeconds` flips Auto-Peck once, on every device.
 - Why: owner, UI thread 2026-10-08: "if the user press the ability it previews the range until it releases"; balance thread 2026-10-31: holding "currently stops the chicken from moving. That should not happen".
-- Enforced by: TEST `Phase6Chunk5Tests.HoldingAnAbility_NeverStopsThePlayersMovement_SourceGuard`, `AbilityPreviewRulesTests.LocalPreview_SingleHeldAvailableSlot_IsThatSlot`; rest CONVENTION
+- Enforced by: TEST `Phase6Chunk5Tests.HoldingAnAbility_NeverStopsThePlayersMovement_SourceGuard`, `AbilityPreviewRulesTests.LocalPreview_SingleHeldAvailableSlot_IsThatSlot`; no aiming: `Phase6Chunk5Tests.NoDeviceAims_PcAndPadActLikeTouch_TheWireAimByteIsAlwaysZero`, `Phase7ChunkATests.KeyboardProvider_HasNoMouseAim_ButKeepsMouseActivityAndRightClickCancel`; pad B / L3 / Start: `Phase6Chunk5Tests` (CancelButton = L3, MenuBackButton = B on slot 3 only) and `Phase7ChunkATests.PadB_IsMenuBack_AndStartIsThePausePress`; keyboard schemes: `ServicesAndInputTests.Keyboard_WasdArrows_PinsTheExactTable`, `Keyboard_ArrowsQwer_PinsTheExactTable`, `Keyboard_NoKeyDrivesTwoDifferentAbilities_InEitherScheme`, `Keyboard_NoAbilityKeyCollidesWithThatSchemesMovement_AndEscIsInNeither`, `KeyboardScheme_DefaultsToWasdArrows_RoundTrips_AndGarbageFallsBack`, `StripArrangement_EveryDeviceAndScheme`; Peck long press: `PeckLongPressTests` (pure rules plus source guards); touch cluster: `Phase6Chunk6Tests.Cluster_Slots2And4MirrorAcrossTheDiagonal_Slot3SitsOnItFurtherOut`; rest CONVENTION
 - Audit check: for a new gate in `AbilityHoldStateMachine.Decide` / `CanActivate`, confirm it refuses only a wiring failure or a rule (cooldown, base wall), not "nobody in range", and that the press still previews.
 - Source: M:ability-input-press-previews.md; UI thread 2026-10-08, balance thread 2026-10-31 (owner)
 - Status: PARTIAL (the "visible cancel" and "never block out of range" halves are review-only; the Slow is gated with `RequiresEnemyInRange` per docs/STATE.md:13, see open question Q5)
@@ -1216,11 +1216,11 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Status: PARTIAL (escape after spawn is unguarded)
 
 ### CODE-DESIGN-13 — Keep fixed kits behind `LoadoutMode`; keep the picking code
-- Rule: Classes use fixed preselected kits for the demo (`LoadoutMode.Fixed`); the free-picking code stays, behind the switch. Ability SOs carry a flags enum of the classes that may equip them.
+- Rule: Classes use fixed preselected kits for the demo (`LoadoutMode.Fixed`); the free-picking code stays, behind the switch. Ability SOs carry a flags enum of the classes that may equip them. Kit order is fixed by slot role (Maestro, 2026-11-20): slot 1 income (Peck; Hunt for Spoiler; Steal for Thief), slot 2 movement (Fatty: second attack), slot 3 flex (defence or self utility, or a second attack; least used), slot 4 main attack (combo partner of slot 1).
 - Why: owner, balance thread 2026-10-31: "Keep code as is, and put some rule there to keep it flexible".
-- Enforced by: TEST `FixedKitTests` (Assets/_Game/Scripts/Editor/Tests/FixedKitTests.cs), `CooldownsKitsSlipperyTests.TheSwappedKits_StayLegal`, `SimplifiedAbilitiesTests.EveryKitAbility_IsAllowedForItsClass_AndJumpIsNeverSpeedys`
+- Enforced by: TEST `FixedKitTests` (Assets/_Game/Scripts/Editor/Tests/FixedKitTests.cs), `FixedKitTests.ShippedKits_HaveTheExactSlotOrder` and `FixedKitTests.EveryKit_FollowsTheSlotRoles` (BL-156), `CooldownsKitsSlipperyTests.TheSwappedKits_StayLegal`, `SimplifiedAbilitiesTests.EveryKitAbility_IsAllowedForItsClass_AndJumpIsNeverSpeedys`
 - Source: M:fixed-kits-baseline-2026-10-31.md; balance thread 2026-10-31, playtest-balance thread 2026-08-21 (owner)
-- Status: CURRENT (the exact kit slot order is unpinned, BL-156; the null-config fallback is Free, BL-153)
+- Status: CURRENT (the null-config fallback is Free, BL-153)
 
 ### CODE-DESIGN-14 — One icon means one effect: Slow and Slow Area are separate jobs
 - Rule: Slow (instant, timed) and Slow Area (aura or placed zone, chosen by `AreaKind` on the SO) are separate jobs; both shapes stay implemented; a new slow-like effect needs its own job.

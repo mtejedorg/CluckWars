@@ -117,18 +117,20 @@
       <table>
         <thead><tr><th>Class</th><th>Specialization</th><th>Passive</th><th>Kit</th></tr></thead>
         <tbody>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Steal 3 s, Stun 5.25 s, Jump 1.5 s)</td><td>Peck, Steal, Stun, Jump</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow aura 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Steal, Slow, Speed</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Steal 3 s, Stun 5.25 s, Jump 1.5 s)</td><td>Peck, Jump, Stun, Steal</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow aura 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Speed, Slow, Steal</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>You bank food 10% faster; immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (the Slow aura holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Shove, Egg Shell</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Egg Shell, Slow, Steal</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Hunt, Stun, Jump, Hide</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>Every steal takes 1.6&times; more</td><td>Steal, Hide, Jump, Slow</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Egg Shell, Shove</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Slow Area, Egg Shell, Steal</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>Banks 15 bonus food if the clock expires with no winner</td><td>Hunt, Jump, Hide, Stun</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>Every steal takes 1.6&times; more</td><td>Steal, Jump, Hide, Slow Area</td></tr>
         </tbody>
       </table>
     </div>
     <p class="small muted">Fixed kits are a balance baseline to iterate on, not a final roster. A switch brings back free picking.</p>
+    <!-- Source: docs/GDD.md section 5.3 (slot roles, Maestro 2026-11-20); kit order read from the Passives .asset files -->
+    <p>Kits are listed in slot order, and the order is a rule. Slot 1 is the income move (Peck; Hunt for the Spoiler, Steal for the Thief), slot 2 is movement (the Fatty's second attack instead), slot 3 is the flex move (defence, self utility or a second attack, the least used) and slot 4 is the main attack, the combo partner of slot 1.</p>
   </section>
 
   <section id="steal">
@@ -242,8 +244,18 @@
     <h2>Hold to aim, release to use</h2>
     <!-- Source: docs/GDD.md §10.1 -->
     <p>An ability always fires on release, never on press. The moment you press, your own screen shows the move's true area on the ground and marks every chicken inside it. What is marked is exactly what gets hit: with range-only targeting that is every rival inside a circle around you.</p>
-    <p>Past about 125 ms the hold becomes a commitment. Rivals see a wind-up glow at your feet, though not your area, and the stick rotates your aim instead of moving you.</p>
-    <p>Having no target is not illegal. A move that needs a rival and finds none shows a cream dashed ring. Release it anyway and it fizzles: no effect, no cooldown, and the slot re-arms after 0.4 s so it cannot be spammed. A held move can be cancelled without firing or costing its cooldown: drag to the screen edge on touch, Esc or right mouse button on keyboard and mouse, B on a gamepad.</p>
+    <p>Past about 125 ms the hold becomes a commitment. Rivals see a wind-up glow at your feet, though not your area, and you keep moving at full speed. Nothing aims: no device has an aim control, so a move fires along your facing, or at the soft-lock target on touch.</p>
+    <p>Having no target is not illegal. A move that needs a rival and finds none shows a cream dashed ring. Release it anyway and it fizzles: no effect, no cooldown, and the slot re-arms after 0.4 s so it cannot be spammed. A held move can be cancelled without firing or costing its cooldown: drag to the screen edge on touch, Esc or right mouse button on keyboard and mouse, L3 (click the left stick) on a gamepad.</p>
+    <h3>Controls</h3>
+    <!-- Source: docs/GDD.md section 10.1, docs/ART.md sections 6.7 and 6.8 -->
+    <ul>
+      <li><b>Touch.</b> Slot 1 sits in the corner under the thumb. Slots 2 and 4 are mirror images across the diagonal through slot 1, a little off the axes, and slot 3 sits on that diagonal, furthest out. Portrait uses a plain 2 &times; 2 grid.</li>
+      <li><b>Gamepad.</b> Left stick moves, the right stick does nothing. A, Y, B and X fire slots 1 to 4, and so do RB, RT, LB and LT. L3 cancels a hold. Start opens the Leave sheet. B backs out of menus, the sheet and the podium only; in a match it is just slot 3.</li>
+      <li><b>Keyboard, scheme A</b> (default): WASD moves; the arrows Down, Up, Right and Left fire slots 1 to 4.</li>
+      <li><b>Keyboard, scheme B:</b> the arrows move; Q, W, R and E fire slots 1 to 4. The choice is a Settings row.</li>
+      <li>Digits 1 to 4 fire the slots in both schemes. Esc or the right mouse button cancels.</li>
+      <li><b>Peck is the exception to hold-and-release.</b> A tap pecks. Holding the Peck slot for 0.5 s toggles Auto-Peck, and an AUTO tag shows on the hex while it is on.</li>
+    </ul>
     <figure>
       <img src="assets/hold.jpg" width="1200" height="675" loading="lazy" alt="Capture of a yellow chicken with a wedge-shaped aim outline drawn on the grass. A red rival chicken stands beside it and a rival nameplate floats above. Ability buttons are at the right, a scoreboard at top left and the timer reads 00:22. A white debug guide rectangle frames part of the screen.">
       <figcaption>Capture of an ability aim outline on the ground with a rival nearby (taken before range-only targeting, when some moves were wedge-shaped).</figcaption>
