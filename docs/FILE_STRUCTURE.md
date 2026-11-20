@@ -544,6 +544,7 @@ dated record of one session, decision or plan, not updated afterwards; **stale**
 | `docs/DASHBOARD.md` | Link dashboard, no copied numbers | living |
 | `docs/docs.base` | Obsidian Base: docs by status | living |
 | `docs/architecture.canvas` | Obsidian canvas: how the main docs fit together | living |
+| `docs/GDD-v0.3.md`, `docs/TDD-v0.1.md`, `docs/ART-v0.1.md`, `docs/CLASSES-2026-08-24.md` | The four pages migrated from Notion, copied verbatim, `status: archived`; stale, never a source of numbers (live: GDD, TDD, ART) | snapshot |
 | `docs/attachments/` | Images pasted through Obsidian; design images live beside their docs | living |
 
 ### 7.3 Other top-level content

@@ -18,7 +18,7 @@ Obsidian is optional. It is a reader and editor for the markdown files that are 
 
 ## Rules of the house
 
-- `docs/` and the code are the source of truth. The old Notion pages were not kept: they were stale copies of the GDD, TDD and ART docs.
+- `docs/` and the code are the source of truth. The four pages migrated from Notion (`GDD-v0.3.md`, `TDD-v0.1.md`, `ART-v0.1.md`, `CLASSES-2026-08-24.md`) are copied as they were and marked `status: archived`. They are stale and never a source of numbers.
 - Install no community plugins. The core plugins switched on are in `.obsidian/core-plugins.json`.
 - Commit only `.obsidian/app.json`, `core-plugins.json` and `appearance.json`. Workspace, cache and graph files are per machine and ignored by git.
 - The rules docs and `docs/FILE_STRUCTURE.md` are edited by the `librarian` agent. Edit them by hand only for a quick fix.
