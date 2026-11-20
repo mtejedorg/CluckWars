@@ -49,6 +49,8 @@ namespace CluckWars.Balance
                 report.StandardMeanCargo = farmers.MeanCargo;
                 report.StandardLeaderBanked = farmers.LeaderBanked;
                 report.StandardFarmerBanked = farmers.FarmerBanked;
+                report.StandardSeatBanked = farmers.SeatBanked;
+                report.StandardPilesEmptyAt = farmers.PilesEmptyAt;
 
                 BuildSpoiler(report, inputs, scope, match, farmers);
                 BuildThief(report, inputs, scope, match, kits, farmers);
@@ -76,38 +78,73 @@ namespace CluckWars.Balance
         private static void Fill(KitLine line, OracleMapSO map, OracleKit kit, OracleKit standard, OracleFood food,
             FarmRules open, FarmRules stop, IReadOnlyDictionary<string, float> offsets)
         {
-            int cells = Seats * Routes.Length;
+            int routes = Routes.Length;
+            int cells = Seats * routes;
             line.BankedBySeatRoute = new float[cells];
             line.SecondsBySeatRoute = new float[cells];
-            float best = float.NegativeInfinity, worst = float.PositiveInfinity, sum = 0f;
-            int bestCell = 0;
-            line.BestSeconds = -1f;
 
             for (int seat = 0; seat < Seats; seat++)
             {
-                for (int r = 0; r < Routes.Length; r++)
+                for (int r = 0; r < routes; r++)
                 {
-                    int cell = seat * Routes.Length + r;
+                    int cell = seat * routes + r;
                     var seats = OthersStandard(standard);
                     seats[seat] = new FarmSeat { Present = true, Kit = kit, Route = Routes[r] };
-
-                    float banked = FarmSim.Run(map, food, seats, open)[seat].Banked;
-                    float seconds = FarmSim.Run(map, food, seats, stop)[seat].SecondsToTarget;
-                    line.BankedBySeatRoute[cell] = banked;
-                    line.SecondsBySeatRoute[cell] = seconds;
-
-                    sum += banked;
-                    if (banked > best) { best = banked; bestCell = cell; }
-                    if (banked < worst) worst = banked;
-                    if (seconds >= 0f && (line.BestSeconds < 0f || seconds < line.BestSeconds)) line.BestSeconds = seconds;
+                    line.BankedBySeatRoute[cell] = FarmSim.Run(map, food, seats, open)[seat].Banked;
+                    line.SecondsBySeatRoute[cell] = FarmSim.Run(map, food, seats, stop)[seat].SecondsToTarget;
                 }
             }
 
-            line.BestBanked = best;
-            line.BestRoute = Routes[bestCell % Routes.Length];
+            // Per route: the mean over the four seats (a kit cannot choose its seat), and the seat range on the route that is best.
+            float sum = 0f, bestMean = float.NegativeInfinity, worstMean = float.PositiveInfinity;
+            int bestRoute = 0;
+            for (int r = 0; r < routes; r++)
+            {
+                float routeSum = 0f;
+                for (int seat = 0; seat < Seats; seat++) routeSum += line.BankedBySeatRoute[seat * routes + r];
+                sum += routeSum;
+                float mean = routeSum / Seats;
+                if (mean > bestMean) { bestMean = mean; bestRoute = r; }
+                if (mean < worstMean) worstMean = mean;
+            }
+
+            float seatMin = float.PositiveInfinity, seatMax = float.NegativeInfinity;
+            for (int seat = 0; seat < Seats; seat++)
+            {
+                float v = line.BankedBySeatRoute[seat * routes + bestRoute];
+                if (v < seatMin) seatMin = v;
+                if (v > seatMax) seatMax = v;
+            }
+
+            // Seconds to the goal: per route, the mean over the seats that reach it; the fastest route is the lowest mean.
+            float fastest = -1f;
+            int reaching = 0;
+            for (int r = 0; r < routes; r++)
+            {
+                float secSum = 0f;
+                int n = 0;
+                for (int seat = 0; seat < Seats; seat++)
+                {
+                    float sec = line.SecondsBySeatRoute[seat * routes + r];
+                    if (sec < 0f) continue;
+                    secSum += sec;
+                    n++;
+                }
+                if (n == 0) continue;
+                float mean = secSum / n;
+                if (fastest < 0f || mean < fastest || (mean == fastest && n > reaching)) { fastest = mean; reaching = n; }
+            }
+
+            line.BestRoute = Routes[bestRoute];
+            line.BestBanked = bestMean;
+            line.BestSeatMin = seatMin;
+            line.BestSeatMax = seatMax;
+            line.SeatSpread = seatMax - seatMin;
             line.MeanBanked = sum / cells;
-            line.Spread = best - worst;
-            line.IncomePerSecond = open.ClockSeconds > 0f ? best / open.ClockSeconds : 0f;
+            line.Spread = bestMean - worstMean;
+            line.BestSeconds = fastest;
+            line.SeatsReachingGoal = reaching;
+            line.IncomePerSecond = open.ClockSeconds > 0f ? bestMean / open.ClockSeconds : 0f;
             line.OffsetSeconds = offsets != null && offsets.TryGetValue(kit.Label, out var offset) ? offset : 0f;
             line.Result = line.BestBanked + line.OffsetSeconds * line.IncomePerSecond;
         }
@@ -126,6 +163,8 @@ namespace CluckWars.Balance
             public float MeanCargo;
             public float LeaderBanked;
             public float[] FarmerBanked;
+            public float[] SeatBanked;
+            public float PilesEmptyAt;
         }
 
         /// <summary>
@@ -147,7 +186,13 @@ namespace CluckWars.Balance
             // The Spoiler takes the fourth seat, so the three farmers it hunts are seats 0 to 2 of this run.
             var hunted = new float[Seats - 1];
             for (int i = 0; i < hunted.Length; i++) hunted[i] = results[i].Banked;
-            return new FarmerFacts { MeanCargo = counted > 0 ? sum / counted : 0f, LeaderBanked = leader, FarmerBanked = hunted };
+            var all = new float[Seats];
+            for (int i = 0; i < all.Length; i++) all[i] = results[i].Banked;
+            return new FarmerFacts
+            {
+                MeanCargo = counted > 0 ? sum / counted : 0f, LeaderBanked = leader, FarmerBanked = hunted,
+                SeatBanked = all, PilesEmptyAt = results[0].PilesEmptyAt,
+            };
         }
 
         // ------------------------------------------------------- Sneaky tables

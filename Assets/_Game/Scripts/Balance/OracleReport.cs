@@ -17,15 +17,24 @@ namespace CluckWars.Balance
         public float[] BankedBySeatRoute = Array.Empty<float>();
         /// <summary>Clock time the kit first banked the win target, same layout; -1 where it never did.</summary>
         public float[] SecondsBySeatRoute = Array.Empty<float>();
-        /// <summary>Route of the cell holding <see cref="BestBanked"/>.</summary>
+        /// <summary>The route with the highest mean over the four seats.</summary>
         public FarmRoute BestRoute;
+        /// <summary>Food banked on <see cref="BestRoute"/>, the mean over the four seats (a kit does not choose its seat).</summary>
         public float BestBanked;
+        /// <summary>The seat that banks least on <see cref="BestRoute"/>.</summary>
+        public float BestSeatMin;
+        /// <summary>The seat that banks most on <see cref="BestRoute"/>.</summary>
+        public float BestSeatMax;
+        /// <summary><see cref="BestSeatMax"/> minus <see cref="BestSeatMin"/>: how much the result depends on where the kit spawns.</summary>
+        public float SeatSpread;
         /// <summary>Mean over every seat and route cell.</summary>
         public float MeanBanked;
-        /// <summary>Best cell minus worst cell over every seat and route.</summary>
+        /// <summary>Best route's seat mean minus worst route's seat mean.</summary>
         public float Spread;
-        /// <summary>Fastest time to the win target over every cell; -1 when no cell reached it.</summary>
+        /// <summary>Seat mean of the seconds to the win target on the fastest route, counting only seats that reach it; -1 when no seat on any route does.</summary>
         public float BestSeconds = -1f;
+        /// <summary>How many of the four seats reach the win target on the route behind <see cref="BestSeconds"/>; 0 when none.</summary>
+        public int SeatsReachingGoal;
         /// <summary><see cref="BestBanked"/> divided by the clock.</summary>
         public float IncomePerSecond;
         public float OffsetSeconds;
@@ -94,6 +103,10 @@ namespace CluckWars.Balance
         public float StandardLeaderBanked;
         /// <summary>The three farmers the Spoiler is compared with (seats 0 to 2 of the four-standard-farmer run).</summary>
         public float[] StandardFarmerBanked = Array.Empty<float>();
+        /// <summary>What each of the four seats banks in the four-standard-farmer run (goal off, no event), index = seat.</summary>
+        public float[] StandardSeatBanked = Array.Empty<float>();
+        /// <summary>Seconds into the clock at which all nine piles were empty in that run; -1 when food was left when the clock ended.</summary>
+        public float StandardPilesEmptyAt = -1f;
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -119,7 +132,9 @@ namespace CluckWars.Balance
             Num(sb, "meanCargo", StandardMeanCargo); sb.Append(',');
             Num(sb, "capacity", StandardCapacity); sb.Append(',');
             Num(sb, "leaderBanked", StandardLeaderBanked); sb.Append(',');
-            Arr(sb, "farmerBanked", StandardFarmerBanked); sb.Append("},");
+            Arr(sb, "farmerBanked", StandardFarmerBanked); sb.Append(',');
+            Arr(sb, "seatBanked", StandardSeatBanked); sb.Append(',');
+            Num(sb, "pilesEmptyAtSeconds", StandardPilesEmptyAt); sb.Append("},");
 
             sb.Append("\"spoiler\":{");
             Num(sb, "bountyPerKill", SpoilerBountyPerKill); sb.Append(',');
@@ -180,6 +195,10 @@ namespace CluckWars.Balance
                 Arr(sb, "secondsBySeatRoute", l.SecondsBySeatRoute); sb.Append(',');
                 Str(sb, "bestRoute", l.BestRoute.ToString()); sb.Append(',');
                 Num(sb, "bestBanked", l.BestBanked); sb.Append(',');
+                Num(sb, "bestSeatMin", l.BestSeatMin); sb.Append(',');
+                Num(sb, "bestSeatMax", l.BestSeatMax); sb.Append(',');
+                Num(sb, "seatSpread", l.SeatSpread); sb.Append(',');
+                Num(sb, "seatsReachingGoal", l.SeatsReachingGoal); sb.Append(',');
                 Num(sb, "meanBanked", l.MeanBanked); sb.Append(',');
                 Num(sb, "spread", l.Spread); sb.Append(',');
                 Num(sb, "bestSeconds", l.BestSeconds); sb.Append(',');
@@ -231,6 +250,8 @@ namespace CluckWars.Balance
             sb.AppendLine($"- Starting food per pile: personal {F0(Food.Personal)}, contested {F0(Food.Contested)}, centre {F0(Food.Centre)}");
             sb.AppendLine();
 
+            StandardSection(sb);
+
             EconomySection(sb, "## Economy (no comeback event)", Economy,
                 "Each row is one kit farming food while the other three chickens are plain Warriors with no abilities. "
                 + $"Food is counted when the {F0(ClockSeconds)} s clock ends, with the {F0(WinTarget)}-food goal switched off so a fast kit is not cut short.");
@@ -248,24 +269,40 @@ namespace CluckWars.Balance
             return sb.ToString();
         }
 
+        private void StandardSection(StringBuilder sb)
+        {
+            sb.AppendLine("## Four plain Warriors");
+            sb.AppendLine();
+            sb.AppendLine($"Four standard farmers (Warrior stats, no passive, no abilities, each walking to its nearest pile) on the same map and the same starting food, with the {F0(WinTarget)}-food goal switched off. This is what every kit below is measured against.");
+            sb.AppendLine();
+            for (int s = 0; s < StandardSeatBanked.Length; s++)
+                sb.AppendLine($"- Seat {s + 1} banks {F1(StandardSeatBanked[s])} food");
+            sb.AppendLine();
+            sb.AppendLine(StandardPilesEmptyAt < 0f
+                ? $"The map never runs out of food in this run: food is still in the piles when the {F0(ClockSeconds)} s clock ends."
+                : $"The map runs out of food {F1(StandardPilesEmptyAt)} s into the {F0(ClockSeconds)} s clock in this run.");
+            sb.AppendLine();
+        }
+
         private void EconomySection(StringBuilder sb, string heading, List<KitLine> lines, string sentence)
         {
             sb.AppendLine(heading);
             sb.AppendLine();
             sb.AppendLine(sentence);
-            sb.AppendLine("Best, average and spread are over every seat and route tried; Result is the best food plus the kit's offset in seconds at its own income per second.");
+            sb.AppendLine("Food and seconds are the mean over the four spawn seats on the kit's best route, and the seat range is the lowest and highest seat on that route: a wide range means the result depends on where you spawn. "
+                + "Result is that food plus the kit's offset in seconds at its own income per second.");
             sb.AppendLine();
-            sb.AppendLine("| Kit | Best food | Best route | Average food | Spread | Fastest to goal (s) | Offset (s) | Result |");
-            sb.AppendLine("|---|---|---|---|---|---|---|---|");
+            sb.AppendLine("| Kit | Best route | Food (seat mean) | Seat range | Seconds to goal (seat mean) | Offset (s) | Result |");
+            sb.AppendLine("|---|---|---|---|---|---|---|");
             foreach (var l in lines)
             {
                 if (!l.Applicable)
                 {
-                    sb.AppendLine($"| {l.Label} | n/a, does not forage | | | | | | |");
+                    sb.AppendLine($"| {l.Label} | n/a, does not forage | | | | | |");
                     continue;
                 }
-                string goal = l.BestSeconds < 0f ? "not reached" : F1(l.BestSeconds);
-                sb.AppendLine($"| {l.Label} | {F1(l.BestBanked)} | {RouteName(l.BestRoute)} | {F1(l.MeanBanked)} | {F1(l.Spread)} | {goal} | {F1(l.OffsetSeconds)} | {F1(l.Result)} |");
+                string goal = l.BestSeconds < 0f ? "not reached" : $"{F1(l.BestSeconds)} ({l.SeatsReachingGoal} of {OracleMapSO.SeatCount} seats)";
+                sb.AppendLine($"| {l.Label} | {RouteName(l.BestRoute)} | {F1(l.BestBanked)} | {F1(l.BestSeatMin)} to {F1(l.BestSeatMax)} | {goal} | {F1(l.OffsetSeconds)} | {F1(l.Result)} |");
             }
             sb.AppendLine();
         }

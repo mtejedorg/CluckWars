@@ -70,6 +70,7 @@ namespace CluckWars.Balance
             private readonly Chicken[] _c = new Chicken[Seats];
             private readonly int[] _easyContested = new int[Seats];
             private float _time;
+            private float _dryAt = -1f;
 
             public Sim(OracleMapSO map, OracleFood food, FarmSeat[] seats, FarmRules rules)
             {
@@ -126,11 +127,13 @@ namespace CluckWars.Balance
 
                     for (int k = 0; k < Seats; k++)
                         Step((i + k) % Seats);
+
+                    if (_dryAt < 0f && !AnyFood()) _dryAt = Math.Min(_time + _tick, clock);
                 }
 
                 var result = new FarmSeatResult[Seats];
                 for (int s = 0; s < Seats; s++)
-                    result[s] = new FarmSeatResult { Banked = _c[s].Banked, SecondsToTarget = _c[s].SecondsToTarget, Trips = _c[s].Trips, Carried = _c[s].Carrying };
+                    result[s] = new FarmSeatResult { Banked = _c[s].Banked, SecondsToTarget = _c[s].SecondsToTarget, Trips = _c[s].Trips, Carried = _c[s].Carrying, PilesEmptyAt = _dryAt };
                 return result;
             }
 

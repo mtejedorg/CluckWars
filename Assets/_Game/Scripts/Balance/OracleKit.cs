@@ -82,5 +82,7 @@ namespace CluckWars.Balance
         public int Trips;
         /// <summary>Food still in the cargo when the clock ended.</summary>
         public float Carried;
+        /// <summary>Clock time at which the food in all nine piles first reached zero in this run (the same value in every seat's result); -1 when the piles never ran dry.</summary>
+        public float PilesEmptyAt;
     }
 }
