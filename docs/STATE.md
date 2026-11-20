@@ -11,6 +11,16 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-20 - Oracle v2: where it stands after plan tasks 0-7 (`develop`, not pushed)
+
+Design `docs/superpowers/specs/2026-11-20-balance-oracle-v2-design.md`, plan `docs/superpowers/plans/2026-11-20-balance-oracle-v2-plan.md`. Maestro's ruling: the oracle is a guide, not the law.
+- **Done:** task 0 `-cw_timescale` (`152bc426`; solo, dev tools; clean log up to x5, x10/x20 run but trip the round-start invariant probes; banked food per seat differs between speeds, cause not proven); 1 `OracleMapSO` + bake (`64f1ed2d`); 2 `FarmSim` (`d7d88a41`, fixes `79fd8641`); 3 kits from assets (`0a6c87ee`, trait fix `1cf0150f`); 4 report + Spoiler/Thief tables (`2541cf6a`, `b142f81c`); 5 non-blocking local check (`887758ae`); 6 reference + drift guard, v1 retired (`9a560739`); 7 pile food on `MatchConfig`, **personal 10 / contested 15 / centre 40** (`612c83af`); review follow-ups: seat-mean headline (`0ad08d37`), **Record baseline (keeps prices) vs Accept as balanced (recomputes them)** (`0041c81a`; this replaces the single "Accept as reference" of the entry below), food sweep (`f306186a`).
+- **Menus:** `Cluck Wars/Balance/Oracle/` Bake map, Report, Record baseline (keep prices), Accept as balanced (recompute prices), Sweep food. Batch entries on `CluckWars.EditorTools.OracleMenu`: `ReportBatch`, `RecordBatch`, `AcceptBatch` (`-oracleNote`), `SweepFoodBatch`; `OracleMapBaker.BakeBatch`. Output in `Captures/oracle/` (git-ignored).
+- **What the oracle says with 10 / 15 / 40** (each kit against three plain Warriors, no fighting): four plain Warriors bank 34-37 and the map is empty at 21.6 s; every foraging kit reaches 40 alone in 18.0 s (Hoarder) to 24.8 s (Bully). Sweep of ten pile setups: `Captures/oracle/sweep-food-*.md`. **Open for Maestro:** keep 10 / 15 / 40 or lower the centre; the personal pile now fills a Speedy's cargo in one visit (the old test for that was replaced by `PersonalPile_AloneCannotWinTheMatch`).
+- **Prices in the reference:** Warrior kits +5 s, the rest 0 (carried over from v1, recorded 2026-11-20).
+- **Not verified:** the oracle menus and the note wizard in a live Editor (only batch paths ran); the local balance editor's CHECK text on screen; `ProjectContext.prefab` `_oracleMap` wiring was added in YAML, confirm it in the Inspector. Render tests (15) fail under `-nographics` and were last seen green with graphics at task 6.
+- **Not started:** task 8 (flat execute bounty, mark weighted toward the leader, Leader Bounty event removed), 9 (solver), 10 (docs: GDD 2.1, compendium `#sct` / `#data`, rules docs by `librarian`, Kit Lab refresh). Then the Peck cast in the game, the abstract match simulator (part 2) and real-game bot runs (part 3).
+
 ## 🎯 2026-11-20 - Controls batch follow-ups: BL-199/200/201/203 closed, BL-202 fixed in code (`develop`)
 
 - **BL-200 (`f57272ab`):** the dead explicit-aim decode is gone from the simulation (`AimQuantizer`, `AbilityAimForward` `explicitAim`, the `ChickenController` aim branch, `ChickenMovement.Tick` `faceOverride`); `ApplyAimForFire` is now `ApplySoftLockForFire`. Fire direction is unchanged (facing or soft-lock). Kept: `PlayerNetworkInput.Aim` (struct unchanged) and `ChickenController.CastAim` (always zero now; removing it touches `AbilityBaseSO.GatherTargets`).
