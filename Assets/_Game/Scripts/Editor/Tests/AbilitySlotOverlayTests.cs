@@ -18,7 +18,7 @@ namespace CluckWars.Tests
     /// <remarks>
     /// Assertions are written as RELATIONSHIPS against the real constants and the real shipped
     /// assets, never as restated literals. Two separate incidents on this project (the
-    /// BalanceOracle drift, the lobby copy drift) came from a test that restated the value it
+    /// v1 Balance Oracle drift, the lobby copy drift) came from a test that restated the value it
     /// was meant to be guarding and therefore agreed with any future change to it.
     /// </remarks>
     public sealed class AbilitySlotOverlayTests

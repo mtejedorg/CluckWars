@@ -191,7 +191,7 @@ namespace CluckWars.EditorTools
             return places.ToArray();
         }
 
-        /// <summary>Distance from a place's centre that need not be walked: the base deposit radius, or the pile's oval toward <paramref name="toward"/> plus peck reach (same rule as <c>BalanceOracle</c>).</summary>
+        /// <summary>Distance from a place's centre that need not be walked: the base deposit radius, or the pile's oval toward <paramref name="toward"/> plus peck reach (the rule the v1 oracle used).</summary>
         private static float Radius(OraclePlace place, Vector2 toward, Inputs inputs) =>
             place.Kind == OraclePlaceKind.Base
                 ? inputs.DepositRadius

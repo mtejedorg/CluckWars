@@ -11,6 +11,10 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-20 - Oracle v2: accepted reference, offsets, drift guard; v1 retired (plan Task 6, `develop`)
+
+`OracleReferenceSO` (`Assets/_Game/Data/Balance/OracleReference.asset`) stores each foraging kit's measured best food and its offset in seconds; `OracleMenu` report and `ReportBatch` pass those offsets. `Cluck Wars/Balance/Oracle/Accept as reference` (note dialog; `OracleMenu.AcceptBatch -oracleNote "..."` in batch) re-measures and equalises every kit's result on the mean. The first reference keeps the old meaning (Warrior kits +5 s, the rest 0, note "v1 targets carried over"). The only oracle test that can fail is `OracleReferenceTests.Measured_EqualsTheAcceptedReference` (drift, 0.05 food). Retired: `BalanceOracle`, `SctTargets`, `SpecSctTargets`, `BalanceTypes.cs`, `BalanceOracleTests`, `ShippedMap.OracleMap`; the `ChickenStatsSO` tooltips now say the oracle reports and the value may be tuned by hand. No Maestro wiring.
+
 ## 🎯 2026-11-20 - Oracle v2: FarmSim policy fixes and a non-blocking local check (plan Task 5, `develop`)
 
 `FarmSim`: ties between equally near piles (within 0.02 m) go by an order relative to the chicken's own seat, and a chicken carrying food walks home once the clock leaves only the walk, the deposit and one tick (a peck in flight counts), and does not leave home when a round trip plus one peck no longer fits (`FarmSeatResult.Carried` added). The local balance editor's CHECK now runs `OracleRunner` before and after on copies and lists best food per kit, before -> after and the change, plus what the oracle does not model; **it never blocks APPLY** (`BalanceSctCheck.Run` returns `OracleCheck`, no `Passed`; `MapProvider` and `OracleMapHook` are gone). The map is `ProjectInstaller._oracleMap` (serialized, wired in `Resources/ProjectContext.prefab`), so the check also runs in a dev-tools player build. **Maestro: nothing to wire**, the prefab line was added by hand in YAML; open `ProjectContext` once in the Inspector and confirm `Oracle Map` shows `OracleMap`. Not verified: the panel text on screen.

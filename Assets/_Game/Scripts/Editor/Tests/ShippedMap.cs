@@ -134,29 +134,6 @@ namespace CluckWars.Tests
         public static float PileCollectReach => TestAssets.PrivateField<float>(
             TestAssets.Load<GameObject>(TestAssets.FoodPilePrefabPath).GetComponent<FoodPile>(), "_collectReach");
 
-        /// <summary>
-        /// The map the SCT axiom is solved on, as seat <paramref name="seat"/> sees it: that
-        /// corner's base, all nine piles (no nudge: shipped jitter is 0), the shipped footprints,
-        /// yaws and food, and the prefab deposit radius + peck reach. The centre pile is not
-        /// permanent in the shipped scene, so its whole amount is farmable.
-        /// </summary>
-        public static OracleMap OracleMap(int seat)
-        {
-            Assert.IsFalse(TestAssets.SceneFloat("_centerPileIsPermanent") > 0.5f,
-                "The centre pile is permanent in Game.unity: only the food above its floor is farmable. Teach ShippedMap.OracleMap that before trusting any SCT number.");
-            var spawn = MapGenerator.SpawnPointNominal(Corners()[seat]);
-            return new OracleMap
-            {
-                BasePos = new Vector2(spawn.x, spawn.z),
-                BaseRadius = BaseDepositRadius,
-                CollectReach = PileCollectReach,
-                Piles = ShippedPiles(Vector2.zero, Vector2.zero).Select(p => new OraclePile
-                {
-                    Pos = new Vector2(p.Pos.x, p.Pos.z), Food = p.Food, Footprint = p.Footprint, Yaw = p.Yaw,
-                }).ToArray(),
-            };
-        }
-
         public static ScatterSettings ScatterSettings() => new ScatterSettings(
             CoverPerSector, CoverSpanRange,
             BarrierPerSector, BarrierSpanRange, WallThickness,

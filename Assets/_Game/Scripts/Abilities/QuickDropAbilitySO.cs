@@ -24,7 +24,7 @@ namespace CluckWars.Abilities
     /// gain costs a slot".
     ///
     /// <b>Still SCT-sensitive.</b> It moves banking time directly, so its multiplier and
-    /// duration belong to <c>BalanceOracle</c>, not to hand-tuning — the values here are a
+    /// duration move the Balance Oracle's numbers (it reports them; read its report before tuning) — the values here are a
     /// starting point deliberately well below the passive's old permanent 6x.
     /// </remarks>
     [CreateAssetMenu(fileName = "QuickDrop",

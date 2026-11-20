@@ -80,7 +80,7 @@ namespace CluckWars.Tests
         public void ShippedJitter_IsZero_PilesSitOnTheirZoneDiscs()
         {
             Assert.AreEqual(0f, ShippedMap.PilePositionJitter, 1e-6f,
-                "D9 = a: piles ship with no per-match position jitter (BalanceOracle: any jitter changes SCT match to match; 0 keeps every seat on the solved nominal layout and every pile concentric with its baked zone disc).");
+                "D9 = a: piles ship with no per-match position jitter (Balance Oracle: any jitter changes the farming numbers match to match; 0 keeps every seat on the solved nominal layout and every pile concentric with its baked zone disc).");
             Assert.AreEqual(MapGenerator.PileKeepClearSlack, ShippedMap.PileKeepClearAllowance, 1e-6f,
                 "The terrain keep-clear inflation must stay 0.4 so a re-bake reproduces the shipped arms.");
         }
@@ -352,15 +352,16 @@ namespace CluckWars.Tests
             }
         }
 
-        // ---- oracle: equal travel per seat, from the shipped scene -------------------------------
+        // ---- equal travel per seat, from the shipped scene ---------------------------------------
 
         /// <summary>
-        /// Runs the Oracle on <see cref="ShippedMap.OracleMap"/> (the generator's formulas over
-        /// Game.unity + prefab values), after pinning MAP.UNITY's baked discs (piles + bases) to
-        /// those same formulas, so the numbers are the shipped geometry and not a restatement of literals.
+        /// Pins MAP.UNITY's baked discs (piles + bases) to the generator's formulas over Game.unity + prefab values,
+        /// then checks every seat has the same travel terms, so the numbers are the shipped geometry and not a
+        /// restatement of literals. What the v1 oracle added here (equal solo clear time per seat) is covered by
+        /// <c>FarmSimTests.IdenticalKits_SymmetricSeats_BankTheSame</c> on the baked <c>OracleMapSO</c>.
         /// </summary>
         [Test]
-        public void Oracle_TravelAndSct_AreEqualAcrossTheFourSeats_OnTheShippedMap()
+        public void Seats_HaveEqualTravel_OnTheShippedMap()
         {
             var scene = EditorSceneManager.OpenScene(MapScene, OpenSceneMode.Single);
             var geo = scene.GetRootGameObjects().First(g => g.name == "GeneratedMapGeometry").transform;
@@ -382,13 +383,8 @@ namespace CluckWars.Tests
                 return new Vector2(bz.position.x, bz.position.z);
             }).ToArray();
 
-            var config = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
-            var stats = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir).Where(s => SctTargets.All.Any(t => t.ClassName == s.DisplayName)).ToList();
-            Assert.IsNotEmpty(stats);
-
             var report = new System.Text.StringBuilder("[D9] per seat:");
             float[] refTravel = null;
-            var refSct = new Dictionary<string, OracleResult>();
             for (int seat = 0; seat < 4; seat++)
             {
                 int prev = (seat + 3) % 4;
@@ -414,18 +410,6 @@ namespace CluckWars.Tests
                     Assert.AreEqual(refTravel[k], travel[k], 0.01f, $"seat {seat} travel term {k} differs from seat 0.");
                 Assert.AreEqual(travel[1], travel[2], 0.01f, $"seat {seat}: its two contested piles are not equidistant (chirality).");
                 Assert.AreEqual(travel[5], travel[6], 0.01f, $"seat {seat}: its two contested piles' surfaces are not equidistant (chirality).");
-
-                foreach (var s in stats)
-                {
-                    var r = BalanceOracle.Simulate(ShippedMap.OracleMap(seat),
-                        new OracleChicken { MoveSpeed = s.MoveSpeed, CargoCapacity = s.CargoCapacity, PeckAmount = s.PeckAmount,
-                                            PeckCooldown = s.PeckCooldown, DepositRate = config.DepositRatePerSecond },
-                        config.FoodTargetToWin);
-                    report.Append($" | {s.DisplayName} {r.SctSeconds:F2}s/{r.Trips}");
-                    if (!refSct.TryGetValue(s.DisplayName, out var r0)) { refSct[s.DisplayName] = r; continue; }
-                    Assert.AreEqual(r0.SctSeconds, r.SctSeconds, 0.01f, $"{s.DisplayName}: seat {seat} SCT differs from seat 0.");
-                    Assert.AreEqual(r0.Trips, r.Trips, $"{s.DisplayName}: seat {seat} trip count differs from seat 0.");
-                }
             }
             Debug.Log(report.ToString());
         }

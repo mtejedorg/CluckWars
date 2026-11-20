@@ -23,10 +23,9 @@ namespace CluckWars.Gameplay
         public string DisplayName = "Warrior";
 
         [Header("Movement")]
-        [Tooltip("World-units/sec. Solved against this class's SCT target — do NOT hand-tune " +
-                 "it; change SctTargets and re-solve against BalanceOracle. Scaled x1.35 on " +
-                 "2026-08-14 alongside the arena, which leaves every travel term " +
-                 "(distance / speed) and therefore every SCT unchanged.")]
+        [Tooltip("World-units/sec. The Balance Oracle reports on this value and it may be tuned by hand. " +
+                 "Scaled x1.35 on 2026-08-14 alongside the arena, which leaves every travel term " +
+                 "(distance / speed) unchanged.")]
         [Min(0f)] public float MoveSpeed = 12.15f;
         [Min(0f)] public float TurnSpeed = 720f; // deg/sec
 
@@ -41,12 +40,10 @@ namespace CluckWars.Gameplay
                  "actually differentiate them.")]
         [Min(0.1f)] public float PeckAmount = 3f;
 
-        [Tooltip("Seconds between Peck presses. Solved against this class's SCT target — do NOT " +
-                 "hand-tune it; change SctTargets and re-solve. Note a partial press still costs " +
-                 "a full cooldown, so the effective rate (amount/cooldown) sits ~20-30% above the " +
-                 "old CollectionRate for the same clear time. That gap is quantisation waste, " +
-                 "not a buff. Solved on the reach-aware Oracle map (legs shortened by the base " +
-                 "deposit radius, pile oval and peck reach), checked from all four seats.")]
+        [Tooltip("Seconds between Peck presses. The Balance Oracle reports on this value and it may be tuned by hand. " +
+                 "Note a partial press still costs a full cooldown, so the effective rate (amount/cooldown) " +
+                 "sits ~20-30% above the old CollectionRate for the same clear time. That gap is " +
+                 "quantisation waste, not a buff.")]
         [Min(0.05f)] public float PeckCooldown = 1f;
 
         [Header("Visuals")]

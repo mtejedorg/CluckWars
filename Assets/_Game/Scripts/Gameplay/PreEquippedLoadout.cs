@@ -93,7 +93,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The one hard design rule about foraging: every class forages except the Assassin
         /// (Predation axiom: it earns food by taking it from rivals; mirrors
-        /// <c>SctTargets.Exempt</c>, pinned by a test). This is NOT read from any ability's
+        /// <c>ChickenClasses.MayForage</c>, pinned by a test). This is NOT read from any ability's
         /// AllowedClasses.
         /// </summary>
         public static bool ClassMayForage(ChickenClass cls) => ChickenClasses.MayForage(cls);

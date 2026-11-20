@@ -109,7 +109,7 @@ namespace CluckWars.Tests
         // ---- forage, roster ----------------------------------------------------------------------------------------
 
         [Test]
-        public void Foraging_IsEveryClassButTheAssassin_AndSctExemptionIsDerivedFromIt()
+        public void Foraging_IsEveryClassButTheAssassin()
         {
             for (int raw = 0; raw < 256; raw++)
             {
@@ -117,7 +117,6 @@ namespace CluckWars.Tests
                 Assert.AreEqual(cls != ChickenClass.Assassin, ChickenClasses.MayForage(cls), $"class {raw}");
                 Assert.AreEqual(cls != ChickenClass.Assassin, PreEquippedLoadout.ClassMayForage(cls), $"class {raw}");
             }
-            CollectionAssert.AreEqual(new[] { "Assassin" }, SctTargets.Exempt, "the string list this rule used to be mirrored in");
         }
 
         [Test]

@@ -27,7 +27,7 @@ namespace CluckWars.Tests
     ///
     /// Assertions are relationships against the real assets and the real enum rather than restated
     /// literals — a test that hardcodes the ability list agrees with any future change to it, which
-    /// is how the BalanceOracle drift on this project went green while it was wrong.
+    /// is how the v1 Balance Oracle drift on this project went green while it was wrong.
     /// </remarks>
     public sealed class CastArchetypeWiringTests
     {

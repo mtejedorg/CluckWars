@@ -406,15 +406,12 @@ namespace CluckWars.Tests
         // ---- Foraging is derived from the Peck-slot column --------------------------
 
         [Test]
-        public void ClassMayForage_IsEveryClassButTheAssassin_AndAgreesWithSctExempt()
+        public void ClassMayForage_IsEveryClassButTheAssassin_AndAgreesWithChickenClasses()
         {
             foreach (ChickenClass cls in System.Enum.GetValues(typeof(ChickenClass)))
-                Assert.AreEqual(SctTargets.IsExempt(cls.ToString()), !PreEquippedLoadout.ClassMayForage(cls),
-                    $"{cls}: SctTargets.Exempt and ClassMayForage disagree.");
-            foreach (var name in SctTargets.Exempt)
-                Assert.IsFalse(PreEquippedLoadout.ClassMayForage((ChickenClass)System.Enum.Parse(typeof(ChickenClass), name)));
-            foreach (var target in SctTargets.All)
-                Assert.IsTrue(PreEquippedLoadout.ClassMayForage((ChickenClass)System.Enum.Parse(typeof(ChickenClass), target.ClassName)));
+                Assert.AreEqual(ChickenClasses.MayForage(cls), PreEquippedLoadout.ClassMayForage(cls),
+                    $"{cls}: ChickenClasses.MayForage and PreEquippedLoadout.ClassMayForage disagree.");
+            Assert.IsFalse(PreEquippedLoadout.ClassMayForage(ChickenClass.Assassin));
         }
 
         [Test]

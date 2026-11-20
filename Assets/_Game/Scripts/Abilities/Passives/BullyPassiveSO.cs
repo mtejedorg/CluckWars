@@ -10,8 +10,8 @@ namespace CluckWars.Abilities
     /// <remarks>
     /// <b>Reworked 2026-11-05 (Maestro).</b> The Warrior is the all-rounder: a bit of steal, crowd control, pecking
     /// and movement, each weaker than the specialist's. Bully took over the cooldown reduction Relentless had
-    /// (x0.75); its old steal x1.4 and +2 cargo were dropped, so it farms exactly like a naked Warrior and needs no
-    /// <c>SpecSctTargets</c> exception any more.
+    /// (x0.75); its old steal x1.4 and +2 cargo were dropped, so it farms exactly like a naked Warrior, so the
+    /// Balance Oracle needs no special case for it.
     /// <para>
     /// ⚠️ <b>Deliberately excludes Peck.</b> Peck is an ability with a cooldown like any other, so a blanket
     /// reduction would hand the Warrior ~25% more farming throughput, an effect that lives entirely outside the
