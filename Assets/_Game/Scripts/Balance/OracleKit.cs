@@ -80,5 +80,7 @@ namespace CluckWars.Balance
         /// <summary>Clock time the seat first banked <see cref="FarmRules.WinTarget"/>; -1 when it never did.</summary>
         public float SecondsToTarget;
         public int Trips;
+        /// <summary>Food still in the cargo when the clock ended.</summary>
+        public float Carried;
     }
 }

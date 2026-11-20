@@ -15,10 +15,16 @@ namespace CluckWars.Balance
     /// leg that ends at, or starts from, a non-empty pile has <see cref="OracleMapSO.CollectReach"/> metres walked at
     /// <see cref="FarmRules.PileSlowFactor"/> (the whole leg if it is shorter), judged from the position at the start of each tick.
     /// With <see cref="FarmRules.StopAtTarget"/> each seat stops on its own; the other seats keep farming until the clock ends.
+    /// Ties between equally near piles go by an order relative to the chicken's own seat (centre, own personal, next seats' personal,
+    /// then the contested edges the same way), so a kit banks the same from every seat on a four-fold symmetric map.
+    /// Clock: a chicken carrying food heads home once the time left is no more than the walk home plus the deposit plus one tick, and
+    /// does not leave home for a pile when the round trip plus one peck cycle no longer fits.
     /// </remarks>
     public static class FarmSim
     {
         private const float Eps = 1e-4f;
+        /// <summary>Two legs within this many metres are a tie; the tie goes to the pile first in the chicken's own seat-relative order.</summary>
+        private const float TieMetres = 0.02f;
         private const int Seats = OracleMapSO.SeatCount;
 
         public static FarmSeatResult[] Run(OracleMapSO map, OracleFood food, FarmSeat[] seats, FarmRules rules)
@@ -124,7 +130,7 @@ namespace CluckWars.Balance
 
                 var result = new FarmSeatResult[Seats];
                 for (int s = 0; s < Seats; s++)
-                    result[s] = new FarmSeatResult { Banked = _c[s].Banked, SecondsToTarget = _c[s].SecondsToTarget, Trips = _c[s].Trips };
+                    result[s] = new FarmSeatResult { Banked = _c[s].Banked, SecondsToTarget = _c[s].SecondsToTarget, Trips = _c[s].Trips, Carried = _c[s].Carrying };
                 return result;
             }
 
@@ -174,14 +180,39 @@ namespace CluckWars.Balance
             private float StillNeeded(in Chicken ch) =>
                 ch.Banked < _rules.WinTarget - Eps || _rules.StopAtTarget ? _rules.WinTarget - ch.Banked : float.MaxValue;
 
-            // Full, carrying what it still needs, or nothing left to take.
+            // Full, carrying what it still needs, nothing left to take, or the clock leaves just time to walk home and bank.
             private bool ReturnDue(int s)
             {
                 ref Chicken ch = ref _c[s];
                 if (ch.Carrying <= Eps) return false;
                 return ch.Carrying >= _seats[s].Kit.CargoCapacity - Eps
                     || ch.Carrying >= StillNeeded(ch) - Eps
-                    || !AnyFood();
+                    || !AnyFood()
+                    || TimeIsShort(s, false);
+            }
+
+            private float TimeLeft => _rules.ClockSeconds - _time;
+
+            // Carrying food, and the time left is no more than the walk home (the redirect's triangle estimate when mid-leg) + deposit + one tick.
+            // `extraFood` / `extraSeconds` count a peck that is in flight or about to start (its amount lands after its remaining cast).
+            private bool TimeIsShort(int s, bool walking, float extraFood = 0f, float extraSeconds = 0f)
+            {
+                ref Chicken ch = ref _c[s];
+                OracleKit kit = _seats[s].Kit;
+                if (ch.Carrying <= Eps || kit.DepositRate <= 0f || kit.MoveSpeed <= 0f) return false;
+                int home = OracleMapSO.BaseIndex(s);
+                float metres = walking ? RedirectCost(s, home, out _) : _map.Leg(ch.At, home, kit.Jumps);
+                return TimeLeft <= metres / kit.MoveSpeed + (ch.Carrying + extraFood) / kit.DepositRate + _tick + extraSeconds;
+            }
+
+            // A round trip to pile p from here plus one peck cycle fits the clock.
+            private bool RoundTripFits(int s, int p)
+            {
+                OracleKit kit = _seats[s].Kit;
+                if (kit.MoveSpeed <= 0f) return true;
+                int home = OracleMapSO.BaseIndex(s);
+                float metres = _map.Leg(_c[s].At, p, kit.Jumps) + _map.Leg(p, home, kit.Jumps);
+                return metres / kit.MoveSpeed + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds) <= TimeLeft;
             }
 
             // Idle: pick the next thing. Returns true when the phase changed (keep stepping).
@@ -195,6 +226,7 @@ namespace CluckWars.Balance
                 int p = ChoosePile(s, false);
                 if (p < 0) return false; // nothing to take: wait here (a food event may refill the piles)
                 if (p == ch.At) { ch.Phase = Phase.Collect; return true; }
+                if (!RoundTripFits(s, p)) return false; // too late to go out: stay put (carried food was already sent home by ReturnDue)
                 StartWalk(s, p);
                 return true;
             }
@@ -245,24 +277,44 @@ namespace CluckWars.Balance
 
             private bool Has(int p, int exclude) => p != exclude && _left[p] > Eps;
 
+            // The pile at position k of seat s's own tie-break order: centre, personal of s, s+1.., then contested edges s, s+1..
+            private static int PileAtRank(int s, int k)
+            {
+                if (k == 0) return OracleMapSO.CentreIndex;
+                if (k <= Seats) return OracleMapSO.PersonalIndex((s + k - 1) % Seats);
+                return OracleMapSO.ContestedIndex((s + k - 1 - Seats) % Seats);
+            }
+
+            private static int RankOf(int s, int p)
+            {
+                if (p == OracleMapSO.CentreIndex) return 0;
+                if (p < OracleMapSO.ContestedIndex(0))
+                    return 1 + (p - OracleMapSO.PersonalIndex(0) - s + Seats) % Seats;
+                return 1 + Seats + (p - OracleMapSO.ContestedIndex(0) - s + Seats) % Seats;
+            }
+
             private int Nearest(int s, bool walking, int exclude)
             {
-                int best = -1;
-                float bestCost = float.MaxValue;
+                float min = float.MaxValue;
                 for (int p = 0; p < OracleMapSO.PileCount; p++)
+                    if (Has(p, exclude)) min = Math.Min(min, CostTo(s, p, walking));
+                if (min == float.MaxValue) return -1;
+
+                for (int k = 0; k < OracleMapSO.PileCount; k++)
                 {
-                    if (!Has(p, exclude)) continue;
-                    float cost = CostTo(s, p, walking);
-                    if (cost < bestCost) { bestCost = cost; best = p; }
+                    int p = PileAtRank(s, k);
+                    if (Has(p, exclude) && CostTo(s, p, walking) <= min + TieMetres) return p;
                 }
-                return best;
+                return -1;
             }
 
             private int NearestOf(int s, bool walking, int exclude, int a, int b)
             {
                 bool ha = Has(a, exclude), hb = Has(b, exclude);
-                if (ha && hb) return CostTo(s, b, walking) < CostTo(s, a, walking) ? b : a;
-                return ha ? a : hb ? b : -1;
+                if (!ha || !hb) return ha ? a : hb ? b : -1;
+                int first = RankOf(s, a) <= RankOf(s, b) ? a : b;
+                int second = first == a ? b : a;
+                return CostTo(s, second, walking) < CostTo(s, first, walking) - TieMetres ? second : first;
             }
 
             // Route rule -> the pile to go for, or -1 when no pile has food. `walking` redirects from mid-walk; the empty target is excluded.
@@ -296,6 +348,8 @@ namespace CluckWars.Balance
             {
                 ref Chicken ch = ref _c[s];
                 OracleKit kit = _seats[s].Kit;
+
+                if (ch.To < OracleMapSO.PileCount && TimeIsShort(s, true)) Redirect(s, OracleMapSO.BaseIndex(s));
 
                 if (ch.Walked < ch.Total - Eps && ch.To < OracleMapSO.PileCount && _left[ch.To] <= Eps)
                 {
@@ -347,11 +401,19 @@ namespace CluckWars.Balance
                 OracleKit kit = _seats[s].Kit;
                 int p = ch.At;
 
+                // Out of time with food in hand: drop the peck in flight when its food could no longer be banked, and walk home.
+                if (ch.Pecking && TimeIsShort(s, false, PeckTake(s, p), ch.PeckDoneAt - _time))
+                {
+                    ch.Pecking = false;
+                    StartWalk(s, OracleMapSO.BaseIndex(s));
+                    return true;
+                }
+
                 if (ch.Pecking)
                 {
                     if (_time + Eps < ch.PeckDoneAt) return false;
                     ch.Pecking = false;
-                    float take = Math.Min(Math.Min(kit.PeckAmount, _left[p]), kit.CargoCapacity - ch.Carrying);
+                    float take = PeckTake(s, p);
                     if (take > 0f)
                     {
                         ch.Carrying += take;
@@ -363,12 +425,18 @@ namespace CluckWars.Balance
                 if (_left[p] <= Eps) { ch.Phase = Phase.Idle; return true; }
 
                 if (_time + Eps < ch.NextPeckStart) return false;
+                // Another peck would land too late to bank its food: walk home with what is in hand.
+                if (TimeIsShort(s, false, PeckTake(s, p), kit.PeckCastSeconds)) { StartWalk(s, OracleMapSO.BaseIndex(s)); return true; }
                 ch.Pecking = true;
                 ch.PeckDoneAt = _time + kit.PeckCastSeconds;
                 ch.NextPeckStart = _time + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds);
                 // A zero cast lands the food at once: loop again to apply it.
                 return kit.PeckCastSeconds <= 0f;
             }
+
+            // What a peck at pile p would take now.
+            private float PeckTake(int s, int p) =>
+                Math.Max(0f, Math.Min(Math.Min(_seats[s].Kit.PeckAmount, _left[p]), _seats[s].Kit.CargoCapacity - _c[s].Carrying));
 
             private bool DepositStep(int s)
             {

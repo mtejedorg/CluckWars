@@ -370,5 +370,82 @@ namespace CluckWars.Tests
                 Assert.AreEqual(a[s].Trips, b[s].Trips, $"seat {s} trips");
             }
         }
+
+        // ---- ties and the clock ----
+
+        private static OracleMapSO BakedMap()
+        {
+            var map = AssetDatabase.LoadAssetAtPath<OracleMapSO>(OracleMapBaker.AssetPath);
+            Assert.IsNotNull(map, $"{OracleMapBaker.AssetPath} is missing: run {OracleMapBaker.MenuPath}.");
+            return map;
+        }
+
+        private static OracleFood MapFood(OracleMapSO map) =>
+            new OracleFood { Personal = map.PersonalFood, Contested = map.ContestedFood, Centre = map.CentreFood };
+
+        [Test]
+        public void TieBreak_IsRelativeToTheSeat()
+        {
+            var map = BakedMap();
+            var kit = Kit(speed: 7f, capacity: 8, amount: 2f);
+            var rules = new FarmRules { WinTarget = 40f, ClockSeconds = 45f, PileSlowFactor = 1f };
+            var routes = new[] { FarmRoute.Nearest, FarmRoute.SidesFirst, FarmRoute.CentreFirst, FarmRoute.EasySideThenCentre };
+
+            foreach (var route in routes)
+            {
+                var banked = new float[4];
+                for (int tested = 0; tested < 4; tested++)
+                {
+                    var seats = new FarmSeat[4];
+                    for (int s = 0; s < 4; s++)
+                        seats[s] = new FarmSeat { Present = true, Kit = Kit(speed: 6f, capacity: 6, amount: 2f), Route = FarmRoute.Nearest };
+                    seats[tested] = new FarmSeat { Present = true, Kit = kit, Route = route };
+                    banked[tested] = FarmSim.Run(map, MapFood(map), seats, rules)[tested].Banked;
+                }
+
+                float min = Mathf.Min(banked), max = Mathf.Max(banked);
+                float mean = (banked[0] + banked[1] + banked[2] + banked[3]) / 4f;
+                int odd = 0;
+                for (int s = 1; s < 4; s++)
+                    if (Mathf.Abs(banked[s] - mean) > Mathf.Abs(banked[odd] - mean)) odd = s;
+                Assert.LessOrEqual(max - min, kit.PeckAmount,
+                    $"route {route}: banked by seat = [{string.Join(", ", banked)}]; seat {odd} differs from the rest");
+            }
+        }
+
+        [Test]
+        public void CarriedFood_IsBankedBeforeTheClockEnds()
+        {
+            var map = BakedMap();
+            var food = MapFood(map);
+            float total = food.Centre + 4f * food.Personal + 4f * food.Contested;
+            var kit = Kit(speed: 7f, capacity: Mathf.CeilToInt(total) + 1, amount: 2f);
+            // A clock far too short to take everything: the chicken is still collecting when it has to turn home.
+            float clock = 0.5f * total / (kit.PeckAmount / kit.PeckCooldown);
+            var rules = new FarmRules { WinTarget = total, ClockSeconds = clock, PileSlowFactor = 1f };
+
+            var r = FarmSim.Run(map, food, Seat0(kit), rules)[0];
+
+            Assert.Greater(r.Banked, 0f, "the chicken banked nothing");
+            Assert.AreEqual(0f, r.Carried, 1e-3f, $"it ended the clock carrying food it never banked (banked {r.Banked})");
+        }
+
+        [Test]
+        public void DoesNotLeaveHome_WhenARoundTripNoLongerFits()
+        {
+            const float leg = 12f, food = 6f;
+            var kit = Kit(speed: 6f, capacity: 6, amount: 2f);
+            var map = PersonalMap(leg);
+            float roundTrip = 2f * leg / kit.MoveSpeed;
+            float cycle = Mathf.Max(kit.PeckCooldown, kit.PeckCastSeconds);
+
+            var tooLate = FarmSim.Run(map, PersonalOnly(food), Seat0(kit), Rules(food, roundTrip + cycle - 0.5f, false))[0];
+            Assert.AreEqual(0f, tooLate.Carried, 1e-3f, "it walked out although the round trip plus a peck cycle did not fit the clock");
+            Assert.AreEqual(0f, tooLate.Banked, 1e-3f);
+
+            float fits = roundTrip + cycle + kit.PeckAmount / kit.DepositRate + 1f;
+            var enough = FarmSim.Run(map, PersonalOnly(food), Seat0(kit), Rules(food, fits, false))[0];
+            Assert.Greater(enough.Banked, 0f, "with time for the trip it should bank");
+        }
     }
 }
