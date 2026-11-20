@@ -644,7 +644,7 @@ namespace CluckWars.Visuals
         private Vector3 ResolvePreviewForward(AbilityBaseSO ability, out bool aimed)
         {
             float half = _input != null ? AimSoftLock.HalfAngleFor(_input.Device) : 0f;
-            return AbilityAimForward.Resolve(ability, _controller, Vector2.zero, half, _softLockScratch, out aimed);
+            return AbilityAimForward.Resolve(ability, _controller, half, _softLockScratch, out aimed);
         }
 
         /// <summary>

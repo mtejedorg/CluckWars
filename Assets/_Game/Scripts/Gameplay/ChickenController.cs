@@ -1043,15 +1043,8 @@ namespace CluckWars.Gameplay
 
             if (GetInput<PlayerNetworkInput>(out var input))
             {
-                // A held ability previews, it never stops the bird: the stick always walks. Aiming a directional move with
-                // an explicit aim byte (none is sent today) faces the aim while the bird strafes; with no aim given the stick steers both, so
-                // on a single stick moving is how you aim.
-                var aiming = AimRotatingAbility();
-                Vector2? face = aiming != null && aiming.RotatesToAim && input.Aim != 0
-                    ? CluckWars.Input.AimQuantizer.Decode(input.Aim)
-                    : (Vector2?)null;
-
-                _movement.Tick(input.Movement, Runner.DeltaTime, lockFacing: _facingLockTick == Runner.Tick.Raw, faceOverride: face);
+                // A held ability previews, it never stops the bird: the stick always walks and steers the facing.
+                _movement.Tick(input.Movement, Runner.DeltaTime, lockFacing: _facingLockTick == Runner.Tick.Raw);
             }
         }
 
@@ -1143,24 +1136,6 @@ namespace CluckWars.Gameplay
             if (!HasStateAuthority) return;
             transform.rotation = rotation;
             _facingLockTick = -1;
-        }
-
-        /// <summary>
-        /// Hold-to-aim (FEEDBACK.md §2.3): the ability this chicken is charging, when its footprint moves as they turn, so
-        /// an explicit aim faces the bird. Movement is unaffected. Reads
-        /// <see cref="AbilityController.ChargingAbility"/>, so it only ever fires here on
-        /// the StateAuthority path above (bots never reach this — <c>IsBot</c> already
-        /// returned earlier — and non-directional shapes fall through to normal movement).
-        ///
-        /// The shape membership itself lives on <see cref="AbilityBaseSO.IsDirectionalAim"/>
-        /// rather than being restated here: it used to be a hard-coded list of three shapes,
-        /// which a fourth (Capsule) would have quietly failed to join.
-        /// </summary>
-        private Abilities.AbilityBaseSO AimRotatingAbility()
-        {
-            if (_abilities == null || _abilities.ChargingSlot == 0) return null;
-            var ability = _abilities.ChargingAbility;
-            return ability != null && ability.IsDirectionalAim ? ability : null;
         }
 
         // ---- Passive hooks ---------------------------------------------------

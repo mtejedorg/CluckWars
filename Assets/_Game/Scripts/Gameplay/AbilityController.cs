@@ -424,7 +424,7 @@ namespace CluckWars.Gameplay
                     // The aim turns the bird so the shape tests run along it, but only a REAL cast keeps that turn:
                     // a fizzle / refusal puts the heading back (Phase 7 A15).
                     Quaternion headingBeforeAim = _controller != null ? _controller.transform.rotation : Quaternion.identity;
-                    ApplyAimForFire(decision.Slot, input);
+                    ApplySoftLockForFire(decision.Slot, input);
                     if (!TryActivate(decision.Slot) && _controller != null) _controller.RestoreFacing(headingBeforeAim);
                     if (_controller != null) _controller.CastAim = Vector3.zero;
                     break;
@@ -461,20 +461,19 @@ namespace CluckWars.Gameplay
         private readonly Vector2[] _softLockOffsets = new Vector2[8];
 
         /// <summary>
-        /// Phase 6 chunk 5 (A7): turns the aim byte into the bird's heading at FIRE time, on the state authority, before
+        /// Phase 6 chunk 5 (A7): turns the soft-lock pick into the bird's heading at FIRE time, on the state authority, before
         /// <see cref="TryActivate"/> resolves targets. So <c>GatherTargets</c>, the shape centre, the jump and every
         /// peer's shape test (the heading replicates through NetworkTransform) all follow the aim without any of them
         /// knowing about it.
         /// <list type="bullet">
-        ///   <item>Aim 0 and no soft-lock bit: nothing changes (today's behaviour).</item>
+        ///   <item>No soft-lock bit: nothing changes, the bird fires along its facing.</item>
         ///   <item>A move that does not <see cref="AbilityBaseSO.UsesAim"/> (self shapes, auras, Speed Burst, Shadowstep,
         ///   Roll &amp; Push) is left alone, on every device.</item>
-        ///   <item>Single-target moves keep the heading and pick by angle through <c>ChickenController.CastAim</c>.</item>
-        ///   <item>No explicit aim from touch or a pad: snap to the rival with the smallest angle within 30 / 12 degrees of
+        ///   <item>Touch or a pad: snap to the rival with the smallest angle within 30 / 12 degrees of
         ///   facing who would be inside the shape if the bird turned there. Single-target moves keep picking nearest.</item>
         /// </list>
         /// </summary>
-        private void ApplyAimForFire(int slot, in PlayerNetworkInput input)
+        private void ApplySoftLockForFire(int slot, in PlayerNetworkInput input)
         {
             if (_controller == null) return;
             _controller.CastAim = Vector3.zero;
@@ -483,18 +482,13 @@ namespace CluckWars.Gameplay
             if (ability == null || !ability.UsesAim) return;
 
             // The same function the preview calls (Phase 7 B3), so the shape the player saw is the shape that fires.
-            Vector2 explicitAim = CluckWars.Input.AimQuantizer.Decode(input.Aim);
             float halfAngle = CluckWars.Input.AimSoftLock.HalfAngleFor(
                 input.Buttons.IsSet((int)InputButton.SoftLockTouch), input.Buttons.IsSet((int)InputButton.SoftLockPad));
-            Vector3 world = AbilityAimForward.Resolve(ability, _controller, explicitAim, halfAngle, _softLockOffsets, out bool aimed);
+            Vector3 world = AbilityAimForward.Resolve(ability, _controller, halfAngle, _softLockOffsets, out bool aimed);
 
             if (ability.RotatesToAim)
             {
                 if (aimed) _controller.FaceNow(world);
-            }
-            else if (explicitAim != Vector2.zero)
-            {
-                _controller.CastAim = new Vector3(explicitAim.x, 0f, explicitAim.y);
             }
         }
 

@@ -211,17 +211,14 @@ namespace CluckWars.Tests
         // ---- 3: one forward for the preview and the release ------------------------------------------------------
 
         [Test]
-        public void ForwardChoice_ExplicitAimWins_ThenSoftLock_ThenFacing()
+        public void ForwardChoice_SoftLockWins_ThenFacing()
         {
             var facing = Vector3.forward;
-            var mouse = new Vector2(1f, 0f);
             var pick = new Vector2(0f, -1f);
 
-            Assert.AreEqual(Vector3.right, AbilityAimForward.Choose(mouse, pick, facing, out bool aimed));
-            Assert.IsTrue(aimed, "mouse / stick byte beats the soft-lock");
-            Assert.AreEqual(Vector3.back, AbilityAimForward.Choose(Vector2.zero, pick, facing, out aimed));
+            Assert.AreEqual(Vector3.back, AbilityAimForward.Choose(pick, facing, out bool aimed));
             Assert.IsTrue(aimed, "touch soft-lock pick");
-            Assert.AreEqual(facing, AbilityAimForward.Choose(Vector2.zero, Vector2.zero, facing, out aimed));
+            Assert.AreEqual(facing, AbilityAimForward.Choose(Vector2.zero, facing, out aimed));
             Assert.IsFalse(aimed, "nothing resolved: the bird's facing");
         }
 
@@ -247,7 +244,7 @@ namespace CluckWars.Tests
         [Test]
         public void PreviewForward_EqualsFireForward_ForEveryInputCase()
         {
-            // Both the preview (AbilityTelegraph / AbilitySlotOverlay) and the release (AbilityController.ApplyAimForFire)
+            // Both the preview (AbilityTelegraph / AbilitySlotOverlay) and the release (AbilityController.ApplySoftLockForFire)
             // call AbilityAimForward.Resolve with the same inputs; this pins what it answers for each device.
             // Wing Slam's authored cone: Shaped (under RangeOnly, 2026-11-05, no shipped move turns to the aim).
             var savedMode = AbilityTargeting.Mode;
@@ -265,31 +262,25 @@ namespace CluckWars.Tests
             try
             {
                 Vector3 toRival = (rival.transform.position - caster.transform.position).normalized;
-                var mouseAim = new Vector2(-1f, 0f);
 
-                // Touch: no explicit aim, soft-lock 30 -> toward the rival 25 degrees off the heading.
-                var touch = AbilityAimForward.Resolve(slam, caster, Vector2.zero, AimSoftLock.HalfAngleFor(InputDeviceKind.Touch), scratch, out bool aimed);
+                // Touch: soft-lock 30 -> toward the rival 25 degrees off the heading.
+                var touch = AbilityAimForward.Resolve(slam, caster, AimSoftLock.HalfAngleFor(InputDeviceKind.Touch), scratch, out bool aimed);
                 Assert.IsTrue(aimed);
                 Assert.Less(Vector3.Angle(touch, toRival), 0.5f, "touch preview and fire both point at the soft-lock pick");
                 Assert.Greater(Vector3.Angle(touch, caster.transform.forward), 20f, "...not at the heading");
 
                 // Pad: 12 degrees cannot reach a rival 25 degrees off -> the heading.
-                var pad = AbilityAimForward.Resolve(slam, caster, Vector2.zero, AimSoftLock.HalfAngleFor(InputDeviceKind.Gamepad), scratch, out aimed);
+                var pad = AbilityAimForward.Resolve(slam, caster, AimSoftLock.HalfAngleFor(InputDeviceKind.Gamepad), scratch, out aimed);
                 Assert.IsFalse(aimed);
                 Assert.Less(Vector3.Angle(pad, caster.transform.forward), 0.01f);
 
-                // Mouse / right stick: the explicit byte wins, even over a rival the soft-lock would take.
-                var mouse = AbilityAimForward.Resolve(slam, caster, mouseAim, AimSoftLock.HalfAngleFor(InputDeviceKind.Touch), scratch, out aimed);
-                Assert.IsTrue(aimed);
-                Assert.Less(Vector3.Angle(mouse, new Vector3(mouseAim.x, 0f, mouseAim.y)), 0.01f);
-
-                // Keyboard + mouse with no aim: no magnetism, heading.
-                var keys = AbilityAimForward.Resolve(slam, caster, Vector2.zero, AimSoftLock.HalfAngleFor(InputDeviceKind.KeyboardMouse), scratch, out aimed);
+                // Keyboard + mouse: no magnetism, heading.
+                var keys = AbilityAimForward.Resolve(slam, caster, AimSoftLock.HalfAngleFor(InputDeviceKind.KeyboardMouse), scratch, out aimed);
                 Assert.IsFalse(aimed);
                 Assert.Less(Vector3.Angle(keys, caster.transform.forward), 0.01f);
 
                 // The same call twice answers the same (the preview polls it every frame, the cast once).
-                Assert.AreEqual(touch, AbilityAimForward.Resolve(slam, caster, Vector2.zero, 30f, scratch, out _));
+                Assert.AreEqual(touch, AbilityAimForward.Resolve(slam, caster, 30f, scratch, out _));
             }
             finally
             {
@@ -308,7 +299,7 @@ namespace CluckWars.Tests
             var caster = Probe(Vector3.zero, Vector3.forward);
             try
             {
-                var fwd = AbilityAimForward.Resolve(burst, caster, new Vector2(1f, 0f), 30f, new Vector2[8], out bool aimed);
+                var fwd = AbilityAimForward.Resolve(burst, caster, 30f, new Vector2[8], out bool aimed);
                 Assert.IsFalse(aimed);
                 Assert.Less(Vector3.Angle(fwd, Vector3.forward), 0.01f);
             }

@@ -35,32 +35,6 @@ namespace CluckWars.Tests
 
         private static readonly bool[] All = { true, true, true, true };
 
-        // ---- Aim byte --------------------------------------------------------------------------------
-
-        [Test]
-        public void Aim_ZeroIsReserved_AndDecodesToNoDirection()
-        {
-            Assert.AreEqual(Vector2.zero, AimQuantizer.Decode(0));
-        }
-
-        [Test]
-        public void Aim_EveryNonZeroByteDecodesToADistinctUnitVector_ByteOneIsNorth()
-        {
-            // 0 deg is +Z (north), 90 deg is +X: the same convention the movement vector uses (x, z).
-            Vector2 north = AimQuantizer.Decode(1);
-            Assert.AreEqual(0f, north.x, 1e-5f);
-            Assert.AreEqual(1f, north.y, 1e-5f);
-
-            var seen = new HashSet<Vector2>();
-            for (int b = 1; b <= 255; b++)
-            {
-                var v = AimQuantizer.Decode((byte)b);
-                Assert.AreEqual(1f, v.magnitude, 1e-4f);
-                Assert.IsTrue(seen.Add(new Vector2(Mathf.Round(v.x * 1e4f), Mathf.Round(v.y * 1e4f))), $"Byte {b} repeats a direction.");
-            }
-            Assert.AreEqual(255, seen.Count);
-        }
-
         // ---- No device aims (item 5, 2026-11-20) -----------------------------------------------------
 
         [Test]
@@ -429,9 +403,9 @@ namespace CluckWars.Tests
         public void FireTick_AppliesAimBeforeTargetsResolve_AndComposeIsWired()
         {
             string ctl = Read("Assets/_Game/Scripts/Gameplay/AbilityController.cs");
-            int aim = ctl.IndexOf("ApplyAimForFire(decision.Slot, input);", StringComparison.Ordinal);
+            int aim = ctl.IndexOf("ApplySoftLockForFire(decision.Slot, input);", StringComparison.Ordinal);
             int cast = ctl.IndexOf("TryActivate(decision.Slot);", aim, StringComparison.Ordinal);
-            Assert.Greater(aim, 0, "The Fire case must apply the aim.");
+            Assert.Greater(aim, 0, "The Fire case must apply the soft-lock aim.");
             Assert.Greater(cast, aim, "Aim is applied before TryActivate resolves targets.");
             StringAssert.Contains("quickCast", ctl);
 
@@ -463,7 +437,7 @@ namespace CluckWars.Tests
             string fun = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/ChickenController.cs", "public override void FixedUpdateNetwork()");
             StringAssert.DoesNotContain("aiming != null, lockFacing", fun, "a charge must not suppress translation");
             StringAssert.Contains("_movement.Tick(input.Movement, Runner.DeltaTime,", fun, "the stick always walks the bird");
-            StringAssert.Contains("faceOverride:", fun, "an explicit aim turns the bird without moving it");
+            StringAssert.DoesNotContain("faceOverride", fun, "no explicit aim turns the bird any more");
         }
     }
 }

@@ -51,10 +51,9 @@ namespace CluckWars.Gameplay
         /// Turn in place: the stick steers <em>facing</em> and planar translation is suppressed; gravity and knockback keep
         /// running. Only a bot lining up a cast uses this (<c>ChickenController.BotFace</c>). A player's hold never does.
         /// </param>
-        /// <param name="faceOverride">A player's explicit aim during a hold: the bird faces it while <paramref name="input"/> walks it.</param>
         /// <param name="lockFacing">Phase 6 chunk 5 (A7): true on the tick an ability has just turned the bird to its aim,
         /// so this tick's movement cannot rotate it again before the rotation replicates.</param>
-        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false, bool lockFacing = false, Vector2? faceOverride = null)
+        public void Tick(Vector2 input, float deltaTime, bool aimRotateOnly = false, bool lockFacing = false)
         {
             var stats = _owner.Stats;
             if (stats == null) return;
@@ -104,12 +103,11 @@ namespace CluckWars.Gameplay
 
             ClampInsideArena();
 
-            // Face the explicit aim, else the movement direction — or, turning in place, the raw stick direction
+            // Face the movement direction — or, turning in place, the raw stick direction
             // (planar is deliberately zeroed above in that case, so read the input directly).
-            // Skip while locked or with no direction. A rooted bird turns only for an explicit aim or a bot's turn in place.
-            Vector3 faceDir = faceOverride.HasValue ? new Vector3(faceOverride.Value.x, 0f, faceOverride.Value.y)
-                : aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
-            if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || faceOverride.HasValue || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
+            // Skip while locked or with no direction. A rooted bird turns only for a bot's turn in place.
+            Vector3 faceDir = aimRotateOnly ? new Vector3(input.x, 0f, input.y) : planar;
+            if (!lockFacing && !_owner.MovementLocked && (aimRotateOnly || !_owner.Rooted) && faceDir.sqrMagnitude > 0.01f)
             {
                 var targetRot = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
                 _transform.rotation = Quaternion.RotateTowards(

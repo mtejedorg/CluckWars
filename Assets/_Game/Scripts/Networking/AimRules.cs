@@ -11,24 +11,6 @@ namespace CluckWars.Input
         Gamepad = 3,
     }
 
-    /// <summary>
-    /// Decodes the <c>PlayerNetworkInput.Aim</c> byte (Phase 6 chunk 5, A7) into a world-XZ direction. 0 is reserved
-    /// for "no aim, use facing"; 1..255 are <see cref="Steps"/> equal slices of the circle, measured clockwise from +Z.
-    /// No client writes anything but 0 any more (no device aims), but the simulation still decodes the byte it receives.
-    /// </summary>
-    public static class AimQuantizer
-    {
-        public const int Steps = 255;
-
-        /// <summary>Byte back to a unit world-XZ direction; 0 decodes to <see cref="Vector2.zero"/>.</summary>
-        public static Vector2 Decode(byte aim)
-        {
-            if (aim == 0) return Vector2.zero;
-            float radians = (aim - 1) * (2f * Mathf.PI / Steps);
-            return new Vector2(Mathf.Sin(radians), Mathf.Cos(radians));
-        }
-    }
-
     /// <summary>Pure conversion of a camera-relative stick vector into world XZ.</summary>
     public static class AimRules
     {
