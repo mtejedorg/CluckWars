@@ -315,11 +315,11 @@ namespace CluckWars.Input
             // also the whole of the SlotUnavailable refusal treatment (§6 case 28): ART
             // §6.6's slot-3 visibility rule already removes the hex from the layout, so
             // there is nothing left to mark.
-            if (slot == 2)
-            {
-                var display = equipped != null ? DisplayStyle.Flex : DisplayStyle.None;
-                if (refs.Hex.style.display != display) refs.Hex.style.display = display;
-            }
+            // A Peck hex never hides (PeckLongPressRules.HexHidden): it is the income button, wherever the kit puts it.
+            if (slot == 2) UiElements.SetShown(refs.Hex, !PeckLongPressRules.HexHidden(slot, equipped));
+
+            // "AUTO" on the Peck hex while Auto-Peck is on; read live, so the long press and the Settings toggle both show at once.
+            UiElements.SetShown(refs.AutoTag, PeckLongPressRules.AutoPeckBadgeVisible(equipped.Is(AbilityJob.Peck), PlayerPreferences.AutoPeckEnabled));
 
             float remaining = 0f, total = 0f;
             if (equipped != null)
@@ -792,9 +792,16 @@ namespace CluckWars.Input
             slash.AddToClassList("cw-hex-flash-slash");
             slash.style.display = DisplayStyle.None;
 
+            // The "AUTO" tag of a Peck hex while Auto-Peck is on (text from the wording dictionary, CODE-TEXT-01).
+            var auto = new Label(UiText.Get(UiKeys.HudAutoPeckTag)) { pickingMode = PickingMode.Ignore };
+            auto.AddToClassList(PeckLongPressRules.AutoTagClass);
+            auto.style.display = DisplayStyle.None;
+
             hex.Add(puff);
             hex.Add(slash);
             hex.Add(x);
+            hex.Add(auto);
+            slot.AutoTag = auto;
             slot.CancelX = x;
             slot.Puff = puff;
             slot.FizzleSlash = slash;

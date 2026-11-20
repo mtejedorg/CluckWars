@@ -135,6 +135,7 @@ namespace CluckWars.Localization
         [UiArgs("perk")] public const string LoadoutKitTitle = "loadout.kit.title";
         public const string MarkHexKill = "mark.hex.kill";
         public const string HudBackIn = "hud.backin";
+        public const string HudAutoPeckTag = "hud.autoPeck.tag";
         public const string MarkToast = "mark.toast";
         [UiArgs("secs")] public const string MarkClock = "mark.clock";
         [UiArgs("secs")] public const string MarkClockArming = "mark.clock.arming";

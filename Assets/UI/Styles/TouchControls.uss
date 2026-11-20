@@ -546,6 +546,26 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* The "AUTO" tag of the Peck hex while Auto-Peck is on (PeckLongPressRules.AutoTagClass, built in code, shown by
+   PeckLongPressRules.AutoPeckBadgeVisible): a cream pill with an ink rim across the bottom of the hex, 28 px text (the HUD
+   floor). It sits over the cooldown seconds only for the short Peck cooldown. Same on the touch arc and the desktop / pad strip. */
+.cw-hex-autotag {
+    position: absolute;
+    left: 30px; right: 30px; bottom: 4px; height: 32px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px; letter-spacing: 1px;
+    color: rgb(42, 26, 12);
+    background-color: rgb(254, 245, 224);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0; margin: 0;
+}
+
 /* The cancel X shown over the held hex while the edge band is armed: two crossed bars, bigger than the
    stunned cross's weight class so it reads as a different thing. */
 .cw-hex-x {

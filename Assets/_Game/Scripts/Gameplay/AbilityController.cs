@@ -499,7 +499,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>The slot holding Peck, or <see cref="InvalidSlot"/> (the Assassin cannot forage).</summary>
-        private int FindPeckSlot()
+        public int FindPeckSlot()
         {
             for (int i = 0; i < SlotCount; i++)
                 if (GetSlot(i).Is(AbilityJob.Peck)) return i;
