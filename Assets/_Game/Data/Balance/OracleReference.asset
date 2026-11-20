@@ -13,24 +13,25 @@ MonoBehaviour:
   m_Name: OracleReference
   m_EditorClassIdentifier: 
   AcceptedOn: 2026-11-20
-  Note: food 10 / 15 / 40 (D1b)
+  Note: food 10 / 15 / 40 (D1b); v1 prices carried over
   MapFingerprint: be5e5449aca95e44
+  Origin: 1
   Entries:
   - Label: Speedy_Slippery
     BestBanked: 39.999935
-    OffsetSeconds: 3.9375448
+    OffsetSeconds: 0
   - Label: Speedy_Featherfoot
     BestBanked: 40.000046
-    OffsetSeconds: 3.9374096
+    OffsetSeconds: 0
   - Label: Fatty_Hoarder
     BestBanked: 49.999977
-    OffsetSeconds: -5.85001
+    OffsetSeconds: 0
   - Label: Fatty_Bulwark
-    BestBanked: 49.7499657
-    OffsetSeconds: -6.6176453
+    BestBanked: 49.749966
+    OffsetSeconds: 0
   - Label: Warrior_Relentless
     BestBanked: 39.99993
-    OffsetSeconds: 3.9375498
+    OffsetSeconds: 5
   - Label: Warrior_Bully
     BestBanked: 39.99993
-    OffsetSeconds: 3.9375498
+    OffsetSeconds: 5

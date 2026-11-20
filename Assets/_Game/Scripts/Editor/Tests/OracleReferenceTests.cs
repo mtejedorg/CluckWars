@@ -35,7 +35,7 @@ namespace CluckWars.Tests
             _map = AssetDatabase.LoadAssetAtPath<OracleMapSO>(OracleMapBaker.AssetPath);
             Assert.IsNotNull(_map, $"{OracleMapBaker.AssetPath} is missing: run {OracleMapBaker.MenuPath}.");
             _reference = AssetDatabase.LoadAssetAtPath<OracleReferenceSO>(OracleMenu.ReferencePath);
-            Assert.IsNotNull(_reference, $"{OracleMenu.ReferencePath} is missing: run {OracleMenu.AcceptMenuPath}.");
+            Assert.IsNotNull(_reference, $"{OracleMenu.ReferencePath} is missing: run {OracleMenu.RecordMenuPath}.");
             _measured = OracleRunner.Run(Inputs(), _reference.Offsets());
         }
 
@@ -64,7 +64,7 @@ namespace CluckWars.Tests
         {
             var found = Differences(report, reference);
             Assert.IsEmpty(found,
-                $"numbers moved since {reference.AcceptedOn}: accept the new state (Cluck Wars/Balance/Oracle/Accept as reference) or find what moved. "
+                $"numbers moved since {reference.AcceptedOn}: record the new state ({OracleMenu.RecordMenuPath}) or find what moved. "
                 + string.Join("; ", found));
         }
 
@@ -77,14 +77,14 @@ namespace CluckWars.Tests
             var moved = ScriptableObject.CreateInstance<OracleReferenceSO>();
             try
             {
-                OracleReferenceSO.Accept(moved, _measured, "test", "2000-01-01");
+                OracleReferenceSO.Record(moved, _measured, "test", "2000-01-01");
                 var first = moved.Entries[0];
                 first.BestBanked += 2f * DriftTolerance + 1f;
                 moved.Entries[0] = first;
 
                 var ex = Assert.Throws<AssertionException>(() => AssertNoDrift(_measured, moved));
                 StringAssert.Contains("numbers moved since 2000-01-01", ex.Message);
-                StringAssert.Contains("Cluck Wars/Balance/Oracle/Accept as reference", ex.Message);
+                StringAssert.Contains(OracleMenu.RecordMenuPath, ex.Message);
                 StringAssert.Contains(first.Label, ex.Message);
             }
             finally { Object.DestroyImmediate(moved); }
@@ -108,6 +108,80 @@ namespace CluckWars.Tests
                 Assert.AreEqual(_measured.MapFingerprint, accepted.MapFingerprint);
             }
             finally { Object.DestroyImmediate(accepted); }
+        }
+
+        [Test]
+        public void Record_KeepsTheStoredOffsets_AndStoresTheMeasurement()
+        {
+            var target = ScriptableObject.CreateInstance<OracleReferenceSO>();
+            try
+            {
+                var foragers = _measured.Economy.Where(l => l.Applicable).Select(l => l.Label).ToList();
+                Assert.GreaterOrEqual(foragers.Count, 3);
+                // First kit: an offset to keep. Second kit: no entry at all. A label the game no longer has: dropped.
+                target.Entries = new List<OracleReferenceSO.Entry>
+                {
+                    new OracleReferenceSO.Entry { Label = foragers[0], BestBanked = 1f, OffsetSeconds = 3.25f },
+                    new OracleReferenceSO.Entry { Label = foragers[2], BestBanked = 1f, OffsetSeconds = -1.5f },
+                    new OracleReferenceSO.Entry { Label = "Retired_Kit", BestBanked = 1f, OffsetSeconds = 9f },
+                };
+
+                OracleReferenceSO.Record(target, _measured, "re-arm", "2026-11-20");
+
+                var offsets = target.Offsets();
+                Assert.AreEqual(3.25f, offsets[foragers[0]], 1e-6f);
+                Assert.AreEqual(0f, offsets[foragers[1]], 1e-6f, "a label with no stored offset gets 0");
+                Assert.AreEqual(-1.5f, offsets[foragers[2]], 1e-6f);
+                Assert.IsFalse(offsets.ContainsKey("Retired_Kit"));
+                CollectionAssert.AreEquivalent(foragers, target.Entries.Select(e => e.Label));
+                foreach (var entry in target.Entries)
+                    Assert.AreEqual(_measured.Economy.Single(l => l.Label == entry.Label).BestBanked, entry.BestBanked, 1e-6f, entry.Label);
+                Assert.AreEqual(ReferenceOrigin.Recorded, target.Origin);
+                Assert.AreEqual("re-arm", target.Note);
+                Assert.AreEqual(_measured.MapFingerprint, target.MapFingerprint);
+                Assert.IsEmpty(Differences(_measured, target), "a recorded baseline re-arms the drift guard");
+            }
+            finally { Object.DestroyImmediate(target); }
+        }
+
+        [Test]
+        public void Accept_ReplacesTheOffsets_Record_DoesNot()
+        {
+            var target = ScriptableObject.CreateInstance<OracleReferenceSO>();
+            try
+            {
+                var first = _measured.Economy.First(l => l.Applicable).Label;
+                target.Entries = new List<OracleReferenceSO.Entry> { new OracleReferenceSO.Entry { Label = first, OffsetSeconds = 42f } };
+
+                OracleReferenceSO.Record(target, _measured, "a", "2026-11-20");
+                Assert.AreEqual(42f, target.Offsets()[first], 1e-6f);
+
+                OracleReferenceSO.Accept(target, _measured, "b", "2026-11-20");
+                Assert.AreNotEqual(42f, target.Offsets()[first], "Accept recomputes the offset");
+                Assert.AreEqual(ReferenceOrigin.AcceptedAsBalanced, target.Origin);
+            }
+            finally { Object.DestroyImmediate(target); }
+        }
+
+        [Test]
+        public void ReportHeader_SaysWhoSetTheOffsets()
+        {
+            var target = ScriptableObject.CreateInstance<OracleReferenceSO>();
+            try
+            {
+                OracleReferenceSO.Record(target, _measured, "n", "2026-11-20");
+                var recorded = OracleRunner.Run(Inputs(), target.Offsets());
+                recorded.PricesNote = target.PricesText();
+                StringAssert.Contains("prices set by Maestro", recorded.ToMarkdown());
+                StringAssert.Contains(target.PricesText(), recorded.ToJson());
+
+                OracleReferenceSO.Accept(target, _measured, "n", "2026-11-20");
+                var accepted = OracleRunner.Run(Inputs(), target.Offsets());
+                accepted.PricesNote = target.PricesText();
+                StringAssert.Contains("prices recomputed by the oracle when this state was accepted as balanced", accepted.ToMarkdown());
+                StringAssert.DoesNotContain("prices set by Maestro", accepted.ToMarkdown());
+            }
+            finally { Object.DestroyImmediate(target); }
         }
 
         [Test]

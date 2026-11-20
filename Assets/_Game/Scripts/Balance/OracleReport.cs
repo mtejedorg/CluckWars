@@ -84,6 +84,8 @@ namespace CluckWars.Balance
 
         public string MapFingerprint;
         public string BalanceHash;
+        /// <summary>Where the kits' price offsets came from, in words for the header; empty when none were applied.</summary>
+        public string PricesNote;
         public OracleFood Food;
         public float ClockSeconds;
         public float WinTarget;
@@ -118,6 +120,7 @@ namespace CluckWars.Balance
             sb.Append('{');
             Str(sb, "mapFingerprint", MapFingerprint); sb.Append(',');
             Str(sb, "balanceHash", BalanceHash); sb.Append(',');
+            Str(sb, "pricesNote", PricesNote); sb.Append(',');
             Num(sb, "clockSeconds", ClockSeconds); sb.Append(',');
             Num(sb, "winTarget", WinTarget); sb.Append(',');
             sb.Append("\"food\":{");
@@ -248,6 +251,7 @@ namespace CluckWars.Balance
             sb.AppendLine($"- Map bake: `{MapFingerprint}`");
             sb.AppendLine($"- Match: {F0(WinTarget)} food wins, clock {F0(ClockSeconds)} s");
             sb.AppendLine($"- Starting food per pile: personal {F0(Food.Personal)}, contested {F0(Food.Contested)}, centre {F0(Food.Centre)}");
+            if (!string.IsNullOrEmpty(PricesNote)) sb.AppendLine($"- Offsets in the tables: {PricesNote}");
             sb.AppendLine();
 
             StandardSection(sb);
