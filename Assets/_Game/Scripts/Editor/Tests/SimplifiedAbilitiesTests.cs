@@ -277,14 +277,14 @@ namespace CluckWars.Tests
             }
         }
 
-        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Steal", "Stun", "Jump")]          // Maestro 2026-11-05 Warrior rework
-        [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Steal", "Slow", "Speed")]
+        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Jump", "Stun", "Steal")]          // Maestro 2026-11-05 Warrior rework; slot roles 2026-11-20
+        [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Speed", "Slow", "Steal")]
         [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Shove")]   // Maestro 2026-11-05: Speedys do not steal
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
-        [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Shove", "Egg Shell")]
-        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Egg Shell", "Slow Area", "Steal")]
-        [TestCase(ChickenSubclass.Assassin_Spoiler, "Hunt", "Stun", "Jump", "Hide")]   // Hide replaced Slow, 2026-11-05
-        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Hide", "Jump", "Slow Area")]   // Slow replaced Shove, 2026-11-05; split 2026-11-13
+        [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Egg Shell", "Shove")]
+        [TestCase(ChickenSubclass.Fatty_Hoarder, "Peck", "Slow Area", "Egg Shell", "Steal")]
+        [TestCase(ChickenSubclass.Assassin_Spoiler, "Hunt", "Jump", "Hide", "Stun")]   // Hide replaced Slow, 2026-11-05
+        [TestCase(ChickenSubclass.Assassin_Thief, "Steal", "Jump", "Hide", "Slow Area")]   // Slow replaced Shove, 2026-11-05; split 2026-11-13
         public void TheKit_ResolvesExactlyAsRuled(ChickenSubclass subclass, string s0, string s1, string s2, string s3)
         {
             var passive = Registry.Passives.Single(p => p.Subclass == subclass);

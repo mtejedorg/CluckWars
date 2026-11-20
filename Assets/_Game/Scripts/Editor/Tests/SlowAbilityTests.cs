@@ -186,7 +186,7 @@ namespace CluckWars.Tests
                 Assert.IsTrue(kit.Contains(area), $"{name}: carries Slow Area");
                 Assert.IsFalse(kit.Any(a => a is SlowAbilitySO), $"{name}: no instant Slow");
             }
-            Assert.AreEqual(area, Passive("Hoarder").Kit[2], "Hoarder: slot 3 (index 2) as today");
+            Assert.AreEqual(area, Passive("Hoarder").Kit[1], "Hoarder: slot 2 (index 1), the Fatty's second attack (2026-11-20 slot roles)");
             Assert.AreEqual(area, Passive("Thief").Kit[3], "Thief: slot 4 (index 3) as today");
         }
 

@@ -85,6 +85,60 @@ namespace CluckWars.Tests
             CollectionAssert.AreEqual(slippery.Kit, featherfoot.Kit, "the approved duplicate; revisit this test if the Speedy kits diverge again");
         }
 
+        // ---- slot roles (BL-156, Maestro 2026-11-20: every slot has a fixed role) ------------------------------------
+
+        /// <summary>
+        /// The exact shipped slot order of all 8 kits. Slot 1 income, slot 2 movement (Fatty: the second attack), slot 3 flex
+        /// (defence / self utility, or the second attack), slot 4 the main attack. A deliberate re-order edits this table.
+        /// </summary>
+        private static readonly (string passive, string[] slots)[] ShippedKits =
+        {
+            ("Bully",      new[] { "Peck",     "Shadowstep", "WingSlam",    "Snatch" }),
+            ("Relentless", new[] { "Peck",     "SpeedBurst", "Slow",        "Snatch" }),
+            ("Featherfoot", new[] { "Peck",    "SpeedBurst", "Slow",        "CluckShock" }),
+            ("Slippery",   new[] { "Peck",     "SpeedBurst", "Slow",        "CluckShock" }),
+            ("Bulwark",    new[] { "Peck",     "WingSlam",   "TurtleMode",  "CluckShock" }),
+            ("Hoarder",    new[] { "Peck",     "FeatherAura", "TurtleMode", "Snatch" }),
+            ("Spoiler",    new[] { "MarkKill", "Shadowstep", "Invisibility", "WingSlam" }),
+            ("Thief",      new[] { "Snatch",   "Shadowstep", "Invisibility", "FeatherAura" }),
+        };
+
+        [Test]
+        public void ShippedKits_HaveTheExactSlotOrder()
+        {
+            Assert.AreEqual(Registry.Passives.Count(), ShippedKits.Length, "a kit is missing from (or extra in) the table");
+            foreach (var (passive, slots) in ShippedKits)
+            {
+                var spec = Registry.Passives.Single(p => p.name == passive);
+                CollectionAssert.AreEqual(slots, spec.Kit.Select(a => a.name).ToArray(), $"{passive}: slot order");
+            }
+        }
+
+        [Test]
+        public void EveryKit_FollowsTheSlotRoles()
+        {
+            foreach (var p in Registry.Passives)
+            {
+                var kit = p.Kit;
+                bool fatty = p.Subclass.ClassOf() == ChickenClass.Fatty;
+
+                // Slot 1: income. Peck at a pile, the Spoiler's Death Mark (Hunt), the Thief's Steal.
+                Assert.IsTrue(kit[0].Is(AbilityJob.Peck) || kit[0].Is(AbilityJob.DeathMark) || kit[0].Is(AbilityJob.Steal),
+                    $"{p.name}: slot 1 '{kit[0].name}' is not an income ability");
+
+                // Slot 2: movement (Speed, Jump). The Fatty has none, so its slot 2 holds the second attack.
+                if (fatty)
+                    Assert.IsTrue(IsAttack(kit[1]), $"{p.name}: slot 2 '{kit[1].name}' must be the Fatty's second attack (Steal or Control)");
+                else
+                    Assert.IsTrue(kit[1].Is(AbilityJob.Speed) || kit[1].Is(AbilityJob.Jump), $"{p.name}: slot 2 '{kit[1].name}' is not a movement ability");
+
+                // Slot 4: the main attack, combo partner of slot 1.
+                Assert.IsTrue(IsAttack(kit[3]), $"{p.name}: slot 4 '{kit[3].name}' is not an attack (Steal or Control)");
+            }
+        }
+
+        private static bool IsAttack(AbilityBaseSO a) => a.Category == AbilityCategory.Steal || a.Category == AbilityCategory.Control;
+
         // ---- break it: each rule must actually fire ------------------------------------------------------------
 
         [Test]
@@ -321,6 +375,24 @@ namespace CluckWars.Tests
             CollectionAssert.AreEqual(spec.Kit, r.Slots);
 
             Assert.IsFalse(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Free, out _, out _), "Free keeps its strict checks");
+        }
+
+        [Test]
+        public void LastSetup_Fixed_ASetupSavedWithTheOldBullyOrder_RestoresTheKitInTheNewOrder()
+        {
+            // Saved before the 2026-11-20 re-order: Peck, Snatch, WingSlam, Shadowstep. Fixed mode reads the passive, never the list.
+            var spec = Spec(ChickenSubclass.Warrior_Bully);
+            var rec = new LastSetupRecord
+            {
+                Class = (int)ChickenClass.Warrior,
+                Subclass = (int)spec.Subclass,
+                Abilities = new[] { "Peck", "Snatch", "WingSlam", "Shadowstep" },
+                Mode = (int)SessionMode.Host,
+            };
+
+            Assert.IsTrue(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Fixed, out var r, out var problem), problem);
+            CollectionAssert.AreEqual(spec.Kit, r.Slots);
+            CollectionAssert.AreEqual(new[] { "Peck", "Shadowstep", "WingSlam", "Snatch" }, r.Slots.Select(a => a.name).ToArray());
         }
 
         [Test]

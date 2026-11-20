@@ -7,7 +7,7 @@ from support import DataCopyCase, OK
 import apply_delta as ad
 
 DELTA = {"schema": 1, "assets": {"Snatch": {"Cooldown": 3.5, "StealAmount": 6}, "Warrior": {"MoveSpeed": 11}},
-         "kits": {"Bully": ["Peck", "Snatch", "WingSlam", "SpeedBurst"]}}
+         "kits": {"Bully": ["Peck", "Shadowstep", "WingSlam", "SpeedBurst"]}}
 
 
 def run(delta_path, *flags, dirty=lambda p: []):
@@ -52,7 +52,7 @@ class ApplyTests(DataCopyCase):
                         self.assertTrue(x.startswith("  - {fileID: 11400000, guid: "))
                     else:
                         self.assertEqual(x.split(":")[0], y.split(":")[0])
-        self.assertEqual(total, 4)   # Cooldown, StealAmount, MoveSpeed, one Kit guid (Shadowstep -> SpeedBurst)
+        self.assertEqual(total, 4)   # Cooldown, StealAmount, MoveSpeed, one Kit guid (Snatch -> SpeedBurst, slot 4)
         self.assertIn("  Cooldown: 3.5\n", after[next(p for p in changed if p.name == "Snatch.asset")].decode())
 
     def test_enum_by_name_is_refused(self):

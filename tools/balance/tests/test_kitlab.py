@@ -8,9 +8,9 @@ DUMP = {
     "abilityvals": {"Snatch": {"values": {"Cooldown": 3.5}}, "Ambush": {"values": {"Cooldown": 2}}},
     "classstats": {"Warrior": {"values": {"move": 11, "carry": 16}}},
     "kits": {
-        "Bully": {"passive": "Bully", "slots": ["Peck", "Snatch", "WingSlam", "SpeedBurst"], "stats": {"cdr": 30}},
-        "Thief": {"passive": "Thief", "slots": ["Snatch", "Invisibility", "Shadowstep", "FeatherAura"], "stats": {"steal": 50}},
-        "Relentless": {"passive": "Bulwark", "slots": ["Peck", "Snatch", "Slow", "SpeedBurst"]},
+        "Bully": {"passive": "Bully", "slots": ["Peck", "Shadowstep", "WingSlam", "SpeedBurst"], "stats": {"cdr": 30}},
+        "Thief": {"passive": "Thief", "slots": ["Snatch", "Shadowstep", "Invisibility", "FeatherAura"], "stats": {"steal": 50}},
+        "Relentless": {"passive": "Bulwark", "slots": ["Peck", "SpeedBurst", "Slow", "Snatch"]},
     },
     "custom": {"c1": {"name": "Egg Toss", "cat": "Control"}},
 }
@@ -23,7 +23,7 @@ class KitLabTests(DataCopyCase):
         self.assertEqual(p["assets"]["Warrior"], {"MoveSpeed": 11, "CargoCapacity": 16})
         self.assertAlmostEqual(p["assets"]["Bully"]["CooldownMultiplier"], 0.7)
         self.assertAlmostEqual(p["assets"]["Thief"]["StealMultiplier"], 1.5)
-        self.assertEqual(p["kits"], {"Bully": ["Peck", "Snatch", "WingSlam", "SpeedBurst"]})
+        self.assertEqual(p["kits"], {"Bully": ["Peck", "Shadowstep", "WingSlam", "SpeedBurst"]})
         needs = " ".join(p["needsBuild"])
         self.assertIn("Ambush", needs)
         self.assertIn("passive swapped", needs)
@@ -47,7 +47,7 @@ class KitLabTests(DataCopyCase):
         self.assertEqual(docs["abilityvals"]["Snatch"]["values"], {"Cooldown": 3.5})
         self.assertEqual(docs["classstats"]["Warrior"]["values"], {"move": 11, "carry": 16})
         self.assertEqual(docs["kits"]["Bully"]["stats"], {"cdr": 30})
-        self.assertEqual(docs["kits"]["Bully"]["slots"], ["Peck", "Snatch", "WingSlam", "SpeedBurst"])
+        self.assertEqual(docs["kits"]["Bully"]["slots"], ["Peck", "Shadowstep", "WingSlam", "SpeedBurst"])
         self.assertEqual(docs["kits"]["Thief"]["stats"], {"steal": 50})
         self.assertEqual(docs["unsupported"], [])
         again = k2p.convert(docs)

@@ -33,6 +33,6 @@ MonoBehaviour:
   Subclass: 2
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
-  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
-  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
   - {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
+  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
+  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
