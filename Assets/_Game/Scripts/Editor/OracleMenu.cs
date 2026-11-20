@@ -21,6 +21,8 @@ namespace CluckWars.EditorTools
         public const string RecordMenuPath = "Cluck Wars/Balance/Oracle/Record baseline (keep prices)";
         public const string AcceptMenuPath = "Cluck Wars/Balance/Oracle/Accept as balanced (recompute prices)";
         public const string SweepMenuPath = "Cluck Wars/Balance/Oracle/Sweep food";
+        public const string SolveMenuPath = "Cluck Wars/Balance/Oracle/Solve";
+        public const string ProblemFileName = "problem.json";
         public const string ReferencePath = "Assets/_Game/Data/Balance/OracleReference.asset";
         public const string NoteArgument = "-oracleNote";
         private const string DefaultRecordNote = "baseline recorded from the menu";
@@ -55,6 +57,54 @@ namespace CluckWars.EditorTools
 
             new UnityLogService(LogLevel.Info).Info(Source, $"Oracle food sweep written: {md} and {json} ({rows.Count} setups).");
             return (json, md);
+        }
+
+        [MenuItem(SolveMenuPath, priority = 65)]
+        private static void SolveFromMenu() => Solve();
+
+        /// <summary>Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.SolveBatch</c>. Reads <c>Captures/oracle/problem.json</c>; proposes only, nothing is applied or published.</summary>
+        public static void SolveBatch() => InBatch("The oracle solve failed.", () => Solve());
+
+        /// <summary>
+        /// Reads <c>Captures/oracle/problem.json</c>, runs <see cref="OracleSolver"/> over the shipped assets and writes
+        /// <c>proposal-&lt;UTC&gt;.json</c> and <c>.md</c> next to it; returns the two paths. A missing or malformed problem file is
+        /// logged with its path and what is wrong, then thrown. No asset is changed and nothing is published.
+        /// </summary>
+        public static (string json, string markdown) Solve()
+        {
+            var log = new UnityLogService(LogLevel.Info);
+            if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before solving: the solver reads the shipped assets.");
+
+            string dir = OutputDirectory();
+            string problemPath = Path.Combine(dir, ProblemFileName);
+            if (!File.Exists(problemPath))
+            {
+                string missing = $"The oracle problem file is missing: {problemPath}. Write one first (see OracleProblem.TryParse for its shape).";
+                log.Error(Source, missing);
+                throw new FileNotFoundException(missing, problemPath);
+            }
+            if (!OracleProblem.TryParse(File.ReadAllText(problemPath), out var problem, out string error))
+            {
+                string bad = $"The oracle problem file is malformed: {problemPath}: {error}.";
+                log.Error(Source, bad);
+                throw new InvalidOperationException(bad);
+            }
+
+            var inputs = Inputs();
+            using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
+            {
+                inputs.Book = book;
+                var started = DateTime.UtcNow;
+                var proposal = OracleSolver.Solve(inputs, problem, LoadReference().Offsets());
+
+                string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+                string json = Path.Combine(dir, $"proposal-{stamp}.json");
+                string md = Path.Combine(dir, $"proposal-{stamp}.md");
+                File.WriteAllText(json, proposal.ToJson());
+                File.WriteAllText(md, proposal.ToMarkdown());
+                log.Info(Source, $"Oracle proposal written (nothing applied): {md} and {json}; score {proposal.ScoreBefore:0.00} -> {proposal.ScoreAfter:0.00} in {(DateTime.UtcNow - started).TotalSeconds:0} s.");
+                return (json, md);
+            }
         }
 
         private static string OutputDirectory()

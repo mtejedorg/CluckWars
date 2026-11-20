@@ -1,0 +1,467 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using CluckWars.Gameplay;
+
+namespace CluckWars.Balance
+{
+    /// <summary>One value the solver may move: a field of a named asset (as a schema-1 delta names it) or an oracle-only value.</summary>
+    public sealed class FreeValue
+    {
+        /// <summary>The asset name a delta uses ("Fatty", "Snatch", "MatchConfig"), or <see cref="OracleSolver.OracleAsset"/> for an oracle-only value.</summary>
+        public string Asset;
+        /// <summary>The field ("CargoCapacity"), or for an oracle-only value "&lt;Class&gt;.PeckCastSeconds".</summary>
+        public string Field;
+        /// <summary>Lower limit of the search; NaN takes the field's own [Range] / [Min] (an oracle-only value: 0).</summary>
+        public float Min = float.NaN;
+        /// <summary>Upper limit of the search; NaN takes the field's [Range] maximum (a field without one, and an oracle-only value, must state it).</summary>
+        public float Max = float.NaN;
+        /// <summary>Size of one move; positive.</summary>
+        public float Step;
+
+        public string Key => Asset + "." + Field;
+        public bool IsOracleOnly => Asset == OracleSolver.OracleAsset;
+    }
+
+    /// <summary>What to search and what to aim at. Everything not listed in <see cref="Free"/> stays as it is.</summary>
+    public sealed class OracleProblem
+    {
+        public List<FreeValue> Free = new List<FreeValue>();
+        /// <summary>The band the standard farmer's banked food (mean of the four seats in the four-standard-farmer run) should sit in.</summary>
+        public float BandLow = 28f;
+        public float BandHigh = 36f;
+        public int MaxPasses = 6;
+
+        /// <summary>
+        /// Reads <c>{"bandLow":28,"bandHigh":36,"maxPasses":6,"free":[{"asset":"Fatty","field":"CargoCapacity","min":10,"max":60,"step":5}]}</c>.
+        /// Every key but <c>free</c> is optional, <c>min</c> and <c>max</c> too (see <see cref="FreeValue"/>); an unknown key is an error, never skipped.
+        /// </summary>
+        public static bool TryParse(string json, out OracleProblem problem, out string error)
+        {
+            problem = null;
+            if (!BalanceJson.TryParse(json, out var root, out error)) { error = "not valid JSON (" + error + ")"; return false; }
+            if (root.Kind != JsonKind.Object) { error = "the problem is not a JSON object"; return false; }
+
+            var result = new OracleProblem();
+            foreach (var member in root.Members)
+            {
+                switch (member.Key)
+                {
+                    case "bandLow": if (!Number(member.Value, "bandLow", out result.BandLow, out error)) return false; break;
+                    case "bandHigh": if (!Number(member.Value, "bandHigh", out result.BandHigh, out error)) return false; break;
+                    case "maxPasses":
+                        if (!Number(member.Value, "maxPasses", out float passes, out error)) return false;
+                        result.MaxPasses = (int)passes;
+                        break;
+                    case "free":
+                        if (member.Value.Kind != JsonKind.Array) { error = "\"free\" must be an array"; return false; }
+                        for (int i = 0; i < member.Value.Items.Count; i++)
+                            if (!ParseFree(member.Value.Items[i], i, result.Free, out error)) return false;
+                        break;
+                    default:
+                        error = $"unknown key \"{member.Key}\"";
+                        return false;
+                }
+            }
+            if (!(result.BandLow <= result.BandHigh)) { error = "bandLow must not exceed bandHigh"; return false; }
+            if (result.MaxPasses < 1) { error = "maxPasses must be 1 or more"; return false; }
+            problem = result;
+            error = null;
+            return true;
+        }
+
+        private static bool ParseFree(JsonValue item, int index, List<FreeValue> into, out string error)
+        {
+            string at = $"free[{index}]";
+            error = null;
+            if (item.Kind != JsonKind.Object) { error = at + " is not an object"; return false; }
+            var free = new FreeValue();
+            bool hasAsset = false, hasField = false, hasStep = false;
+            foreach (var m in item.Members)
+            {
+                switch (m.Key)
+                {
+                    case "asset": if (m.Value.Kind != JsonKind.String) { error = at + ".asset must be a string"; return false; } free.Asset = m.Value.Text; hasAsset = true; break;
+                    case "field": if (m.Value.Kind != JsonKind.String) { error = at + ".field must be a string"; return false; } free.Field = m.Value.Text; hasField = true; break;
+                    case "min": if (!Number(m.Value, at + ".min", out free.Min, out error)) return false; break;
+                    case "max": if (!Number(m.Value, at + ".max", out free.Max, out error)) return false; break;
+                    case "step": if (!Number(m.Value, at + ".step", out free.Step, out error)) return false; hasStep = true; break;
+                    default: error = $"{at}: unknown key \"{m.Key}\""; return false;
+                }
+            }
+            if (!hasAsset || !hasField || !hasStep) { error = $"{at} needs asset, field and step"; return false; }
+            into.Add(free);
+            return true;
+        }
+
+        private static bool Number(JsonValue v, string name, out float value, out string error)
+        {
+            value = 0f;
+            error = null;
+            if (v.Kind != JsonKind.Number) { error = $"\"{name}\" must be a number"; return false; }
+            value = (float)v.Number;
+            return true;
+        }
+
+        public string ToJson()
+        {
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new StringBuilder("{");
+            sb.Append("\"bandLow\":").Append(BandLow.ToString("R", inv));
+            sb.Append(",\"bandHigh\":").Append(BandHigh.ToString("R", inv));
+            sb.Append(",\"maxPasses\":").Append(MaxPasses.ToString(inv));
+            sb.Append(",\"free\":[");
+            for (int i = 0; i < Free.Count; i++)
+            {
+                var f = Free[i];
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"asset\":").Append(BalanceJson.Quote(f.Asset)).Append(",\"field\":").Append(BalanceJson.Quote(f.Field));
+                if (!float.IsNaN(f.Min)) sb.Append(",\"min\":").Append(f.Min.ToString("R", inv));
+                if (!float.IsNaN(f.Max)) sb.Append(",\"max\":").Append(f.Max.ToString("R", inv));
+                sb.Append(",\"step\":").Append(f.Step.ToString("R", inv)).Append('}');
+            }
+            return sb.Append("]}").ToString();
+        }
+    }
+
+    /// <summary>One free value before and after the solve.</summary>
+    public sealed class ProposedValue
+    {
+        public string Asset;
+        public string Field;
+        public float Old;
+        public float New;
+        /// <summary>True for a value the game cannot take yet (the Peck cast): reported, never written into the delta.</summary>
+        public bool OracleOnly;
+        public bool Changed;
+    }
+
+    public sealed class OracleProposal
+    {
+        /// <summary>A schema-1 balance delta holding every changed game value (<c>{"schema":1}</c> when none changed). Never holds an oracle-only value.</summary>
+        public string DeltaJson = "{\"schema\":1}";
+        /// <summary>Every free oracle-only value at its proposed value, key "&lt;Class&gt;.PeckCastSeconds".</summary>
+        public Dictionary<string, float> OracleOnly = new Dictionary<string, float>();
+        public OracleReport Before;
+        public OracleReport After;
+        public float ScoreBefore;
+        public float ScoreAfter;
+        /// <summary>Every free value with its old and proposed value, in the order the problem lists them.</summary>
+        public List<ProposedValue> Values = new List<ProposedValue>();
+        /// <summary>How many passes ran (a pass that finds no better move ends the search and is not counted).</summary>
+        public int Passes;
+
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        public string ToJson()
+        {
+            var sb = new StringBuilder(16384);
+            sb.Append("{\"scoreBefore\":").Append(N(ScoreBefore)).Append(",\"scoreAfter\":").Append(N(ScoreAfter));
+            sb.Append(",\"passes\":").Append(Passes.ToString(Inv));
+            sb.Append(",\"delta\":").Append(DeltaJson);
+            sb.Append(",\"oracleOnly\":{");
+            bool first = true;
+            foreach (var kv in OracleOnly.OrderBy(k => k.Key, StringComparer.Ordinal))
+            {
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append(BalanceJson.Quote(kv.Key)).Append(':').Append(N(kv.Value));
+            }
+            sb.Append("},\"values\":[");
+            for (int i = 0; i < Values.Count; i++)
+            {
+                var v = Values[i];
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"asset\":").Append(BalanceJson.Quote(v.Asset)).Append(",\"field\":").Append(BalanceJson.Quote(v.Field));
+                sb.Append(",\"old\":").Append(N(v.Old)).Append(",\"new\":").Append(N(v.New));
+                sb.Append(",\"oracleOnly\":").Append(v.OracleOnly ? "true" : "false").Append('}');
+            }
+            sb.Append("],\"before\":").Append(Before.ToJson()).Append(",\"after\":").Append(After.ToJson()).Append('}');
+            return sb.ToString();
+        }
+
+        public string ToMarkdown()
+        {
+            var sb = new StringBuilder(4096);
+            sb.AppendLine("# Balance Oracle proposal");
+            sb.AppendLine();
+            sb.AppendLine("A proposal only: nothing here was applied to the game's data or published. It is the solver's best answer to the problem it was given, measured on the simulated four-chicken matches of the oracle report.");
+            sb.AppendLine();
+            sb.AppendLine($"- Score (lower is better): {F2(ScoreBefore)} before, {F2(ScoreAfter)} after, {Passes} pass(es)");
+            sb.AppendLine($"- Balance before: `{Before.BalanceHash}`, after: `{After.BalanceHash}`");
+            sb.AppendLine($"- Map bake: `{Before.MapFingerprint}`");
+            sb.AppendLine();
+            sb.AppendLine("## Proposed values");
+            sb.AppendLine();
+            sb.AppendLine("| Value | Now | Proposed | Goes into |");
+            sb.AppendLine("|---|---|---|---|");
+            foreach (var v in Values)
+            {
+                string where = v.OracleOnly ? "oracle only (the game has no Peck cast yet)" : "the balance delta";
+                sb.AppendLine($"| {v.Asset}.{v.Field} | {F2(v.Old)} | {F2(v.New)}{(v.Changed ? "" : " (unchanged)")} | {where} |");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Balance delta (schema 1):");
+            sb.AppendLine();
+            sb.AppendLine("```json");
+            sb.AppendLine(DeltaJson);
+            sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("## Four plain Warriors");
+            sb.AppendLine();
+            sb.AppendLine("| Seat | Before | After |");
+            sb.AppendLine("|---|---|---|");
+            for (int s = 0; s < Before.StandardSeatBanked.Length; s++)
+                sb.AppendLine($"| {s + 1} | {F1(Before.StandardSeatBanked[s])} | {F1(After.StandardSeatBanked[s])} |");
+            sb.AppendLine();
+            sb.AppendLine("## Each kit");
+            sb.AppendLine();
+            sb.AppendLine("Food is the seat mean on the kit's best route, goal switched off. Result adds the kit's offset (its price) at its own income.");
+            sb.AppendLine();
+            sb.AppendLine("| Kit | Food before | Food after | Result before | Result after |");
+            sb.AppendLine("|---|---|---|---|---|");
+            foreach (var b in Before.Economy)
+            {
+                var a = After.Economy.FirstOrDefault(l => l.Label == b.Label);
+                if (!b.Applicable || a == null || !a.Applicable) { sb.AppendLine($"| {b.Label} | n/a, does not forage | | | |"); continue; }
+                sb.AppendLine($"| {b.Label} | {F1(b.BestBanked)} | {F1(a.BestBanked)} | {F1(b.Result)} | {F1(a.Result)} |");
+            }
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
+        private static string N(float v) => float.IsNaN(v) || float.IsInfinity(v) ? "null" : v.ToString("R", Inv);
+        private static string F1(float v) => v.ToString("0.0", Inv);
+        private static string F2(float v) => v.ToString("0.00", Inv);
+    }
+
+    /// <summary>
+    /// Proposes values for the free values of a problem (Balance Oracle v2, spec 5). It only proposes: nothing is applied to an
+    /// asset or published. Deterministic: the same inputs give the same proposal.
+    /// <para>Score to minimise: the variance of the kits' <see cref="KitLine.Result"/> plus the squared distance of the standard
+    /// farmers' banked food (mean of the four seats) outside the band. <see cref="FoodRules"/> and each field's [Range] / [Min]
+    /// are hard limits: a candidate that breaks one is never scored. Search: coordinate descent, the best single move of one step
+    /// per pass, until no move improves or <see cref="OracleProblem.MaxPasses"/> passes ran.</para>
+    /// </summary>
+    public static class OracleSolver
+    {
+        /// <summary>The asset key of an oracle-only value; the field is "&lt;Class&gt;.PeckCastSeconds".</summary>
+        public const string OracleAsset = "Oracle";
+        public const string PeckCastField = "PeckCastSeconds";
+
+        /// <summary>A move must beat the current score by more than this to count (stops float noise from moving values).</summary>
+        private const float MinGain = 1e-4f;
+
+        public static OracleProposal Solve(OracleInputs inputs, OracleProblem problem, IReadOnlyDictionary<string, float> offsets)
+        {
+            if (inputs == null) throw new ArgumentNullException(nameof(inputs));
+            if (problem == null) throw new ArgumentNullException(nameof(problem));
+            if (inputs.Verdict != null && !inputs.Verdict.IsEmpty)
+                throw new ArgumentException("The solver starts from the shipped assets: OracleInputs.Verdict must be null or empty.", nameof(inputs));
+
+            var specs = Resolve(inputs, problem);
+            var values = specs.Select(s => s.Start).ToArray();
+
+            var current = Evaluate(inputs, problem, specs, values, offsets);
+            var start = current;
+            int passes = 0;
+            while (passes < problem.MaxPasses)
+            {
+                Candidate best = null;
+                float[] bestValues = null;
+                for (int i = 0; i < specs.Count; i++)
+                {
+                    foreach (int direction in new[] { 1, -1 })
+                    {
+                        float moved = Clamp(specs[i], Round(values[i] + direction * specs[i].Free.Step));
+                        if (moved == values[i]) continue;
+                        var trial = (float[])values.Clone();
+                        trial[i] = moved;
+                        var candidate = Evaluate(inputs, problem, specs, trial, offsets);
+                        if (!candidate.Usable) continue;
+                        if (candidate.Score < (best?.Score ?? current.Score - MinGain)) { best = candidate; bestValues = trial; }
+                    }
+                }
+                if (best == null) break;
+                current = best;
+                values = bestValues;
+                passes++;
+            }
+
+            var proposal = new OracleProposal
+            {
+                DeltaJson = current.DeltaJson,
+                Before = start.Report,
+                After = current.Report,
+                ScoreBefore = start.Score,
+                ScoreAfter = current.Score,
+                Passes = passes,
+            };
+            for (int i = 0; i < specs.Count; i++)
+            {
+                var s = specs[i];
+                proposal.Values.Add(new ProposedValue
+                {
+                    Asset = s.Free.Asset, Field = s.Free.Field, Old = s.Start, New = values[i],
+                    OracleOnly = s.Free.IsOracleOnly, Changed = values[i] != s.Start,
+                });
+                if (s.Free.IsOracleOnly) proposal.OracleOnly[s.Free.Field] = values[i];
+            }
+            return proposal;
+        }
+
+        // ------------------------------------------------------------- problem
+
+        private sealed class Spec
+        {
+            public FreeValue Free;
+            /// <summary>For an oracle-only value, the class name before ".PeckCastSeconds".</summary>
+            public string ClassName;
+            public float Start;
+            public float Lo;
+            public float Hi;
+        }
+
+        private static List<Spec> Resolve(OracleInputs inputs, OracleProblem problem)
+        {
+            var specs = new List<Spec>(problem.Free.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var free in problem.Free)
+            {
+                if (free == null) throw new ArgumentException("The problem lists a null free value.", nameof(problem));
+                if (!(free.Step > 0f) || float.IsInfinity(free.Step)) throw new ArgumentException($"{free.Key}: the step must be positive.", nameof(problem));
+                if (!seen.Add(free.Key)) throw new ArgumentException($"{free.Key} is listed twice.", nameof(problem));
+
+                var spec = new Spec { Free = free };
+                float attrMin = float.NegativeInfinity, attrMax = float.PositiveInfinity;
+                if (free.IsOracleOnly)
+                {
+                    int dot = free.Field.IndexOf('.');
+                    string className = dot > 0 ? free.Field.Substring(0, dot) : string.Empty;
+                    if (dot < 0 || free.Field.Substring(dot + 1) != PeckCastField || !Enum.IsDefined(typeof(ChickenClass), className))
+                        throw new ArgumentException($"{free.Key}: an oracle-only value is \"<Class>.{PeckCastField}\" with a ChickenClass name.", nameof(problem));
+                    spec.ClassName = className;
+                    spec.Start = inputs.PeckCastSeconds != null && inputs.PeckCastSeconds.TryGetValue(className, out float cast) ? cast : 0f;
+                    attrMin = 0f;
+                }
+                else
+                {
+                    if (inputs.Book == null) throw new ArgumentException($"{free.Key}: reading a game value needs OracleInputs.Book.", nameof(problem));
+                    if (!inputs.Book.TryProbe(free.Asset, free.Field, out spec.Start, out attrMin, out attrMax, out string why))
+                        throw new ArgumentException($"{free.Key}: {why}.", nameof(problem));
+                }
+
+                spec.Lo = float.IsNaN(free.Min) ? attrMin : Math.Max(free.Min, attrMin);
+                spec.Hi = float.IsNaN(free.Max) ? attrMax : Math.Min(free.Max, attrMax);
+                if (float.IsInfinity(spec.Lo) || float.IsInfinity(spec.Hi))
+                    throw new ArgumentException($"{free.Key}: no {(float.IsInfinity(spec.Lo) ? "min" : "max")} given and the field has no [Range] / [Min] to take it from.", nameof(problem));
+                if (spec.Lo > spec.Hi) throw new ArgumentException($"{free.Key}: the allowed range {spec.Lo} to {spec.Hi} is empty.", nameof(problem));
+                spec.Start = Round(spec.Start);
+                specs.Add(spec);
+            }
+            return specs;
+        }
+
+        // ---------------------------------------------------------- evaluation
+
+        private sealed class Candidate
+        {
+            public bool Usable;
+            public OracleReport Report;
+            public float Score;
+            public string DeltaJson;
+        }
+
+        private static Candidate Evaluate(OracleInputs inputs, OracleProblem problem, List<Spec> specs, float[] values,
+            IReadOnlyDictionary<string, float> offsets)
+        {
+            string delta = BuildDelta(specs, values);
+            BalanceVerdict verdict = null;
+            if (inputs.Book != null && delta != null)
+            {
+                verdict = inputs.Book.Evaluate(delta, "oracle solver");
+                // Anything the book refuses or skips is a candidate the game would not take as written: never scored.
+                if (!verdict.IsAccepted || verdict.Ignored.Count > 0)
+                    return new Candidate { Usable = false, DeltaJson = delta };
+            }
+
+            var cast = new Dictionary<string, float>();
+            if (inputs.PeckCastSeconds != null) foreach (var kv in inputs.PeckCastSeconds) cast[kv.Key] = kv.Value;
+            for (int i = 0; i < specs.Count; i++)
+                if (specs[i].Free.IsOracleOnly) cast[specs[i].ClassName] = values[i];
+
+            var run = new OracleInputs
+            {
+                Map = inputs.Map, Book = inputs.Book, Verdict = verdict, Abilities = inputs.Abilities, Classes = inputs.Classes,
+                Match = inputs.Match, FoodOverride = inputs.FoodOverride, PeckCastSeconds = cast,
+            };
+            var report = OracleRunner.Run(run, offsets);
+
+            return new Candidate
+            {
+                Usable = FoodRules.OwnPlusOneIsNotEnough(report.Food, report.WinTarget) && FoodRules.OwnPlusTwoIsEnough(report.Food, report.WinTarget),
+                Report = report,
+                Score = Score(report, problem),
+                DeltaJson = verdict != null && !verdict.IsEmpty ? verdict.Canonical : "{\"schema\":1}",
+            };
+        }
+
+        /// <summary>The delta of every game value that differs from its shipped value; null when none does.</summary>
+        private static string BuildDelta(List<Spec> specs, float[] values)
+        {
+            var byAsset = new SortedDictionary<string, SortedDictionary<string, float>>(StringComparer.Ordinal);
+            for (int i = 0; i < specs.Count; i++)
+            {
+                var s = specs[i];
+                if (s.Free.IsOracleOnly || values[i] == s.Start) continue;
+                if (!byAsset.TryGetValue(s.Free.Asset, out var fields))
+                    byAsset[s.Free.Asset] = fields = new SortedDictionary<string, float>(StringComparer.Ordinal);
+                fields[s.Free.Field] = values[i];
+            }
+            if (byAsset.Count == 0) return null;
+
+            var sb = new StringBuilder("{\"schema\":1,\"assets\":{");
+            bool firstAsset = true;
+            foreach (var asset in byAsset)
+            {
+                if (!firstAsset) sb.Append(',');
+                firstAsset = false;
+                sb.Append(BalanceJson.Quote(asset.Key)).Append(":{");
+                bool firstField = true;
+                foreach (var field in asset.Value)
+                {
+                    if (!firstField) sb.Append(',');
+                    firstField = false;
+                    sb.Append(BalanceJson.Quote(field.Key)).Append(':').Append(field.Value.ToString("R", CultureInfo.InvariantCulture));
+                }
+                sb.Append('}');
+            }
+            return sb.Append("}}").ToString();
+        }
+
+        /// <summary>Variance of the applicable kits' results plus the squared distance of the standard farmers' mean food outside the band.</summary>
+        public static float Score(OracleReport report, OracleProblem problem)
+        {
+            var results = report.Economy.Where(l => l.Applicable).Select(l => l.Result).ToArray();
+            float variance = 0f;
+            if (results.Length > 0)
+            {
+                float mean = results.Average();
+                variance = results.Sum(r => (r - mean) * (r - mean)) / results.Length;
+            }
+
+            float standard = report.StandardSeatBanked.Length > 0 ? report.StandardSeatBanked.Average() : 0f;
+            float outside = standard < problem.BandLow ? problem.BandLow - standard
+                : standard > problem.BandHigh ? standard - problem.BandHigh
+                : 0f;
+            return variance + outside * outside;
+        }
+
+        private static float Clamp(Spec s, float v) => Math.Min(s.Hi, Math.Max(s.Lo, v));
+
+        /// <summary>Four decimals: keeps repeated steps from drifting (0.1 + 0.1 + 0.1) and the delta readable.</summary>
+        private static float Round(float v) => (float)Math.Round(v, 4);
+    }
+}

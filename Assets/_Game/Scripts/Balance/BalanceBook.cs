@@ -773,6 +773,36 @@ namespace CluckWars.Balance
         }
 
         /// <summary>
+        /// The shipped value of one overridable number field and the hard limits a delta must respect for it (its
+        /// <c>[Range]</c> / <c>[Min]</c>; infinities where it has none). False, with the reason, for an unknown asset or
+        /// field, a deny-listed field or a field that is not a number. Read-only (the oracle solver reads its starting
+        /// point and limits here, and the delta it proposes still goes through <see cref="Evaluate"/>).
+        /// </summary>
+        public bool TryProbe(string asset, string field, out float shipped, out float min, out float max, out string problem)
+        {
+            shipped = 0f;
+            min = float.NegativeInfinity;
+            max = float.PositiveInfinity;
+            if (!TryBuildIndex(out var index, out problem)) return false;
+            if (!index.TryGetValue(asset ?? string.Empty, out var so)) { problem = $"unknown asset \"{asset}\""; return false; }
+            var info = FindField(so.GetType(), field ?? string.Empty);
+            if (info == null) { problem = $"unknown field {asset}.{field}"; return false; }
+            if (IsDenied(info)) { problem = $"{asset}.{field} is deny-listed: a delta may not change it"; return false; }
+            if (!BaselineOf(so).TryGet(field, out var value) || value.Kind != JsonKind.Number)
+            {
+                problem = $"{asset}.{field} is not a number field";
+                return false;
+            }
+            shipped = (float)value.Number;
+            var range = info.GetCustomAttribute<RangeAttribute>();
+            if (range != null) { min = range.min; max = range.max; }
+            var minAttr = info.GetCustomAttribute<MinAttribute>();
+            if (minAttr != null && minAttr.min > min) min = minAttr.min;
+            problem = null;
+            return true;
+        }
+
+        /// <summary>
         /// A throwaway copy of <paramref name="original"/> as it would read with <paramref name="verdict"/> applied over the
         /// SHIPPED assets (not over what is applied now): the oracle check reads proposed values from it without touching
         /// the live asset or this book's snapshots. The caller destroys the copy.
