@@ -47,7 +47,7 @@ namespace CluckWars.Tests
         [TestCase(9f, 21f, 4.29f)]    // past the portrait ortho cap: 5.36 m lateral
         [TestCase(16f, 9f, 4.15f)]
         [TestCase(20f, 9f, 3.55f)]
-        [TestCase(4f, 3f, 3.63f)]     // tablet: the touch hexes bind, not the band (linear panel formula, WP8 correction)
+        [TestCase(4f, 3f, 3.31f)]     // tablet: the touch hexes bind, not the band (linear panel formula, WP8 correction); 3.63 until the 2026-11-20 mirror re-lay lowered the arc (a3 top 472 px, was a2 531)
         public void RingRadius_PerAspectTable(float w, float h, float expected)
         {
             Assert.AreEqual(expected, RadiusAt(w / h, out _, out _), Tol, $"{w}:{h}");

@@ -124,17 +124,18 @@ namespace CluckWars.Tests
         [Test]
         public void PortraitEventBanner_ClearsTheHexArc_DerivedFromTouchControlsUss()
         {
-            // The 600 px comes from "the hexes top out at ~531 px": re-derive it from the hex rules so a re-layout of the arc
-            // fails here instead of putting the banner over a button.
+            // The 600 px comes from "the hexes top out at ~531 px" (the landscape arc's old a2: 361 + 150 + 20): re-derive it from the
+            // PORTRAIT hex rules (the layout this banner sits in; 445 px since the 2026-11-20 mirror re-lay, a2/a3 bottom 275) so a
+            // re-layout of the grid fails here instead of putting the banner over a button.
             string touch = Read("Assets/UI/Styles/TouchControls.uss");
             float hex = float.Parse(Regex.Match(touch, @"^\.cw-hex\s*\{[^}]*height:\s*(\d+)px", RegexOptions.Multiline).Groups[1].Value,
                 CultureInfo.InvariantCulture);
             float top = 0f;
-            var rules = Regex.Matches(touch, @"^\.cw-hex--a\d\s*\{\s*right:\s*\d+px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
-            Assert.AreEqual(4, rules.Count, "four .cw-hex--aN rules");
+            var rules = Regex.Matches(touch, @"^\.layout--portrait \.cw-hex--a\d\s*\{\s*right:\s*\d+px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
+            Assert.AreEqual(4, rules.Count, "four .layout--portrait .cw-hex--aN rules");
             foreach (Match m in rules)
                 top = Mathf.Max(top, float.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) + hex + CluckWars.Visuals.HudControlZones.ControlPadPx);
-            Assert.AreEqual(531f, top, "the arc's top (hex + its chain ring) the banner rule was derived from");
+            Assert.AreEqual(445f, top, "the portrait grid's top (hex + its chain ring) the banner must clear");
 
             string overlays = Read("Assets/UI/Styles/MatchOverlays.uss");
             float banner = float.Parse(Regex.Match(Block(overlays, ".cw-eventbanner.layout--portrait"), @"bottom:\s*(\d+)px").Groups[1].Value,
@@ -142,7 +143,7 @@ namespace CluckWars.Tests
             // The hexes sit inside the safe area and the banner does not: allow the spec's simulated gesture bar (2 % of a
             // 9:20 panel, 1724 px high: UI Toolkit's linear scale blend, WP8) plus the 8 px U1 gap.
             float gestureBar = 0.02f * 1724f;
-            Assert.GreaterOrEqual(banner, top + gestureBar + 8f, "the portrait banner must clear the hex arc");
+            Assert.GreaterOrEqual(banner, top + gestureBar + 8f, "the portrait banner must clear the hex grid");
         }
 
         // ---- Landscape is unchanged apart from the goal pill --------------------------------------------------

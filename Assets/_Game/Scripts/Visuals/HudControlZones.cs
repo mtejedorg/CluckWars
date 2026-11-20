@@ -61,17 +61,17 @@ namespace CluckWars.Visuals
         public static readonly Vector2[] TouchHexRightBottomPx =
         {
             new Vector2(95f, 95f),
-            new Vector2(142f, 361f),
-            new Vector2(302f, 269f),
-            new Vector2(365f, 95f),
+            new Vector2(113f, 285f),
+            new Vector2(302f, 302f),
+            new Vector2(285f, 113f),
         };
 
         /// <summary>Portrait touch layout: the 2 x 2 grid of <c>.layout--portrait .cw-hex--aN</c> (right, bottom).</summary>
         public static readonly Vector2[] TouchHexRightBottomPortraitPx =
         {
             new Vector2(80f, 95f),
-            new Vector2(80f, 270f),
-            new Vector2(260f, 270f),
+            new Vector2(80f, 275f),
+            new Vector2(260f, 275f),
             new Vector2(260f, 95f),
         };
 

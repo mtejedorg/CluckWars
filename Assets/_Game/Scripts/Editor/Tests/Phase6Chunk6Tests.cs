@@ -616,6 +616,93 @@ namespace CluckWars.Tests
             }
         }
 
+        // ---- Slot roles in the geometry (Maestro 2026-11-20) ------------------------------------------------------------
+        // Slot 1 (income, most used) is the corner hex; slots 2 and 4 are mirror images across the 45-degree diagonal through
+        // slot 1's centre, at the same distance; slot 3 (flex, least used) sits on that diagonal, further out.
+
+        private static Vector2[] RuleCentres(string selectorPrefix)
+        {
+            string uss = Read("Assets/UI/Styles/TouchControls.uss");
+            var centres = new Vector2[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var m = Regex.Match(uss, @"^" + selectorPrefix + @"\.cw-hex--a" + (i + 1) + @"\s*\{\s*right:\s*(\d+)px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
+                Assert.IsTrue(m.Success, $"{selectorPrefix}.cw-hex--a{i + 1} rule not found in TouchControls.uss.");
+                centres[i] = new Vector2(float.Parse(m.Groups[1].Value) + HexPx / 2f, float.Parse(m.Groups[2].Value) + HexPx / 2f);
+            }
+            return centres;
+        }
+
+        [TestCase("", false, TestName = "Landscape")]
+        [TestCase(@"\.layout--portrait ", true, TestName = "Portrait")]
+        public void Cluster_Slots2And4MirrorAcrossTheDiagonal_Slot3SitsOnItFurtherOut(string selectorPrefix, bool portrait)
+        {
+            var c = RuleCentres(selectorPrefix);
+            // Offsets from slot 1's centre; x grows leftwards and y upwards, so the corner diagonal is x == y and the
+            // reflection across it swaps the two components.
+            Vector2 o2 = c[1] - c[0], o3 = c[2] - c[0], o4 = c[3] - c[0];
+
+            Assert.AreEqual(o2.magnitude, o4.magnitude, 1f, "slots 2 and 4 are not the same distance from slot 1");
+            Assert.AreEqual(o4.x, o2.y, 1f, "slot 2 is not the mirror of slot 4 across the diagonal (x)");
+            Assert.AreEqual(o4.y, o2.x, 1f, "slot 2 is not the mirror of slot 4 across the diagonal (y)");
+            Assert.Greater(o2.y, o2.x - 1f, "slot 2 belongs on the upper side of the diagonal");
+            Assert.Greater(o4.x, o4.y - 1f, "slot 4 belongs on the left side of the diagonal");
+            Assert.AreEqual(o3.x, o3.y, 1f, "slot 3 is not on the diagonal through slot 1");
+            Assert.Greater(o3.magnitude, o2.magnitude, "slot 3 must be further from slot 1 than slots 2 and 4");
+            Assert.Greater(o3.x, 0f, "slot 3 is on the wrong side of slot 1");
+
+            // The corner hex keeps the distance from the right edge it had (the edge-cancel arm band: 36 dp = 80 px portrait).
+            Assert.GreaterOrEqual(c[0].x - HexPx / 2f, portrait ? 80f : 95f, "slot 1 sits closer to the right edge than the cancel band allows");
+
+            // No two hexes overlap, with the 10 px denied-press shake on top of the portrait gap.
+            float minGap = portrait ? 10f : 35f;
+            for (int i = 0; i < 4; i++)
+                for (int j = i + 1; j < 4; j++)
+                    Assert.GreaterOrEqual(Vector2.Distance(c[i], c[j]), HexPx + minGap, $"Hexes {i + 1} and {j + 1} are too close.");
+        }
+
+        [Test]
+        public void Cluster_ClearsTheStatusStripTheStickAndThePanelEdges_OnEveryTestedPanel()
+        {
+            const int maxStatusRows = 3;   // stun, root, slow
+            var landscape = RuleCentres("");
+            foreach (var panel in new[] { new Vector2(2400, 1080), new Vector2(1920, 864), new Vector2(1440, 1080) })
+            {
+                var strip = new Rect(HudControlZones.StatusStripLeftPx, HudControlZones.StatusStripBottomPx,
+                    HudControlZones.StatusStripWidthPx, maxStatusRows * HudControlZones.StatusRowPitchPx);
+                var stick = new Rect(HudControlZones.JoystickLeftPx, HudControlZones.JoystickBottomPx, HudControlZones.JoystickSizePx, HudControlZones.JoystickSizePx);
+                AssertClusterClear(landscape, panel, strip, stick, HudControlZones.TopBandLandscapeZonePx, "landscape");
+            }
+
+            var portraitC = RuleCentres(@"\.layout--portrait ");
+            foreach (float aspect in new[] { 1080f / 1920f, 1080f / 2400f, 1080f / 2410f, 0.4308f })   // 0.4308: the 749 px panel, the narrowest the portrait grid is designed for
+            {
+                Vector2 panel = HudControlZones.PanelSize(aspect);
+                var strip = new Rect(HudControlZones.StatusStripPortraitLeftPx, HudControlZones.StatusStripBottomPx,
+                    HudControlZones.StatusStripPortraitWidthPx, maxStatusRows * HudControlZones.StatusRowPitchPx);
+                var stick = new Rect(HudControlZones.JoystickLeftPortraitPx, HudControlZones.JoystickBottomPx, HudControlZones.JoystickSizePx, HudControlZones.JoystickSizePx);
+                AssertClusterClear(portraitC, panel, strip, stick, HudControlZones.TopBandPortraitLayoutPx - HudControlZones.TopBandPortraitFadePx, "portrait");
+            }
+        }
+
+        /// <summary>Boxes and the info zones are in panel px from the bottom-left (y up); centres are from the bottom-right.</summary>
+        private static void AssertClusterClear(Vector2[] centres, Vector2 panel, Rect strip, Rect stick, float topBandPx, string label)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                var box = new Rect(panel.x - centres[i].x - HexPx / 2f, centres[i].y - HexPx / 2f, HexPx, HexPx);
+                string where = $"{label} a{i + 1} at {panel.x:0}x{panel.y:0}";
+                Assert.GreaterOrEqual(box.xMin, 0f, where + " leaves the left edge");
+                Assert.LessOrEqual(box.xMax, panel.x, where + " leaves the right edge");
+                Assert.GreaterOrEqual(box.yMin, 0f, where + " leaves the bottom");
+                Assert.LessOrEqual(box.yMax + HudControlZones.ControlPadPx, panel.y - topBandPx, where + " runs into the top bar");
+                Assert.IsFalse(box.Overlaps(strip), where + " overlaps the status strip");
+                Assert.IsFalse(box.Overlaps(stick), where + " overlaps the joystick");
+                Assert.GreaterOrEqual(Mathf.Max(box.xMin - strip.xMax, strip.xMin - box.xMax, box.yMin - strip.yMax, strip.yMin - box.yMax),
+                    19f, where + " is closer than 8 dp to the status strip");
+            }
+        }
+
         // ---- Settings ---------------------------------------------------------------------------------------------
 
         [Test]

@@ -119,17 +119,19 @@
     -unity-background-image-tint-color: rgb(115, 179, 255); /* neutral until equipped */
 }
 /* MOBA arc positions (element edge offsets, measured from the AbilityRoot's bottom-right corner).
-   Phase 6 chunk 6 (A11): every hex CENTRE sits on a 270 px (~115 dp at 1 dp = 2.35 px) arc around slot 1's
-   centre (170,170 from the corner), 40 degrees apart, so the thumb that rests on slot 1 reaches all four
-   without leaving its pivot (the old fourth slot was ~364 px / 155 dp away). Neighbours are 185 px apart
-   centre to centre against a 150 px hex, so the gap between hexes is 35 px. Centres (from the corner):
-     a1 (170,170)  a2 (217,436)  a3 (377,344)  a4 (440,170)
-   TouchHudLayoutTests parses these four rules and fails if any centre drifts past 125 dp of slot 1, two hexes
-   overlap, or one leaves the 2400x1080 / 1920x864 / 1440x1080 panels. */
-.cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* centre (-170,170) */
-.cw-hex--a2 { right: 142px; bottom: 361px; }   /* centre (-217,436) : straight up, a touch left */
-.cw-hex--a3 { right: 302px; bottom: 269px; }   /* centre (-377,344) : the diagonal */
-.cw-hex--a4 { right: 365px; bottom: 95px;  }   /* centre (-440,170) : level with slot 1, to its left */
+   Every slot has a fixed role (Maestro 2026-11-20), and the geometry says it: slot 1 (income, the most used) sits in the
+   corner where the thumb rests; slots 2 (movement) and 4 (main attack, combo partner of 1) are MIRROR IMAGES of each other
+   across the 45-degree diagonal through slot 1's centre, at the same distance; slot 3 (flex, the least used) sits ON that
+   diagonal, further out. Centres from the corner (x leftwards, y up), offsets from slot 1 in brackets:
+     a1 (170,170)  a2 (188,360) [18,190]  a4 (360,188) [190,18]  a3 (377,377) [207,207]
+   a2 and a4 are 190.9 px from a1 (5.4 degrees off the horizontal / vertical axis: the tilt is small on purpose, a bigger
+   one pushes a3 past 125 dp = 294 px of slot 1, or a3 into a2 / a4), a3 is 292.7 px (124.6 dp) out. Gaps between hexes:
+   a1-a2 / a1-a4 40.9 px, a3-a2 / a3-a4 39.8 px, a2-a4 243 px (150 px hex). TouchHudLayoutTests (Phase6Chunk6Tests) pins
+   the reach, the overlap and the panels; Phase6Chunk6Tests.Cluster_Slots2And4MirrorAcrossTheDiagonal_Slot3SitsOnItFurtherOut pins the mirror. */
+.cw-hex--a1 { right: 95px;  bottom: 95px;  }   /* centre (-170,170) : the corner */
+.cw-hex--a2 { right: 113px; bottom: 285px; }   /* centre (-188,360) : above slot 1, a touch left */
+.cw-hex--a3 { right: 302px; bottom: 302px; }   /* centre (-377,377) : ON the diagonal, furthest out */
+.cw-hex--a4 { right: 285px; bottom: 113px; }   /* centre (-360,188) : left of slot 1, a touch up (mirror of a2) */
 
 /* --- Layer 6 : cooldown clip (dark overlay rising from the bottom) --------- */
 /* The wrapper's height % = remaining/total; overflow hidden crops the fill's
@@ -616,10 +618,14 @@
    The UI Toolkit panel is NOT area-scaled: ScaleWithScreenSize + MatchWidthOrHeight 0.5 is a LINEAR blend,
    scale = (W/1920 + H/1080) / 2, so a 9:20 phone (1080x2400, Pixel 10 Pro 1080x2410) gets a 776 x 1724 panel,
    not the 966 x 2147 the WP7 layout was sized for. At 776 px the landscape arc (hexes up to 515 px from the
-   right) ran into the joystick (80..360). Portrait touch uses a 2 x 2 grid instead, same order as the arc
-   (a1 bottom-right, a2 above it, a4 to its left, a3 diagonal): boxes 30 px apart side by side (column pitch 180,
-   ~ the landscape arc's 185), 25 px apart above; with their 80 px rings 20 / 15 px, so the 10 px denied-press
-   bump (a horizontal shake) still leaves >= 10 px (WP8 gate: 9:16 caught a 7.7 px gap at pitch 174), the right column 80 px from the edge (the edge-cancel arm
+   right) ran into the joystick (80..360). Portrait touch uses a 2 x 2 grid instead, same roles as the arc
+   (a1 bottom-right corner, a2 above it, a4 to its left, a3 on the diagonal; a2 and a4 mirror images across the
+   diagonal through a1, a3 further out; pinned by Phase6Chunk6Tests.Cluster_Slots2And4MirrorAcrossTheDiagonal_Slot3SitsOnItFurtherOut): column and
+   row pitch both 180 (a1 centre (155,170), a2 (155,350), a4 (335,170), a3 (335,350)), so the boxes are 30 px apart both
+   ways and the 80 px rings 20 px, so the 10 px denied-press bump (a horizontal shake) still leaves >= 10 px (WP8 gate:
+   9:16 caught a 7.7 px gap at pitch 174). The tilt of the landscape arc is 0 here on purpose: the left column is already
+   at the stick's edge on the 749 px panel (centre 335 from the right), and any tilt either squeezes a3 against a2 / a4
+   or pushes a3 past that edge. The right column is 80 px from the edge (the edge-cancel arm
    band is 36 dp = ~80 panel px on a 9:20 phone), and the stick + status strip 40 px from the left. It fits
    down to a 749 px panel (just under 9:21). Placed BEFORE the desktop / pad block on purpose: at equal specificity those
    rules win when the keyboard / pad strip is up. HudControlZones mirrors every number
@@ -627,8 +633,8 @@
    ============================================================================ */
 .layout--portrait .cw-joy-base     { left: 40px; }
 .layout--portrait .cw-hex--a1 { right: 80px;  bottom: 95px;  }
-.layout--portrait .cw-hex--a2 { right: 80px;  bottom: 270px; }
-.layout--portrait .cw-hex--a3 { right: 260px; bottom: 270px; }
+.layout--portrait .cw-hex--a2 { right: 80px;  bottom: 275px; }
+.layout--portrait .cw-hex--a3 { right: 260px; bottom: 275px; }
 .layout--portrait .cw-hex--a4 { right: 260px; bottom: 95px;  }
 
 /* ============================================================================
