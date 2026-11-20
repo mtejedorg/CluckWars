@@ -48,6 +48,7 @@ namespace CluckWars.Balance
                 report.StandardCapacity = standard.CargoCapacity;
                 report.StandardMeanCargo = farmers.MeanCargo;
                 report.StandardLeaderBanked = farmers.LeaderBanked;
+                report.StandardFarmerBanked = farmers.FarmerBanked;
 
                 BuildSpoiler(report, inputs, scope, match, farmers);
                 BuildThief(report, inputs, scope, match, kits, farmers);
@@ -124,6 +125,7 @@ namespace CluckWars.Balance
         {
             public float MeanCargo;
             public float LeaderBanked;
+            public float[] FarmerBanked;
         }
 
         /// <summary>
@@ -142,7 +144,10 @@ namespace CluckWars.Balance
                 sum += Mathf.Min(r.Banked / r.Trips, standard.CargoCapacity);
                 counted++;
             }
-            return new FarmerFacts { MeanCargo = counted > 0 ? sum / counted : 0f, LeaderBanked = leader };
+            // The Spoiler takes the fourth seat, so the three farmers it hunts are seats 0 to 2 of this run.
+            var hunted = new float[Seats - 1];
+            for (int i = 0; i < hunted.Length; i++) hunted[i] = results[i].Banked;
+            return new FarmerFacts { MeanCargo = counted > 0 ? sum / counted : 0f, LeaderBanked = leader, FarmerBanked = hunted };
         }
 
         // ------------------------------------------------------- Sneaky tables
@@ -160,7 +165,7 @@ namespace CluckWars.Balance
                 RemovalSeconds = mark.RemovalSeconds,
                 MeanCargo = farmers.MeanCargo,
                 Capacity = report.StandardCapacity,
-                LeaderBanked = farmers.LeaderBanked,
+                FarmerBanked = farmers.FarmerBanked,
                 MaxKills = SneakyTables.MaxSpoilerKills(mark, match.MatchDurationSeconds),
             };
             report.SpoilerBountyPerKill = t.ExecuteBounty;

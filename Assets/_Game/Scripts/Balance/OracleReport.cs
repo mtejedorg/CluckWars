@@ -40,6 +40,7 @@ namespace CluckWars.Balance
         public float CargoPerKill;
         public float Final;
         public float FinalWithPassive;
+        /// <summary>The best standard farmer left after the kills landed on the farmers (what the Spoiler has to beat).</summary>
         public float LeaderFinal;
         public bool Wins;
         public bool WinsWithPassive;
@@ -51,6 +52,8 @@ namespace CluckWars.Balance
         public int Steals;
         public float VictimCargo;
         public float Banked;
+        /// <summary>Round trips home, the last one (banking what is still held) included.</summary>
+        public int Trips;
         public float SecondsNeeded;
         public bool FitsTheClock;
     }
@@ -64,6 +67,8 @@ namespace CluckWars.Balance
             "Pursuit: nobody chases anybody, so escape speed and Egg Shell show no value.",
             "Scatter cover: the walls are the only obstacles.",
             "Bots' decisions: routes are fixed rules, not what a bot would choose.",
+            "The Spoiler's walk home to bank its bag is not timed.",
+            "A kill or a steal is assumed to always land.",
             "The Peck cast, until it ships in the game: a peck gives its food at the end of its cooldown.",
             "Straight-line jump legs: a jumping kit crosses arms in a straight line, which is an approximation.",
         };
@@ -87,6 +92,8 @@ namespace CluckWars.Balance
         public float StandardMeanCargo;
         public float StandardCapacity;
         public float StandardLeaderBanked;
+        /// <summary>The three farmers the Spoiler is compared with (seats 0 to 2 of the four-standard-farmer run).</summary>
+        public float[] StandardFarmerBanked = Array.Empty<float>();
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -111,7 +118,8 @@ namespace CluckWars.Balance
             sb.Append("\"standard\":{");
             Num(sb, "meanCargo", StandardMeanCargo); sb.Append(',');
             Num(sb, "capacity", StandardCapacity); sb.Append(',');
-            Num(sb, "leaderBanked", StandardLeaderBanked); sb.Append("},");
+            Num(sb, "leaderBanked", StandardLeaderBanked); sb.Append(',');
+            Arr(sb, "farmerBanked", StandardFarmerBanked); sb.Append("},");
 
             sb.Append("\"spoiler\":{");
             Num(sb, "bountyPerKill", SpoilerBountyPerKill); sb.Append(',');
@@ -143,6 +151,7 @@ namespace CluckWars.Balance
                 Num(sb, "steals", r.Steals); sb.Append(',');
                 Num(sb, "victimCargo", r.VictimCargo); sb.Append(',');
                 Num(sb, "banked", r.Banked); sb.Append(',');
+                Num(sb, "trips", r.Trips); sb.Append(',');
                 Num(sb, "secondsNeeded", r.SecondsNeeded); sb.Append(',');
                 Bool(sb, "fitsTheClock", r.FitsTheClock);
                 sb.Append('}');
@@ -267,28 +276,39 @@ namespace CluckWars.Balance
             sb.AppendLine();
             sb.AppendLine($"Each row is the Spoiler after some executions of victims who each hold the cargo shown. A kill pays {F0(SpoilerBountyPerKill)} food plus the victim's cargo. "
                 + $"The passive adds {F0(SpoilerPassiveBonus)} food when the clock runs out with nobody at {F0(WinTarget)}. "
-                + $"The best farmer starts at {F1(StandardLeaderBanked)} food and loses cargo and {F1(SpoilerRemovalSeconds)} s of income for each kill that lands on it. "
-                + "The Spoiler wins a row when it ends above the best farmer; with the passive it must also be that nobody reached the goal.");
+                + $"Without kills the three standard farmers end on {FarmerList()} food. Kills go to the best farmer first, then the second, then the third, and each victim loses its cargo and {F1(SpoilerRemovalSeconds)} s of its own income. "
+                + "The Spoiler wins a row when it ends above the best farmer left; with the passive it must also be that nobody reached the goal.");
             sb.AppendLine();
-            sb.AppendLine("| Kills | Cargo per victim | Spoiler ends on | With the passive | Best farmer ends on | Wins | Wins with passive |");
+            sb.AppendLine("| Kills | Cargo per victim | Spoiler ends on | With the passive | Best farmer left ends on | Wins | Wins with passive |");
             sb.AppendLine("|---|---|---|---|---|---|---|");
             foreach (var r in Spoiler)
                 sb.AppendLine($"| {r.Kills} | {F1(r.CargoPerKill)} | {F1(r.Final)} | {F1(r.FinalWithPassive)} | {F1(r.LeaderFinal)} | {YesNo(r.Wins)} | {YesNo(r.WinsWithPassive)} |");
             sb.AppendLine();
         }
 
+        private string FarmerList()
+        {
+            var parts = new List<string>();
+            foreach (float b in StandardFarmerBanked) parts.Add(F1(b));
+            return string.Join(", ", parts);
+        }
+
         private void ThiefSection(StringBuilder sb)
         {
             sb.AppendLine("## Thief: steals needed");
             sb.AppendLine();
-            sb.AppendLine("Each row is the Thief after some steals from victims who each hold the cargo shown (a steal takes the Thief's amount, or everything the victim has if that is less). "
-                + "Time counts the steal cooldowns, one walk home from a contested pile for every trip its cargo capacity forces, and the time to bank the food. "
-                + $"The goal is {F0(WinTarget)} food; the clock is {F0(ClockSeconds)} s.");
+            sb.AppendLine("Each row is the Thief after some steals from victims who each hold the cargo shown. A steal takes the Thief's amount, or everything the victim has if that is less, or whatever room the Thief has left. "
+                + "The Thief goes home when it cannot take a full steal; each trip is a round trip between a contested pile and its base, and the last load is banked on one more trip. "
+                + "Time counts the steal cooldowns, those trips and the time to bank the food. "
+                + $"The goal is {F0(WinTarget)} food; the clock is {F0(ClockSeconds)} s. Victims carrying nothing: no steal pays, so they get no rows.");
             sb.AppendLine();
-            sb.AppendLine("| Steals | Cargo per victim | Food taken | Seconds needed | Fits the clock | Reaches the goal |");
-            sb.AppendLine("|---|---|---|---|---|---|");
+            sb.AppendLine("| Steals | Cargo per victim | Food taken | Trips home | Seconds needed | Fits the clock | Reaches the goal |");
+            sb.AppendLine("|---|---|---|---|---|---|---|");
             foreach (var r in Thief)
-                sb.AppendLine($"| {r.Steals} | {F1(r.VictimCargo)} | {F1(r.Banked)} | {F1(r.SecondsNeeded)} | {YesNo(r.FitsTheClock)} | {YesNo(r.Banked >= WinTarget)} |");
+            {
+                if (r.VictimCargo <= 0f) continue;
+                sb.AppendLine($"| {r.Steals} | {F1(r.VictimCargo)} | {F1(r.Banked)} | {r.Trips} | {F1(r.SecondsNeeded)} | {YesNo(r.FitsTheClock)} | {YesNo(r.Banked >= WinTarget)} |");
+            }
             sb.AppendLine();
         }
 

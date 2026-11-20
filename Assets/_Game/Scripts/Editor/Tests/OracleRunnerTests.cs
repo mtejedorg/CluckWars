@@ -228,6 +228,106 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void SpoilerTable_OneKill_ComparesAgainstTheFarmersLeft()
+        {
+            var banked = _baseline.StandardFarmerBanked;
+            Assert.AreEqual(3, banked.Length, "the three farmers the Spoiler hunts");
+            var sorted = banked.OrderByDescending(b => b).ToArray();
+            float clock = _baseline.ClockSeconds;
+            foreach (var row in _baseline.Spoiler.Where(r => r.Kills == 1))
+            {
+                float reducedLeader = Math.Max(0f, sorted[0] - (row.CargoPerKill + sorted[0] / clock * _baseline.SpoilerRemovalSeconds));
+                float expected = Math.Max(reducedLeader, Math.Max(sorted[1], sorted[2]));
+                Assert.AreEqual(expected, row.LeaderFinal, 1e-3f, $"cargo {row.CargoPerKill}");
+                Assert.GreaterOrEqual(row.LeaderFinal, sorted[1], "an untouched farmer is still there to beat");
+            }
+        }
+
+        [Test]
+        public void SpoilerTable_KillsGoToTheBestFarmerFirst_ThenTheNext()
+        {
+            var t = new SpoilerTableInputs
+            {
+                ExecuteBounty = 5f, PassiveBonus = 15f, ClockSeconds = 45f, WinTarget = 40f, RemovalSeconds = 3f,
+                MeanCargo = 10f, Capacity = 14f, FarmerBanked = new[] { 19f, 21f, 20f }, MaxKills = 4,
+            };
+            var rows = SneakyTables.Spoiler(t).Where(r => r.CargoPerKill == 10f).OrderBy(r => r.Kills).ToList();
+
+            Assert.AreEqual(21f, rows[0].LeaderFinal, 1e-4f);
+            Assert.AreEqual(20f, rows[1].LeaderFinal, 1e-4f, "after one kill the second farmer is the best left, not the reduced leader");
+            Assert.AreEqual(19f, rows[2].LeaderFinal, 1e-4f, "after two kills the third farmer is");
+            Assert.Less(rows[3].LeaderFinal, 19f, "three kills reach every farmer");
+        }
+
+        private (OracleKit thief, SnatchAbilitySO steal, PassiveAbilitySO passive) ThiefParts()
+        {
+            var thief = OracleKits.All(Inputs()).Single(k => k.Label == ChickenSubclass.Assassin_Thief.ToString());
+            var steal = _abilities.All.OfType<SnatchAbilitySO>().Single(a => a.Job == AbilityJob.Steal);
+            var passive = _abilities.Passives.OfType<ThiefPassiveSO>().Single();
+            return (thief, steal, passive);
+        }
+
+        private float MeanBaseToContested(bool jumps)
+        {
+            float sum = 0f;
+            for (int seat = 0; seat < 4; seat++)
+            {
+                sum += _map.Leg(OracleMapSO.BaseIndex(seat), OracleMapSO.ContestedIndex(seat), jumps);
+                sum += _map.Leg(OracleMapSO.BaseIndex(seat), OracleMapSO.ContestedIndex((seat + 3) % 4), jumps);
+            }
+            return sum / 8f;
+        }
+
+        [Test]
+        public void ThiefTable_ATripIsARoundTrip()
+        {
+            var (thief, steal, passive) = ThiefParts();
+            float cooldown = passive.ModifyCooldown(steal.Cooldown, steal, null);
+            float roundTrip = 2f * MeanBaseToContested(thief.Jumps) / thief.MoveSpeed;
+            Assert.Greater(roundTrip, 0f);
+
+            foreach (var row in _baseline.Thief)
+            {
+                float expected = row.Steals * cooldown + row.Trips * roundTrip + row.Banked / thief.DepositRate;
+                Assert.AreEqual(expected, row.SecondsNeeded, 1e-3f, $"steals {row.Steals}, cargo {row.VictimCargo}");
+            }
+        }
+
+        [Test]
+        public void ThiefTable_ASteal_NeverTakesMoreThanTheRoom()
+        {
+            var (thief, steal, passive) = ThiefParts();
+            float perSteal = passive.ModifyStealAmount(steal.StealAmount, null);
+            foreach (var row in _baseline.Thief)
+            {
+                float full = Math.Min(perSteal, row.VictimCargo);
+                Assert.LessOrEqual(row.Trips, row.Steals, "no more trips than steals");
+                Assert.GreaterOrEqual(row.Trips, (int)Math.Ceiling(row.Banked / thief.CargoCapacity - 1e-4f), $"{row.Banked} food cannot ride in fewer loads");
+                Assert.LessOrEqual(row.Banked, row.Steals * full + 1e-4f);
+                // When two full steals do not fit in the cargo, every steal needs its own trip.
+                if (full > 0f && 2f * full > thief.CargoCapacity) Assert.AreEqual(row.Steals, row.Trips, $"steals {row.Steals}, cargo {row.VictimCargo}");
+            }
+        }
+
+        [Test]
+        public void ThiefTable_GoesHomeWhenItCannotTakeAFullSteal()
+        {
+            var t = new ThiefTableInputs
+            {
+                StealAmount = 5f, StealMultiplier = 1f, StealCooldown = 4f, CargoCapacity = 12f, MoveSpeed = 10f, DepositRate = 10f,
+                MeanBaseToContestedLeg = 10f, ClockSeconds = 45f, WinTarget = 40f, MeanCargo = 100f, Capacity = 60f,
+            };
+            var rows = SneakyTables.Thief(t).Where(r => r.VictimCargo == 100f).OrderBy(r => r.Steals).ToList();
+
+            Assert.AreEqual(1, rows[0].Trips);
+            Assert.AreEqual(1, rows[1].Trips, "two steals of 5 fit in 12");
+            Assert.AreEqual(10f, rows[1].Banked, 1e-4f);
+            Assert.AreEqual(2, rows[2].Trips, "a third full steal does not fit: home first, then another load");
+            Assert.AreEqual(15f, rows[2].Banked, 1e-4f, "the steal that did not fit took nothing extra");
+            Assert.AreEqual(4f * 3 + 2 * (2f * 10f / 10f) + 15f / 10f, rows[2].SecondsNeeded, 1e-3f);
+        }
+
+        [Test]
         public void Report_ListsWhatItDoesNotModel()
         {
             Assert.IsNotEmpty(_baseline.NotModelled);
