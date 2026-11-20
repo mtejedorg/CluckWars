@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,6 +7,7 @@ using CluckWars.Audio;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Services;
+using CluckWars.Settings;
 
 namespace CluckWars.Tests
 {
@@ -354,67 +356,196 @@ namespace CluckWars.Tests
             Assert.IsFalse(kb.GetAbilityHeld(-1));
         }
 
-        // ---- Ability key bindings (Maestro, 2026-08-15) -------------------------
-        // Asserted against the Key-enum table rather than by pressing keys, because
-        // Keyboard.current is null in EditMode — an enum table is what makes this
-        // mapping verifiable at all.
+        // ---- Ability key bindings: two schemes (Maestro, 2026-11-20) -----------------------------
+        // Asserted against the Key-enum tables rather than by pressing keys, because
+        // Keyboard.current is null in EditMode: an enum table is what makes the mapping verifiable at all.
+
+        private static readonly KeyboardScheme[] Schemes = { KeyboardScheme.WasdArrows, KeyboardScheme.ArrowsQwer };
 
         [Test]
-        public void Keyboard_EveryAbilitySlot_HasALetterADigitAndAnArrow()
+        public void Keyboard_WasdArrows_PinsTheExactTable()
         {
-            var table = KeyboardInputProvider.AbilityKeys;
-
-            Assert.AreEqual(4, table.Length,
-                "One row per ability slot; every class has had four slots since b3bf52f.");
-
-            var expected = new[]
-            {
-                new[] { Key.Q, Key.Digit1, Key.UpArrow },
-                new[] { Key.E, Key.Digit2, Key.RightArrow },
-                new[] { Key.R, Key.Digit3, Key.DownArrow },
-                new[] { Key.F, Key.Digit4, Key.LeftArrow },
-            };
-
-            for (int slot = 0; slot < expected.Length; slot++)
-            {
-                CollectionAssert.AreEqual(expected[slot], table[slot],
-                    $"Slot {slot} bindings changed. Digits must match the number printed on " +
-                    "the HUD hex, and the arrows run clockwise from Up in the same order.");
-            }
+            var table = KeyboardInputProvider.AbilityKeysFor(KeyboardScheme.WasdArrows);
+            Assert.AreEqual(4, table.Length, "One row per ability slot.");
+            CollectionAssert.AreEqual(new[] { Key.DownArrow,  Key.Digit1 }, table[0], "slot 1 = Down");
+            CollectionAssert.AreEqual(new[] { Key.UpArrow,    Key.Digit2 }, table[1], "slot 2 = Up");
+            CollectionAssert.AreEqual(new[] { Key.RightArrow, Key.Digit3 }, table[2], "slot 3 = Right");
+            CollectionAssert.AreEqual(new[] { Key.LeftArrow,  Key.Digit4 }, table[3], "slot 4 = Left");
+            CollectionAssert.AreEqual(new[] { Key.W, Key.S, Key.A, Key.D }, KeyboardInputProvider.MovementKeysFor(KeyboardScheme.WasdArrows), "up, down, left, right");
         }
 
         [Test]
-        public void Keyboard_NoKeyDrivesTwoDifferentAbilities()
+        public void Keyboard_ArrowsQwer_PinsTheExactTable()
         {
-            // A key appearing in two rows would fire both abilities from one press — and
-            // would look like a gameplay bug ("why did Peck go off too?"), not an input one.
-            var seen = new Dictionary<Key, int>();
+            var table = KeyboardInputProvider.AbilityKeysFor(KeyboardScheme.ArrowsQwer);
+            Assert.AreEqual(4, table.Length, "One row per ability slot.");
+            CollectionAssert.AreEqual(new[] { Key.Q, Key.Digit1 }, table[0], "slot 1 = Q");
+            CollectionAssert.AreEqual(new[] { Key.W, Key.Digit2 }, table[1], "slot 2 = W");
+            CollectionAssert.AreEqual(new[] { Key.R, Key.Digit3 }, table[2], "slot 3 = R (the flex slot sits last, like an ultimate)");
+            CollectionAssert.AreEqual(new[] { Key.E, Key.Digit4 }, table[3], "slot 4 = E");
+            CollectionAssert.AreEqual(new[] { Key.UpArrow, Key.DownArrow, Key.LeftArrow, Key.RightArrow },
+                KeyboardInputProvider.MovementKeysFor(KeyboardScheme.ArrowsQwer), "up, down, left, right");
+        }
 
-            var table = KeyboardInputProvider.AbilityKeys;
-            for (int slot = 0; slot < table.Length; slot++)
+        [Test]
+        public void Keyboard_EverySlotOfEveryScheme_HasItsKeyAndItsDigit()
+        {
+            foreach (var scheme in Schemes)
             {
-                foreach (var key in table[slot])
+                var table = KeyboardInputProvider.AbilityKeysFor(scheme);
+                Assert.AreEqual(4, table.Length, $"{scheme}: four slots");
+                for (int slot = 0; slot < 4; slot++)
                 {
-                    Assert.IsFalse(seen.TryGetValue(key, out int firstSlot),
-                        $"{key} is bound to both slot {firstSlot} and slot {slot}.");
-                    seen[key] = slot;
+                    Assert.AreEqual(2, table[slot].Length, $"{scheme} slot {slot}: the scheme's key plus a digit");
+                    Assert.AreEqual(Key.Digit1 + slot, table[slot][1], $"{scheme} slot {slot}: the digit printed on the HUD hex");
+                    CollectionAssert.AllItemsAreUnique(table[slot], $"{scheme} slot {slot}: no duplicate key inside a slot");
                 }
             }
         }
 
         [Test]
-        public void Keyboard_NoAbilityKeyCollidesWithMovement()
+        public void Keyboard_NoKeyDrivesTwoDifferentAbilities_InEitherScheme()
         {
-            // WASD is the left hand and must stay purely movement. A collision here would
-            // make walking fire an ability every time the key went down.
-            var movement = new HashSet<Key>(KeyboardInputProvider.MovementKeys);
-
-            foreach (var row in KeyboardInputProvider.AbilityKeys)
-            foreach (var key in row)
+            // A key appearing in two rows would fire both abilities from one press.
+            foreach (var scheme in Schemes)
             {
-                Assert.IsFalse(movement.Contains(key),
-                    $"{key} is both a movement key and an ability key.");
+                var seen = new Dictionary<Key, int>();
+                var table = KeyboardInputProvider.AbilityKeysFor(scheme);
+                for (int slot = 0; slot < table.Length; slot++)
+                    foreach (var key in table[slot])
+                    {
+                        Assert.IsFalse(seen.TryGetValue(key, out int firstSlot), $"{scheme}: {key} is bound to both slot {firstSlot} and slot {slot}.");
+                        seen[key] = slot;
+                    }
             }
+        }
+
+        [Test]
+        public void Keyboard_NoAbilityKeyCollidesWithThatSchemesMovement_AndEscIsInNeither()
+        {
+            // Walking must never fire an ability, and Esc stays cancel / back / Leave sheet.
+            foreach (var scheme in Schemes)
+            {
+                var movement = new HashSet<Key>(KeyboardInputProvider.MovementKeysFor(scheme));
+                Assert.AreEqual(4, movement.Count, $"{scheme}: four distinct movement keys");
+                Assert.IsFalse(movement.Contains(Key.Escape), $"{scheme}: Esc is not a movement key");
+                foreach (var row in KeyboardInputProvider.AbilityKeysFor(scheme))
+                    foreach (var key in row)
+                    {
+                        Assert.IsFalse(movement.Contains(key), $"{scheme}: {key} is both a movement key and an ability key.");
+                        Assert.AreNotEqual(Key.Escape, key, $"{scheme}: Esc is not an ability key.");
+                    }
+            }
+        }
+
+        [Test]
+        public void Keyboard_TheTwoSchemesShareOnlyTheDigits()
+        {
+            var a = new HashSet<Key>(KeyboardInputProvider.AbilityKeysFor(KeyboardScheme.WasdArrows).SelectMany(r => r));
+            var b = KeyboardInputProvider.AbilityKeysFor(KeyboardScheme.ArrowsQwer).SelectMany(r => r);
+            CollectionAssert.AreEquivalent(new[] { Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4 }, b.Where(a.Contains).ToArray());
+        }
+
+        // ---- KeyboardScheme preference ------------------------------------------------------------
+
+        [Test]
+        public void KeyboardScheme_DefaultsToWasdArrows_RoundTrips_AndGarbageFallsBack()
+        {
+            bool had = PlayerPrefs.HasKey(PlayerPreferences.KeyboardSchemeKey);
+            int saved = PlayerPrefs.GetInt(PlayerPreferences.KeyboardSchemeKey, 0);
+            try
+            {
+                PlayerPrefs.DeleteKey(PlayerPreferences.KeyboardSchemeKey);
+                PlayerPreferences.ResetCache();
+                Assert.AreEqual(KeyboardScheme.WasdArrows, PlayerPreferences.KeyboardSchemeChoice, "default");
+
+                PlayerPreferences.KeyboardSchemeChoice = KeyboardScheme.ArrowsQwer;
+                Assert.AreEqual(KeyboardScheme.ArrowsQwer, PlayerPreferences.KeyboardSchemeChoice, "live, no reload");
+                PlayerPreferences.ResetCache();
+                Assert.AreEqual(KeyboardScheme.ArrowsQwer, PlayerPreferences.KeyboardSchemeChoice, "persisted");
+                StringAssert.StartsWith("CluckWars.", PlayerPreferences.KeyboardSchemeKey);
+
+                PlayerPrefs.SetInt(PlayerPreferences.KeyboardSchemeKey, 99);
+                PlayerPreferences.ResetCache();
+                Assert.AreEqual(KeyboardScheme.WasdArrows, PlayerPreferences.KeyboardSchemeChoice, "an unknown stored value falls back to the default");
+                Assert.AreEqual(KeyboardScheme.WasdArrows, PlayerPreferences.SchemeFromStored(-1));
+                Assert.AreEqual(KeyboardScheme.ArrowsQwer, PlayerPreferences.SchemeFromStored(1));
+            }
+            finally
+            {
+                if (had) PlayerPrefs.SetInt(PlayerPreferences.KeyboardSchemeKey, saved);
+                else PlayerPrefs.DeleteKey(PlayerPreferences.KeyboardSchemeKey);
+                PlayerPrefs.Save();
+                PlayerPreferences.ResetCache();
+            }
+        }
+
+        // ---- Badges and strip arrangement ---------------------------------------------------------
+
+        [Test]
+        public void Badge_WasdArrows_DrawsArrowsDownUpRightLeft_WithNoText()
+        {
+            var arrows = new[] { BadgeArrow.Down, BadgeArrow.Up, BadgeArrow.Right, BadgeArrow.Left };
+            for (int slot = 0; slot < 4; slot++)
+            {
+                Assert.AreEqual(arrows[slot], HudLayoutRules.ArrowFor(HudDeviceMode.KeyboardMouse, slot, KeyboardScheme.WasdArrows), $"slot {slot}");
+                Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.KeyboardMouse, slot, KeyboardScheme.WasdArrows), "an arrow badge prints no text");
+            }
+        }
+
+        [Test]
+        public void Badge_ArrowsQwer_PrintsQWRE_AndNoArrow()
+        {
+            var letters = new[] { "Q", "W", "R", "E" };
+            for (int slot = 0; slot < 4; slot++)
+            {
+                Assert.AreEqual(letters[slot], HudLayoutRules.BadgeLabel(HudDeviceMode.KeyboardMouse, slot, KeyboardScheme.ArrowsQwer), $"slot {slot}");
+                Assert.AreEqual(BadgeArrow.None, HudLayoutRules.ArrowFor(HudDeviceMode.KeyboardMouse, slot, KeyboardScheme.ArrowsQwer));
+            }
+        }
+
+        [Test]
+        public void Badge_OnTouchAndPad_IgnoresTheKeyboardScheme()
+        {
+            foreach (var scheme in Schemes)
+            {
+                Assert.AreEqual("1", HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, 0, scheme));
+                Assert.AreEqual("A", HudLayoutRules.BadgeLabel(HudDeviceMode.Gamepad, 0, scheme));
+                Assert.AreEqual(BadgeArrow.None, HudLayoutRules.ArrowFor(HudDeviceMode.Touch, 0, scheme));
+                Assert.AreEqual(BadgeArrow.None, HudLayoutRules.ArrowFor(HudDeviceMode.Gamepad, 0, scheme));
+            }
+            Assert.AreEqual(BadgeArrow.None, HudLayoutRules.ArrowFor(HudDeviceMode.KeyboardMouse, 4, KeyboardScheme.WasdArrows), "out of range is inert");
+        }
+
+        [Test]
+        public void BadgeArrow_Classes_AreOnePerDirection_EachWithOneRotateRule()
+        {
+            string uss = System.IO.File.ReadAllText(System.IO.Path.Combine(
+                System.IO.Directory.GetParent(Application.dataPath).FullName, "Assets/UI/Styles/TouchControls.uss"));
+            var expectedDegrees = new Dictionary<BadgeArrow, int> { { BadgeArrow.Up, 0 }, { BadgeArrow.Right, 90 }, { BadgeArrow.Down, 180 }, { BadgeArrow.Left, 270 } };
+            foreach (var kv in expectedDegrees)
+            {
+                string cls = HudLayoutRules.ArrowClass(kv.Key);
+                Assert.IsNotNull(cls, kv.Key.ToString());
+                var m = System.Text.RegularExpressions.Regex.Match(uss,
+                    @"\." + System.Text.RegularExpressions.Regex.Escape(cls) + @"\s*\{\s*rotate:\s*(\d+)deg");
+                Assert.IsTrue(m.Success, $"{cls}: no rotate rule");
+                Assert.AreEqual(kv.Value, int.Parse(m.Groups[1].Value), $"{cls} rotation");
+            }
+            Assert.IsNull(HudLayoutRules.ArrowClass(BadgeArrow.None));
+        }
+
+        [Test]
+        public void StripArrangement_EveryDeviceAndScheme()
+        {
+            Assert.AreEqual(HudStripArrangement.Tee, HudLayoutRules.StripArrangement(HudDeviceMode.KeyboardMouse, KeyboardScheme.WasdArrows));
+            Assert.AreEqual(HudStripArrangement.Row, HudLayoutRules.StripArrangement(HudDeviceMode.KeyboardMouse, KeyboardScheme.ArrowsQwer));
+            Assert.AreEqual(HudStripArrangement.Tee, HudLayoutRules.StripArrangement(HudDeviceMode.Gamepad, KeyboardScheme.WasdArrows), "pad shares the T");
+            Assert.AreEqual(HudStripArrangement.Tee, HudLayoutRules.StripArrangement(HudDeviceMode.Gamepad, KeyboardScheme.ArrowsQwer), "the keyboard scheme never changes the pad");
+            Assert.AreEqual(HudStripArrangement.None, HudLayoutRules.StripArrangement(HudDeviceMode.Touch, KeyboardScheme.WasdArrows));
+            Assert.AreEqual(HudStripArrangement.None, HudLayoutRules.StripArrangement(HudDeviceMode.Touch, KeyboardScheme.ArrowsQwer));
+            Assert.AreEqual("cw-hud--strip-row", HudLayoutRules.ArrangementClass(HudStripArrangement.Row));
+            Assert.AreEqual("cw-hud--strip-tee", HudLayoutRules.ArrangementClass(HudStripArrangement.Tee));
         }
     }
 }

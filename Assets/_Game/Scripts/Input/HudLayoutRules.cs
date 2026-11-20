@@ -1,4 +1,5 @@
 using CluckWars.Localization;
+using CluckWars.Settings;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 
@@ -14,6 +15,20 @@ namespace CluckWars.Input
         /// <summary>As KeyboardMouse, badged with the pad buttons.</summary>
         Gamepad = 2,
     }
+
+    /// <summary>How the four hexes of the desktop / pad information strip are arranged (<see cref="HudLayoutRules.StripArrangement"/>).</summary>
+    public enum HudStripArrangement : byte
+    {
+        /// <summary>The touch arc (the strip does not exist).</summary>
+        None = 0,
+        /// <summary>One row, left to right Q W E R = slots 1, 2, 4, 3 (keyboard scheme ArrowsQwer).</summary>
+        Row = 1,
+        /// <summary>Inverted T like the arrow cluster and the pad's face diamond: slot 2 on top, slots 4, 1, 3 along the bottom.</summary>
+        Tee = 2,
+    }
+
+    /// <summary>Which way an arrow-key badge points; the badge shows a drawn arrow because the HUD fonts have no arrow glyphs.</summary>
+    public enum BadgeArrow : byte { None = 0, Up = 1, Right = 2, Down = 3, Left = 4 }
 
     /// <summary>
     /// Pure rules behind the desktop / controller HUD: which layout the last-used device wants, what each hex's badge
@@ -52,23 +67,74 @@ namespace CluckWars.Input
         // ---- Badges ----------------------------------------------------------------------------------
 
         /// <summary>
-        /// What the slot badge shows: the slot number on touch, the slot's first key on keyboard (Q / E / R / F), the
-        /// slot's face button on a controller (A / Y / B / X). Derived from the REAL binding tables, so the badge
-        /// can never advertise a key the provider does not read.
+        /// What the slot badge prints: the slot number on touch, the slot's first key on keyboard (a letter for ArrowsQwer;
+        /// <see cref="string.Empty"/> for an arrow key, which <see cref="ArrowFor"/> draws instead), the slot's face button on a
+        /// controller (A / Y / B / X). Derived from the REAL binding tables, so the badge can never advertise a key the
+        /// provider does not read.
         /// </summary>
-        public static string BadgeLabel(HudDeviceMode mode, int slot)
+        public static string BadgeLabel(HudDeviceMode mode, int slot, KeyboardScheme scheme)
         {
             if (slot < 0 || slot >= 4) return string.Empty;
             switch (mode)
             {
                 case HudDeviceMode.KeyboardMouse:
-                    return KeyboardInputProvider.AbilityKeys[slot][0].ToString();
+                {
+                    var key = KeyboardInputProvider.AbilityKeysFor(scheme)[slot][0];
+                    return ArrowOf(key) != BadgeArrow.None ? string.Empty : key.ToString();
+                }
                 case HudDeviceMode.Gamepad:
                     return PadLabel(GamepadInputProvider.AbilityButtons[slot][0]);
                 default:
                     return (slot + 1).ToString();
             }
         }
+
+        /// <summary>The arrow the slot's badge draws (keyboard, arrow-key slot); <see cref="BadgeArrow.None"/> everywhere else.</summary>
+        public static BadgeArrow ArrowFor(HudDeviceMode mode, int slot, KeyboardScheme scheme) =>
+            mode == HudDeviceMode.KeyboardMouse && slot >= 0 && slot < 4
+                ? ArrowOf(KeyboardInputProvider.AbilityKeysFor(scheme)[slot][0])
+                : BadgeArrow.None;
+
+        /// <summary>The arrow a key draws, keyed on the Key enum.</summary>
+        public static BadgeArrow ArrowOf(Key key) => key switch
+        {
+            Key.UpArrow    => BadgeArrow.Up,
+            Key.RightArrow => BadgeArrow.Right,
+            Key.DownArrow  => BadgeArrow.Down,
+            Key.LeftArrow  => BadgeArrow.Left,
+            _              => BadgeArrow.None,
+        };
+
+        /// <summary>USS class of the badge's arrow element for <paramref name="arrow"/> (none for <see cref="BadgeArrow.None"/>).</summary>
+        public static string ArrowClass(BadgeArrow arrow) => arrow switch
+        {
+            BadgeArrow.Up    => "cw-hex-badge-arrow--up",
+            BadgeArrow.Right => "cw-hex-badge-arrow--right",
+            BadgeArrow.Down  => "cw-hex-badge-arrow--down",
+            BadgeArrow.Left  => "cw-hex-badge-arrow--left",
+            _                => null,
+        };
+
+        // ---- Strip arrangement -----------------------------------------------------------------------
+
+        /// <summary>
+        /// How the strip reads like the keys: ArrowsQwer is one row (Q W E R); WasdArrows and the pad share the inverted T of the
+        /// arrow cluster / face diamond. Touch has no strip.
+        /// </summary>
+        public static HudStripArrangement StripArrangement(HudDeviceMode mode, KeyboardScheme scheme) => mode switch
+        {
+            HudDeviceMode.KeyboardMouse => scheme == KeyboardScheme.ArrowsQwer ? HudStripArrangement.Row : HudStripArrangement.Tee,
+            HudDeviceMode.Gamepad       => HudStripArrangement.Tee,
+            _                           => HudStripArrangement.None,
+        };
+
+        /// <summary>USS modifier class on the HUD root for <paramref name="arrangement"/> (none for <see cref="HudStripArrangement.None"/>).</summary>
+        public static string ArrangementClass(HudStripArrangement arrangement) => arrangement switch
+        {
+            HudStripArrangement.Row => "cw-hud--strip-row",
+            HudStripArrangement.Tee => "cw-hud--strip-tee",
+            _                       => null,
+        };
 
         /// <summary>Pad button as printed on the pad.</summary>
         public static string PadLabel(GamepadButton button) => button switch

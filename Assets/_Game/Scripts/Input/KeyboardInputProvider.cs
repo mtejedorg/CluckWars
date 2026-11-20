@@ -1,47 +1,39 @@
+using CluckWars.Settings;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace CluckWars.Input
 {
     /// <summary>
-    /// Standalone-Windows input. WASD = movement; every ability slot answers to
-    /// <b>three</b> keys — a letter, a digit and an arrow. There is no aim: the mouse only counts as device activity and
-    /// its right button cancels a hold, so abilities cast along the facing exactly as on touch.
+    /// Standalone-Windows input, in one of two schemes the player picks in Settings
+    /// (<see cref="PlayerPreferences.KeyboardSchemeChoice"/>, live: read on every poll). Every ability slot answers to
+    /// <b>two</b> keys: the scheme's key and the digit. There is no aim: the mouse only counts as device activity and
+    /// its right button cancels a hold, so abilities cast along the facing exactly as on touch. Esc cancels a hold and is
+    /// still menu back / the Leave sheet.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>The binding table lives in one place</b> (<see cref="BindingsFor"/>) and both the
-    /// edge-triggered and level-triggered readers derive from it. Previously each slot was
-    /// spelled out twice — once in <c>GetAbilityNPressed</c> and again in
-    /// <c>GetAbilityHeld</c> — which is two lists to keep in step; at three keys per slot
-    /// that would have been 24 hand-maintained references and a near-certain drift between
-    /// "fires" and "is held".
-    /// </para>
-    /// <para>
-    /// <b>Layout (Maestro, 2026-08-15).</b> Movement is the left hand on WASD, so abilities
-    /// get the right hand on the arrows, with the digit row as the direct route for players
-    /// who read the slot number off the HUD:
+    /// <b>The binding tables live in one place</b> (<see cref="AbilityKeysFor"/> / <see cref="MovementKeysFor"/>, one pair per
+    /// scheme) and both the edge-triggered and level-triggered readers derive from them, so "fires" and "is held" cannot drift.
     /// </para>
     /// <list type="table">
-    ///   <listheader><term>Slot</term><description>Keys</description></listheader>
-    ///   <item><term>1</term><description>Q · 1 · Up</description></item>
-    ///   <item><term>2</term><description>E · 2 · Right</description></item>
-    ///   <item><term>3</term><description>R · 3 · Down</description></item>
-    ///   <item><term>4</term><description>F · 4 · Left</description></item>
+    ///   <listheader><term>Slot</term><description>WasdArrows (default) / ArrowsQwer</description></listheader>
+    ///   <item><term>1</term><description>Down · 1 / Q · 1</description></item>
+    ///   <item><term>2</term><description>Up · 2 / W · 2</description></item>
+    ///   <item><term>3</term><description>Right · 3 / R · 3</description></item>
+    ///   <item><term>4</term><description>Left · 4 / E · 4</description></item>
     /// </list>
     /// <para>
-    /// The digits are the obvious half: the HUD already prints 1–4 on the ability hexes, so
-    /// pressing the number you can see is the mapping players will guess first. The arrows
-    /// run <b>clockwise from Up</b> — the same order as the digits, laid onto the arrow
-    /// diamond, which is also how a gamepad's face buttons sit. Q/E/R/F are kept so nobody's
-    /// muscle memory breaks.
+    /// WasdArrows: WASD moves with the left hand, the arrows are the abilities (the inverted-T cluster the HUD strip mirrors).
+    /// ArrowsQwer (MOBA): the arrows move and Q W E R are abilities in slot order 1, 2, 4, 3 along the row (R, the rarely used
+    /// flex slot, sits like an ultimate). The digits are the direct route for players who read the slot number off the HUD.
     /// </para>
     /// <para>
     /// <b>Arrow keys are also UI Toolkit's navigation keys.</b> That is safe here only
-    /// because the menu and the match never own the screen at the same time — during a match
+    /// because the menu and the match never own the screen at the same time: during a match
     /// no menu panel has focus, so nothing else is listening. If an in-match focusable panel
     /// is ever added (a pause menu, a scoreboard overlay), an arrow press would drive both it
-    /// and an ability in the same frame, and this provider will need gating on menu focus.
+    /// and an ability (WasdArrows) or the walk (ArrowsQwer) in the same frame, and this provider will need gating on menu focus.
     /// </para>
     /// <para>
     /// Phase 1 caveat, unchanged: <c>wasPressedThisFrame</c> is sampled at Unity Update rate
@@ -98,10 +90,11 @@ namespace CluckWars.Input
             if (kb == null) return Vector2.zero;
 
             float x = 0f, y = 0f;
-            if (kb.wKey.isPressed) y += 1f;
-            if (kb.sKey.isPressed) y -= 1f;
-            if (kb.aKey.isPressed) x -= 1f;
-            if (kb.dKey.isPressed) x += 1f;
+            var m = MovementKeysFor(PlayerPreferences.KeyboardSchemeChoice);   // up, down, left, right
+            if (kb[m[0]].isPressed) y += 1f;
+            if (kb[m[1]].isPressed) y -= 1f;
+            if (kb[m[2]].isPressed) x -= 1f;
+            if (kb[m[3]].isPressed) x += 1f;
             return new Vector2(x, y);
         }
 
@@ -137,37 +130,52 @@ namespace CluckWars.Input
         public bool GetPausePressed() => GetBackPressed();
 
         /// <summary>
-        /// The one and only slot-to-key table: <c>AbilityKeys[slot]</c> is every key that
-        /// fires that slot.
+        /// The slot-to-key table of a scheme: <c>AbilityKeysFor(scheme)[slot]</c> is every key that fires that slot. Entry [0] is
+        /// the key the HUD badge prints.
         /// </summary>
         /// <remarks>
         /// Deliberately <see cref="Key"/> enums rather than resolved control references.
         /// A control table can only be built from a live <see cref="Keyboard"/>,
-        /// which does not exist in an EditMode test run — so an enum table is the difference
+        /// which does not exist in an EditMode test run, so an enum table is the difference
         /// between this mapping being pinned by tests and being unverifiable. See
-        /// <c>ServicesAndInputTests</c>, which asserts the table is total, has no duplicate
-        /// key inside a slot, no key shared between slots, and no collision with WASD.
-        ///
+        /// <c>ServicesAndInputTests</c>, which asserts for each scheme that the table is total, has no duplicate
+        /// key inside a slot, no key shared between slots, and no collision with that scheme's movement keys.
         /// Allocated once as <c>static readonly</c>; the per-tick readers only index it.
         /// </remarks>
-        public static readonly Key[][] AbilityKeys =
+        public static Key[][] AbilityKeysFor(KeyboardScheme scheme) =>
+            scheme == KeyboardScheme.ArrowsQwer ? ArrowsQwerAbilityKeys : WasdArrowsAbilityKeys;
+
+        /// <summary>The scheme's movement keys in the order up, down, left, right (exposed so tests can prove no ability key collides).</summary>
+        public static Key[] MovementKeysFor(KeyboardScheme scheme) =>
+            scheme == KeyboardScheme.ArrowsQwer ? ArrowsQwerMovementKeys : WasdArrowsMovementKeys;
+
+        private static readonly Key[][] WasdArrowsAbilityKeys =
         {
-            new[] { Key.Q, Key.Digit1, Key.UpArrow },
-            new[] { Key.E, Key.Digit2, Key.RightArrow },
-            new[] { Key.R, Key.Digit3, Key.DownArrow },
-            new[] { Key.F, Key.Digit4, Key.LeftArrow },
+            new[] { Key.DownArrow,  Key.Digit1 },
+            new[] { Key.UpArrow,    Key.Digit2 },
+            new[] { Key.RightArrow, Key.Digit3 },
+            new[] { Key.LeftArrow,  Key.Digit4 },
         };
 
-        /// <summary>The movement keys, exposed so tests can prove no ability key collides.</summary>
-        public static readonly Key[] MovementKeys = { Key.W, Key.A, Key.S, Key.D };
+        private static readonly Key[][] ArrowsQwerAbilityKeys =
+        {
+            new[] { Key.Q, Key.Digit1 },
+            new[] { Key.W, Key.Digit2 },
+            new[] { Key.R, Key.Digit3 },
+            new[] { Key.E, Key.Digit4 },
+        };
+
+        private static readonly Key[] WasdArrowsMovementKeys = { Key.W, Key.S, Key.A, Key.D };
+        private static readonly Key[] ArrowsQwerMovementKeys = { Key.UpArrow, Key.DownArrow, Key.LeftArrow, Key.RightArrow };
 
         /// <summary>Edge-triggered: did any of this slot's keys go down this frame?</summary>
         private static bool Pressed(int slot)
         {
             var kb = Keyboard.current;
-            if (kb == null || slot < 0 || slot >= AbilityKeys.Length) return false;
+            var table = AbilityKeysFor(PlayerPreferences.KeyboardSchemeChoice);
+            if (kb == null || slot < 0 || slot >= table.Length) return false;
 
-            var keys = AbilityKeys[slot];
+            var keys = table[slot];
             for (int i = 0; i < keys.Length; i++)
                 if (kb[keys[i]].wasPressedThisFrame) return true;
 
@@ -178,9 +186,10 @@ namespace CluckWars.Input
         private static bool Held(int slot)
         {
             var kb = Keyboard.current;
-            if (kb == null || slot < 0 || slot >= AbilityKeys.Length) return false;
+            var table = AbilityKeysFor(PlayerPreferences.KeyboardSchemeChoice);
+            if (kb == null || slot < 0 || slot >= table.Length) return false;
 
-            var keys = AbilityKeys[slot];
+            var keys = table[slot];
             for (int i = 0; i < keys.Length; i++)
                 if (kb[keys[i]].isPressed) return true;
 

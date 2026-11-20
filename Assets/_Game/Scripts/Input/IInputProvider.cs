@@ -13,7 +13,7 @@ namespace CluckWars.Input
     /// </remarks>
     public interface IInputProvider
     {
-        /// <summary>Stick / WASD axis, range roughly [-1,1] per axis. Not normalized.</summary>
+        /// <summary>Stick / keyboard movement axis (WASD or the arrows, per scheme), range roughly [-1,1] per axis. Not normalized.</summary>
         Vector2 GetMovement();
         bool GetAbility1Pressed();
         bool GetAbility2Pressed();

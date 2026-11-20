@@ -1455,6 +1455,12 @@
     border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;
 }
 
+/* Two-option choice row (Settings > Keyboard): two wood buttons side by side, the chosen one gold. The row's own
+   name / description column shrinks; the buttons keep their width. MenuUiController.BindChoiceRow toggles --on. */
+.cw-setting-choice { flex-direction: row; flex-shrink: 0; }
+.cw-setting-choice__btn { min-height: 84px; margin-left: 12px; margin-top: 0; margin-bottom: 0; margin-right: 0; padding-left: 20px; padding-right: 20px; font-size: 32px; }
+.cw-setting-choice__btn--on { -unity-background-image-tint-color: rgb(245, 200, 66); }
+
 .cw-opt-toggle {
     flex-shrink: 0;
     margin-top: 0; margin-bottom: 0; margin-left: 0; margin-right: 0;

@@ -75,11 +75,26 @@ namespace CluckWars.Visuals
             new Vector2(260f, 95f),
         };
 
-        /// <summary>Desktop / pad layout: hex a1..a4 left edge relative to the zone's horizontal centre
-        /// (<c>margin-left</c> in <c>.cw-hud--desktop .cw-hex--aN</c>), all at <see cref="DesktopStripBottomPx"/>.</summary>
-        public static readonly float[] DesktopStripLeftFromCentrePx = { -279f, -143f, -7f, 129f };
+        /// <summary>Desktop / pad strip, row arrangement (keyboard ArrowsQwer: Q W E R = a1 a2 a4 a3): (left edge relative to the
+        /// zone's horizontal centre, bottom) of hex a1..a4 (<c>margin-left</c> / <c>bottom</c> in <c>.cw-hud--strip-row .cw-hex--aN</c>).</summary>
+        public static readonly Vector2[] StripRowLeftFromCentreBottomPx =
+        {
+            new Vector2(-279f, 4f), new Vector2(-143f, 4f), new Vector2(129f, 4f), new Vector2(-7f, 4f),
+        };
 
-        public const float DesktopStripBottomPx = 4f;
+        /// <summary>Desktop / pad strip, inverted-T arrangement (keyboard WasdArrows and the pad): same meaning, from
+        /// <c>.cw-hud--strip-tee .cw-hex--aN</c>. a2 on top in the middle; a4, a1, a3 along the bottom at the same 136 px pitch;
+        /// the top row is 124 px above (a gap of 11.5 px between the 0.75-scaled hexes).</summary>
+        public static readonly Vector2[] StripTeeLeftFromCentreBottomPx =
+        {
+            new Vector2(-75f, 4f), new Vector2(-75f, 128f), new Vector2(61f, 4f), new Vector2(-211f, 4f),
+        };
+
+        /// <summary>The strip's hex positions for <paramref name="arrangement"/> (null for the touch arc).</summary>
+        public static Vector2[] StripPositions(HudStripArrangement arrangement) =>
+            arrangement == HudStripArrangement.Row ? StripRowLeftFromCentreBottomPx
+            : arrangement == HudStripArrangement.Tee ? StripTeeLeftFromCentreBottomPx
+            : null;
 
         // ---- Information zones (mirrored from MatchTopBar.uss / TouchControls.uss; Phase8ChunkDRivalArrowTests parses them) ----
 
@@ -145,9 +160,11 @@ namespace CluckWars.Visuals
             return new Vector2(aspect * h, h);
         }
 
-        /// <summary>Builds the control zones, in viewport units, for <paramref name="mode"/> at <paramref name="aspect"/>.
+        /// <summary>Builds the control zones, in viewport units, for <paramref name="mode"/> at <paramref name="aspect"/>
+        /// (<paramref name="arrangement"/> picks the desktop / pad strip's layout; the touch arc ignores it).
         /// <paramref name="safeInsets"/> is Screen.safeArea as viewport fractions (left, bottom, right, top).</summary>
-        public static void Build(List<Rect> into, HudDeviceMode mode, float aspect, Vector4 safeInsets)
+        public static void Build(List<Rect> into, HudDeviceMode mode, float aspect, Vector4 safeInsets,
+            HudStripArrangement arrangement = HudStripArrangement.Row)
         {
             into.Clear();
             Vector2 panel = PanelSize(aspect);
@@ -178,11 +195,11 @@ namespace CluckWars.Visuals
 
             // Keyboard / mouse and gamepad: no joystick; the hexes are an information strip at the bottom centre.
             float centre = 0.5f * (L + (1f - R));
-            foreach (float left in DesktopStripLeftFromCentrePx)
+            foreach (var lb in StripPositions(arrangement) ?? StripRowLeftFromCentreBottomPx)
             {
                 into.Add(Rect.MinMaxRect(
-                    centre + (left - pad) / pw, FromBottom(DesktopStripBottomPx - pad),
-                    centre + (left + HexSizePx + pad) / pw, FromBottom(DesktopStripBottomPx + HexSizePx + pad)));
+                    centre + (lb.x - pad) / pw, FromBottom(lb.y - pad),
+                    centre + (lb.x + HexSizePx + pad) / pw, FromBottom(lb.y + HexSizePx + pad)));
             }
         }
 
@@ -224,12 +241,13 @@ namespace CluckWars.Visuals
         private static readonly List<Rect> InfoCache = new List<Rect>(2);    // top band + status strip
         private static readonly List<Rect> AvoidCache = new List<Rect>(7);
         private static HudDeviceMode _cacheMode = (HudDeviceMode)255;
+        private static HudStripArrangement _cacheArrangement = (HudStripArrangement)255;
         private static float _cacheAspect = -1f;
         private static Vector4 _cacheInsets = new Vector4(-1f, -1f, -1f, -1f);
         private static int _cacheStatusRows = -1;
 
         /// <summary>The live layout's HUD control zones for <paramref name="cam"/>. Cached; rebuilt only when the layout
-        /// mode, the aspect, the safe area or the status strip's row count changes, so calling it per rival per frame
+        /// mode, the strip arrangement, the aspect, the safe area or the status strip's row count changes, so calling it per rival per frame
         /// allocates nothing.</summary>
         public static IReadOnlyList<Rect> Current(Camera cam)
         {
@@ -258,18 +276,19 @@ namespace CluckWars.Visuals
             HudDeviceMode mode = touch != null
                 ? touch.Mode
                 : (Application.isMobilePlatform ? HudDeviceMode.Touch : HudDeviceMode.KeyboardMouse);
+            var arrangement = HudLayoutRules.StripArrangement(mode, CluckWars.Settings.PlayerPreferences.KeyboardSchemeChoice);
             int statusRows = touch != null && touch.isActiveAndEnabled ? touch.StatusRowCount : 0;   // a disabled HUD draws no strip
             Vector4 insets = SafeInsets();
 
             if (mode == _cacheMode && Mathf.Approximately(aspect, _cacheAspect) && insets == _cacheInsets
-                && statusRows == _cacheStatusRows) return;
+                && statusRows == _cacheStatusRows && arrangement == _cacheArrangement) return;
 
-            Build(Cache, mode, aspect, insets);
+            Build(Cache, mode, aspect, insets, arrangement);
             BuildInfoZones(InfoCache, mode, aspect, insets, statusRows);
             AvoidCache.Clear();
             AvoidCache.AddRange(Cache);
             AvoidCache.AddRange(InfoCache);
-            _cacheMode = mode; _cacheAspect = aspect; _cacheInsets = insets; _cacheStatusRows = statusRows;
+            _cacheMode = mode; _cacheArrangement = arrangement; _cacheAspect = aspect; _cacheInsets = insets; _cacheStatusRows = statusRows;
         }
 
         /// <summary>The safe area (<see cref="CluckWars.UI.SafeAreaSource.Current"/>) as viewport fractions (left, bottom,

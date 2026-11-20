@@ -129,6 +129,10 @@ settings.autoPeck,Auto-Peck
 settings.autoPeck.desc,Peck by yourself when you stand by a pile.
 settings.quickMoves,Quick Moves
 settings.quickMoves.desc,Moves fire the moment you tap.
+settings.keyboard,Keyboard
+settings.keyboard.desc,Which keys walk you and which keys fire your moves.
+settings.keyboard.wasd,WASD + arrows
+settings.keyboard.qwer,Arrows + QWER
 settings.buzzWhenHit,Buzz When Hit
 settings.buzzWhenHit.desc,Your phone buzzes when a move hits you.
 settings.musicVolume,Music

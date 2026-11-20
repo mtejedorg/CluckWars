@@ -2,6 +2,15 @@ using UnityEngine;
 
 namespace CluckWars.Settings
 {
+    /// <summary>Which keyboard layout the player uses in a match (Settings: "Keyboard"). Stored as its int value; never reorder.</summary>
+    public enum KeyboardScheme
+    {
+        /// <summary>WASD moves; Down / Up / Right / Left = slots 1 / 2 / 3 / 4. The default.</summary>
+        WasdArrows = 0,
+        /// <summary>Arrow keys move; Q / W / R / E = slots 1 / 2 / 3 / 4 (R, the rarely used flex slot, sits like an ultimate).</summary>
+        ArrowsQwer = 1,
+    }
+
     /// <summary>
     /// Persisted, player-facing display options plus the developer-tools gate.
     /// Deliberately tiny: this is the only settings surface the project has, so it is a
@@ -24,6 +33,7 @@ namespace CluckWars.Settings
     ///   <item><see cref="PerformanceModeEnabled"/>: Performance Mode</item>
     ///   <item><see cref="QuickMovesEnabled"/> / <see cref="AutoPeckEnabled"/> / <see cref="BuzzWhenHitEnabled"/>
     ///   and the <see cref="MusicVolume"/> / <see cref="SfxVolume"/> sliders (Phase 6 chunk 6)</item>
+    ///   <item><see cref="KeyboardSchemeChoice"/>: Keyboard (a two-button choice row, hidden on phones)</item>
     ///   <item><see cref="DeveloperModeEnabled"/>: Dev Mode (shows/hides the main menu's
     ///   Ability Lab row as soon as it changes)</item>
     /// </list>
@@ -318,6 +328,43 @@ namespace CluckWars.Settings
             }
         }
 
+        /// <summary><c>PlayerPrefs</c> key for <see cref="KeyboardSchemeChoice"/>. Namespaced like every key here.</summary>
+        public const string KeyboardSchemeKey = "CluckWars.KeyboardScheme";
+
+        private static KeyboardScheme _keyboardScheme;
+        private static bool _keyboardSchemeLoaded;
+
+        /// <summary>
+        /// The keyboard layout in use. <b>Defaults to <see cref="KeyboardScheme.WasdArrows"/></b>; a stored value that is not a
+        /// known scheme falls back to the default (a legal state: an older or hand-edited store), without an error. Cached, and
+        /// read on every input poll, so changing it from Settings takes effect on the next poll with no restart.
+        /// </summary>
+        public static KeyboardScheme KeyboardSchemeChoice
+        {
+            get
+            {
+                if (!_keyboardSchemeLoaded)
+                {
+                    _keyboardScheme = SchemeFromStored(PlayerPrefs.GetInt(KeyboardSchemeKey, (int)KeyboardScheme.WasdArrows));
+                    _keyboardSchemeLoaded = true;
+                }
+                return _keyboardScheme;
+            }
+            set
+            {
+                if (_keyboardSchemeLoaded && _keyboardScheme == value) return;
+
+                _keyboardScheme = value;
+                _keyboardSchemeLoaded = true;
+                PlayerPrefs.SetInt(KeyboardSchemeKey, (int)value);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>Pure: the scheme a stored int means, the default for anything unknown.</summary>
+        public static KeyboardScheme SchemeFromStored(int stored) =>
+            stored == (int)KeyboardScheme.ArrowsQwer ? KeyboardScheme.ArrowsQwer : KeyboardScheme.WasdArrows;
+
         /// <summary><c>PlayerPrefs</c> key for <see cref="BuzzWhenHitEnabled"/>. Namespaced like every key here.</summary>
         public const string BuzzWhenHitKey = "CluckWars.BuzzWhenHit";
 
@@ -530,6 +577,7 @@ namespace CluckWars.Settings
             _performanceModeLoaded    = false;
             _autoPeckLoaded           = false;
             _quickMovesLoaded         = false;
+            _keyboardSchemeLoaded     = false;
             _buzzWhenHitLoaded        = false;
             _holdHintCountLoaded      = false;
             _musicVolumeLoaded        = false;

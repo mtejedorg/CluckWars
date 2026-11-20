@@ -127,7 +127,7 @@ namespace CluckWars.AbilityLab
         /// </summary>
         /// <remarks>
         /// <b>Reads <see cref="IInputProvider"/>, not <c>Keyboard.current</c>.</b> It used to
-        /// sample the keyboard directly through <c>KeyboardInputProvider.AbilityKeys</c>, which
+        /// sample the keyboard directly through <c>KeyboardInputProvider.AbilityKeysFor</c>, which
         /// measured nothing on a phone: with no keyboard attached, no press is ever stamped, so
         /// every cast reports "—" and the one number Maestro wants ON the device was the one
         /// number that could not be read there. Going through the provider measures whichever

@@ -12,7 +12,7 @@ namespace CluckWars.Input
     /// <remarks>
     /// <para>
     /// <b>Binding table.</b> <see cref="AbilityButtons"/> is the one slot-to-buttons table (every slot has its shoulder or trigger and its face button), as an enum table for the same
-    /// reason as <see cref="KeyboardInputProvider.AbilityKeys"/>: a live <see cref="Gamepad"/> does not exist in an
+    /// reason as <see cref="KeyboardInputProvider.AbilityKeysFor"/>: a live <see cref="Gamepad"/> does not exist in an
     /// EditMode run, so an enum table is the difference between the mapping being pinned by tests and being
     /// unverifiable. Layout: RB, RT, LB, LT = slots 1, 2, 3, 4, and A, Y, B, X = slots 1, 2, 3, 4 (the diamond mirrors the slot roles: A bottom, Y top, B right, X left). The triggers are read as buttons through the Input
     /// System's press point (0.5 by default), so a half pull is a press.

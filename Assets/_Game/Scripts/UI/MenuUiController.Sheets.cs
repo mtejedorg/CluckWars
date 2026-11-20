@@ -196,6 +196,7 @@ namespace CluckWars.UI
             BindSettingRow("QuickMovesRow", "QuickMovesToggle",
                 () => PlayerPreferences.QuickMovesEnabled,
                 v => PlayerPreferences.QuickMovesEnabled = v, "Quick moves");
+            BindKeyboardSchemeRow();
             BindSettingRow("AutoPeckRow", "AutoPeckToggle",
                 () => PlayerPreferences.AutoPeckEnabled,
                 v => PlayerPreferences.AutoPeckEnabled = v, "Auto-peck");
@@ -212,6 +213,10 @@ namespace CluckWars.UI
             BindSettingRow("DeveloperModeRow", "DeveloperModeToggle",
                 () => PlayerPreferences.DeveloperModeEnabled,
                 v => { PlayerPreferences.DeveloperModeEnabled = v; RefreshDevRow(); }, "Developer mode");
+
+            // Keyboard schemes only mean something with a keyboard: a phone has none, so the row is hidden there.
+            if (Application.isMobilePlatform)
+                Bind<VisualElement>(_settingsSheet, "KeyboardSchemeRow", r => UiElements.SetShown(r, false));
 
             // Buzz When Hit only means something on a phone: desktop and the Editor have no vibrator, so the row
             // is hidden there rather than offering a switch that can never do anything.
@@ -274,6 +279,43 @@ namespace CluckWars.UI
             _settingToggles.Add((toggle, get));
         }
 
+        /// <summary>
+        /// Binds the two-button Keyboard row: the chosen scheme's button is lit (<c>.cw-setting-choice__btn--on</c>), a press
+        /// writes <see cref="PlayerPreferences.KeyboardSchemeChoice"/>, which the keyboard provider and the HUD strip read live.
+        /// Re-lit from the stored value on every <see cref="OpenSettings"/>, like the toggles.
+        /// </summary>
+        private void BindKeyboardSchemeRow()
+        {
+            var wasd = _settingsSheet.Q<Button>("KeyboardSchemeWasdBtn");
+            var qwer = _settingsSheet.Q<Button>("KeyboardSchemeQwerBtn");
+            if (wasd == null || qwer == null)
+            {
+                _log?.Error(Source, "Settings sheet is missing #KeyboardSchemeWasdBtn or #KeyboardSchemeQwerBtn; the keyboard layout cannot be changed from the menu.");
+                return;
+            }
+
+            void Light()
+            {
+                var current = PlayerPreferences.KeyboardSchemeChoice;
+                wasd.EnableInClassList("cw-setting-choice__btn--on", current == KeyboardScheme.WasdArrows);
+                qwer.EnableInClassList("cw-setting-choice__btn--on", current == KeyboardScheme.ArrowsQwer);
+            }
+            void Pick(KeyboardScheme scheme)
+            {
+                if (PlayerPreferences.KeyboardSchemeChoice == scheme) return;
+                PlayerPreferences.KeyboardSchemeChoice = scheme;
+                _audio.Tap();
+                _log?.Info(Source, $"Keyboard layout: {scheme}.");
+                Light();
+            }
+
+            wasd.clicked += () => Pick(KeyboardScheme.WasdArrows);
+            qwer.clicked += () => Pick(KeyboardScheme.ArrowsQwer);
+            Light();
+            _settingChoiceLights.Add(Light);
+        }
+
+        private readonly List<Action> _settingChoiceLights = new();
         private readonly List<(Toggle Toggle, Func<bool> Get)> _settingToggles = new();
         private readonly List<(Slider Slider, Func<float> Get, Label Percent)> _settingSliders = new();
 
@@ -360,6 +402,7 @@ namespace CluckWars.UI
         {
             if (_settingsSheet == null) return;
             foreach (var (toggle, get) in _settingToggles) toggle.SetValueWithoutNotify(get());
+            foreach (var light in _settingChoiceLights) light();
             foreach (var (slider, get, percent) in _settingSliders)
             {
                 slider.SetValueWithoutNotify(get());

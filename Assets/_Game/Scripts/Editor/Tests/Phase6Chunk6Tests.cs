@@ -324,29 +324,35 @@ namespace CluckWars.Tests
         public void Badges_LabelTableByDevice()
         {
             CollectionAssert.AreEqual(new[] { "1", "2", "3", "4" }, Labels(HudDeviceMode.Touch));
-            CollectionAssert.AreEqual(new[] { "Q", "E", "R", "F" }, Labels(HudDeviceMode.KeyboardMouse));
+            CollectionAssert.AreEqual(new[] { "Q", "W", "R", "E" }, Labels(HudDeviceMode.KeyboardMouse, KeyboardScheme.ArrowsQwer));
+            CollectionAssert.AreEqual(new[] { "", "", "", "" }, Labels(HudDeviceMode.KeyboardMouse, KeyboardScheme.WasdArrows),
+                "The arrow keys of WasdArrows are drawn, not printed (the HUD fonts have no arrow glyphs).");
             CollectionAssert.AreEqual(new[] { "A", "Y", "B", "X" }, Labels(HudDeviceMode.Gamepad));
-            Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, 4));
-            Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, -1));
+            Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, 4, KeyboardScheme.WasdArrows));
+            Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, -1, KeyboardScheme.WasdArrows));
         }
 
-        private static string[] Labels(HudDeviceMode mode)
+        private static string[] Labels(HudDeviceMode mode, KeyboardScheme scheme = KeyboardScheme.WasdArrows)
         {
             var a = new string[4];
-            for (int i = 0; i < 4; i++) a[i] = HudLayoutRules.BadgeLabel(mode, i);
+            for (int i = 0; i < 4; i++) a[i] = HudLayoutRules.BadgeLabel(mode, i, scheme);
             return a;
         }
 
         [Test]
         public void Badges_AreDerivedFromTheRealBindingTables()
         {
-            for (int slot = 0; slot < 4; slot++)
-            {
-                Assert.AreEqual(KeyboardInputProvider.AbilityKeys[slot][0].ToString(),
-                    HudLayoutRules.BadgeLabel(HudDeviceMode.KeyboardMouse, slot), "Badge = the slot's first key.");
-                Assert.AreEqual(HudLayoutRules.PadLabel(GamepadInputProvider.AbilityButtons[slot][0]),
-                    HudLayoutRules.BadgeLabel(HudDeviceMode.Gamepad, slot));
-            }
+            foreach (var scheme in new[] { KeyboardScheme.WasdArrows, KeyboardScheme.ArrowsQwer })
+                for (int slot = 0; slot < 4; slot++)
+                {
+                    var first = KeyboardInputProvider.AbilityKeysFor(scheme)[slot][0];
+                    var arrow = HudLayoutRules.ArrowOf(first);
+                    Assert.AreEqual(arrow == BadgeArrow.None ? first.ToString() : string.Empty,
+                        HudLayoutRules.BadgeLabel(HudDeviceMode.KeyboardMouse, slot, scheme), $"{scheme}: badge = the slot's first key (an arrow is drawn instead).");
+                    Assert.AreEqual(arrow, HudLayoutRules.ArrowFor(HudDeviceMode.KeyboardMouse, slot, scheme));
+                    Assert.AreEqual(HudLayoutRules.PadLabel(GamepadInputProvider.AbilityButtons[slot][0]),
+                        HudLayoutRules.BadgeLabel(HudDeviceMode.Gamepad, slot, scheme));
+                }
             Assert.AreEqual("RB", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.RightShoulder));
             Assert.AreEqual("A", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.South));
             Assert.AreEqual("Y", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.North));

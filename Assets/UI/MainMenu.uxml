@@ -141,6 +141,16 @@
                         </ui:VisualElement>
                         <ui:Toggle name="QuickMovesToggle" class="cw-opt-toggle" />
                     </ui:VisualElement>
+                    <ui:VisualElement name="KeyboardSchemeRow" class="cw-setting-toggle-row">
+                        <ui:VisualElement class="cw-setting-toggle-row__texts">
+                            <ui:Label text="@settings.keyboard" class="cw-setting-toggle-row__name" />
+                            <ui:Label text="@settings.keyboard.desc" class="cw-setting-toggle-row__desc" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="cw-setting-choice">
+                            <ui:Button name="KeyboardSchemeWasdBtn" text="@settings.keyboard.wasd" class="cw-btn cw-btn--wood cw-setting-choice__btn" />
+                            <ui:Button name="KeyboardSchemeQwerBtn" text="@settings.keyboard.qwer" class="cw-btn cw-btn--wood cw-setting-choice__btn" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
                     <ui:VisualElement name="AutoPeckRow" class="cw-setting-toggle-row">
                         <ui:VisualElement class="cw-setting-toggle-row__texts">
                             <ui:Label text="@settings.autoPeck" class="cw-setting-toggle-row__name" />

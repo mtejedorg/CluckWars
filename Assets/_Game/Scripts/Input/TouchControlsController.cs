@@ -138,6 +138,7 @@ namespace CluckWars.Input
             public VisualElement StateBarA;  // one arm of the ✕
             public VisualElement StateBarB;  // the other arm of the ✕
             public VisualElement Mark;       // category shape (CategoryMark): the category without colour
+            public VisualElement BadgeArrow; // drawn arrow of an arrow-key badge (the HUD fonts have no arrow glyphs)
             public Label         BadgeText;  // slot badge text: the slot number, or the key / pad button on desktop
             public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
             public HexDurationRing Ring;     // duration ring while this slot's ability is running
@@ -233,6 +234,7 @@ namespace CluckWars.Input
         private AudioRegistrySO _sfx;
         private bool            _missingAudioReported;
         private HudDeviceMode   _mode = HudDeviceMode.Touch;
+        private KeyboardScheme  _scheme = KeyboardScheme.WasdArrows;   // the scheme the layout was last applied for
         private bool            _modeApplied;
         private VisualElement   _hudRoot;
         private VisualElement   _hintHost;
@@ -467,6 +469,7 @@ namespace CluckWars.Input
                     Fill       = _root.Q<VisualElement>($"Fill{n}"),
                     Pip        = _root.Q<VisualElement>($"Pip{n}"),
                     BadgeText  = _root.Q<Label>($"BadgeText{n}"),
+                    BadgeArrow = _root.Q<VisualElement>($"BadgeArrow{n}"),
                     KillText   = _root.Q<Label>($"KillText{n}"),
                     HuntDot    = _root.Q<VisualElement>($"HuntDot{n}"),
                     HuntGlyph  = _root.Q<VisualElement>($"HuntGlyph{n}"),
@@ -548,7 +551,8 @@ namespace CluckWars.Input
         {
             var wanted = DebugForceMode ?? HudLayoutRules.FromDevice(
                 _input != null ? _input.Device : InputDeviceKind.None, Application.isMobilePlatform);
-            if (_modeApplied && wanted == _mode) return;
+            var scheme = PlayerPreferences.KeyboardSchemeChoice;
+            if (_modeApplied && wanted == _mode && scheme == _scheme) return;   // a scheme change from Settings re-badges and re-arranges at once
             ApplyMode(wanted);
         }
 
@@ -558,6 +562,7 @@ namespace CluckWars.Input
             if (leavingTouch) ReleaseAllPointers();
 
             _mode = mode;
+            _scheme = PlayerPreferences.KeyboardSchemeChoice;
             _modeApplied = true;
             bool interactive = HudLayoutRules.HexesAreInteractive(mode);
 
@@ -565,6 +570,9 @@ namespace CluckWars.Input
             {
                 _hudRoot.EnableInClassList("cw-hud--desktop", mode == HudDeviceMode.KeyboardMouse);
                 _hudRoot.EnableInClassList("cw-hud--pad", mode == HudDeviceMode.Gamepad);
+                var arrangement = HudLayoutRules.StripArrangement(mode, _scheme);
+                _hudRoot.EnableInClassList(HudLayoutRules.ArrangementClass(HudStripArrangement.Row), arrangement == HudStripArrangement.Row);
+                _hudRoot.EnableInClassList(HudLayoutRules.ArrangementClass(HudStripArrangement.Tee), arrangement == HudStripArrangement.Tee);
             }
             if (_joyBase != null)
                 _joyBase.style.display = interactive ? DisplayStyle.Flex : DisplayStyle.None;
@@ -573,7 +581,8 @@ namespace CluckWars.Input
             {
                 var refs = _slots[slot];
                 if (refs.Hex != null) refs.Hex.pickingMode = interactive ? PickingMode.Position : PickingMode.Ignore;
-                if (refs.BadgeText != null) refs.BadgeText.text = HudLayoutRules.BadgeLabel(mode, slot);
+                if (refs.BadgeText != null) refs.BadgeText.text = HudLayoutRules.BadgeLabel(mode, slot, _scheme);
+                ApplyBadgeArrow(refs.BadgeArrow, HudLayoutRules.ArrowFor(mode, slot, _scheme));
                 _appliedCdText[slot] = null;
                 _appliedCdSeconds[slot] = int.MinValue;
                 _appliedScale[slot] = -1f;   // rest scale changed: force the next held refresh to rewrite it
@@ -582,6 +591,24 @@ namespace CluckWars.Input
             if (_hint != null && _hintOn) HideHint();
             _log?.Info(Source, $"HUD layout: {mode}.");
         }
+
+        /// <summary>Shows <paramref name="arrow"/> on a badge (one modifier class, none for no arrow). A missing element is a wiring bug in TouchControls.uxml.</summary>
+        private void ApplyBadgeArrow(VisualElement el, BadgeArrow arrow)
+        {
+            if (el == null)
+            {
+                _log?.Warn(Source, "TouchControls.uxml has no #BadgeArrowN; an arrow-key badge would show nothing.");
+                return;
+            }
+            foreach (var a in BadgeArrowValues)
+            {
+                string cls = HudLayoutRules.ArrowClass(a);
+                if (cls != null) el.EnableInClassList(cls, a == arrow);
+            }
+            UiElements.SetShown(el, arrow != BadgeArrow.None);
+        }
+
+        private static readonly BadgeArrow[] BadgeArrowValues = { BadgeArrow.Up, BadgeArrow.Right, BadgeArrow.Down, BadgeArrow.Left };
 
         /// <summary>The layout is leaving the thumb arc while pointers may still be down: nothing fires from them.</summary>
         private void ReleaseAllPointers()

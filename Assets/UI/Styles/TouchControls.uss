@@ -288,6 +288,22 @@
     color: rgb(254, 245, 224);
     -unity-text-align: middle-center;
 }
+/* Arrow-key badge: the HUD fonts (Lilita One, Nunito, Noto Emoji) have no arrow glyphs, so an arrow key is a drawn
+   cream arrow (HudArrowUp.png points up) turned by one modifier class per direction (HudLayoutRules.ArrowClass).
+   Hidden unless TouchControlsController shows it on a keyboard badge. */
+.cw-hex-badge-arrow {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 30px; height: 30px;
+    margin-left: -15px; margin-top: -15px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HudArrowUp.png");
+    -unity-background-scale-mode: scale-to-fit;
+    display: none;
+}
+.cw-hex-badge-arrow--up    { rotate: 0deg; }
+.cw-hex-badge-arrow--right { rotate: 90deg; }
+.cw-hex-badge-arrow--down  { rotate: 180deg; }
+.cw-hex-badge-arrow--left  { rotate: 270deg; }
 
 /* --- In-range pip (Phase 6, A1; Phase 7 B20: 28 -> 40 px) ----------------------------------------------
    Bottom-centre of the hex (top-left = slot badge, top-right = category mark). Gold #f5c842 with a
@@ -600,16 +616,35 @@
    TouchControlsController puts .cw-hud--desktop (keyboard + mouse) or .cw-hud--pad (gamepad) on #TouchRoot while
    that is the last-used device, and takes it off the moment a finger touches the screen. The joystick goes; the
    hexes become an INFORMATION strip at the bottom centre (picking-mode Ignore, scale 0.75 written by the
-   controller), left to right in slot order, each badged with the key or button that fires it.
-   Strip geometry: 4 hexes, 136 px pitch, centred on the screen: left edges at -279 / -143 / -7 / +129 from centre.
+   controller), each badged with the key or button that fires it. The strip is arranged like the keys
+   (HudLayoutRules.StripArrangement), by one modifier class on the same root:
+     .cw-hud--strip-row  keyboard scheme ArrowsQwer: one row, left to right Q W E R = slots 1, 2, 4, 3.
+                         Left edges from the centre: a1 -279, a2 -143, a4 -7, a3 +129 (136 px pitch), bottom 4.
+     .cw-hud--strip-tee  keyboard scheme WasdArrows and the pad: the inverted T of the arrow cluster / face diamond.
+                         Bottom row (bottom 4) a4 -211, a1 -75, a3 +61 (same 136 px pitch); a2 on top in the middle
+                         (-75) at bottom 128 (124 px above). The top hex's unscaled box reaches 278 px up, its scaled
+                         drawing ~259 px: clear of the status strip (left 40, <= 380 wide so it ends at 420 px) because
+                         the T's left drawing edge is >= 520 px at the narrowest 4:3 panel (1646 px wide: 823 - 211 +
+                         18.75), and clear of the top band (290 px from the top, panel >= 960 px tall).
+   HudControlZones mirrors every number (StripRowLeftFromCentreBottomPx, StripTeeLeftFromCentreBottomPx).
    ============================================================================ */
 .cw-hud--desktop .cw-joy-base, .cw-hud--pad .cw-joy-base { display: none; }
 .cw-hud--desktop .cw-status-strip, .cw-hud--pad .cw-status-strip { left: 40px; bottom: 60px; }
 
-.cw-hud--desktop .cw-hex--a1, .cw-hud--pad .cw-hex--a1 { left: 50%; right: auto; bottom: 4px; margin-left: -279px; }
-.cw-hud--desktop .cw-hex--a2, .cw-hud--pad .cw-hex--a2 { left: 50%; right: auto; bottom: 4px; margin-left: -143px; }
-.cw-hud--desktop .cw-hex--a3, .cw-hud--pad .cw-hex--a3 { left: 50%; right: auto; bottom: 4px; margin-left: -7px; }
-.cw-hud--desktop .cw-hex--a4, .cw-hud--pad .cw-hex--a4 { left: 50%; right: auto; bottom: 4px; margin-left: 129px; }
+.cw-hud--desktop .cw-hex--a1, .cw-hud--pad .cw-hex--a1 { left: 50%; right: auto; bottom: 4px; }
+.cw-hud--desktop .cw-hex--a2, .cw-hud--pad .cw-hex--a2 { left: 50%; right: auto; bottom: 4px; }
+.cw-hud--desktop .cw-hex--a3, .cw-hud--pad .cw-hex--a3 { left: 50%; right: auto; bottom: 4px; }
+.cw-hud--desktop .cw-hex--a4, .cw-hud--pad .cw-hex--a4 { left: 50%; right: auto; bottom: 4px; }
+
+.cw-hud--strip-row .cw-hex--a1 { margin-left: -279px; }
+.cw-hud--strip-row .cw-hex--a2 { margin-left: -143px; }
+.cw-hud--strip-row .cw-hex--a3 { margin-left: 129px; }
+.cw-hud--strip-row .cw-hex--a4 { margin-left: -7px; }
+
+.cw-hud--strip-tee .cw-hex--a1 { margin-left: -75px; }
+.cw-hud--strip-tee .cw-hex--a2 { margin-left: -75px; bottom: 128px; }
+.cw-hud--strip-tee .cw-hex--a3 { margin-left: 61px; }
+.cw-hud--strip-tee .cw-hex--a4 { margin-left: -211px; }
 
 /* Badge: a key cap. 40 px text x the strip's 0.75 scale = 30 px on screen (floor 28); cream on near-black ink is
    far above 4.5:1. A two-letter pad label (RB / LT) widens the cap into a pill. */
@@ -664,6 +699,8 @@
     transition-duration: 0.25s;
 }
 .cw-hud--desktop .cw-hold-hint, .cw-hud--pad .cw-hold-hint { max-width: 1400px; }
+/* The T's top hex reaches ~259 px up: the hint sits above it. */
+.cw-hud--strip-tee .cw-hold-hint-host { bottom: 280px; }
 .cw-hold-hint--on { opacity: 1; }
 
 /* ============================================================================

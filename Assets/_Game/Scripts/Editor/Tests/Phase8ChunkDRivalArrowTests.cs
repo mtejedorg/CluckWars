@@ -189,10 +189,22 @@ namespace CluckWars.Tests
                 Assert.That(float.Parse(m.Groups[1].Value), Is.EqualTo(HudControlZones.TouchHexRightBottomPx[i].x), $"a{i + 1} right");
                 Assert.That(float.Parse(m.Groups[2].Value), Is.EqualTo(HudControlZones.TouchHexRightBottomPx[i].y), $"a{i + 1} bottom");
 
-                var d = Regex.Match(uss, @"\.cw-hud--desktop \.cw-hex--a" + (i + 1) + @",[^{]*\{\s*left:\s*50%;\s*right:\s*auto;\s*bottom:\s*(\d+)px;\s*margin-left:\s*(-?\d+)px");
-                Assert.That(d.Success, Is.True, $"desktop a{i + 1} rule not found");
-                Assert.That(float.Parse(d.Groups[1].Value), Is.EqualTo(HudControlZones.DesktopStripBottomPx), $"desktop a{i + 1} bottom");
-                Assert.That(float.Parse(d.Groups[2].Value), Is.EqualTo(HudControlZones.DesktopStripLeftFromCentrePx[i]), $"desktop a{i + 1} margin-left");
+                var d = Regex.Match(uss, @"\.cw-hud--desktop \.cw-hex--a" + (i + 1) + @",[^{]*\{\s*left:\s*50%;\s*right:\s*auto;\s*bottom:\s*(\d+)px;");
+                Assert.That(d.Success, Is.True, $"desktop a{i + 1} base rule not found");
+                Assert.That(float.Parse(d.Groups[1].Value), Is.EqualTo(HudControlZones.StripRowLeftFromCentreBottomPx[i].y), $"desktop a{i + 1} base bottom");
+
+                foreach (var (cls, positions) in new[]
+                {
+                    ("cw-hud--strip-row", HudControlZones.StripRowLeftFromCentreBottomPx),
+                    ("cw-hud--strip-tee", HudControlZones.StripTeeLeftFromCentreBottomPx),
+                })
+                {
+                    var a = Regex.Match(uss, @"^\." + cls + @" \.cw-hex--a" + (i + 1) + @"\s*\{\s*margin-left:\s*(-?\d+)px;(?:\s*bottom:\s*(\d+)px;)?", RegexOptions.Multiline);
+                    Assert.That(a.Success, Is.True, $"{cls} a{i + 1} rule not found");
+                    Assert.That(float.Parse(a.Groups[1].Value), Is.EqualTo(positions[i].x), $"{cls} a{i + 1} margin-left");
+                    float bottom = a.Groups[2].Success ? float.Parse(a.Groups[2].Value) : HudControlZones.StripRowLeftFromCentreBottomPx[i].y;
+                    Assert.That(bottom, Is.EqualTo(positions[i].y), $"{cls} a{i + 1} bottom");
+                }
 
                 var p = Regex.Match(uss, @"^\.layout--portrait \.cw-hex--a" + (i + 1) + @"\s*\{\s*right:\s*(\d+)px;\s*bottom:\s*(\d+)px;", RegexOptions.Multiline);
                 Assert.That(p.Success, Is.True, $"portrait a{i + 1} rule not found");
@@ -317,6 +329,69 @@ namespace CluckWars.Tests
             Assert.That(z.Count, Is.EqualTo(4));
             Assert.That(Contains(z, new Vector2(0.05f, 0.05f)), Is.False, "no joystick on desktop / pad: the bottom-left corner is free");
             Assert.That(Contains(z, new Vector2(0.5f, 0.05f)), Is.True, "bottom-centre strip");
+        }
+
+        private static readonly HudStripArrangement[] Arrangements = { HudStripArrangement.Row, HudStripArrangement.Tee };
+
+        private static List<Rect> StripZones(HudStripArrangement arrangement, float aspect)
+        {
+            var list = new List<Rect>();
+            HudControlZones.Build(list, HudDeviceMode.KeyboardMouse, aspect, Vector4.zero, arrangement);
+            return list;
+        }
+
+        [Test]
+        public void Strip_Row_ReadsQWER_AsSlots1_2_4_3_LeftToRight()
+        {
+            var p = HudControlZones.StripRowLeftFromCentreBottomPx;   // a1..a4
+            Assert.That(p[0].x, Is.LessThan(p[1].x), "slot 1 left of 2");
+            Assert.That(p[1].x, Is.LessThan(p[3].x), "slot 2 left of 4");
+            Assert.That(p[3].x, Is.LessThan(p[2].x), "slot 4 left of 3");
+            for (int i = 1; i < 4; i++) Assert.That(p[i].y, Is.EqualTo(p[0].y), "one row");
+        }
+
+        [Test]
+        public void Strip_Tee_IsAnInvertedT_Slot2OnTop_4_1_3Along_TheBottom()
+        {
+            var p = HudControlZones.StripTeeLeftFromCentreBottomPx;   // a1..a4
+            Assert.That(p[1].y, Is.GreaterThan(p[0].y), "slot 2 above slot 1");
+            Assert.That(p[1].x, Is.EqualTo(p[0].x), "slot 2 centred over slot 1 (Up over Down)");
+            Assert.That(p[2].y, Is.EqualTo(p[0].y)); Assert.That(p[3].y, Is.EqualTo(p[0].y));
+            Assert.That(p[3].x, Is.LessThan(p[0].x), "slot 4 (Left) left of slot 1");
+            Assert.That(p[0].x, Is.LessThan(p[2].x), "slot 1 left of slot 3 (Right)");
+            Assert.That(p[0].x - p[3].x, Is.EqualTo(p[2].x - p[0].x), "even pitch along the bottom");
+        }
+
+        [TestCase(2400f / 1080f)]
+        [TestCase(16f / 9f)]
+        [TestCase(4f / 3f)]
+        public void Strip_EveryArrangement_HasFourSeparateHexes_OnScreen_ClearOfTheStatusStripAndTheTopBand(float aspect)
+        {
+            foreach (var arrangement in Arrangements)
+            {
+                var z = StripZones(arrangement, aspect);
+                Assert.That(z.Count, Is.EqualTo(4), arrangement.ToString());
+                var info = Info(HudDeviceMode.KeyboardMouse, aspect, 4);   // top band + a full four-row status strip
+                // Compare the hexes as drawn: the zones add a 20 px pad, and the strip draws each 150 px box at HexRestScale.
+                Vector2 panel = HudControlZones.PanelSize(aspect);
+                float halfW = HudControlZones.HexSizePx * HudLayoutRules.HexRestScale(HudDeviceMode.KeyboardMouse) / 2f / panel.x;
+                float halfH = HudControlZones.HexSizePx * HudLayoutRules.HexRestScale(HudDeviceMode.KeyboardMouse) / 2f / panel.y;
+                Rect Drawn(Rect zone) => Rect.MinMaxRect(zone.center.x - halfW, zone.center.y - halfH, zone.center.x + halfW, zone.center.y + halfH);
+                for (int i = 0; i < 4; i++)
+                {
+                    Assert.That(z[i].xMin, Is.GreaterThanOrEqualTo(0f), $"{arrangement} hex {i} on screen (left)");
+                    Assert.That(z[i].xMax, Is.LessThanOrEqualTo(1f), $"{arrangement} hex {i} on screen (right)");
+                    Assert.That(z[i].yMax, Is.LessThanOrEqualTo(1f), $"{arrangement} hex {i} on screen (top)");
+                    var hex = Drawn(z[i]);
+                    for (int j = i + 1; j < 4; j++)
+                    {
+                        var other = Drawn(z[j]);
+                        Assert.That(hex.Overlaps(other), Is.False, $"{arrangement}: hex {i} overlaps hex {j}");
+                    }
+                    foreach (var inf in info)
+                        Assert.That(hex.Overlaps(inf), Is.False, $"{arrangement}: hex {i} runs into an information zone");
+                }
+            }
         }
 
         [Test]

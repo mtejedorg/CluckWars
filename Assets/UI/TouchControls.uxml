@@ -115,6 +115,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="Badge1" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText1" text="1" class="cw-hex-badge-text" picking-mode="Ignore" />
+                <ui:VisualElement name="BadgeArrow1" class="cw-hex-badge-arrow" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Pip1" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
@@ -141,6 +142,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="Badge2" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText2" text="2" class="cw-hex-badge-text" picking-mode="Ignore" />
+                <ui:VisualElement name="BadgeArrow2" class="cw-hex-badge-arrow" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Pip2" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
@@ -169,6 +171,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="Badge3" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText3" text="3" class="cw-hex-badge-text" picking-mode="Ignore" />
+                <ui:VisualElement name="BadgeArrow3" class="cw-hex-badge-arrow" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Pip3" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>
@@ -196,6 +199,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="Badge4" class="cw-hex-badge" picking-mode="Ignore">
                 <ui:Label name="BadgeText4" text="4" class="cw-hex-badge-text" picking-mode="Ignore" />
+                <ui:VisualElement name="BadgeArrow4" class="cw-hex-badge-arrow" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Pip4" class="cw-hex-pip" picking-mode="Ignore" />
         </ui:VisualElement>

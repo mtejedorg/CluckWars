@@ -165,6 +165,10 @@ namespace CluckWars.Localization
         public const string SettingsAutoPeckDesc = "settings.autoPeck.desc";
         public const string SettingsQuickMoves = "settings.quickMoves";
         public const string SettingsQuickMovesDesc = "settings.quickMoves.desc";
+        public const string SettingsKeyboard = "settings.keyboard";
+        public const string SettingsKeyboardDesc = "settings.keyboard.desc";
+        public const string SettingsKeyboardWasd = "settings.keyboard.wasd";
+        public const string SettingsKeyboardQwer = "settings.keyboard.qwer";
         public const string SettingsBuzzWhenHit = "settings.buzzWhenHit";
         public const string SettingsBuzzWhenHitDesc = "settings.buzzWhenHit.desc";
         public const string SettingsMusicVolume = "settings.musicVolume";
