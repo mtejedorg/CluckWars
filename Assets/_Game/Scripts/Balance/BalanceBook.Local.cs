@@ -327,16 +327,16 @@ namespace CluckWars.Balance
         // ---- The oracle check ----------------------------------------------------------------------------------
 
         /// <summary>
-        /// Runs the SCT axiom on <paramref name="verdict"/> laid over the shipped assets, on copies: the live assets are not
-        /// touched (see <see cref="Preview{T}"/>). See <see cref="BalanceSctCheck"/>.
+        /// Runs the Balance Oracle on <paramref name="verdict"/> laid over the shipped assets, on copies: the live assets are not
+        /// touched (see <see cref="Preview{T}"/>). It reports numbers and never blocks an apply. See <see cref="BalanceSctCheck"/>.
         /// </summary>
-        public SctReport CheckSct(BalanceVerdict verdict)
+        public OracleCheck CheckOracle(BalanceVerdict verdict)
         {
-            if (!CheckLocalAllowed("SCT check")) return new SctReport { Relevant = true, Note = "dev tools are off" };
-            var report = BalanceSctCheck.Run(this, verdict, _abilities, _classes, _match);
-            if (report.Relevant && !report.Available)
-                _log.Warn(Source, $"Balance: the SCT check could not run ({report.Note}); a local apply of this delta stays blocked.");
-            return report;
+            if (!CheckLocalAllowed("oracle check")) return new OracleCheck { Relevant = true, Note = "dev tools are off" };
+            var check = BalanceSctCheck.Run(this, verdict, _abilities, _classes, _match, _oracleMap);
+            if (check.Relevant && !check.Ran)
+                _log.Warn(Source, $"Balance: the oracle check could not run ({check.Note}); the apply is not affected.");
+            return check;
         }
     }
 }

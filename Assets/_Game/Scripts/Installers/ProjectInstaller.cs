@@ -31,6 +31,9 @@ namespace CluckWars.Installers
         [Tooltip("Drop the ChickenClassRegistry asset here so Game-scene systems can resolve it.")]
         [SerializeField] private ChickenClassRegistrySO _chickenClassRegistry;
 
+        [Tooltip("Drop the OracleMap asset here (Assets/_Game/Data/Balance/OracleMap.asset): the baked arena the dev-tools balance editor's oracle check reads. If null, that check reports that it cannot run; nothing else changes.")]
+        [SerializeField] private OracleMapSO _oracleMap;
+
         [Tooltip("Drop the AudioRegistry asset here so audio cues resolve. If null, an empty runtime instance is bound and all SFX are silent.")]
         [SerializeField] private AudioRegistrySO _audioRegistry;
 
@@ -272,7 +275,7 @@ namespace CluckWars.Installers
             bool remote = BalanceSourceChoice.Decide(Application.isEditor, BalanceSourceChoice.EditorToggle);
 #endif
 
-            var book = new BalanceBook(log, abilityRegistry, _chickenClassRegistry, matchConfig);
+            var book = new BalanceBook(log, abilityRegistry, _chickenClassRegistry, matchConfig, _oracleMap);
             Container.BindInterfacesAndSelfTo<BalanceBook>().FromInstance(book).AsSingle();
 
             BalanceCache cache = null;

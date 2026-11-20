@@ -136,18 +136,21 @@ namespace CluckWars.Balance
         private readonly AbilityRegistrySO _abilities;
         private readonly ChickenClassRegistrySO _classes;
         private readonly MatchConfigSO _match;
+        private readonly OracleMapSO _oracleMap;
 
         private readonly Dictionary<ScriptableObject, Snapshot> _snapshots = new Dictionary<ScriptableObject, Snapshot>();
         private readonly Dictionary<PassiveAbilitySO, AbilityBaseSO[]> _kitSnapshots = new Dictionary<PassiveAbilitySO, AbilityBaseSO[]>();
         private BalanceVerdict _current;
         private bool _disposed;
 
-        public BalanceBook(ILogService log, AbilityRegistrySO abilities, ChickenClassRegistrySO classes, MatchConfigSO match)
+        /// <param name="oracleMap">The baked arena the oracle check reads (serialized on the installer); null leaves the check unable to run, never blocking.</param>
+        public BalanceBook(ILogService log, AbilityRegistrySO abilities, ChickenClassRegistrySO classes, MatchConfigSO match, OracleMapSO oracleMap = null)
         {
             _log = log;
             _abilities = abilities;
             _classes = classes;
             _match = match;
+            _oracleMap = oracleMap;
             Live = this;
             Application.quitting += OnQuitting;
         }

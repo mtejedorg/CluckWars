@@ -296,13 +296,12 @@ dev.balance.status.changes,"{count} change(s):
 {list}"
 dev.balance.status.ignored,"Ignored:
 {list}"
-dev.balance.sct.ok,SCT axiom holds.
-dev.balance.sct.skipped,SCT check not needed: {reason}.
-dev.balance.sct.unavailable,"SCT check could not run, so APPLY is blocked: {reason}."
-dev.balance.sct.failed,SCT axiom broken. APPLY is blocked:
-dev.balance.sct.line,{label}: {seconds} s and {trips} trips on seat {seat} (target {target} s and {targetTrips} trips)
-dev.balance.sct.lineNotReached,{label}: never banks the target on seat {seat}
-dev.balance.sct.problem,{label}: {problem}
+dev.balance.oracle.header,"Oracle: best food banked per kit in the match clock, before -> after (APPLY is never blocked)"
+dev.balance.oracle.skipped,Oracle check not needed: {reason}.
+dev.balance.oracle.unavailable,"The oracle could not run, APPLY is not affected: {reason}."
+dev.balance.oracle.line,{label}: {before} -> {after} ({change})
+dev.balance.oracle.notModelled,The oracle does not model:
+dev.balance.oracle.notModelledItem,- {item}
 dev.balance.result.applied,Applied here: bal={hash}. Stored on this device.
 dev.balance.result.stored,Stored: bal={hash} applies next launch.
 dev.balance.result.refused,Not applied: {reason}

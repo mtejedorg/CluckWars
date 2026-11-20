@@ -15,7 +15,7 @@ namespace CluckWars.Diagnostics
     /// <summary>
     /// Dev-tools builds only: the local balance editor. Lists every overridable field of the class stats, abilities,
     /// specializations and MatchConfig with its shipped and current value, takes edits, CHECKs them (the one validation in
-    /// <see cref="BalanceBook.Evaluate"/> plus the SCT axiom on copies, <see cref="BalanceSctCheck"/>), APPLYes them on this
+    /// <see cref="BalanceBook.Evaluate"/> plus the Balance Oracle's before -> after numbers on copies, <see cref="BalanceSctCheck"/>, which reports and never blocks), APPLYes them on this
     /// device through <see cref="BalanceLocalOverride"/> (only while the apply window is open; otherwise it stores them for
     /// next launch), and shows and copies the delta in force so the owner can publish it with <c>/balance publish dev</c>
     /// on the PC. No network, no credential, no publish (ARCH-DATA-14, owner ruling 2026-11-18).
@@ -326,38 +326,37 @@ namespace CluckWars.Diagnostics
             if (verdict.Ignored.Count > 0)
                 sb.AppendLine(UiText.Format(UiKeys.DevBalanceStatusIgnored, ("list", string.Join("\n", verdict.Ignored))));
 
-            var sct = _book.CheckSct(verdict);
-            sb.Append(SctText(sct));
-            if (sct.Passed) { _checkedJson = json; _checkedHash = _book.Hash; }
+            // The oracle reports; it never gates the apply.
+            sb.Append(OracleText(_book.CheckOracle(verdict)));
+            _checkedJson = json;
+            _checkedHash = _book.Hash;
             Show(sb.ToString());
             RefreshButtons();
         }
 
-        /// <summary>The report lines for one SCT check: why it was skipped or blocked, or each class run, failures first.</summary>
-        public static string SctText(SctReport report)
+        /// <summary>The report lines for one oracle check: why it did not run, or each kit's best food before -> after and what the oracle does not model.</summary>
+        public static string OracleText(OracleCheck check)
         {
-            if (!report.Relevant) return UiText.Format(UiKeys.DevBalanceSctSkipped, ("reason", report.Note ?? string.Empty));
-            if (!report.Available) return UiText.Format(UiKeys.DevBalanceSctUnavailable, ("reason", report.Note ?? string.Empty));
+            if (!check.Relevant) return UiText.Format(UiKeys.DevBalanceOracleSkipped, ("reason", check.Note ?? string.Empty));
+            if (!check.Ran) return UiText.Format(UiKeys.DevBalanceOracleUnavailable, ("reason", check.Note ?? string.Empty));
 
-            var sb = new StringBuilder(UiText.Get(report.Passed ? UiKeys.DevBalanceSctOk : UiKeys.DevBalanceSctFailed));
-            foreach (var pass in new[] { false, true })
-                foreach (var line in report.Lines)
-                    if (line.Ok == pass) sb.Append('\n').Append(SctLineText(line));
+            var sb = new StringBuilder(UiText.Get(UiKeys.DevBalanceOracleHeader));
+            foreach (var row in check.Rows())
+                sb.Append('\n').Append(UiText.Format(UiKeys.DevBalanceOracleLine,
+                    ("label", row.Label),
+                    ("before", Number(row.Before)),
+                    ("after", Number(row.After)),
+                    ("change", Signed(row.Change))));
+            if (check.After.NotModelled.Count > 0)
+            {
+                sb.Append('\n').Append(UiText.Get(UiKeys.DevBalanceOracleNotModelled));
+                foreach (var item in check.After.NotModelled) sb.Append('\n').Append(UiText.Format(UiKeys.DevBalanceOracleNotModelledItem, ("item", item)));
+            }
             return sb.ToString();
         }
 
-        public static string SctLineText(SctLine line)
-        {
-            if (line.Problem != null) return UiText.Format(UiKeys.DevBalanceSctProblem, ("label", line.Label), ("problem", line.Problem));
-            if (!line.Reached) return UiText.Format(UiKeys.DevBalanceSctLineNotReached, ("label", line.Label), ("seat", line.Seat));
-            return UiText.Format(UiKeys.DevBalanceSctLine,
-                ("label", line.Label),
-                ("seconds", line.Seconds.ToString("0.0", CultureInfo.InvariantCulture)),
-                ("trips", line.Trips),
-                ("target", line.TargetSeconds.ToString("0.0", CultureInfo.InvariantCulture)),
-                ("targetTrips", line.TargetTrips),
-                ("seat", line.Seat));
-        }
+        private static string Number(float value) => value.ToString("0.0", CultureInfo.InvariantCulture);
+        private static string Signed(float value) => (value >= 0f ? "+" : string.Empty) + Number(value);
 
         private void ApplyChecked()
         {

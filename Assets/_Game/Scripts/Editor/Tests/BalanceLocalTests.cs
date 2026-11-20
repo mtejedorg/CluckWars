@@ -17,7 +17,7 @@ namespace CluckWars.Tests
     /// <summary>
     /// The local half of the balance layer (dev-tools balance editor, owner ruling 2026-11-18): the Local origin, the gate as a
     /// pure function, the field list, the delta builder (only values that differ from shipped, enums as names, hash parity with
-    /// the publish form), the SCT check on copies, and the stored override (write, read, boot apply, reset, window closed).
+    /// the publish form), the stored override (write, read, boot apply, reset, window closed).
     /// Real registries and assets, as in BalanceBookTests; TearDown restores and compares every asset to its shipped JSON.
     /// </summary>
     public sealed class BalanceLocalTests
@@ -52,8 +52,6 @@ namespace CluckWars.Tests
         private MatchConfigSO _match;
         private Dictionary<ScriptableObject, string> _shipped;
         private string _tempDir;
-        private Func<int, OracleMap> _savedProvider;
-
         private AbilityBaseSO Ability(string name) => _registry.All.First(a => a != null && a.name == name);
         private ChickenStatsSO Stats(ChickenClass cls) => _classes.TryGet(cls, out var e) ? e.Stats : null;
 
@@ -70,14 +68,11 @@ namespace CluckWars.Tests
             all.Add(_match);
             _shipped = all.Distinct().ToDictionary(so => so, so => JsonUtility.ToJson(so));
             _book = new BalanceBook(_log, _registry, _classes, _match);
-            _savedProvider = BalanceSctCheck.MapProvider;
-            BalanceSctCheck.MapProvider = ShippedMap.OracleMap;
         }
 
         [TearDown]
         public void TearDown()
         {
-            BalanceSctCheck.MapProvider = _savedProvider;
             _book?.Dispose();
             if (_tempDir != null && Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true);
             _tempDir = null;
@@ -300,69 +295,6 @@ namespace CluckWars.Tests
             Assert.IsTrue(_book.TryApplyLocal(SnatchDelta, out _));
             Assert.AreEqual(_book.Canonical, _book.PublishJson, "no enum field: both forms are the same text");
             Assert.AreEqual("{\"assets\":{\"Snatch\":{\"Cooldown\":3.25}},\"schema\":1}", _book.PublishJson);
-        }
-
-        // ---- The SCT check (on copies) ----------------------------------------------------------------------------
-
-        [Test]
-        public void Sct_AProposalThatTouchesNoSctInput_IsNotChecked_AndPasses()
-        {
-            var verdict = _book.Evaluate(SnatchDelta, "test");
-            var report = _book.CheckSct(verdict);
-            Assert.IsFalse(report.Relevant);
-            Assert.IsTrue(report.Passed);
-            Assert.IsEmpty(report.Lines);
-        }
-
-        [Test]
-        public void Sct_TheShippedNumbers_Pass_OnAllFourSeats()
-        {
-            Assert.IsTrue(_book.TryGetShippedToken("MatchConfig", "FoodTargetToWin", out string target));
-            var verdict = _book.Evaluate("{\"schema\":1,\"assets\":{\"MatchConfig\":{\"FoodTargetToWin\":" + target + "}}}", "test");
-            var report = _book.CheckSct(verdict);
-            Assert.IsTrue(report.Relevant);
-            Assert.IsTrue(report.Available, report.Note);
-            Assert.IsTrue(report.Passed, string.Join("\n", report.Lines.Where(l => !l.Ok).Select(l => $"{l.Label}: {l.Seconds}s/{l.Trips}")));
-            Assert.GreaterOrEqual(report.Lines.Count, SctTargets.All.Length);
-        }
-
-        [Test]
-        public void Sct_AClassSpeedChange_IsBlocked_WithoutTouchingTheLiveAsset()
-        {
-            var speedy = Stats(ChickenClass.Speedy);
-            float live = speedy.MoveSpeed;
-            var verdict = _book.Evaluate("{\"schema\":1,\"assets\":{\"" + speedy.name + "\":{\"MoveSpeed\":" + (live * 2f).ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "}}}", "test");
-            Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
-
-            var report = _book.CheckSct(verdict);
-            Assert.IsTrue(report.Available, report.Note);
-            Assert.IsFalse(report.Passed, "double the move speed breaks the Speedy SCT target");
-            Assert.IsTrue(report.Lines.Any(l => !l.Ok && l.Label.StartsWith("Speedy", StringComparison.Ordinal)));
-            Assert.AreEqual(live, speedy.MoveSpeed, "the check ran on copies");
-            Assert.AreEqual(BalanceOrigin.Baseline, _book.Origin);
-        }
-
-        [Test]
-        public void Sct_WithoutAMap_ABlockedProposalSaysSo_AndDoesNotPass()
-        {
-            BalanceSctCheck.MapProvider = null;
-            var speedy = Stats(ChickenClass.Speedy);
-            var verdict = _book.Evaluate("{\"schema\":1,\"assets\":{\"" + speedy.name + "\":{\"MoveSpeed\":8}}}", "test");
-            var report = _book.CheckSct(verdict);
-            Assert.IsTrue(report.Relevant);
-            Assert.IsFalse(report.Available);
-            Assert.IsFalse(report.Passed);
-            Assert.IsNotEmpty(report.Note);
-        }
-
-        [Test]
-        public void Sct_AMapThatThrows_IsReported_NotSwallowed()
-        {
-            BalanceSctCheck.MapProvider = _ => throw new InvalidOperationException("no scene");
-            var speedy = Stats(ChickenClass.Speedy);
-            var report = _book.CheckSct(_book.Evaluate("{\"schema\":1,\"assets\":{\"" + speedy.name + "\":{\"MoveSpeed\":8}}}", "test"));
-            Assert.IsFalse(report.Available);
-            StringAssert.Contains("no scene", report.Note);
         }
 
         // ---- The stored override ----------------------------------------------------------------------------------

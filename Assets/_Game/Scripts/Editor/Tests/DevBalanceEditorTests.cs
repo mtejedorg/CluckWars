@@ -12,7 +12,7 @@ namespace CluckWars.Tests
     /// <summary>
     /// The dev-tools balance editor (ARCH-DATA-14, owner ruling 2026-11-18): that it and the local balance path are reachable
     /// only behind <see cref="DevTools.Available"/> (the Editor has the tools on, so the gates are pinned in the sources), that
-    /// nothing in it talks to a network service, that the menu sees only its interface, and its pure helpers (filter, SCT report
+    /// nothing in it talks to a network service, that the menu sees only its interface, and its pure helpers (filter, oracle report
     /// text). The behaviour of the local path is <c>BalanceLocalTests</c>.
     /// </summary>
     public sealed class DevBalanceEditorTests
@@ -47,7 +47,7 @@ namespace CluckWars.Tests
             foreach (string method in new[]
             {
                 "public bool ApplyLocal(", "public bool TryApplyLocal(", "public IReadOnlyList<BalanceFieldInfo> DescribeFields(",
-                "public bool TryBuildDeltaJson(", "public SctReport CheckSct(",
+                "public bool TryBuildDeltaJson(", "public OracleCheck CheckOracle(",
             })
             {
                 int at = src.IndexOf(method, System.StringComparison.Ordinal);
@@ -208,33 +208,6 @@ namespace CluckWars.Tests
             Assert.IsTrue(DevBalanceEditor.Matches("Snatch", "Cooldown", "snat"));
             Assert.IsTrue(DevBalanceEditor.Matches("Snatch", "Cooldown", " COOL "));
             Assert.IsFalse(DevBalanceEditor.Matches("Snatch", "Cooldown", "speed"));
-        }
-
-        [Test]
-        public void SctText_SaysWhyItWasSkippedOrBlocked_AndListsFailuresFirst()
-        {
-            StringAssert.Contains("not needed", DevBalanceEditor.SctText(new SctReport { Relevant = false, Note = "no stat changes" }));
-            StringAssert.Contains("APPLY is blocked", DevBalanceEditor.SctText(new SctReport { Relevant = true, Available = false, Note = "no map" }));
-
-            var report = new SctReport { Relevant = true, Available = true };
-            report.Lines.Add(new SctLine { Label = "Fatty", Ok = true, Seat = 1, Seconds = 30f, Trips = 2, TargetSeconds = 30f, TargetTrips = 2, Reached = true });
-            report.Lines.Add(new SctLine { Label = "Speedy", Ok = false, Seat = 2, Seconds = 20.5f, Trips = 3, TargetSeconds = 30f, TargetTrips = 4, Reached = true });
-            Assert.IsFalse(report.Passed);
-            string text = DevBalanceEditor.SctText(report);
-            StringAssert.Contains("broken", text);
-            Assert.Less(text.IndexOf("Speedy", System.StringComparison.Ordinal), text.IndexOf("Fatty", System.StringComparison.Ordinal), "the failing run comes first");
-            StringAssert.Contains("20.5 s", text);
-
-            report.Lines[1].Ok = true;
-            Assert.IsTrue(report.Passed);
-            StringAssert.Contains("holds", DevBalanceEditor.SctText(report));
-        }
-
-        [Test]
-        public void ARelevantReport_WithNoRuns_NeverPasses()
-        {
-            Assert.IsFalse(new SctReport { Relevant = true, Available = true }.Passed);
-            Assert.IsTrue(new SctReport { Relevant = false }.Passed);
         }
     }
 }
