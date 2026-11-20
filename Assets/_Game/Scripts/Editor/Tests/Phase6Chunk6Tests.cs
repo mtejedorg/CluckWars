@@ -485,7 +485,7 @@ namespace CluckWars.Tests
         {
             UiText.Reset();
             Assert.AreEqual("Hold to see the reach · Let go to use it · Slide to the edge to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Touch)));
-            Assert.AreEqual("Hold to see the reach · Let go to use it · B to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Gamepad)));
+            Assert.AreEqual("Hold to see the reach · Let go to use it · Click the left stick to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.Gamepad)));
             Assert.AreEqual("Hold to see the reach · Let go to use it · Esc to cancel", UiText.Get(HoldHintRules.KeyFor(HudDeviceMode.KeyboardMouse)));
             Assert.IsEmpty(UiText.Problems);
             UiText.Reset();

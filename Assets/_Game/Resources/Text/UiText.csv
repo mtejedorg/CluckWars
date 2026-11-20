@@ -239,7 +239,7 @@ hud.badge.egg,EGG
 hud.badge.hidden,HIDDEN
 hud.badge.fast,FAST
 hud.hint.hold.touch,Hold to see the reach · Let go to use it · Slide to the edge to cancel
-hud.hint.hold.pad,Hold to see the reach · Let go to use it · B to cancel
+hud.hint.hold.pad,Hold to see the reach · Let go to use it · Click the left stick to cancel
 hud.hint.hold.keys,Hold to see the reach · Let go to use it · Esc to cancel
 countdown.waitingFor,Waiting for {name}…
 countdown.waitingSomeone,Waiting for a slow bird…
