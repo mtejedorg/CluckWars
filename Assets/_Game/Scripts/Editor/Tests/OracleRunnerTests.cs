@@ -160,7 +160,7 @@ namespace CluckWars.Tests
             float room = clock - mark.RoundStartCooldownSeconds - mark.WindowSeconds;
             int expected = room <= 0f ? 0 : (int)Math.Ceiling(room / period);
 
-            Assert.AreEqual(expected, SneakyTables.MaxSpoilerKills(mark, clock));
+            Assert.AreEqual(expected, SneakyTables.MaxSpoilerKills(mark.RoundStartCooldownSeconds, mark.WindowSeconds, mark.SuccessCooldownSeconds, clock));
         }
 
         [Test]
@@ -168,7 +168,7 @@ namespace CluckWars.Tests
         {
             var mark = _abilities.All.OfType<MarkKillAbilitySO>().FirstOrDefault()
                        ?? _abilities.Passives.SelectMany(p => p.Kit).OfType<MarkKillAbilitySO>().First();
-            int rowsPerLevel = SneakyTables.MaxSpoilerKills(mark, _match.MatchDurationSeconds) + 1;
+            int rowsPerLevel = SneakyTables.MaxSpoilerKills(mark.RoundStartCooldownSeconds, mark.WindowSeconds, mark.SuccessCooldownSeconds, _match.MatchDurationSeconds) + 1;
             var levels = _baseline.Spoiler.GroupBy(r => r.CargoPerKill).ToList();
 
             Assert.AreEqual(3, levels.Count, "empty, mean load and full load");

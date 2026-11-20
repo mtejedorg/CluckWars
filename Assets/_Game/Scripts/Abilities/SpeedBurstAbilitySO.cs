@@ -31,6 +31,8 @@ namespace CluckWars.Abilities
         [Tooltip("Multiplier applied to MoveSpeed while active.")]
         [Min(1f)] public float SpeedMultiplier = 1.3f;
 
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts { SpeedMultiplier = SpeedMultiplier, SpeedSeconds = Duration };
+
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
 

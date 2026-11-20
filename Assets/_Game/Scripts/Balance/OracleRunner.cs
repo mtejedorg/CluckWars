@@ -155,18 +155,18 @@ namespace CluckWars.Balance
         private static void BuildSpoiler(OracleReport report, OracleInputs inputs, Previews scope, MatchConfigSO match, FarmerFacts farmers)
         {
             var passive = scope.Of(FindPassive<SpoilerPassiveSO>(inputs.Abilities));
-            var mark = scope.Of(FindAbility<MarkKillAbilitySO>(inputs.Abilities));
+            var mark = scope.Of(FindAbility(inputs.Abilities, AbilityJob.DeathMark)).OracleFacts;
             var t = new SpoilerTableInputs
             {
                 ExecuteBounty = match.ExecuteBounty,
                 PassiveBonus = passive.MatchEndBonusFood(null),
                 ClockSeconds = match.MatchDurationSeconds,
                 WinTarget = match.FoodTargetToWin,
-                RemovalSeconds = mark.RemovalSeconds,
+                RemovalSeconds = mark.MarkRemovalSeconds,
                 MeanCargo = farmers.MeanCargo,
                 Capacity = report.StandardCapacity,
                 FarmerBanked = farmers.FarmerBanked,
-                MaxKills = SneakyTables.MaxSpoilerKills(mark, match.MatchDurationSeconds),
+                MaxKills = SneakyTables.MaxSpoilerKills(mark.MarkRoundStartCooldown, mark.MarkWindowSeconds, mark.MarkSuccessCooldown, match.MatchDurationSeconds),
             };
             report.SpoilerBountyPerKill = t.ExecuteBounty;
             report.SpoilerPassiveBonus = t.PassiveBonus;
@@ -189,7 +189,7 @@ namespace CluckWars.Balance
 
             var t = new ThiefTableInputs
             {
-                StealAmount = steal.StealAmount,
+                StealAmount = steal.OracleFacts.StealAmount,
                 StealMultiplier = passive.ModifyStealAmount(1f, null),
                 StealCooldown = passive.ModifyCooldown(steal.Cooldown, steal, null),
                 CargoCapacity = kit.CargoCapacity,
@@ -226,27 +226,28 @@ namespace CluckWars.Balance
         }
 
         /// <summary>The ability of type T in the registry, else in a passive's fixed kit (Death Mark is pre-equip only and may not be registered).</summary>
-        private static T FindAbility<T>(AbilityRegistrySO abilities) where T : AbilityBaseSO
+        private static AbilityBaseSO FindAbility(AbilityRegistrySO abilities, AbilityJob job)
         {
             if (abilities.All != null)
                 foreach (var a in abilities.All)
-                    if (a is T found) return found;
+                    if (a != null && a.Job == job) return a;
             foreach (var p in abilities.Passives)
             {
                 if (p == null || p.Kit == null) continue;
                 foreach (var a in p.Kit)
-                    if (a is T found) return found;
+                    if (a != null && a.Job == job) return a;
             }
-            throw new InvalidOperationException($"No {typeof(T).Name} asset is reachable from the ability registry.");
+            throw new InvalidOperationException($"No {job} asset is reachable from the ability registry.");
         }
 
-        private static SnatchAbilitySO FindSteal(AbilityRegistrySO abilities)
+        private static AbilityBaseSO FindSteal(AbilityRegistrySO abilities)
         {
             if (abilities.All != null)
                 foreach (var a in abilities.All)
                     if (a != null && a.Job == AbilityJob.Steal)
-                        return a as SnatchAbilitySO
-                            ?? throw new InvalidOperationException($"{a.name} has the Steal job but is not a SnatchAbilitySO: the oracle cannot read its steal amount.");
+                        return a.OracleFacts.StealAmount > 0f
+                            ? a
+                            : throw new InvalidOperationException($"{a.name} has the Steal job but declares no steal amount in its OracleFacts: the oracle cannot read it.");
             throw new InvalidOperationException("The ability registry holds no ability with the Steal job.");
         }
 

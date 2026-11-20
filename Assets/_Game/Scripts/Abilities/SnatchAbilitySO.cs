@@ -57,6 +57,8 @@ namespace CluckWars.Abilities
 
         public override float NominalStealAmount => StealAmount;
 
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts { StealAmount = StealAmount };
+
         public override float EmittedKnockback => KnockbackStrength;
 
         public override bool TargetEffectIncludesSteal => true;

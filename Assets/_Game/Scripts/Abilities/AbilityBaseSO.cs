@@ -401,6 +401,9 @@ namespace CluckWars.Abilities
         /// </remarks>
         public virtual float NominalStealAmount => 0f;
 
+        /// <summary>The numbers the balance oracle reads off this ability (zero where the ability does not own them).</summary>
+        public virtual AbilityOracleFacts OracleFacts => default;
+
         /// <summary>
         /// The stun, root or timed slow this ability sends its victims through
         /// <c>ChickenController.RPC_ApplyStun</c> / <c>RPC_ApplyRoot</c> / <c>RPC_ApplyAbilitySlow</c>,

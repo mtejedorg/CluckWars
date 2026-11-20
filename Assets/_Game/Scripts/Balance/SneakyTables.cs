@@ -50,16 +50,15 @@ namespace CluckWars.Balance
         /// Most executions one round allows: the first press when the round-start cooldown ends, each kill lands at the end
         /// of the window, the next press comes one success cooldown later, and a kill counts only if it lands before the clock ends.
         /// </summary>
-        public static int MaxSpoilerKills(MarkKillAbilitySO mark, float clockSeconds)
+        public static int MaxSpoilerKills(float roundStartCooldown, float windowSeconds, float successCooldown, float clockSeconds)
         {
-            if (mark == null) throw new ArgumentNullException(nameof(mark));
-            float window = Math.Max(mark.WindowSeconds, 0.1f);
-            float press = mark.RoundStartCooldownSeconds;
+            float window = Math.Max(windowSeconds, 0.1f);
+            float press = roundStartCooldown;
             int kills = 0;
             while (press + window < clockSeconds)
             {
                 kills++;
-                press += window + mark.SuccessCooldownSeconds;
+                press += window + successCooldown;
             }
             return kills;
         }

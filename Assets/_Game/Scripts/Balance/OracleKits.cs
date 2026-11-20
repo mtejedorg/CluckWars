@@ -154,9 +154,11 @@ namespace CluckWars.Balance
             {
                 if (ability == null) continue;
                 if (ability.Job == AbilityJob.Jump) result.Jumps = true;
-                if (ability.Job != AbilityJob.Speed || !(scope.Of(ability) is SpeedBurstAbilitySO burst)) continue;
-                result.BurstMultiplier = burst.SpeedMultiplier;
-                result.BurstSeconds = burst.Duration;
+                if (ability.Job != AbilityJob.Speed) continue;
+                var burst = scope.Of(ability);
+                var facts = burst.OracleFacts;
+                result.BurstMultiplier = facts.SpeedMultiplier;
+                result.BurstSeconds = facts.SpeedSeconds;
                 result.BurstCooldown = passive != null ? passive.ModifyCooldown(burst.Cooldown, burst, null) : burst.Cooldown;
             }
             return result;

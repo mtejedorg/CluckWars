@@ -176,7 +176,7 @@ namespace CluckWars.Tests
             foreach (var name in new[] { "PileSlowFactor", "CollisionSlowFactor" })
             {
                 var field = typeof(ChickenController).GetField(
-                    name, BindingFlags.NonPublic | BindingFlags.Static);
+                    name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 Assert.IsNotNull(field, $"ChickenController.{name} was renamed or removed.");
 
                 float value = (float)field.GetRawConstantValue();

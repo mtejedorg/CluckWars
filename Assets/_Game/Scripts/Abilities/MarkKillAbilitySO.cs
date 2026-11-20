@@ -60,6 +60,14 @@ namespace CluckWars.Abilities
 
         public override float RoundStartCooldown => RoundStartCooldownSeconds;
 
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts
+        {
+            MarkRoundStartCooldown = RoundStartCooldownSeconds,
+            MarkWindowSeconds = WindowSeconds,
+            MarkSuccessCooldown = SuccessCooldownSeconds,
+            MarkRemovalSeconds = RemovalSeconds,
+        };
+
         public override bool RequiresEnemyInRange => false;
         /// <summary>The Kill is pressed during the stun the bot's own Ambush is still running.</summary>
         public override bool BotIgnoresOneAtATime => true;
