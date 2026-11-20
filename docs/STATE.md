@@ -11,13 +11,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 📓 2026-11-20 - Obsidian vault at the repo root; Notion pages archived (`develop`, not committed)
+## 📓 2026-11-20 - Obsidian vault at the repo root; Notion pages archived, then dropped (`develop`, not pushed)
 
 Obsidian is an optional reader for the docs; nothing depends on it. Guide: `docs/OBSIDIAN.md`. Vault root is the repo root, links stay standard relative markdown (no wikilinks), no community plugins. Tracked: `.obsidian/app.json`, `core-plugins.json`, `appearance.json` only; workspace, cache and graph files are gitignored. `app.json` hides `Library/`, `Assets/`, `Builds/` and similar from search and graph.
 
 Added `docs/DASHBOARD.md` (links only, no copied numbers), `docs/docs.base` (docs by `status`), `docs/architecture.canvas`. Frontmatter (`status`, `owner`, `type`) is on STATE, BACKLOG, ROADMAP, ARCHITECTURE_RULES, CODE_RULES and FILE_STRUCTURE: the 91 `STATE.md:<line>` anchors in the rules docs and BACKLOG shift by 5 lines (they were already commit-pinned and drifted). The six `docs/FILE_STRUCTURE.md` 7.2 rows were added by `librarian`.
 
-Four Notion pages (GDD v0.3, TDD v0.1, Art Direction v0.1, Classes) were copied verbatim to `docs/notion-import/` as history with banners; they are stale and never a source of numbers. Nothing was deleted in Notion: trashing them waits for Maestro's confirmed list (BL-197). The repo is public, so the archive becomes public when `develop` is pushed. The graphify ignore lines (`.obsidian/`, `docs/notion-import/`) live in the per-clone `.graphifyignore`, which is itself gitignored. Open check in the Obsidian UI: BL-196.
+The four Notion pages (GDD v0.3, TDD v0.1, Art Direction v0.1, Classes) were first archived to `docs/notion-import/`, then deleted from the repo the same day on Maestro's call: stale copies of GDD, TDD and ART, and the repo is public. They sit in Notion Trash for 30 days (BL-197). The first of these commits still holds them in git history until the local commits are rewritten or discarded before a push. The graphify ignore line `.obsidian/` lives in the per-clone `.graphifyignore`, which is itself gitignored. Open check in the Obsidian UI: BL-196.
 
 ## 🔢 2026-11-19 - Build number identifies the commit (`848cebbd`, `develop`, not pushed)
 

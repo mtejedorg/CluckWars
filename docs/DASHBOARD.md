@@ -43,7 +43,3 @@ Add, close or re-prioritise items with the `/backlog` skill, not by hand.
 ## All docs by status
 
 Open [docs.base](docs.base) in Obsidian for a table of every doc grouped by `status`.
-
-## History
-
-- [notion-import/](notion-import/README.md): pages archived from Notion on 2026-11-20. History only.

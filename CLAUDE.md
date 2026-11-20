@@ -33,7 +33,7 @@ Read this first. It is the single project config (the former `.claude/CLAUDE.md`
 | **What's the plan, what's shipped, what's next?** Per-phase status, dedicated test session work list. | `docs/ROADMAP.md` |
 | **Why does the design look like this?** GDD / TDD / ART. | `docs/GDD.md` / `docs/TDD.md` / `docs/ART.md` |
 | **How do I show the game to a human?** Interactive mechanics site — classes, abilities, arena, traversal, tech stack. Doubles as portfolio. | `docs/site/index.html` — **keep in sync, see below** |
-| **How do I read the docs in Obsidian, and where is the Notion history?** Start-here guide, link dashboard, docs-by-status table, architecture canvas. The Notion pages in `docs/notion-import/` are history only, never a source of numbers. | `docs/OBSIDIAN.md`, `docs/DASHBOARD.md` |
+| **How do I read the docs in Obsidian?** Start-here guide, link dashboard, docs-by-status table, architecture canvas. | `docs/OBSIDIAN.md`, `docs/DASHBOARD.md` |
 | **How does the open-source Unity MCP work?** MCP architecture, UI Toolkit rules, asset structure, and Claude integration. | `docs/UNITY_MCP_GUIDE.md` |
 | **Why this engine / other big choices?** Architecture decision records (e.g. Unity vs Godot). | `docs/adr/` |
 | **What are the Google Play listing limits (short description 80, full 4000, release notes 500, graphics), and where are the store graphics?** | `docs/PLAY_STORE.md` |
