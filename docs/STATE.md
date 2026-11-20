@@ -11,6 +11,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-20 - Controls batch follow-ups: BL-199/200/201/203 closed, BL-202 fixed in code (`develop`)
+
+- **BL-200 (`f57272ab`):** the dead explicit-aim decode is gone from the simulation (`AimQuantizer`, `AbilityAimForward` `explicitAim`, the `ChickenController` aim branch, `ChickenMovement.Tick` `faceOverride`); `ApplyAimForFire` is now `ApplySoftLockForFire`. Fire direction is unchanged (facing or soft-lock). Kept: `PlayerNetworkInput.Aim` (struct unchanged) and `ChickenController.CastAim` (always zero now; removing it touches `AbilityBaseSO.GatherTargets`).
+- **BL-199 (`8dc874b6`):** `ClassStatsAndRegistryGuardTests` pins each class's MaxHP/CargoCapacity/Scale and the 11 active abilities. MaxHP is read from the asset YAML because `ChickenStatsSO` no longer has the field.
+- **BL-202 (`cfd34f80`):** pad B both closes the Leave sheet and is slot 3, so the closing press reached slot 3. `LeaveSheetInputGate` (`MatchBackRules.cs`) keeps input blocked after the sheet was up until every move button is released. Still needs a real pad test.
+- **BL-201 (`908ec55c`):** `capture_phase6_chunk5.py` deleted. **BL-203:** Kit Lab artifact v14 republished from the assets; saved Spoiler/Thief kit docs reordered to the slot roles.
+- **Suite:** batch run with `-nographics`, 3959/3978. The 19 failures are render-state tests that need a GPU (MarkScreenEffect RealRender, D1 FullMound, D11, D8 ring ghost), two MCP-log-line failures, and two Oracle tests waiting on another session's uncommitted map/MatchConfig work. Rerun without `-nographics` when the Editor is free.
+- **Site:** fact-check fixes are in `b620fdba` (artifact v23). The Oracle/SCT wording, pile food, comeback event and Spoiler numbers are left to the Oracle v2 session's docs task. BL-204 retakes the captures.
+
 ## 🎯 2026-11-20 - Oracle v2: accepted reference, offsets, drift guard; v1 retired (plan Task 6, `develop`)
 
 `OracleReferenceSO` (`Assets/_Game/Data/Balance/OracleReference.asset`) stores each foraging kit's measured best food and its offset in seconds; `OracleMenu` report and `ReportBatch` pass those offsets. `Cluck Wars/Balance/Oracle/Accept as reference` (note dialog; `OracleMenu.AcceptBatch -oracleNote "..."` in batch) re-measures and equalises every kit's result on the mean. The first reference keeps the old meaning (Warrior kits +5 s, the rest 0, note "v1 targets carried over"). The only oracle test that can fail is `OracleReferenceTests.Measured_EqualsTheAcceptedReference` (drift, 0.05 food). Retired: `BalanceOracle`, `SctTargets`, `SpecSctTargets`, `BalanceTypes.cs`, `BalanceOracleTests`, `ShippedMap.OracleMap`; the `ChickenStatsSO` tooltips now say the oracle reports and the value may be tuned by hand. No Maestro wiring.
