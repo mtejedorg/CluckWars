@@ -11,6 +11,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-21 - Oracle v2: the result is seconds to the goal (`a804a9cb`, `develop`, not pushed)
+
+- **Why:** Maestro found that the solver ignored Peck time. The kit result was food banked at the clock end, and four farmers empty the 140-food map by about 21 s, so the number did not react to speed, Peck cooldown or Peck cast.
+- **Now:** a kit's result is the seat-mean seconds to bank the win target on its best route, minus its offset (a positive offset is a credit; Warrior kits +5 s, the rest 0, unchanged). A seat that misses the goal is extrapolated past the clock at its own income. `OracleReference.asset` was re-recorded with the prices kept. Food, seat range and seats reaching the goal stay as supporting columns.
+- **Peck time in `FarmSim`:** the chicken is rooted from the start of a peck until its food lands, then for the game's own post-peck lock (`Peck.asset` `Duration`, read through the balance preview as `OracleKit.PeckLockSeconds`). The cast is still an oracle-only input until BL-206 ships.
+- **Solver:** scores the variance of the seconds results; `OracleProblem.MaxFlatSteps` (default 4) lets it cross a flat stretch.
+- **Suite:** 4012 passed, 0 failed, in the live Editor.
+- **In progress, another session:** BL-206, Peck as an interruptible cast in the game, with the animation fitted to the cast time. Its spec is `docs/superpowers/specs/2026-11-21-peck-cast-design.md`. That session moves the cast from an oracle-only input to a real class stat and then brings the rules docs in line with the renamed oracle fields (`Entry.BestSeconds`, `RouteSpreadSeconds`, `PeckLockSeconds`, `MaxFlatSteps`; `IncomePerSecond` and `Spread` are gone).
+
 ## 🎯 2026-11-20 - Oracle v2: tasks 8 and 9 done, docs brought in line (`develop`, not pushed)
 
 Continues the entry below. Suite: **4001 passed / 0 failed** in the live Editor at `11381291`.
