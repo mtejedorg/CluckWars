@@ -35,6 +35,9 @@ namespace CluckWars.EditorTools
             public Vector2 ContestedFootprint;
             public float DepositRadius;
             public float CollectReach;
+            public float PersonalFood;
+            public float ContestedFood;
+            public float CentreFood;
         }
 
         public static Inputs ReadInputs() => new Inputs
@@ -51,6 +54,9 @@ namespace CluckWars.EditorTools
             ContestedFootprint = ShippedMap.ContestedPileFootprint,
             DepositRadius = ShippedMap.BaseDepositRadius,
             CollectReach = ShippedMap.PileCollectReach,
+            PersonalFood = TestAssets.SceneFloat("_personalPileAmount"),
+            ContestedFood = TestAssets.SceneFloat("_contestedPileAmount"),
+            CentreFood = TestAssets.SceneFloat("_centerPileAmount"),
         };
 
         /// <summary>The fingerprint of the live scene (inputs plus the arms the generator builds from them).</summary>
@@ -75,6 +81,7 @@ namespace CluckWars.EditorTools
             Mix(inputs.PersonalInset); Mix(inputs.ContestedInset); Mix(inputs.PileJitter);
             MixV(inputs.CentreFootprint); MixV(inputs.PersonalFootprint); MixV(inputs.ContestedFootprint);
             Mix(inputs.DepositRadius); Mix(inputs.CollectReach);
+            Mix(inputs.PersonalFood); Mix(inputs.ContestedFood); Mix(inputs.CentreFood);
             Mix(arms.Length);
             foreach (var arm in arms) { MixV(arm.A); MixV(arm.B); }
             return h.ToString("x16");
@@ -139,6 +146,9 @@ namespace CluckWars.EditorTools
             map.WallHalfWidth = halfWidth;
             map.BaseRadius = inputs.DepositRadius;
             map.CollectReach = inputs.CollectReach;
+            map.PersonalFood = inputs.PersonalFood;
+            map.ContestedFood = inputs.ContestedFood;
+            map.CentreFood = inputs.CentreFood;
             map.WalkLegs = walk;
             map.JumpLegs = jump;
             map.SceneFingerprint = Fingerprint(inputs, arms);

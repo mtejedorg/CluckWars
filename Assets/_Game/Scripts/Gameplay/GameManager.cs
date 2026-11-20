@@ -1048,6 +1048,11 @@ namespace CluckWars.Gameplay
             }
         }
 
+        /// <summary>Food in the Golden Pile the comeback event spawns (read by the Balance Oracle).</summary>
+        public const float GoldenPileFood = 25f;
+        /// <summary>Food the Restock event adds to every pile, up to its maximum (read by the Balance Oracle).</summary>
+        public const float RestockFood = 10f;
+
         private void SpawnGoldenPile()
         {
             if (_prefabRegistry == null || _prefabRegistry.FoodPile == null)
@@ -1087,8 +1092,8 @@ namespace CluckWars.Gameplay
                     var pile = networkObject.GetComponent<FoodPile>();
                     if (pile != null)
                     {
-                        pile.Amount = 25f;
-                        pile.MaxAmount = 25f;
+                        pile.Amount = GoldenPileFood;
+                        pile.MaxAmount = GoldenPileFood;
                         pile.IsEvent = true;
                         // No NetworkTransform on piles: the position reaches the other peers only through this stamp.
                         pile.SpawnPosition = pos;
@@ -1096,7 +1101,7 @@ namespace CluckWars.Gameplay
                     }
                 });
 
-            _log?.Info(Source, $"GoldenPile spawned at {pos} with 25 food.");
+            _log?.Info(Source, $"GoldenPile spawned at {pos} with {GoldenPileFood} food.");
         }
 
         private void ApplyUnderdogSurge()
@@ -1173,9 +1178,9 @@ namespace CluckWars.Gameplay
             {
                 var p = piles[i];
                 if (p == null) continue;
-                p.Amount = Mathf.Min(p.MaxAmount, p.Amount + 10f);
+                p.Amount = Mathf.Min(p.MaxAmount, p.Amount + RestockFood);
             }
-            _log?.Info(Source, "Restocked all food piles by +10.");
+            _log?.Info(Source, $"Restocked all food piles by +{RestockFood}.");
         }
     }
 }

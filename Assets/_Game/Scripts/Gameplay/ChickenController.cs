@@ -118,7 +118,7 @@ namespace CluckWars.Gameplay
         // ---- Passive tuning constants (balance-pass values; Part B / test session) ---
         private const float CollisionSlowRadius      = ContactHysteresis.EnterMeters;  // metres — two chickens touching
         private const float CollisionSlowFactor      = 0.75f; // GDD TBD #7
-        private const float PileSlowFactor           = 0.80f; // GDD TBD #6
+        public const float PileSlowFactor            = 0.80f; // GDD TBD #6
 
         /// <summary>
         /// <see cref="SlowMultiplier"/> below which the replicated <see cref="ControlVfx.Slowed"/>

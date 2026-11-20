@@ -52,6 +52,11 @@ namespace CluckWars.Balance
         public float BaseRadius;
         public float CollectReach;
 
+        /// <summary>Starting food of each pile kind as <c>Game.unity</c> authors it. Read by <c>OracleKits.Food</c> until the amounts move to <c>MatchConfigSO</c>.</summary>
+        public float PersonalFood;
+        public float ContestedFood;
+        public float CentreFood;
+
         /// <summary>13 x 13, row-major, metres between rims; walls respected.</summary>
         public float[] WalkLegs;
 
