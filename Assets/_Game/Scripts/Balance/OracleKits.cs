@@ -24,7 +24,8 @@ namespace CluckWars.Balance
         public OracleFood? FoodOverride;
         /// <summary>
         /// The Peck cast per class (key = <see cref="ChickenClass"/> name), seconds; oracle-only, because the game has no Peck cast yet.
-        /// Null or a missing class reads 0, which is today's behaviour: <see cref="FarmSim"/> then uses the cooldown as the cycle.
+        /// Null or a missing class reads 0: the food comes at the press, as in today's game (the post-peck movement lock still applies,
+        /// see <see cref="OracleKit.PeckLockSeconds"/>).
         /// </summary>
         public IReadOnlyDictionary<string, float> PeckCastSeconds;
     }
@@ -158,6 +159,7 @@ namespace CluckWars.Balance
                 PeckAmount = stats.PeckAmount,
                 PeckCooldown = peckCooldown,
                 PeckCastSeconds = PeckCastOf(inputs, cls),
+                PeckLockSeconds = scope.Of(peck).Duration,
                 DepositRate = deposit,
                 IgnoresPileSlow = ignoresSlow,
             };

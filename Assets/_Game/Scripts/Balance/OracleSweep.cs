@@ -11,10 +11,11 @@ namespace CluckWars.Balance
     {
         public string Label;
         public FarmRoute BestRoute;
-        /// <summary>Food banked when the clock ends, mean over the four seats.</summary>
+        /// <summary>Food banked when the clock ends on the fastest route, mean over the four seats (supporting: capped by the food on the map).</summary>
         public float FoodAtClock;
-        /// <summary>Mean seconds to the win target over the seats that reach it on the fastest route; -1 when none does.</summary>
-        public float SecondsToGoal = -1f;
+        /// <summary>Seconds to the win target on the fastest route, mean over the four seats; a seat that misses the goal is extrapolated (<see cref="KitLine.SecondsBySeatRoute"/>). The headline.</summary>
+        public float SecondsToGoal;
+        /// <summary>How many of the four seats really reach the win target before the clock ends.</summary>
         public int SeatsReachingGoal;
     }
 
@@ -122,7 +123,7 @@ namespace CluckWars.Balance
             sb.AppendLine("How to read the table: \"Piles\" is personal / contested / centre food per pile and \"Total\" is all the food on the map. "
                 + "\"Food rules\" says whether your own pile plus one contested pile stays short of winning and your own pile plus two contested piles reaches it; a row that breaks them is kept and marked BREAKS. "
                 + "\"Four plain Warriors\" is what the lowest and the highest seat bank when all four chickens are standard farmers, and \"Map empty at\" is the second the map runs out of food in that run. "
-                + "Each kit column then gives, for that kit on its best route, the food banked when the clock ends and the seconds to reach the win target, both averaged over the four seats, with how many of the four seats reached it.");
+                + "Each kit column then gives, for that kit on its fastest route, the seconds to bank the win target (averaged over the four seats; a seat that misses it inside the clock is worked out from the food it banked) with how many of the four seats really reached it, and the food banked when the clock ends.");
             sb.AppendLine();
 
             var kits = rows.Count > 0 ? rows[0].Kits.Select(k => k.Label).ToList() : new List<string>();
@@ -157,9 +158,7 @@ namespace CluckWars.Balance
         }
 
         private static string KitText(SweepKit k) =>
-            k.SecondsToGoal < 0f
-                ? $"{F1(k.FoodAtClock)} food, goal not reached"
-                : $"{F1(k.FoodAtClock)} food, goal at {F1(k.SecondsToGoal)} s ({k.SeatsReachingGoal} of {OracleMapSO.SeatCount} seats)";
+            $"{F1(k.SecondsToGoal)} s to goal ({k.SeatsReachingGoal} of {OracleMapSO.SeatCount} seats reach it), {F1(k.FoodAtClock)} food";
 
         public static string ToJson(IReadOnlyList<SweepRow> rows, string balanceHash, string mapFingerprint)
         {

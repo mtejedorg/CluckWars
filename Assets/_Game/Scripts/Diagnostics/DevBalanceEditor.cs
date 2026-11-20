@@ -334,7 +334,7 @@ namespace CluckWars.Diagnostics
             RefreshButtons();
         }
 
-        /// <summary>The report lines for one oracle check: why it did not run, or each kit's best food before -> after and what the oracle does not model.</summary>
+        /// <summary>The report lines for one oracle check: why it did not run, or each kit's seconds to the win target before -> after and what the oracle does not model.</summary>
         public static string OracleText(OracleCheck check)
         {
             if (!check.Relevant) return UiText.Format(UiKeys.DevBalanceOracleSkipped, ("reason", check.Note ?? string.Empty));

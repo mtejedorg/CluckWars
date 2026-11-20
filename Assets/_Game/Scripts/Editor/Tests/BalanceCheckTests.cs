@@ -107,7 +107,7 @@ namespace CluckWars.Tests
             Assert.IsNotEmpty(rows);
             var speedy = rows.Where(r => r.Label.StartsWith("Speedy", StringComparison.Ordinal)).ToList();
             Assert.IsNotEmpty(speedy);
-            Assert.IsTrue(speedy.Any(r => r.Change > 0f), "a faster Speedy banks more: " + string.Join(", ", speedy.Select(r => $"{r.Label} {r.Before}->{r.After}")));
+            Assert.IsTrue(speedy.Any(r => r.Change < 0f), "a faster Speedy needs fewer seconds to the goal: " + string.Join(", ", speedy.Select(r => $"{r.Label} {r.Before}->{r.After}")));
             foreach (var row in rows.Where(r => !r.Label.StartsWith("Speedy", StringComparison.Ordinal)))
                 Assert.AreEqual(row.Before, row.After, 1e-3f, $"{row.Label} is not touched by a Speedy stat change");
             Assert.AreEqual(before, _book.Hash, "the check ran on copies");

@@ -13,25 +13,26 @@ MonoBehaviour:
   m_Name: OracleReference
   m_EditorClassIdentifier: 
   AcceptedOn: 2026-11-20
-  Note: food 10 / 15 / 40 (D1b); v1 prices carried over
+  Note: seconds-to-goal result (peck lock and cast modelled); food 10 / 15 / 40 (D1b);
+    v1 prices carried over
   MapFingerprint: be5e5449aca95e44
   Origin: 1
   Entries:
   - Label: Speedy_Slippery
-    BestBanked: 39.999935
+    BestSeconds: 24.627785
     OffsetSeconds: 0
   - Label: Speedy_Featherfoot
-    BestBanked: 40.000046
+    BestSeconds: 24.026766
     OffsetSeconds: 0
   - Label: Fatty_Hoarder
-    BestBanked: 49.999977
+    BestSeconds: 19.144451
     OffsetSeconds: 0
   - Label: Fatty_Bulwark
-    BestBanked: 49.749966
+    BestSeconds: 19.422224
     OffsetSeconds: 0
   - Label: Warrior_Relentless
-    BestBanked: 39.99993
+    BestSeconds: 26.125008
     OffsetSeconds: 5
   - Label: Warrior_Bully
-    BestBanked: 39.99993
+    BestSeconds: 27.03334
     OffsetSeconds: 5

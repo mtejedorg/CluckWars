@@ -50,9 +50,9 @@ namespace CluckWars.Tests
             {
                 int at = reference.Entries.FindIndex(e => e.Label == line.Label);
                 if (at < 0) { found.Add($"{line.Label}: the reference has no entry"); continue; }
-                float stored = reference.Entries[at].BestBanked;
-                if (Mathf.Abs(line.BestBanked - stored) > DriftTolerance)
-                    found.Add($"{line.Label}: measured {line.BestBanked:0.00}, reference {stored:0.00}");
+                float stored = reference.Entries[at].BestSeconds;
+                if (Mathf.Abs(line.BestSeconds - stored) > DriftTolerance)
+                    found.Add($"{line.Label}: measured {line.BestSeconds:0.00} s, reference {stored:0.00} s");
             }
             foreach (var entry in reference.Entries)
                 if (!applicable.Any(l => l.Label == entry.Label))
@@ -79,7 +79,7 @@ namespace CluckWars.Tests
             {
                 OracleReferenceSO.Record(moved, _measured, "test", "2000-01-01");
                 var first = moved.Entries[0];
-                first.BestBanked += 2f * DriftTolerance + 1f;
+                first.BestSeconds += 2f * DriftTolerance + 1f;
                 moved.Entries[0] = first;
 
                 var ex = Assert.Throws<AssertionException>(() => AssertNoDrift(_measured, moved));
@@ -100,7 +100,7 @@ namespace CluckWars.Tests
                 var again = OracleRunner.Run(Inputs(), accepted.Offsets());
                 var applicable = again.Economy.Where(l => l.Applicable).ToList();
                 Assert.Greater(applicable.Count, 1);
-                float mean = _measured.Economy.Where(l => l.Applicable).Average(l => l.BestBanked);
+                float mean = _measured.Economy.Where(l => l.Applicable).Average(l => l.BestSeconds);
                 foreach (var line in applicable)
                     Assert.AreEqual(mean, line.Result, 0.01f, $"{line.Label}: result after accepting");
                 Assert.AreEqual("2026-11-20", accepted.AcceptedOn);
@@ -121,9 +121,9 @@ namespace CluckWars.Tests
                 // First kit: an offset to keep. Second kit: no entry at all. A label the game no longer has: dropped.
                 target.Entries = new List<OracleReferenceSO.Entry>
                 {
-                    new OracleReferenceSO.Entry { Label = foragers[0], BestBanked = 1f, OffsetSeconds = 3.25f },
-                    new OracleReferenceSO.Entry { Label = foragers[2], BestBanked = 1f, OffsetSeconds = -1.5f },
-                    new OracleReferenceSO.Entry { Label = "Retired_Kit", BestBanked = 1f, OffsetSeconds = 9f },
+                    new OracleReferenceSO.Entry { Label = foragers[0], BestSeconds = 1f, OffsetSeconds = 3.25f },
+                    new OracleReferenceSO.Entry { Label = foragers[2], BestSeconds = 1f, OffsetSeconds = -1.5f },
+                    new OracleReferenceSO.Entry { Label = "Retired_Kit", BestSeconds = 1f, OffsetSeconds = 9f },
                 };
 
                 OracleReferenceSO.Record(target, _measured, "re-arm", "2026-11-20");
@@ -135,7 +135,7 @@ namespace CluckWars.Tests
                 Assert.IsFalse(offsets.ContainsKey("Retired_Kit"));
                 CollectionAssert.AreEquivalent(foragers, target.Entries.Select(e => e.Label));
                 foreach (var entry in target.Entries)
-                    Assert.AreEqual(_measured.Economy.Single(l => l.Label == entry.Label).BestBanked, entry.BestBanked, 1e-6f, entry.Label);
+                    Assert.AreEqual(_measured.Economy.Single(l => l.Label == entry.Label).BestSeconds, entry.BestSeconds, 1e-6f, entry.Label);
                 Assert.AreEqual(ReferenceOrigin.Recorded, target.Origin);
                 Assert.AreEqual("re-arm", target.Note);
                 Assert.AreEqual(_measured.MapFingerprint, target.MapFingerprint);
@@ -210,7 +210,7 @@ namespace CluckWars.Tests
             foreach (var line in _measured.Economy.Where(l => l.Applicable))
             {
                 Assert.AreEqual(offsets[line.Label], line.OffsetSeconds, 1e-5f, line.Label);
-                Assert.AreEqual(line.BestBanked + line.OffsetSeconds * line.IncomePerSecond, line.Result, 1e-4f, line.Label);
+                Assert.AreEqual(line.BestSeconds - line.OffsetSeconds, line.Result, 1e-4f, line.Label);
             }
         }
 

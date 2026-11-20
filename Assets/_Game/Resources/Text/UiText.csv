@@ -294,7 +294,7 @@ dev.balance.status.changes,"{count} change(s):
 {list}"
 dev.balance.status.ignored,"Ignored:
 {list}"
-dev.balance.oracle.header,"Oracle: best food banked per kit in the match clock, before -> after (APPLY is never blocked)"
+dev.balance.oracle.header,"Oracle: seconds each kit needs to bank the goal (lower is better), before -> after (APPLY is never blocked)"
 dev.balance.oracle.skipped,Oracle check not needed: {reason}.
 dev.balance.oracle.unavailable,"The oracle could not run, APPLY is not affected: {reason}."
 dev.balance.oracle.line,{label}: {before} -> {after} ({change})

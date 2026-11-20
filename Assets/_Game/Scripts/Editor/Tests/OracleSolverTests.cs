@@ -72,7 +72,7 @@ namespace CluckWars.Tests
             float mean = _baseline.StandardSeatBanked.Average();
             return new OracleProblem
             {
-                BandLow = mean - 6f, BandHigh = mean - 3f, MaxPasses = passes,
+                BandLow = mean - 30f, BandHigh = mean - 20f, MaxPasses = passes,
                 Free = { new FreeValue { Asset = "MatchConfig", Field = nameof(MatchConfigSO.CentrePileFood), Min = 0f, Max = centre, Step = centre * 0.25f } },
             };
         }
@@ -142,6 +142,48 @@ namespace CluckWars.Tests
             Assert.Greater(verdict.Changes.Count, 0, "the problem gives the solver a reason to move, so the delta must change something");
             Assert.AreEqual(verdict.Canonical, proposal.DeltaJson, "the proposal is already in the book's canonical form");
             Assert.AreEqual(verdict.Hash, proposal.After.BalanceHash, "the report measured exactly the delta that is proposed");
+        }
+
+        /// <summary>
+        /// A genuine flat stretch: the simulation notices a peck cycle only on tick boundaries, so the score is a staircase in the Peck cooldown
+        /// and a step of an eighth of a tick usually lands on the same stair. Fatty is the fastest kit, so a slower Peck improves the score.
+        /// </summary>
+        private OracleProblem PeckCooldownStaircase(int flatSteps, out float cooldown)
+        {
+            cooldown = Shipped("Fatty", nameof(ChickenStatsSO.PeckCooldown));
+            float tick = FarmRules.DefaultTickSeconds;
+            float mean = _baseline.StandardSeatBanked.Average();
+            return new OracleProblem
+            {
+                BandLow = mean - 100f, BandHigh = mean + 100f, MaxPasses = 1, MaxFlatSteps = flatSteps,
+                Free = { new FreeValue { Asset = "Fatty", Field = nameof(ChickenStatsSO.PeckCooldown), Max = cooldown + 2f * tick, Step = tick / 8f } },
+            };
+        }
+
+        [Test]
+        public void Solver_MovesAValueAcrossAFlatStretch()
+        {
+            var stuck = OracleSolver.Solve(Inputs(), PeckCooldownStaircase(1, out float cooldown), _offsets);
+            Assume.That(stuck.Passes, Is.EqualTo(0), "one step must land on the same stair for the test to mean anything");
+            Assert.IsFalse(stuck.Values[0].Changed);
+
+            var crossing = OracleSolver.Solve(Inputs(), PeckCooldownStaircase(8, out _), _offsets);
+
+            Assert.IsTrue(crossing.Values[0].Changed, "the search must cross the flat stretch");
+            Assert.Greater(crossing.Values[0].New, cooldown, "a slower Peck is the improvement");
+            Assert.Less(crossing.ScoreAfter, crossing.ScoreBefore);
+            Assert.AreEqual(1, crossing.Passes);
+        }
+
+        [Test]
+        public void Problem_ReadsAndWritesMaxFlatSteps()
+        {
+            Assert.AreEqual(4, new OracleProblem().MaxFlatSteps, "the default");
+            Assert.IsTrue(OracleProblem.TryParse("{\"maxFlatSteps\":7,\"free\":[]}", out var problem, out string error), error);
+            Assert.AreEqual(7, problem.MaxFlatSteps);
+            Assert.IsTrue(OracleProblem.TryParse(problem.ToJson(), out var again, out error), error);
+            Assert.AreEqual(7, again.MaxFlatSteps);
+            Assert.IsFalse(OracleProblem.TryParse("{\"maxFlatSteps\":0,\"free\":[]}", out _, out _));
         }
 
         [Test]

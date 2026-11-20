@@ -5,7 +5,7 @@ using CluckWars.Gameplay;
 
 namespace CluckWars.Balance
 {
-    /// <summary>One foraging kit's best banked food before and after a proposed delta.</summary>
+    /// <summary>One foraging kit's seconds to the win target (lower is better) before and after a proposed delta.</summary>
     public readonly struct OracleCheckRow
     {
         public readonly string Label;
@@ -46,7 +46,7 @@ namespace CluckWars.Balance
                 if (!before.Applicable) continue;
                 var after = After.Economy.Find(l => l.Label == before.Label);
                 if (after == null || !after.Applicable) continue;
-                rows.Add(new OracleCheckRow(before.Label, before.BestBanked, after.BestBanked));
+                rows.Add(new OracleCheckRow(before.Label, before.Result, after.Result));
             }
             return rows;
         }

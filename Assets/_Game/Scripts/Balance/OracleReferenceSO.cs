@@ -16,9 +16,9 @@ namespace CluckWars.Balance
     }
 
     /// <summary>
-    /// The state of the game Maestro last recorded or accepted: what every foraging kit banked in the oracle's economy run, with the
-    /// offset in seconds each kit is worth beyond that (spec 5.4, 5.6). The offsets feed <see cref="OracleRunner.Run"/>;
-    /// the drift test compares a fresh measurement with <see cref="Entry.BestBanked"/>. Two Editor-only actions write it:
+    /// The state of the game Maestro last recorded or accepted: the seconds every foraging kit needs to bank the win target in the oracle's
+    /// economy run, with the offset in seconds each kit is worth beyond that (a credit when positive; spec 5.4, 5.6). The offsets feed
+    /// <see cref="OracleRunner.Run"/>; the drift test compares a fresh measurement with <see cref="Entry.BestSeconds"/>. Two Editor-only actions write it:
     /// <see cref="Record"/> (<c>Record baseline (keep prices)</c>) re-arms the drift guard and leaves the prices alone,
     /// <see cref="Accept"/> (<c>Accept as balanced (recompute prices)</c>) is the deliberate "I consider this state balanced".
     /// The asset is committed, so a player build only measures.
@@ -29,7 +29,9 @@ namespace CluckWars.Balance
         public struct Entry
         {
             public string Label;
-            public float BestBanked;
+            /// <summary>The measured seconds to the win target (<see cref="KitLine.BestSeconds"/>), before the offset.</summary>
+            public float BestSeconds;
+            /// <summary>The kit's price in seconds; positive is a credit, taken off the seconds to give <see cref="KitLine.Result"/>.</summary>
             public float OffsetSeconds;
         }
 
@@ -77,7 +79,7 @@ namespace CluckWars.Balance
                 entries.Add(new Entry
                 {
                     Label = line.Label,
-                    BestBanked = line.BestBanked,
+                    BestSeconds = line.BestSeconds,
                     OffsetSeconds = kept.TryGetValue(line.Label, out var offset) ? offset : 0f,
                 });
             Store(target, report, note, date, entries, ReferenceOrigin.Recorded);
@@ -85,7 +87,7 @@ namespace CluckWars.Balance
 
         /// <summary>
         /// Stores the measured numbers of <paramref name="report"/>'s foraging kits and sets each kit's offset so every one
-        /// of them lands on the mean food banked: <c>(mean - BestBanked) / IncomePerSecond</c>. This replaces every stored offset:
+        /// of them lands on the mean seconds: <c>BestSeconds - mean</c>, so <see cref="KitLine.Result"/> (<c>BestSeconds - offset</c>) is the mean for all. This replaces every stored offset:
         /// it is the deliberate "I consider this state balanced". A kit that never forages has no number and gets no entry.
         /// </summary>
         public static void Accept(OracleReferenceSO target, OracleReport report, string note, string date)
@@ -93,21 +95,12 @@ namespace CluckWars.Balance
             var applicable = Validate(target, report, date);
 
             float sum = 0f;
-            foreach (var line in applicable) sum += line.BestBanked;
+            foreach (var line in applicable) sum += line.BestSeconds;
             float mean = sum / applicable.Count;
 
             var entries = new List<Entry>(applicable.Count);
             foreach (var line in applicable)
-            {
-                if (line.IncomePerSecond <= 0f)
-                    throw new InvalidOperationException($"{line.Label} banked no food, so an offset in seconds cannot be worked out for it.");
-                entries.Add(new Entry
-                {
-                    Label = line.Label,
-                    BestBanked = line.BestBanked,
-                    OffsetSeconds = (mean - line.BestBanked) / line.IncomePerSecond,
-                });
-            }
+                entries.Add(new Entry { Label = line.Label, BestSeconds = line.BestSeconds, OffsetSeconds = line.BestSeconds - mean });
             Store(target, report, note, date, entries, ReferenceOrigin.AcceptedAsBalanced);
         }
 

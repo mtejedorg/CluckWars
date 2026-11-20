@@ -16,8 +16,16 @@ namespace CluckWars.Balance
         public int CargoCapacity;
         public float PeckAmount;
         public float PeckCooldown;
-        /// <summary>Seconds from a peck starting to its food arriving. The cycle between two pecks is max(PeckCooldown, PeckCastSeconds).</summary>
+        /// <summary>
+        /// Seconds from a peck starting to its food arriving; the chicken is rooted for all of it. The cycle between two pecks is
+        /// max(PeckCooldown, PeckCastSeconds). 0 is today's game: the food comes at the press.
+        /// </summary>
         public float PeckCastSeconds;
+        /// <summary>
+        /// Seconds the chicken stays rooted after its food landed: the Peck ability's own <c>Duration</c>, the movement lock the game applies
+        /// from the press. It delays walking away only; another peck may start as soon as the cooldown allows.
+        /// </summary>
+        public float PeckLockSeconds;
         /// <summary>Food per second banked while standing at the base.</summary>
         public float DepositRate;
         /// <summary>True when the kit holds a Jump ability: it walks the jump leg table.</summary>

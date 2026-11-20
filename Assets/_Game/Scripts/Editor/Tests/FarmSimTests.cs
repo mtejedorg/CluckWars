@@ -157,6 +157,47 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ZeroCast_FoodComesAtThePress_SoOnlyTheCyclesBetweenPecksCost()
+        {
+            const float leg = 12f, food = 6f;
+            var kit = Kit(capacity: 6, amount: 2f, cooldown: 0.5f, cast: 0f);
+            var map = PersonalMap(leg);
+
+            var r = FarmSim.Run(map, PersonalOnly(food), Seat0(kit), Rules(food, 60f, true))[0];
+
+            int pecks = Mathf.CeilToInt(food / kit.PeckAmount);
+            float expected = leg / kit.MoveSpeed + (pecks - 1) * kit.PeckCooldown + leg / kit.MoveSpeed + food / kit.DepositRate;
+            Assert.AreEqual(expected, r.SecondsToTarget, Tol);
+        }
+
+        [Test]
+        public void PostPeckLock_DelaysLeavingOncePerTrip_NotThePecks()
+        {
+            const float leg = 12f, food = 6f;
+            var plain = Kit(capacity: 6, amount: 2f, cooldown: 0.5f, cast: 0f);
+            var locked = plain;
+            locked.PeckLockSeconds = 0.8f; // longer than the cooldown: it must still not hold up the next peck
+            var map = PersonalMap(leg);
+
+            float without = FarmSim.Run(map, PersonalOnly(food), Seat0(plain), Rules(food, 60f, true))[0].SecondsToTarget;
+            float with = FarmSim.Run(map, PersonalOnly(food), Seat0(locked), Rules(food, 60f, true))[0].SecondsToTarget;
+
+            Assert.AreEqual(locked.PeckLockSeconds, with - without, Tol);
+        }
+
+        [Test]
+        public void ARootedChicken_DoesNotWalkAwayBeforeItsFoodLands()
+        {
+            const float leg = 6f, food = 2f;
+            var kit = Kit(capacity: 2, amount: 2f, cooldown: 0.4f, cast: 2f);
+            var map = PersonalMap(leg);
+
+            var r = FarmSim.Run(map, PersonalOnly(food), Seat0(kit), Rules(food, 60f, true))[0];
+
+            Assert.AreEqual(2f * leg / kit.MoveSpeed + kit.PeckCastSeconds + food / kit.DepositRate, r.SecondsToTarget, Tol);
+        }
+
+        [Test]
         public void WinCrossesMidDeposit_CountsOnlyNeeded()
         {
             const float leg = 12f, food = 10f, target = 6f;

@@ -33,9 +33,14 @@ namespace CluckWars.Balance
         public float BandLow = 28f;
         public float BandHigh = 36f;
         public int MaxPasses = 6;
+        /// <summary>
+        /// When no single step of any value improves the score, the search also tries one move of 2 up to this many steps in each direction for each
+        /// value, so it can cross a flat stretch of the score. 1 turns that off.
+        /// </summary>
+        public int MaxFlatSteps = 4;
 
         /// <summary>
-        /// Reads <c>{"bandLow":28,"bandHigh":36,"maxPasses":6,"free":[{"asset":"Fatty","field":"CargoCapacity","min":10,"max":60,"step":5}]}</c>.
+        /// Reads <c>{"bandLow":28,"bandHigh":36,"maxPasses":6,"maxFlatSteps":4,"free":[{"asset":"Fatty","field":"CargoCapacity","min":10,"max":60,"step":5}]}</c>.
         /// Every key but <c>free</c> is optional, <c>min</c> and <c>max</c> too (see <see cref="FreeValue"/>); an unknown key is an error, never skipped.
         /// </summary>
         public static bool TryParse(string json, out OracleProblem problem, out string error)
@@ -55,6 +60,10 @@ namespace CluckWars.Balance
                         if (!Number(member.Value, "maxPasses", out float passes, out error)) return false;
                         result.MaxPasses = (int)passes;
                         break;
+                    case "maxFlatSteps":
+                        if (!Number(member.Value, "maxFlatSteps", out float flat, out error)) return false;
+                        result.MaxFlatSteps = (int)flat;
+                        break;
                     case "free":
                         if (member.Value.Kind != JsonKind.Array) { error = "\"free\" must be an array"; return false; }
                         for (int i = 0; i < member.Value.Items.Count; i++)
@@ -67,6 +76,7 @@ namespace CluckWars.Balance
             }
             if (!(result.BandLow <= result.BandHigh)) { error = "bandLow must not exceed bandHigh"; return false; }
             if (result.MaxPasses < 1) { error = "maxPasses must be 1 or more"; return false; }
+            if (result.MaxFlatSteps < 1) { error = "maxFlatSteps must be 1 or more"; return false; }
             problem = result;
             error = null;
             return true;
@@ -112,6 +122,7 @@ namespace CluckWars.Balance
             sb.Append("\"bandLow\":").Append(BandLow.ToString("R", inv));
             sb.Append(",\"bandHigh\":").Append(BandHigh.ToString("R", inv));
             sb.Append(",\"maxPasses\":").Append(MaxPasses.ToString(inv));
+            sb.Append(",\"maxFlatSteps\":").Append(MaxFlatSteps.ToString(inv));
             sb.Append(",\"free\":[");
             for (int i = 0; i < Free.Count; i++)
             {
@@ -218,15 +229,15 @@ namespace CluckWars.Balance
             sb.AppendLine();
             sb.AppendLine("## Each kit");
             sb.AppendLine();
-            sb.AppendLine("Food is the seat mean on the kit's best route, goal switched off. Result adds the kit's offset (its price) at its own income.");
+            sb.AppendLine("Result is the seconds the kit needs to bank the win target on its fastest route (seat mean, a seat that misses the goal is worked out from its income), minus the kit's offset (its price): lower is better. Food is the supporting seat mean banked when the clock ends on that route.");
             sb.AppendLine();
-            sb.AppendLine("| Kit | Food before | Food after | Result before | Result after |");
-            sb.AppendLine("|---|---|---|---|---|");
+            sb.AppendLine("| Kit | Result before (s) | Result after (s) | Seats reaching the goal before | after | Food before | Food after |");
+            sb.AppendLine("|---|---|---|---|---|---|---|");
             foreach (var b in Before.Economy)
             {
                 var a = After.Economy.FirstOrDefault(l => l.Label == b.Label);
-                if (!b.Applicable || a == null || !a.Applicable) { sb.AppendLine($"| {b.Label} | n/a, does not forage | | | |"); continue; }
-                sb.AppendLine($"| {b.Label} | {F1(b.BestBanked)} | {F1(a.BestBanked)} | {F1(b.Result)} | {F1(a.Result)} |");
+                if (!b.Applicable || a == null || !a.Applicable) { sb.AppendLine($"| {b.Label} | n/a, does not forage | | | | | |"); continue; }
+                sb.AppendLine($"| {b.Label} | {F1(b.Result)} | {F1(a.Result)} | {b.SeatsReachingGoal} | {a.SeatsReachingGoal} | {F1(b.BestBanked)} | {F1(a.BestBanked)} |");
             }
             sb.AppendLine();
             return sb.ToString();
@@ -240,10 +251,11 @@ namespace CluckWars.Balance
     /// <summary>
     /// Proposes values for the free values of a problem (Balance Oracle v2, spec 5). It only proposes: nothing is applied to an
     /// asset or published. Deterministic: the same inputs give the same proposal.
-    /// <para>Score to minimise: the variance of the kits' <see cref="KitLine.Result"/> plus the squared distance of the standard
+    /// <para>Score to minimise: the variance of the kits' <see cref="KitLine.Result"/> (seconds to the goal, offset applied) plus the squared distance of the standard
     /// farmers' banked food (mean of the four seats) outside the band. <see cref="FoodRules"/> and each field's [Range] / [Min]
     /// are hard limits: a candidate that breaks one is never scored. Search: coordinate descent, the best single move of one step
-    /// per pass, until no move improves or <see cref="OracleProblem.MaxPasses"/> passes ran.</para>
+    /// per pass; when no single step improves, the best move of up to <see cref="OracleProblem.MaxFlatSteps"/> steps (so a flat stretch can be crossed);
+    /// until nothing improves or <see cref="OracleProblem.MaxPasses"/> passes ran.</para>
     /// </summary>
     public static class OracleSolver
     {
@@ -269,21 +281,10 @@ namespace CluckWars.Balance
             int passes = 0;
             while (passes < problem.MaxPasses)
             {
-                Candidate best = null;
-                float[] bestValues = null;
-                for (int i = 0; i < specs.Count; i++)
-                {
-                    foreach (int direction in new[] { 1, -1 })
-                    {
-                        float moved = Clamp(specs[i], Round(values[i] + direction * specs[i].Free.Step));
-                        if (moved == values[i]) continue;
-                        var trial = (float[])values.Clone();
-                        trial[i] = moved;
-                        var candidate = Evaluate(inputs, problem, specs, trial, offsets);
-                        if (!candidate.Usable) continue;
-                        if (candidate.Score < (best?.Score ?? current.Score - MinGain)) { best = candidate; bestValues = trial; }
-                    }
-                }
+                // The best single step first; only when none improves, one longer move (2 to MaxFlatSteps steps) to cross a flat stretch.
+                var best = BestMove(inputs, problem, specs, values, offsets, current.Score, 1, 1, out var bestValues);
+                if (best == null && problem.MaxFlatSteps > 1)
+                    best = BestMove(inputs, problem, specs, values, offsets, current.Score, 2, problem.MaxFlatSteps, out bestValues);
                 if (best == null) break;
                 current = best;
                 values = bestValues;
@@ -310,6 +311,34 @@ namespace CluckWars.Balance
                 if (s.Free.IsOracleOnly) proposal.OracleOnly[s.Free.Field] = values[i];
             }
             return proposal;
+        }
+
+        /// <summary>
+        /// The usable move of <paramref name="fromSteps"/> to <paramref name="toSteps"/> steps of one value, either direction, that lowers the score
+        /// the most (by more than <see cref="MinGain"/>); null when none does. Ties keep the first found: fewer steps, then the value listed first, then up.
+        /// </summary>
+        private static Candidate BestMove(OracleInputs inputs, OracleProblem problem, List<Spec> specs, float[] values,
+            IReadOnlyDictionary<string, float> offsets, float currentScore, int fromSteps, int toSteps, out float[] bestValues)
+        {
+            Candidate best = null;
+            bestValues = null;
+            for (int steps = fromSteps; steps <= toSteps; steps++)
+            {
+                for (int i = 0; i < specs.Count; i++)
+                {
+                    foreach (int direction in new[] { 1, -1 })
+                    {
+                        float moved = Clamp(specs[i], Round(values[i] + direction * steps * specs[i].Free.Step));
+                        if (moved == values[i]) continue;
+                        var trial = (float[])values.Clone();
+                        trial[i] = moved;
+                        var candidate = Evaluate(inputs, problem, specs, trial, offsets);
+                        if (!candidate.Usable) continue;
+                        if (candidate.Score < (best?.Score ?? currentScore - MinGain)) { best = candidate; bestValues = trial; }
+                    }
+                }
+            }
+            return best;
         }
 
         // ------------------------------------------------------------- problem
@@ -441,7 +470,7 @@ namespace CluckWars.Balance
             return sb.Append("}}").ToString();
         }
 
-        /// <summary>Variance of the applicable kits' results plus the squared distance of the standard farmers' mean food outside the band.</summary>
+        /// <summary>Variance of the applicable kits' results (seconds) plus the squared distance of the standard farmers' mean food outside the band.</summary>
         public static float Score(OracleReport report, OracleProblem problem)
         {
             var results = report.Economy.Where(l => l.Applicable).Select(l => l.Result).ToArray();

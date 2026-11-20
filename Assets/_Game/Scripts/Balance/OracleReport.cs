@@ -7,7 +7,9 @@ namespace CluckWars.Balance
 {
     /// <summary>
     /// One kit's economy numbers: the kit farming in each seat with each route, the other three seats standard farmers.
-    /// A kit that never forages has <see cref="Applicable"/> false and no numbers at all (not zeros).
+    /// The headline is a time, <see cref="Result"/> in seconds (lower is better). Food banked, the seat range and the seats that
+    /// reach the goal are supporting numbers. A kit that never forages, or banks nothing in some seat on every route, has
+    /// <see cref="Applicable"/> false and no numbers at all (not zeros).
     /// </summary>
     public sealed class KitLine
     {
@@ -15,31 +17,36 @@ namespace CluckWars.Balance
         public bool Applicable;
         /// <summary>Food banked when the clock ends (goal switched off). 4 seats x route count, row-major: cell = seat * routes + route.</summary>
         public float[] BankedBySeatRoute = Array.Empty<float>();
-        /// <summary>Clock time the kit first banked the win target, same layout; -1 where it never did.</summary>
+        /// <summary>
+        /// Seconds the seat needs to bank the win target (goal on, same layout). A seat that reaches it: the clock time it did. A seat that
+        /// does not: extrapolated from the clock end at the seat's own income, <c>clock + (target - banked) / (banked / clock)</c>, so it is
+        /// finite, past the clock and worse the less the seat banked. NaN where the seat banked nothing.
+        /// </summary>
         public float[] SecondsBySeatRoute = Array.Empty<float>();
-        /// <summary>The route with the highest mean over the four seats.</summary>
+        /// <summary>True where the seat really banked the win target before the clock ended (same layout as <see cref="SecondsBySeatRoute"/>).</summary>
+        public bool[] ReachedBySeatRoute = Array.Empty<bool>();
+        /// <summary>The route with the lowest seat mean of <see cref="SecondsBySeatRoute"/> (the fastest to the goal).</summary>
         public FarmRoute BestRoute;
-        /// <summary>Food banked on <see cref="BestRoute"/>, the mean over the four seats (a kit does not choose its seat).</summary>
-        public float BestBanked;
-        /// <summary>The seat that banks least on <see cref="BestRoute"/>.</summary>
-        public float BestSeatMin;
-        /// <summary>The seat that banks most on <see cref="BestRoute"/>.</summary>
-        public float BestSeatMax;
-        /// <summary><see cref="BestSeatMax"/> minus <see cref="BestSeatMin"/>: how much the result depends on where the kit spawns.</summary>
-        public float SeatSpread;
-        /// <summary>Mean over every seat and route cell.</summary>
-        public float MeanBanked;
-        /// <summary>Best route's seat mean minus worst route's seat mean.</summary>
-        public float Spread;
-        /// <summary>Seat mean of the seconds to the win target on the fastest route, counting only seats that reach it; -1 when no seat on any route does.</summary>
-        public float BestSeconds = -1f;
-        /// <summary>How many of the four seats reach the win target on the route behind <see cref="BestSeconds"/>; 0 when none.</summary>
+        /// <summary>Seconds to the win target on <see cref="BestRoute"/>: the mean over the four seats (a kit does not choose its seat), misses extrapolated.</summary>
+        public float BestSeconds;
+        /// <summary>How many of the four seats really reach the win target before the clock ends on <see cref="BestRoute"/>.</summary>
         public int SeatsReachingGoal;
-        /// <summary><see cref="BestBanked"/> divided by the clock.</summary>
-        public float IncomePerSecond;
+        /// <summary>Slowest route's seat mean of seconds minus <see cref="BestSeconds"/>: how much the result depends on the route.</summary>
+        public float RouteSpreadSeconds;
+        /// <summary>The kit's price in seconds, from the reference. Positive is a credit: it is taken off the seconds.</summary>
         public float OffsetSeconds;
-        /// <summary><c>BestBanked + OffsetSeconds * IncomePerSecond</c>.</summary>
+        /// <summary>The headline, in seconds, lower is better: <c>BestSeconds - OffsetSeconds</c>.</summary>
         public float Result;
+        /// <summary>Supporting: food banked when the clock ends (goal off) on <see cref="BestRoute"/>, the mean over the four seats. Capped by the food on the map, so it says little about speed.</summary>
+        public float BestBanked;
+        /// <summary>Supporting: the seat that banks least food on <see cref="BestRoute"/>.</summary>
+        public float BestSeatMin;
+        /// <summary>Supporting: the seat that banks most food on <see cref="BestRoute"/>.</summary>
+        public float BestSeatMax;
+        /// <summary>Supporting: <see cref="BestSeatMax"/> minus <see cref="BestSeatMin"/> in food.</summary>
+        public float SeatSpread;
+        /// <summary>Supporting: food banked, mean over every seat and route cell.</summary>
+        public float MeanBanked;
     }
 
     /// <summary>What the Spoiler ends on after <see cref="Kills"/> executions of victims holding <see cref="CargoPerKill"/>.</summary>
@@ -78,7 +85,7 @@ namespace CluckWars.Balance
             "Bots' decisions: routes are fixed rules, not what a bot would choose.",
             "The Spoiler's walk home to bank its bag is not timed.",
             "A kill or a steal is assumed to always land.",
-            "The Peck cast, until it ships in the game: a peck gives its food at the end of its cooldown.",
+            "The Peck cast, until it ships in the game: the cast is an oracle-only value per class (0 today); the chicken is rooted from the start of a peck until the food lands, then for the Peck ability's lock.",
             "Straight-line jump legs: a jumping kit crosses arms in a straight line, which is an approximation.",
         };
 
@@ -196,18 +203,18 @@ namespace CluckWars.Balance
                 Bool(sb, "applicable", l.Applicable); sb.Append(',');
                 Arr(sb, "bankedBySeatRoute", l.BankedBySeatRoute); sb.Append(',');
                 Arr(sb, "secondsBySeatRoute", l.SecondsBySeatRoute); sb.Append(',');
+                Flags(sb, "reachedBySeatRoute", l.ReachedBySeatRoute); sb.Append(',');
                 Str(sb, "bestRoute", l.BestRoute.ToString()); sb.Append(',');
+                Num(sb, "result", l.Result); sb.Append(',');
+                Num(sb, "bestSeconds", l.BestSeconds); sb.Append(',');
+                Num(sb, "offsetSeconds", l.OffsetSeconds); sb.Append(',');
+                Num(sb, "seatsReachingGoal", l.SeatsReachingGoal); sb.Append(',');
+                Num(sb, "routeSpreadSeconds", l.RouteSpreadSeconds); sb.Append(',');
                 Num(sb, "bestBanked", l.BestBanked); sb.Append(',');
                 Num(sb, "bestSeatMin", l.BestSeatMin); sb.Append(',');
                 Num(sb, "bestSeatMax", l.BestSeatMax); sb.Append(',');
                 Num(sb, "seatSpread", l.SeatSpread); sb.Append(',');
-                Num(sb, "seatsReachingGoal", l.SeatsReachingGoal); sb.Append(',');
-                Num(sb, "meanBanked", l.MeanBanked); sb.Append(',');
-                Num(sb, "spread", l.Spread); sb.Append(',');
-                Num(sb, "bestSeconds", l.BestSeconds); sb.Append(',');
-                Num(sb, "incomePerSecond", l.IncomePerSecond); sb.Append(',');
-                Num(sb, "offsetSeconds", l.OffsetSeconds); sb.Append(',');
-                Num(sb, "result", l.Result);
+                Num(sb, "meanBanked", l.MeanBanked);
                 sb.Append('}');
             }
             sb.Append(']');
@@ -229,6 +236,17 @@ namespace CluckWars.Balance
             {
                 if (i > 0) sb.Append(',');
                 sb.Append(Number(values[i]));
+            }
+            sb.Append(']');
+        }
+
+        private static void Flags(StringBuilder sb, string key, bool[] values)
+        {
+            sb.Append(BalanceJson.Quote(key)).Append(":[");
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(values[i] ? "true" : "false");
             }
             sb.Append(']');
         }
@@ -258,7 +276,8 @@ namespace CluckWars.Balance
 
             EconomySection(sb, "## Economy (no comeback event)", Economy,
                 "Each row is one kit farming food while the other three chickens are plain Warriors with no abilities. "
-                + $"Food is counted when the {F0(ClockSeconds)} s clock ends, with the {F0(WinTarget)}-food goal switched off so a fast kit is not cut short.");
+                + $"The headline is how many seconds the kit needs to bank {F0(WinTarget)} food, on the route that gets there fastest; a kit that would not make it inside the {F0(ClockSeconds)} s clock is "
+                + "worked out from the food it did bank, so it still gets a finite, worse number.");
             EconomySection(sb, "## Economy with a Golden Pile", EconomyGoldenPile,
                 "The same runs, with the Golden Pile comeback event adding food to the centre pile near the end of the clock.");
             EconomySection(sb, "## Economy with a Restock", EconomyRestock,
@@ -293,20 +312,20 @@ namespace CluckWars.Balance
             sb.AppendLine(heading);
             sb.AppendLine();
             sb.AppendLine(sentence);
-            sb.AppendLine("Food and seconds are the mean over the four spawn seats on the kit's best route, and the seat range is the lowest and highest seat on that route: a wide range means the result depends on where you spawn. "
-                + "Result is that food plus the kit's offset in seconds at its own income per second.");
+            sb.AppendLine("Seconds are the mean over the four spawn seats on the kit's fastest route, lower is better; Result is those seconds minus the kit's offset (its price, a credit when positive). "
+                + "Food banked (goal switched off, clock end) and its seat range are supporting numbers on the same route: the map runs out of food, so they say little about speed. "
+                + "Seats reaching the goal counts the seats that really banked it inside the clock.");
             sb.AppendLine();
-            sb.AppendLine("| Kit | Best route | Food (seat mean) | Seat range | Seconds to goal (seat mean) | Offset (s) | Result |");
-            sb.AppendLine("|---|---|---|---|---|---|---|");
+            sb.AppendLine("| Kit | Best route | Result (s) | Seconds to goal (seat mean) | Offset (s) | Seats reaching the goal | Food banked (seat mean) | Food seat range |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|");
             foreach (var l in lines)
             {
                 if (!l.Applicable)
                 {
-                    sb.AppendLine($"| {l.Label} | n/a, does not forage | | | | | |");
+                    sb.AppendLine($"| {l.Label} | n/a, does not forage | | | | | | |");
                     continue;
                 }
-                string goal = l.BestSeconds < 0f ? "not reached" : $"{F1(l.BestSeconds)} ({l.SeatsReachingGoal} of {OracleMapSO.SeatCount} seats)";
-                sb.AppendLine($"| {l.Label} | {RouteName(l.BestRoute)} | {F1(l.BestBanked)} | {F1(l.BestSeatMin)} to {F1(l.BestSeatMax)} | {goal} | {F1(l.OffsetSeconds)} | {F1(l.Result)} |");
+                sb.AppendLine($"| {l.Label} | {RouteName(l.BestRoute)} | {F1(l.Result)} | {F1(l.BestSeconds)} | {F1(l.OffsetSeconds)} | {l.SeatsReachingGoal} of {OracleMapSO.SeatCount} | {F1(l.BestBanked)} | {F1(l.BestSeatMin)} to {F1(l.BestSeatMax)} |");
             }
             sb.AppendLine();
         }

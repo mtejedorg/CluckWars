@@ -69,6 +69,7 @@ namespace CluckWars.Tests
             {
                 Assert.AreEqual(4 * OracleRunner.Routes.Length, line.BankedBySeatRoute.Length, line.Label);
                 Assert.AreEqual(line.BankedBySeatRoute.Length, line.SecondsBySeatRoute.Length, line.Label);
+                Assert.AreEqual(line.BankedBySeatRoute.Length, line.ReachedBySeatRoute.Length, line.Label);
                 Assert.Greater(line.BestBanked, 0f, $"{line.Label} banked nothing: the run proves nothing");
             }
         }
@@ -84,7 +85,9 @@ namespace CluckWars.Tests
                     Assert.IsFalse(line.Applicable, subclass.ToString());
                     Assert.IsEmpty(line.BankedBySeatRoute, subclass.ToString());
                     Assert.IsEmpty(line.SecondsBySeatRoute, subclass.ToString());
+                    Assert.IsEmpty(line.ReachedBySeatRoute, subclass.ToString());
                     Assert.AreEqual(0f, line.Result, subclass.ToString());
+                    Assert.AreEqual(0f, line.BestSeconds, subclass.ToString());
                     Assert.AreEqual(0f, line.BestBanked, subclass.ToString());
                 }
             }
@@ -94,53 +97,215 @@ namespace CluckWars.Tests
                     _baseline.Economy.Single(l => l.Label == passive.Subclass.ToString()).Applicable, passive.name);
         }
 
-        private static float[] SeatsOnRoute(KitLine line, int route) =>
+        private static float[] FoodOnRoute(KitLine line, int route) =>
             Enumerable.Range(0, 4).Select(seat => line.BankedBySeatRoute[seat * OracleRunner.Routes.Length + route]).ToArray();
 
-        [Test]
-        public void Headline_IsTheSeatMeanOnTheBestRoute()
-        {
-            foreach (var line in _baseline.Economy.Where(l => l.Applicable))
-            {
-                var means = Enumerable.Range(0, OracleRunner.Routes.Length).Select(r => SeatsOnRoute(line, r).Average()).ToArray();
-                int best = Array.IndexOf(means, means.Max());
-                var seats = SeatsOnRoute(line, best);
-                Assert.AreEqual(OracleRunner.Routes[best], line.BestRoute, line.Label);
-                Assert.AreEqual(means.Max(), line.BestBanked, 1e-4f, line.Label);
-                Assert.AreEqual(seats.Min(), line.BestSeatMin, 1e-4f, line.Label);
-                Assert.AreEqual(seats.Max(), line.BestSeatMax, 1e-4f, line.Label);
-                Assert.AreEqual(seats.Max() - seats.Min(), line.SeatSpread, 1e-4f, line.Label);
-                Assert.AreEqual(means.Max() - means.Min(), line.Spread, 1e-4f, line.Label);
-                Assert.AreEqual(line.BankedBySeatRoute.Average(), line.MeanBanked, 1e-3f, line.Label);
-                Assert.AreEqual(line.BestBanked / _baseline.ClockSeconds, line.IncomePerSecond, 1e-4f, line.Label);
-                Assert.That(line.BestBanked, Is.InRange(line.BestSeatMin - 1e-4f, line.BestSeatMax + 1e-4f), $"{line.Label}: the headline is never above the luckiest seat");
-                Assert.LessOrEqual(line.BestBanked, line.BankedBySeatRoute.Max() + 1e-4f, line.Label);
-            }
-        }
+        private static float[] SecondsOnRoute(KitLine line, int route) =>
+            Enumerable.Range(0, 4).Select(seat => line.SecondsBySeatRoute[seat * OracleRunner.Routes.Length + route]).ToArray();
 
         [Test]
-        public void SecondsToGoal_IsTheSeatMeanOnTheFastestRoute_CountingOnlySeatsThatReach()
+        public void Headline_IsTheSeatMeanOfSecondsOnTheFastestRoute()
         {
             int routes = OracleRunner.Routes.Length;
             foreach (var line in _baseline.Economy.Where(l => l.Applicable))
             {
-                var perRoute = new List<(float mean, int n)>();
-                for (int r = 0; r < routes; r++)
-                {
-                    var reached = Enumerable.Range(0, 4).Select(seat => line.SecondsBySeatRoute[seat * routes + r]).Where(sec => sec >= 0f).ToList();
-                    if (reached.Count > 0) perRoute.Add((reached.Average(), reached.Count));
-                }
-                if (perRoute.Count == 0)
-                {
-                    Assert.AreEqual(-1f, line.BestSeconds, line.Label);
-                    Assert.AreEqual(0, line.SeatsReachingGoal, line.Label);
-                    continue;
-                }
-                float fastest = perRoute.Min(p => p.mean);
-                Assert.AreEqual(fastest, line.BestSeconds, 1e-3f, line.Label);
-                Assert.That(perRoute.Where(p => Math.Abs(p.mean - fastest) < 1e-4f).Select(p => p.n), Contains.Item(line.SeatsReachingGoal), line.Label);
-                Assert.That(line.SeatsReachingGoal, Is.InRange(1, 4), line.Label);
+                var means = Enumerable.Range(0, routes).Select(r => SecondsOnRoute(line, r).Average()).ToArray();
+                int best = Array.IndexOf(means, means.Min());
+                Assert.AreEqual(means.Min(), line.BestSeconds, 1e-3f, line.Label);
+                Assert.AreEqual(means.Max() - means.Min(), line.RouteSpreadSeconds, 1e-3f, line.Label);
+                // A tie between routes goes to the one more seats finish on, so the route may differ from the first minimum; its mean may not.
+                Assert.AreEqual(means.Min(), means[Array.IndexOf(OracleRunner.Routes, line.BestRoute)], 1e-3f, line.Label);
+
+                int reaching = Enumerable.Range(0, 4).Count(seat => line.ReachedBySeatRoute[seat * routes + Array.IndexOf(OracleRunner.Routes, line.BestRoute)]);
+                Assert.AreEqual(reaching, line.SeatsReachingGoal, line.Label);
+
+                // Food is the supporting number, on the same route.
+                var food = FoodOnRoute(line, Array.IndexOf(OracleRunner.Routes, line.BestRoute));
+                Assert.AreEqual(food.Average(), line.BestBanked, 1e-4f, line.Label);
+                Assert.AreEqual(food.Min(), line.BestSeatMin, 1e-4f, line.Label);
+                Assert.AreEqual(food.Max(), line.BestSeatMax, 1e-4f, line.Label);
+                Assert.AreEqual(food.Max() - food.Min(), line.SeatSpread, 1e-4f, line.Label);
+                Assert.AreEqual(line.BankedBySeatRoute.Average(), line.MeanBanked, 1e-3f, line.Label);
+                Assert.That(best, Is.InRange(0, routes - 1));
             }
+        }
+
+        [Test]
+        public void EverySeatSecondsValue_IsFinite_AndAReachingSeatNeverBeatsTheClockMissingOne()
+        {
+            float clock = _baseline.ClockSeconds;
+            foreach (var line in _baseline.Economy.Where(l => l.Applicable))
+                for (int cell = 0; cell < line.SecondsBySeatRoute.Length; cell++)
+                {
+                    float sec = line.SecondsBySeatRoute[cell];
+                    if (float.IsNaN(sec)) continue; // a seat that banked nothing: that route has no number, others do
+                    Assert.IsTrue(!float.IsInfinity(sec) && sec > 0f, $"{line.Label} cell {cell}: {sec}");
+                    if (!line.ReachedBySeatRoute[cell]) Assert.Greater(sec, clock - 1e-3f, $"{line.Label} cell {cell}: a miss is past the clock");
+                }
+        }
+
+        [Test]
+        public void GoalSeconds_ExtrapolatesAMiss_FiniteAndMonotone()
+        {
+            float clock = _match.MatchDurationSeconds, target = _match.FoodTargetToWin;
+            var reached = new FarmSeatResult { Banked = target, SecondsToTarget = clock * 0.5f };
+            Assert.AreEqual(reached.SecondsToTarget, OracleRunner.GoalSeconds(reached, target, clock));
+
+            float previous = clock;
+            foreach (float fraction in new[] { 0.9f, 0.7f, 0.5f, 0.25f, 0.05f })
+            {
+                var missed = new FarmSeatResult { Banked = target * fraction, SecondsToTarget = -1f };
+                float sec = OracleRunner.GoalSeconds(missed, target, clock);
+                Assert.IsTrue(!float.IsNaN(sec) && !float.IsInfinity(sec), $"fraction {fraction}");
+                Assert.AreEqual(clock + (target - missed.Banked) / (missed.Banked / clock), sec, 1e-3f);
+                Assert.Greater(sec, previous, $"banking less must be worse: fraction {fraction}");
+                previous = sec;
+            }
+            Assert.IsTrue(float.IsNaN(OracleRunner.GoalSeconds(new FarmSeatResult { Banked = 0f, SecondsToTarget = -1f }, target, clock)), "a seat that banked nothing has no number");
+        }
+
+        private OracleInputs StarvedInputs(OracleFood food)
+        {
+            var inputs = Inputs();
+            inputs.FoodOverride = food;
+            return inputs;
+        }
+
+        [Test]
+        public void SeatThatMissesTheGoal_StillHasAFiniteWorseResult()
+        {
+            // Half the goal spread over the nine piles: no seat can reach the goal, every one of them banks something.
+            float pile = _match.FoodTargetToWin / 18f;
+            var report = OracleRunner.Run(StarvedInputs(new OracleFood { Personal = pile, Contested = pile, Centre = pile }), null);
+            Assert.IsNotEmpty(report.Economy.Where(l => l.Applicable), "the starved map must still give the foragers a number");
+
+            foreach (var line in report.Economy.Where(l => l.Applicable))
+            {
+                var shipped = Line(_baseline, Enum.Parse<ChickenSubclass>(line.Label));
+                Assert.AreEqual(0, line.SeatsReachingGoal, line.Label);
+                Assert.IsTrue(!float.IsNaN(line.Result) && !float.IsInfinity(line.Result), $"{line.Label}: {line.Result}");
+                Assert.Greater(line.Result, report.ClockSeconds, $"{line.Label}: a miss is past the clock");
+                Assert.Greater(line.Result, shipped.Result, $"{line.Label}: a kit that cannot finish is worse than one that does");
+            }
+        }
+
+        [Test]
+        public void SeatThatBanksNothing_HasNoResult_LikeANonForager()
+        {
+            var report = OracleRunner.Run(StarvedInputs(default), null);
+            foreach (var line in report.Economy.Where(l => l.Label != ChickenSubclass.Assassin_Spoiler.ToString() && l.Label != ChickenSubclass.Assassin_Thief.ToString()))
+            {
+                Assert.IsFalse(line.Applicable, $"{line.Label}: nothing to bank, nothing to rank");
+                Assert.IsEmpty(line.SecondsBySeatRoute, line.Label);
+                Assert.AreEqual(0f, line.Result, line.Label);
+            }
+        }
+
+        private static IEnumerable<string> LabelsOf(AbilityRegistrySO abilities, ChickenClass cls) =>
+            abilities.Passives.Where(p => p.Subclass.ClassOf() == cls).Select(p => p.Subclass.ToString());
+
+        private BalanceVerdict StatDelta(string asset, string field, float value)
+        {
+            var verdict = _book.Evaluate(
+                $"{{\"schema\":1,\"assets\":{{\"{asset}\":{{\"{field}\":{value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}}}}}}", "test");
+            Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
+            Assert.AreEqual(0, verdict.Ignored.Count, string.Join("; ", verdict.Ignored));
+            return verdict;
+        }
+
+        [Test]
+        public void Result_ReactsToPeckCooldown()
+        {
+            const string asset = "Fatty";
+            Assert.IsTrue(_book.TryProbe(asset, "PeckCooldown", out float shipped, out _, out float max, out string why), why);
+            float slower = Math.Min(max, shipped + 0.5f);
+            Assume.That(slower, Is.GreaterThan(shipped), "the cooldown has room to rise");
+
+            var slow = OracleRunner.Run(Inputs(StatDelta(asset, "PeckCooldown", slower)), null);
+
+            var labels = LabelsOf(_abilities, ChickenClass.Fatty).ToList();
+            Assert.IsNotEmpty(labels);
+            foreach (string label in labels)
+            {
+                var before = _baseline.Economy.Single(l => l.Label == label);
+                var after = slow.Economy.Single(l => l.Label == label);
+                Assert.Greater(after.Result, before.Result, $"{label}: a slower Peck cooldown must cost seconds");
+            }
+            foreach (var other in _baseline.Economy.Where(l => l.Applicable && !labels.Contains(l.Label)))
+                Assert.AreEqual(other.Result, slow.Economy.Single(l => l.Label == other.Label).Result, 1e-4f, $"{other.Label}: another class is untouched");
+        }
+
+        private OracleInputs WithCast(string cls, float seconds)
+        {
+            var inputs = Inputs();
+            inputs.PeckCastSeconds = new Dictionary<string, float> { { cls, seconds } };
+            return inputs;
+        }
+
+        [Test]
+        public void Result_ReactsToPeckCast()
+        {
+            var kits = OracleKits.All(Inputs()).Where(k => k.Forages && k.Label.StartsWith("Fatty", StringComparison.Ordinal)).ToList();
+            Assert.IsNotEmpty(kits);
+            float cooldown = kits.Min(k => k.PeckCooldown);
+            var labels = kits.Select(k => k.Label).ToList();
+
+            // A cast shorter than the cooldown, then one longer than it: each is strictly worse than the one before.
+            var none = _baseline;
+            var shorter = OracleRunner.Run(WithCast("Fatty", cooldown * 0.5f), null);
+            var longer = OracleRunner.Run(WithCast("Fatty", cooldown * 2f), null);
+
+            foreach (string label in labels)
+            {
+                float r0 = none.Economy.Single(l => l.Label == label).Result;
+                float r1 = shorter.Economy.Single(l => l.Label == label).Result;
+                float r2 = longer.Economy.Single(l => l.Label == label).Result;
+                Assert.Greater(r1, r0, $"{label}: a cast shorter than the cooldown still costs the seconds the chicken stands there");
+                Assert.Greater(r2, r1, $"{label}: a longer cast costs more");
+            }
+            foreach (var other in none.Economy.Where(l => l.Applicable && !labels.Contains(l.Label)))
+                Assert.AreEqual(other.Result, longer.Economy.Single(l => l.Label == other.Label).Result, 1e-4f, $"{other.Label}: another class is untouched");
+        }
+
+        [Test]
+        public void ZeroCast_KeepsTheFarmNumbers_TheGamesPeckLockIsTheOnlyDifference()
+        {
+            var inputs = Inputs();
+            var peck = _abilities.All.Single(a => a.Job == AbilityJob.Peck);
+            Assert.Greater(peck.Duration, 0f, "the game locks movement after a peck; the test needs that lock");
+            var food = OracleKits.Food(inputs);
+            var rules = OracleKits.Rules(inputs, true, FarmFoodEvent.None);
+
+            foreach (var kit in OracleKits.All(inputs).Where(k => k.Forages))
+            {
+                Assert.AreEqual(0f, kit.PeckCastSeconds, kit.Label);
+                Assert.AreEqual(peck.Duration, kit.PeckLockSeconds, 1e-6f, $"{kit.Label}: the lock is the Peck ability's own duration");
+
+                var lockless = kit;
+                lockless.PeckLockSeconds = 0f;
+                // The kit alone on the map, so nobody else's timing can shift with its own: the lock is the only thing that differs.
+                for (int seat = 0; seat < 4; seat++)
+                {
+                    var withLock = FarmSim.Run(_map, food, Alone(seat, kit), rules)[seat];
+                    var without = FarmSim.Run(_map, food, Alone(seat, lockless), rules)[seat];
+                    if (withLock.SecondsToTarget < 0f || without.SecondsToTarget < 0f)
+                    {
+                        Assert.LessOrEqual(withLock.Banked, without.Banked + 1e-3f, $"{kit.Label} seat {seat}: a lock never makes a kit bank more");
+                        continue;
+                    }
+                    Assert.GreaterOrEqual(withLock.SecondsToTarget, without.SecondsToTarget - 1e-4f, $"{kit.Label} seat {seat}: a lock never makes a kit faster");
+                    // The lock delays leaving a pile: once for each pile a trip leaves (at most every pile), plus a tick of rounding on each.
+                    float room = (withLock.Trips + OracleMapSO.PileCount) * (kit.PeckLockSeconds + 2f * FarmRules.DefaultTickSeconds) + 1e-3f;
+                    Assert.LessOrEqual(withLock.SecondsToTarget - without.SecondsToTarget, room, $"{kit.Label} seat {seat}: the lock is the only difference");
+                }
+            }
+        }
+
+        private static FarmSeat[] Alone(int seat, OracleKit kit)
+        {
+            var seats = new FarmSeat[4];
+            seats[seat] = new FarmSeat { Present = true, Kit = kit, Route = FarmRoute.Nearest };
+            return seats;
         }
 
         [Test]
@@ -180,7 +345,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Offset_MovesTheResultByIncomeTimesSeconds()
+        public void Offset_IsACreditInSeconds_TakenOffTheResult()
         {
             string label = ChickenSubclass.Fatty_Hoarder.ToString();
             const float seconds = 3f;
@@ -191,13 +356,14 @@ namespace CluckWars.Tests
             var before = Line(_baseline, ChickenSubclass.Fatty_Hoarder);
             var after = Line(shifted, ChickenSubclass.Fatty_Hoarder);
             Assert.AreEqual(seconds, after.OffsetSeconds, 1e-6f);
+            Assert.AreEqual(before.BestSeconds, after.BestSeconds, 1e-6f, "an offset must not change the measurement");
             Assert.AreEqual(before.BestBanked, after.BestBanked, 1e-6f, "an offset must not change the measurement");
-            Assert.AreEqual(before.BestBanked + seconds * before.IncomePerSecond, after.Result, 1e-3f);
+            Assert.AreEqual(before.BestSeconds - seconds, after.Result, 1e-4f, "a positive offset is a credit: it takes seconds off");
 
             foreach (var line in shifted.Economy.Where(l => l.Label != label && l.Applicable))
             {
                 Assert.AreEqual(0f, line.OffsetSeconds, line.Label);
-                Assert.AreEqual(line.BestBanked, line.Result, 1e-6f, $"{line.Label}: a missing label means no offset");
+                Assert.AreEqual(line.BestSeconds, line.Result, 1e-6f, $"{line.Label}: a missing label means no offset");
             }
         }
 

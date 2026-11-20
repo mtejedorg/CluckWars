@@ -80,8 +80,9 @@ namespace CluckWars.Balance
         {
             int routes = Routes.Length;
             int cells = Seats * routes;
-            line.BankedBySeatRoute = new float[cells];
-            line.SecondsBySeatRoute = new float[cells];
+            var banked = new float[cells];
+            var seconds = new float[cells];
+            var reached = new bool[cells];
 
             for (int seat = 0; seat < Seats; seat++)
             {
@@ -90,63 +91,80 @@ namespace CluckWars.Balance
                     int cell = seat * routes + r;
                     var seats = OthersStandard(standard);
                     seats[seat] = new FarmSeat { Present = true, Kit = kit, Route = Routes[r] };
-                    line.BankedBySeatRoute[cell] = FarmSim.Run(map, food, seats, open)[seat].Banked;
-                    line.SecondsBySeatRoute[cell] = FarmSim.Run(map, food, seats, stop)[seat].SecondsToTarget;
+                    banked[cell] = FarmSim.Run(map, food, seats, open)[seat].Banked;
+                    var toGoal = FarmSim.Run(map, food, seats, stop)[seat];
+                    reached[cell] = toGoal.SecondsToTarget >= 0f;
+                    seconds[cell] = GoalSeconds(toGoal, stop.WinTarget, stop.ClockSeconds);
                 }
             }
 
-            // Per route: the mean over the four seats (a kit cannot choose its seat), and the seat range on the route that is best.
-            float sum = 0f, bestMean = float.NegativeInfinity, worstMean = float.PositiveInfinity;
-            int bestRoute = 0;
+            // Per route: the seat mean of seconds (a kit cannot choose its seat). A route on which some seat banks nothing has no number.
+            // The best route is the fastest; a tie goes to the route more seats really finish on.
+            int bestRoute = -1, bestReaching = 0;
+            float bestSeconds = 0f, slowest = float.NegativeInfinity;
             for (int r = 0; r < routes; r++)
             {
-                float routeSum = 0f;
-                for (int seat = 0; seat < Seats; seat++) routeSum += line.BankedBySeatRoute[seat * routes + r];
-                sum += routeSum;
-                float mean = routeSum / Seats;
-                if (mean > bestMean) { bestMean = mean; bestRoute = r; }
-                if (mean < worstMean) worstMean = mean;
+                float sum = 0f;
+                int n = 0;
+                for (int seat = 0; seat < Seats; seat++)
+                {
+                    sum += seconds[seat * routes + r];
+                    if (reached[seat * routes + r]) n++;
+                }
+                float mean = sum / Seats;
+                if (float.IsNaN(mean)) continue;
+                if (mean > slowest) slowest = mean;
+                if (bestRoute < 0 || mean < bestSeconds || (mean == bestSeconds && n > bestReaching))
+                {
+                    bestRoute = r;
+                    bestSeconds = mean;
+                    bestReaching = n;
+                }
             }
 
-            float seatMin = float.PositiveInfinity, seatMax = float.NegativeInfinity;
+            if (bestRoute < 0)
+            {
+                // Banks nothing in some seat on every route: no number, like a kit that never forages.
+                line.Applicable = false;
+                return;
+            }
+
+            // Supporting food numbers, on the route that is fastest.
+            float routeFood = 0f, seatMin = float.PositiveInfinity, seatMax = float.NegativeInfinity, allFood = 0f;
+            for (int cell = 0; cell < cells; cell++) allFood += banked[cell];
             for (int seat = 0; seat < Seats; seat++)
             {
-                float v = line.BankedBySeatRoute[seat * routes + bestRoute];
+                float v = banked[seat * routes + bestRoute];
+                routeFood += v;
                 if (v < seatMin) seatMin = v;
                 if (v > seatMax) seatMax = v;
             }
 
-            // Seconds to the goal: per route, the mean over the seats that reach it; the fastest route is the lowest mean.
-            float fastest = -1f;
-            int reaching = 0;
-            for (int r = 0; r < routes; r++)
-            {
-                float secSum = 0f;
-                int n = 0;
-                for (int seat = 0; seat < Seats; seat++)
-                {
-                    float sec = line.SecondsBySeatRoute[seat * routes + r];
-                    if (sec < 0f) continue;
-                    secSum += sec;
-                    n++;
-                }
-                if (n == 0) continue;
-                float mean = secSum / n;
-                if (fastest < 0f || mean < fastest || (mean == fastest && n > reaching)) { fastest = mean; reaching = n; }
-            }
-
+            line.BankedBySeatRoute = banked;
+            line.SecondsBySeatRoute = seconds;
+            line.ReachedBySeatRoute = reached;
             line.BestRoute = Routes[bestRoute];
-            line.BestBanked = bestMean;
+            line.BestSeconds = bestSeconds;
+            line.SeatsReachingGoal = bestReaching;
+            line.RouteSpreadSeconds = slowest - bestSeconds;
+            line.OffsetSeconds = offsets != null && offsets.TryGetValue(kit.Label, out var offset) ? offset : 0f;
+            line.Result = line.BestSeconds - line.OffsetSeconds;
+            line.BestBanked = routeFood / Seats;
             line.BestSeatMin = seatMin;
             line.BestSeatMax = seatMax;
             line.SeatSpread = seatMax - seatMin;
-            line.MeanBanked = sum / cells;
-            line.Spread = bestMean - worstMean;
-            line.BestSeconds = fastest;
-            line.SeatsReachingGoal = reaching;
-            line.IncomePerSecond = open.ClockSeconds > 0f ? bestMean / open.ClockSeconds : 0f;
-            line.OffsetSeconds = offsets != null && offsets.TryGetValue(kit.Label, out var offset) ? offset : 0f;
-            line.Result = line.BestBanked + line.OffsetSeconds * line.IncomePerSecond;
+            line.MeanBanked = allFood / cells;
+        }
+
+        /// <summary>
+        /// Seconds a seat needs to bank the goal. A seat that did: the time it did. One that did not: the clock plus what is still missing at the
+        /// seat's own mean income, <c>clock + (target - banked) / (banked / clock)</c>, finite and the worse the less it banked. NaN when it banked nothing.
+        /// </summary>
+        public static float GoalSeconds(FarmSeatResult run, float target, float clock)
+        {
+            if (run.SecondsToTarget >= 0f) return run.SecondsToTarget;
+            if (run.Banked <= 0f || clock <= 0f) return float.NaN;
+            return clock + (target - run.Banked) / (run.Banked / clock);
         }
 
         private static FarmSeat[] OthersStandard(OracleKit standard)
