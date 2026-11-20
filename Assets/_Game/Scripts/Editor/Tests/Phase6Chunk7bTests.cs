@@ -126,12 +126,36 @@ namespace CluckWars.Tests
         {
             string src = Read("Assets/_Game/Scripts/App/FusionNetworkService.cs");
             int onInput = src.IndexOf("INetworkRunnerCallbacks.OnInput(", System.StringComparison.Ordinal);
-            int gate = src.IndexOf("if (LeaveSheetState.IsOpen)", onInput, System.StringComparison.Ordinal);
+            int gate = src.IndexOf("if (LeaveSheetState.BlocksInput(AnyAbilityHeld()))", onInput, System.StringComparison.Ordinal);
             int movement = src.IndexOf("_inputProvider.GetMovement()", onInput, System.StringComparison.Ordinal);
             Assert.Greater(gate, onInput);
             Assert.Less(gate, movement, "the gate comes before any device is read");
             StringAssert.Contains("InputButton.AbilityCancel", src.Substring(gate, 500), "a held aim is cancelled, not fired");
-            StringAssert.Contains("|| LeaveSheetState.IsOpen", src, "the press latch is cleared too");
+            StringAssert.Contains("|| LeaveSheetState.BlocksInput(AnyAbilityHeld())", src, "the press latch is cleared too");
+        }
+
+        // ---- BL-202: pad B closes the sheet and is slot 3 ----------------------------------------------------------
+
+        [Test]
+        public void PadB_ClosingTheSheet_DoesNotReachSlot3_UntilTheButtonIsReleased()
+        {
+            bool carry = false;
+            Assert.IsFalse(LeaveSheetInputGate.Blocks(ref carry, false, false), "no sheet, nothing held: input flows");
+            Assert.IsTrue(LeaveSheetInputGate.Blocks(ref carry, true, false), "the sheet is up: blocked");
+            // The frame B closes the sheet: it is still down (slot 3 held), so its press and hold must stay blocked.
+            Assert.IsTrue(LeaveSheetInputGate.Blocks(ref carry, false, true), "closing frame, B still down");
+            Assert.IsTrue(LeaveSheetInputGate.Blocks(ref carry, false, true), "asking again the same frame answers the same");
+            Assert.IsTrue(LeaveSheetInputGate.Blocks(ref carry, false, true), "still held a frame later");
+            Assert.IsFalse(LeaveSheetInputGate.Blocks(ref carry, false, false), "released: input flows again");
+            Assert.IsFalse(LeaveSheetInputGate.Blocks(ref carry, false, true), "a NEW press after the release is a real one");
+        }
+
+        [Test]
+        public void ClosingTheSheetWithNothingHeld_BlocksNothingExtra()
+        {
+            bool carry = false;
+            LeaveSheetInputGate.Blocks(ref carry, true, false);
+            Assert.IsFalse(LeaveSheetInputGate.Blocks(ref carry, false, false), "Start / Esc / KEEP PLAYING: no extra frame lost");
         }
 
         // ---- Finding 7: music ---------------------------------------------------------------------------------------

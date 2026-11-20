@@ -173,7 +173,7 @@ namespace CluckWars.Networking
             TickNetDiagnostics();
             if (_inputProvider == null) return;
 
-            if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning || LeaveSheetState.IsOpen)
+            if (GameManager.Instance == null || !GameManager.Instance.IsMatchRunning || LeaveSheetState.BlocksInput(AnyAbilityHeld()))
             {
                 _pendingAbility1 = false;
                 _pendingAbility2 = false;
@@ -199,6 +199,13 @@ namespace CluckWars.Networking
             if (p4 && peckSlot != 3) _pendingAbility4 = true;
             if (cancel) _pendingAbilityCancel = true;
             StepPeckPress(peckSlot, peckSlot switch { 0 => p1, 1 => p2, 2 => p3, 3 => p4, _ => false }, cancel);
+        }
+
+        private bool AnyAbilityHeld()
+        {
+            for (int i = 0; i < 4; i++)
+                if (_inputProvider.GetAbilityHeld(i)) return true;
+            return false;
         }
 
         // Peck press gate state (local to this client; the preference it flips is local too).
@@ -246,7 +253,7 @@ namespace CluckWars.Networking
 
             // "Leave match?" is up: this peer's bird stands still and nothing it presses reaches the simulation.
             // The only thing sent is a cancel, so a move being aimed when the sheet opened is dropped, not fired.
-            if (LeaveSheetState.IsOpen)
+            if (LeaveSheetState.BlocksInput(AnyAbilityHeld()))
             {
                 _pendingAbility1 = _pendingAbility2 = _pendingAbility3 = _pendingAbility4 = _pendingAbilityCancel = false;
                 _peckHold = default;
