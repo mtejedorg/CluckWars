@@ -16,7 +16,6 @@ MonoBehaviour:
   FoodTargetToWin: 40
   SpoilerBounty: 15
   ExecuteBounty: 5
-  LeaderExecuteBountyMultiplier: 2
   DeathStunSeconds: 5
   DepositRatePerSecond: 9
   ComebackEventSecondsLeft: 10

@@ -37,6 +37,8 @@ namespace CluckWars.Gameplay
         public const float SuccessCooldown = 8.0f;
         /// <summary>Fallback for <see cref="RemovalSeconds"/> (no MarkKill asset registered); equals the asset.</summary>
         public const float DefaultRemovalSeconds = 3.0f;
+        /// <summary>Fallback for <see cref="LeaderPickWeight"/> (no MarkKill asset registered); equals the asset.</summary>
+        public const float DefaultLeaderPickWeight = 2f;
 
         [Networked] public NetworkBehaviourId MarkedTarget { get; private set; }
         [Networked] public TickTimer ArmTimer { get; private set; }
@@ -68,6 +70,8 @@ namespace CluckWars.Gameplay
         public float RemovalSeconds => _tuning != null ? _tuning.RemovalSeconds : DefaultRemovalSeconds;
         /// <summary>Tuned arm time of a mark (<c>MarkKill.asset</c>): the Death Mark draw never outlasts it.</summary>
         public float ArmSeconds => _tuning != null ? _tuning.ArmSeconds : ArmDuration;
+        /// <summary>Tuned pull of the mark toward the rival with the most banked food (<c>MarkKill.asset</c>; 1 = no pull).</summary>
+        public float LeaderPickWeight => _tuning != null ? _tuning.LeaderPickWeight : DefaultLeaderPickWeight;
         private float FailSeconds => _tuning != null ? _tuning.FailCooldownSeconds : FailCooldown;
         private float SuccessSeconds => _tuning != null ? _tuning.SuccessCooldownSeconds : SuccessCooldown;
 
@@ -88,21 +92,18 @@ namespace CluckWars.Gameplay
         private readonly System.Collections.Generic.List<float> _weights = new System.Collections.Generic.List<float>(4);
         private readonly System.Collections.Generic.List<float> _nears = new System.Collections.Generic.List<float>(4);
         private readonly System.Collections.Generic.List<float> _rolls = new System.Collections.Generic.List<float>(4);
+        private readonly System.Collections.Generic.List<float> _leaderWeights = new System.Collections.Generic.List<float>(4);
+        // Most food banked by any rival in the match (including one the pick leaves out), set by GatherMarkCandidates.
+        private float _bestBanked;
 
         /// <summary>
-        /// Flat food this execute pays on top of the victim's cargo, doubled (by default)
-        /// when the victim was the match leader — the comeback valve that used to arrive as
-        /// eight food scattered on the ground.
+        /// Flat food this execute pays on top of the victim's cargo. The same whoever the victim is (Maestro D7b): the leader
+        /// is favoured by the mark's pick (<see cref="MarkPickRules"/>), not by the payout.
         /// </summary>
-        private float ResolveExecuteBounty(ChickenController victim)
+        private float ResolveExecuteBounty()
         {
             var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
-            if (config == null) return 0f;
-
-            float bounty = config.ExecuteBounty;
-            if (victim != null && victim.LeaderBountyActive)
-                bounty *= Mathf.Max(1f, config.LeaderExecuteBountyMultiplier);
-            return bounty;
+            return config != null ? config.ExecuteBounty : 0f;
         }
 
         /// <summary>
@@ -113,7 +114,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         public void PayExecuteBounty(ChickenController victim)
         {
-            float bounty = ResolveExecuteBounty(victim);
+            float bounty = ResolveExecuteBounty();
             if (bounty <= 0f || _cargo == null) return;
             _cargo.BountyBag += bounty;
             _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag for {victim.name}.");
@@ -400,7 +401,8 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The weighted random pick over the gathered candidates (<see cref="MarkPickRules.PickWeighted"/>): one roll each from
         /// this authority's RNG, weighted by the planar distance to the candidate's own base (<c>w</c>) and to this Assassin
-        /// (<c>n</c>), both against <see cref="PlayerBase.BaseSpan"/>. Logs every candidate's w, n and score at Debug. -1 when
+        /// (<c>n</c>), both against <see cref="PlayerBase.BaseSpan"/>, and by <see cref="LeaderPickWeight"/> for the rival(s) with the
+        /// most banked food (<c>l</c>). Logs every candidate's w, n, l and score at Debug. -1 when
         /// there is nobody.
         /// </summary>
         private int PickWeighted()
@@ -408,25 +410,32 @@ namespace CluckWars.Gameplay
             _weights.Clear();
             _nears.Clear();
             _rolls.Clear();
+            _leaderWeights.Clear();
+            float leaderPull = LeaderPickWeight;
             float span = PlayerBase.BaseSpan();
             if (span <= 0f && _candidates.Count > 0)
                 _log?.Warn(Source, $"{name}: no base data to weigh the mark by, so the pick is uniform (bases live: {PlayerBase.ActiveBases.Count}).");
             Vector3 me = transform.position;
             for (int i = 0; i < _candidates.Count; i++)
             {
-                float w = 1f, a = 1f;
-                if (span > 0f && Runner.TryFindBehaviour(_candidates[i], out ChickenController c))
+                float w = 1f, a = 1f, banked = 0f;
+                if (Runner.TryFindBehaviour(_candidates[i], out ChickenController c))
                 {
-                    Vector3 at = c.transform.position;
-                    a = MarkPickRules.AssassinFraction(Planar.Distance(me, at), span);
-                    if (PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
-                        w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
+                    banked = BankedFood(c.HomeCornerIndex);
+                    if (span > 0f)
+                    {
+                        Vector3 at = c.transform.position;
+                        a = MarkPickRules.AssassinFraction(Planar.Distance(me, at), span);
+                        if (PlayerBase.TryGetBaseCentre(c.HomeCornerIndex, out Vector2 home))
+                            w = MarkPickRules.HomeFraction(Vector2.Distance(new Vector2(at.x, at.z), home), span);
+                    }
                 }
                 _weights.Add(w);
                 _nears.Add(a);
+                _leaderWeights.Add(MarkPickRules.LeaderWeight(banked, _bestBanked, leaderPull));
                 _rolls.Add(Random.value);
             }
-            int pick = MarkPickRules.PickWeighted(_weights, _nears, _rolls, Random.value);
+            int pick = MarkPickRules.PickWeighted(_weights, _nears, _leaderWeights, _rolls, Random.value);
             if (_log != null && _log.IsEnabled(LogLevel.Debug))
             {
                 var sb = new System.Text.StringBuilder("Mark pick:");
@@ -434,7 +443,7 @@ namespace CluckWars.Gameplay
                 {
                     string who = Runner.TryFindBehaviour(_candidates[i], out ChickenController c) ? c.name : _candidates[i].ToString();
                     sb.Append($" {who} w={_weights[i]:0.00} n={_nears[i]:0.00} " +
-                              $"score={MarkPickRules.Score(_rolls[i], _weights[i], _nears[i]):0.000};");
+                              $"l={_leaderWeights[i]:0.0} score={MarkPickRules.Score(_rolls[i], _weights[i], _nears[i], _leaderWeights[i]):0.000};");
                 }
                 _log.Debug(Source, sb.Append(pick >= 0 ? $" -> #{pick}" : " -> nobody").ToString());
             }
@@ -445,6 +454,7 @@ namespace CluckWars.Gameplay
         private void GatherMarkCandidates()
         {
             _candidates.Clear();
+            _bestBanked = 0f;
             int ownCorner = _controller != null ? _controller.HomeCornerIndex : -1;
             int rivals = 0;
             var all = ChickenController.ActiveControllers;
@@ -454,10 +464,21 @@ namespace CluckWars.Gameplay
                 if (c == null || c == _controller || c.Object == null || !c.Object.IsValid || c.IsDecoy) continue;
                 if (ownCorner >= 0 && c.HomeCornerIndex == ownCorner) continue;   // same corner: an ally
                 rivals++;
+                float banked = BankedFood(c.HomeCornerIndex);
+                if (banked > _bestBanked) _bestBanked = banked;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
                 _candidates.Add(c.Id);
             }
             MarkPickRules.Filter(_candidates, _hasLastMark, _lastMark, rivals);
+        }
+
+        /// <summary>Food banked at the base of <paramref name="corner"/>, 0 when it has none (or no base is live).</summary>
+        private static float BankedFood(int corner)
+        {
+            var bases = PlayerBase.ActiveBases;
+            for (int i = 0; i < bases.Count; i++)
+                if (bases[i] != null && bases[i].CornerIndex == corner) return bases[i].FoodTotal;
+            return 0f;
         }
 
         /// <summary>

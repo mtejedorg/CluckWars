@@ -159,8 +159,6 @@ MonoBehaviour:
   _HomeCornerIndex: -1
   _UnderdogSurgeActive:
     _value: 0
-  _LeaderBountyActive:
-    _value: 0
   _IsStunned: 0
   _VerticalVelocity: 0
 --- !u!95 &5731265523250509895

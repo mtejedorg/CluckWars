@@ -317,7 +317,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ExecuteBounty_PaysAFloor_AndTheLeaderMultiplierCanOnlyIncreaseIt()
+        public void ExecuteBounty_PaysAFloor()
         {
             // The Assassin's income FLOOR. Every other route it has (Snatch, Sneaky Steal, the
             // cargo transfer) needs the victim to already be carrying, so if this is authored
@@ -332,12 +332,6 @@ namespace CluckWars.Tests
             Assert.Less(config.ExecuteBounty, config.FoodTargetToWin,
                 $"ExecuteBounty {config.ExecuteBounty} is at or above the {config.FoodTargetToWin} win " +
                 "target, so a single execute would win the match outright.");
-
-            Assert.GreaterOrEqual(config.LeaderExecuteBountyMultiplier, 1f,
-                $"LeaderExecuteBountyMultiplier is {config.LeaderExecuteBountyMultiplier}. Below 1 it " +
-                "SHRINKS the payout for killing the match leader, inverting the comeback valve it " +
-                "exists to be. AssassinExecute.ResolveExecuteBounty clamps with Mathf.Max(1f, ...) so " +
-                "this would not misbehave at runtime — but the authored value would be lying about intent.");
         }
 
         [Test]

@@ -199,7 +199,6 @@ session.returning,Back to the barn in {n}s…
 countdown.getReady,GET READY
 hud.goal,★ FIRST TO {n}
 hud.goal.unknown,★ FIRST TO —
-nameplate.bounty,★ {name} ★
 loadout.swap,TAP TO SWAP
 lobby.status.codeReady,Ready to join
 hud.timer.none,--:--
@@ -212,7 +211,6 @@ hud.rank.4,4th
 hud.event.header,FINAL {n}!
 hud.event.goldenPile,GOLDEN PILE!
 hud.event.underdogSurge,UNDERDOG SURGE!
-hud.event.leaderBounty,BOUNTY ON THE LEADER!
 hud.event.restock,PILES RESTOCKED!
 hud.pop.safe,SAFE
 hud.pop.missed,MISSED

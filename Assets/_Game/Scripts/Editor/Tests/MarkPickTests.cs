@@ -47,13 +47,16 @@ namespace CluckWars.Tests
 
         // ---- Weighted pick: roll * w * w * a, highest wins ---------------------------------------------------------
 
-        /// <summary>The pick with every candidate far from the Assassin (a = 1): the home weighting alone.</summary>
-        private static int Weighted(float[] w, float[] rolls, float fallback = 0.5f)
+        private static float[] Ones(int n)
         {
-            var far = new float[w.Length];
-            for (int i = 0; i < far.Length; i++) far[i] = 1f;
-            return MarkPickRules.PickWeighted(w, far, rolls, fallback);
+            var ones = new float[n];
+            for (int i = 0; i < n; i++) ones[i] = 1f;
+            return ones;
         }
+
+        /// <summary>The pick with every candidate far from the Assassin (a = 1) and no leader (l = 1): the home weighting alone.</summary>
+        private static int Weighted(float[] w, float[] rolls, float fallback = 0.5f) =>
+            MarkPickRules.PickWeighted(w, Ones(w.Length), Ones(w.Length), rolls, fallback);
 
         [Test]
         public void FarFromHome_BeatsNearHome_MostOfTheTime()
@@ -147,7 +150,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(1f, MarkPickRules.HomeFraction(90f, 70f), "beyond the span is as far as it gets");
             Assert.AreEqual(0f, MarkPickRules.HomeFraction(-1f, 70f));
             Assert.AreEqual(1f, MarkPickRules.HomeFraction(10f, 0f), "no base data: every candidate weighs the same");
-            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f, 1f), 1e-6f);
+            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f, 1f, 1f), 1e-6f);
         }
 
         // ---- The Assassin factor: a = NearFloor + (1 - NearFloor) * n, n = d / (span / 3) clamped ---------------------
@@ -179,7 +182,7 @@ namespace CluckWars.Tests
             {
                 var a = new[] { MarkPickRules.AssassinFraction(0f, 0f), MarkPickRules.AssassinFraction(10f, 0f), MarkPickRules.AssassinFraction(50f, 0f) };
                 var w = new[] { MarkPickRules.HomeFraction(0f, 0f), MarkPickRules.HomeFraction(5f, 0f), MarkPickRules.HomeFraction(50f, 0f) };
-                hits[MarkPickRules.PickWeighted(w, a, new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f)]++;
+                hits[MarkPickRules.PickWeighted(w, a, Ones(3), new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f)]++;
             }
             foreach (int h in hits) Assert.That(h, Is.InRange(2700, 3300), $"hits {hits[0]}/{hits[1]}/{hits[2]}");
         }
@@ -188,8 +191,8 @@ namespace CluckWars.Tests
         public void ARivalOnTopOfTheAssassin_AwayFromHome_StillScoresAboveZero()
         {
             float a = MarkPickRules.AssassinFraction(0f, Span);
-            Assert.Greater(MarkPickRules.Score(0.5f, 0.6f, a), 0f, "point-blank is disfavoured, never excluded");
-            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.6f }, new[] { a }, new[] { 0.5f }, 0.9f),
+            Assert.Greater(MarkPickRules.Score(0.5f, 0.6f, a, 1f), 0f, "point-blank is disfavoured, never excluded");
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.6f }, new[] { a }, Ones(1), new[] { 0.5f }, 0.9f),
                 "the only candidate, next to the Assassin, is still marked");
         }
 
@@ -197,11 +200,11 @@ namespace CluckWars.Tests
         public void AtEqualRollAndHomeWeight_TheFartherRivalWins_UntilTheFactorSaturates()
         {
             float near = MarkPickRules.AssassinFraction(4f, Span), far = MarkPickRules.AssassinFraction(18f, Span);
-            Assert.AreEqual(1, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { near, far }, new[] { 0.5f, 0.5f }, 0f));
-            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { far, near }, new[] { 0.5f, 0.5f }, 0f));
+            Assert.AreEqual(1, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { near, far }, Ones(2), new[] { 0.5f, 0.5f }, 0f));
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { far, near }, Ones(2), new[] { 0.5f, 0.5f }, 0f));
             // Beyond span / 3 both weigh 1: a tie, and the first wins it.
             float sat1 = MarkPickRules.AssassinFraction(25f, Span), sat2 = MarkPickRules.AssassinFraction(55f, Span);
-            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { sat1, sat2 }, new[] { 0.5f, 0.5f }, 0.99f));
+            Assert.AreEqual(0, MarkPickRules.PickWeighted(new[] { 0.7f, 0.7f }, new[] { sat1, sat2 }, Ones(2), new[] { 0.5f, 0.5f }, 0.99f));
         }
 
         [Test]
@@ -212,9 +215,80 @@ namespace CluckWars.Tests
             var a = new[] { MarkPickRules.AssassinFraction(0f, Span), 1f };
             int near = 0;
             for (int i = 0; i < 20000; i++)
-                if (MarkPickRules.PickWeighted(w, a, new[] { (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f) == 0) near++;
+                if (MarkPickRules.PickWeighted(w, a, Ones(2), new[] { (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f) == 0) near++;
             // Two uniform rolls scaled 0.25 and 1: P(0.25 r1 > r2) = 0.25 / 2 = 12.5 %.
             Assert.That(near, Is.InRange(2100, 2900), $"near won {near} of 20000");
+        }
+
+        // ---- The leader weight: the rival with the most banked food is likelier to be marked (D7b) ---------------------
+
+        /// <summary>How often candidate 0 wins over the same seeded rolls when its leader weight is <paramref name="leaderWeight"/>.</summary>
+        private static int LeaderWins(float leaderWeight, int trials = 20000)
+        {
+            var rng = new System.Random(20261120);
+            var w = new[] { 0.8f, 0.8f };
+            var a = new[] { 1f, 1f };
+            var l = new[] { leaderWeight, 1f };
+            int wins = 0;
+            for (int i = 0; i < trials; i++)
+                if (MarkPickRules.PickWeighted(w, a, l, new[] { (float)rng.NextDouble(), (float)rng.NextDouble() }, 0.5f) == 0) wins++;
+            return wins;
+        }
+
+        [Test]
+        public void Leader_IsPickedMoreOften()
+        {
+            float weight = ShippedMark.LeaderPickWeight;
+            Assert.Greater(weight, 1f, "the shipped weight must favour the leader at all");
+            int favoured = LeaderWins(weight), even = LeaderWins(1f);
+            Assert.Greater(favoured, even, $"leader won {favoured} of 20000 at weight {weight}, {even} at weight 1");
+            // Two uniform rolls, scores r1 * L and r2: P(leader wins) = 1 - 1 / (2 L) for L >= 1.
+            Assert.AreEqual(20000 * (1f - 1f / (2f * weight)), favoured, 600f);
+        }
+
+        [Test]
+        public void LeaderWeightOne_IsTodaysPick()
+        {
+            var rng = new System.Random(77);
+            for (int i = 0; i < 2000; i++)
+            {
+                var w = new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() };
+                var a = new[] { 0.25f + 0.75f * (float)rng.NextDouble(), 1f, 0.5f };
+                var rolls = new[] { (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble() };
+                float fallback = (float)rng.NextDouble();
+                int today = Today(w, a, rolls, fallback);
+                Assert.AreEqual(today, MarkPickRules.PickWeighted(w, a, Ones(3), rolls, fallback), $"case {i}");
+            }
+            Assert.AreEqual(0.25f * 0.8f, MarkPickRules.Score(0.8f, 0.5f, 1f, 1f), 1e-6f);
+        }
+
+        /// <summary>The pick as it was before the leader weight: roll * w * w * a, highest wins (first on a tie), uniform if all 0.</summary>
+        private static int Today(float[] w, float[] a, float[] rolls, float fallback)
+        {
+            int best = -1;
+            float bestScore = 0f;
+            for (int i = 0; i < w.Length; i++)
+            {
+                float score = rolls[i] * w[i] * w[i] * a[i];
+                if (score > bestScore) { bestScore = score; best = i; }
+            }
+            return best >= 0 ? best : MarkPickRules.Pick(w.Length, fallback);
+        }
+
+        [TestCase(5f, 5f, 2f, 2f)]    // the leader
+        [TestCase(7f, 7f, 2f, 2f)]    // tied leaders: every one of them
+        [TestCase(3f, 5f, 2f, 1f)]    // not the leader
+        [TestCase(0f, 0f, 2f, 2f)]    // nobody has banked: all tied, so the ratios are unchanged
+        public void LeaderWeight_GoesToEveryRivalWithTheMostBankedFood(float banked, float best, float weight, float expected) =>
+            Assert.AreEqual(expected, MarkPickRules.LeaderWeight(banked, best, weight));
+
+        [Test]
+        public void ShippedLeaderPickWeight_IsWithinItsRange_AndTheCallerUsesIt()
+        {
+            Assert.That(ShippedMark.LeaderPickWeight, Is.InRange(1f, 4f));
+            var src = Execute;
+            StringAssert.Contains("MarkPickRules.LeaderWeight(banked, _bestBanked, leaderPull)", src);
+            StringAssert.Contains("float leaderPull = LeaderPickWeight;", src);
         }
 
         [Test]
@@ -224,7 +298,7 @@ namespace CluckWars.Tests
             int pick = src.IndexOf("private int PickWeighted()", StringComparison.Ordinal);
             string body = src.Substring(pick, src.IndexOf("\n        }", pick, StringComparison.Ordinal) - pick);
             StringAssert.Contains("MarkPickRules.AssassinFraction(Planar.Distance(me, at), span)", body);
-            StringAssert.Contains("MarkPickRules.PickWeighted(_weights, _nears, _rolls, Random.value)", body);
+            StringAssert.Contains("MarkPickRules.PickWeighted(_weights, _nears, _leaderWeights, _rolls, Random.value)", body);
             StringAssert.Contains("n={_nears[i]:0.00}", body, "the Debug line shows w, n and the score");
         }
 

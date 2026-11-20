@@ -446,7 +446,6 @@ namespace CluckWars.Tests
             string hud = Read("Assets/_Game/Scripts/UI/MatchHudController.cs");
             StringAssert.Contains("MatchStandings.DisplayName(isLocal, isBot, cls, corner)", hud);
             StringAssert.DoesNotContain("$\"P{corner", hud);
-            Assert.AreEqual("★ DashFox ★", UiText.Format(UiKeys.NameplateBounty, ("name", "DashFox")));
         }
 
         [Test]

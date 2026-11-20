@@ -417,14 +417,12 @@ namespace CluckWars.Gameplay
         [Networked] public int HomeCornerIndex { get; set; } = -1;
 
         /// <summary>
-        /// The two comeback effects (GameManager's mid-match event). Written only on this chicken's state authority:
+        /// The comeback effect (GameManager's mid-match event). Written only on this chicken's state authority:
         /// switched on by <see cref="RPC_GrantComeback"/> (match authority only), off by the round reset. The setters
         /// are private because the match authority does not own a remote human's chicken in Shared Mode, and a direct
         /// write from there is silently lost.
         /// </summary>
         [Networked] public NetworkBool UnderdogSurgeActive { get; private set; }
-        /// <inheritdoc cref="UnderdogSurgeActive"/>
-        [Networked] public NetworkBool LeaderBountyActive { get; private set; }
 
         // WP4 (PROTOCOL CHANGE, B4): the Feather Aura triplet (the bool + radius + factor emitter flags) was
         // removed from this behaviour's networked layout. Feather Aura is a Caster-anchored AbilityZone now, slowed through
@@ -1351,11 +1349,10 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            bool surge = UnderdogSurgeActive, bounty = LeaderBountyActive;
-            ComebackRules.Apply(grant, ref surge, ref bounty);
+            bool surge = UnderdogSurgeActive;
+            ComebackRules.Apply(grant, ref surge);
             UnderdogSurgeActive = surge;
-            LeaderBountyActive = bounty;
-            _log?.Info(Source, $"{name}: comeback granted ({grant}) -> surge={surge}, bounty={bounty}.");
+            _log?.Info(Source, $"{name}: comeback granted ({grant}) -> surge={surge}.");
         }
 
         /// <summary>State authority only: the same queued teleport the round reset uses (an executed chicken's respawn).</summary>
@@ -1869,7 +1866,6 @@ namespace CluckWars.Gameplay
             SyncAbilityEffects();
             ExternalDisplacement = Vector3.zero;
             UnderdogSurgeActive  = false;
-            LeaderBountyActive   = false;
             _log?.Debug(Source, "Control states reset for new match.");
         }
 

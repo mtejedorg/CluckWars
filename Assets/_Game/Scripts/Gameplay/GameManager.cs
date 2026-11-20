@@ -1018,16 +1018,15 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// The comeback event, once per round in the last <see cref="ComebackEventSecondsLeft"/> seconds
-        /// (decision 2). None of the four outlives the round: the golden pile is despawned and the surge /
-        /// bounty flags are cleared by <see cref="ResetWorldForNewRound"/> (PLAY AGAIN), restock is instant,
+        /// (decision 2). None of the three outlives the round: the golden pile is despawned and the surge
+        /// flag is cleared by <see cref="ResetWorldForNewRound"/> (PLAY AGAIN), restock is instant,
         /// and nothing moves once the round has ended, so a flag still set on the end screen changes nothing.
         /// </summary>
         private void TriggerComebackEvent()
         {
             if (!HasStateAuthority) return;
 
-            int rolled = Random.Range(1, 5); // 1..4 inclusive
-            ActiveEvent = (MatchEventKind)rolled;
+            ActiveEvent = ComebackRules.EventForRoll(Random.Range(0, ComebackRules.Events.Length));
 
             _log?.Info(Source, $"COMEBACK EVENT FIRED ({TimeRemaining:0.0}s left): {ActiveEvent}");
 
@@ -1038,9 +1037,6 @@ namespace CluckWars.Gameplay
                     break;
                 case MatchEventKind.UnderdogSurge:
                     ApplyUnderdogSurge();
-                    break;
-                case MatchEventKind.LeaderBounty:
-                    ApplyLeaderBounty();
                     break;
                 case MatchEventKind.Restock:
                     RestockPiles();
@@ -1128,32 +1124,6 @@ namespace CluckWars.Gameplay
                 // By RPC: in Shared Mode the underdog may be a remote human's chicken, which this peer does not own.
                 underdog.RPC_GrantComeback(ComebackGrant.UnderdogSurge);
                 _log?.Info(Source, $"UnderdogSurge applied to {underdog.name} (Corner {underdog.HomeCornerIndex}, Food: {lowestFood}).");
-            }
-        }
-
-        private void ApplyLeaderBounty()
-        {
-            var controllers = ChickenController.ActiveControllers;
-            ChickenController leader = null;
-            float highestFood = -1f;
-
-            for (int i = 0; i < controllers.Count; i++)
-            {
-                var ctrl = controllers[i];
-                if (ctrl == null || ctrl.Object == null || !ctrl.Object.IsValid || ctrl.IsDecoy) continue;
-
-                float food = GetBaseFoodForCorner(ctrl.HomeCornerIndex);
-                if (food > highestFood)
-                {
-                    highestFood = food;
-                    leader = ctrl;
-                }
-            }
-
-            if (leader != null)
-            {
-                leader.RPC_GrantComeback(ComebackGrant.LeaderBounty);   // by RPC, as the surge above
-                _log?.Info(Source, $"LeaderBounty applied to {leader.name} (Corner {leader.HomeCornerIndex}, Food: {highestFood}).");
             }
         }
 

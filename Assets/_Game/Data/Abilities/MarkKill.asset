@@ -39,3 +39,4 @@ MonoBehaviour:
   SuccessCooldownSeconds: 8
   RemovalSeconds: 3
   RoundStartCooldownSeconds: 4
+  LeaderPickWeight: 2

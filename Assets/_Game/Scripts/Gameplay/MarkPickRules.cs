@@ -6,8 +6,9 @@ namespace CluckWars.Gameplay
     /// <summary>
     /// Who a Death Mark lands on, pure, with every roll injected. The caller lists the living, non-decoy rivals; <see cref="Filter"/>
     /// takes the last mark out of them (unless it is the only rival in the match; there is no time release); each survivor scores
-    /// <c>roll * w * w * a</c>, where <c>w</c> is how far it is from its own base (<see cref="HomeFraction"/>) and <c>a</c> how far
-    /// it is from the Assassin (<see cref="AssassinFraction"/>), and the highest score wins. A bird at home scores 0 and a bird
+    /// <c>roll * w * w * a * l</c>, where <c>w</c> is how far it is from its own base (<see cref="HomeFraction"/>), <c>a</c> how far
+    /// it is from the Assassin (<see cref="AssassinFraction"/>) and <c>l</c> its leader weight (the match leader's is
+    /// <c>MarkKill.asset</c>'s LeaderPickWeight, everyone else's is 1), and the highest score wins. A bird at home scores 0 and a bird
     /// far from home is favoured; a bird right next to the Assassin is disfavoured but never excluded (<see cref="NearFloor"/>),
     /// so anyone can still be picked and hugging the Assassin is no hiding place.
     /// </summary>
@@ -46,10 +47,16 @@ namespace CluckWars.Gameplay
             return NearFloor + (1f - NearFloor) * n;
         }
 
+        /// <summary>The leader weight of one candidate: <paramref name="leaderWeight"/> when it holds the most banked food among the
+        /// rivals (<paramref name="bestBanked"/>; every tied rival does), 1 otherwise.</summary>
+        public static float LeaderWeight(float banked, float bestBanked, float leaderWeight) =>
+            banked >= bestBanked ? leaderWeight : 1f;
+
         /// <summary>The score of one filtered candidate: its own roll in [0, 1) times <paramref name="homeFraction"/> squared
-        /// times <paramref name="assassinFraction"/>.</summary>
-        public static float Score(float roll, float homeFraction, float assassinFraction) =>
-            roll * homeFraction * homeFraction * assassinFraction;
+        /// times <paramref name="assassinFraction"/> times <paramref name="leaderWeight"/> (1 leaves the score as it was
+        /// before the leader was favoured).</summary>
+        public static float Score(float roll, float homeFraction, float assassinFraction, float leaderWeight) =>
+            roll * homeFraction * homeFraction * assassinFraction * leaderWeight;
 
         /// <summary>
         /// The index of the highest <see cref="Score"/> over the filtered candidates (first wins a tie); -1 when there are none.
@@ -58,9 +65,11 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <param name="homeFractions">One <see cref="HomeFraction"/> per candidate.</param>
         /// <param name="assassinFractions">One <see cref="AssassinFraction"/> per candidate.</param>
+        /// <param name="leaderWeights">One weight per candidate: the leader's pick weight for the rival with the most banked food
+        /// (every tied rival), 1 for the rest.</param>
         /// <param name="rolls">One roll per candidate, from the authority's RNG.</param>
         public static int PickWeighted(IReadOnlyList<float> homeFractions, IReadOnlyList<float> assassinFractions,
-            IReadOnlyList<float> rolls, float fallbackRoll)
+            IReadOnlyList<float> leaderWeights, IReadOnlyList<float> rolls, float fallbackRoll)
         {
             int count = homeFractions.Count;
             if (count <= 0) return -1;
@@ -68,7 +77,7 @@ namespace CluckWars.Gameplay
             float bestScore = 0f;
             for (int i = 0; i < count; i++)
             {
-                float score = Score(rolls[i], homeFractions[i], assassinFractions[i]);
+                float score = Score(rolls[i], homeFractions[i], assassinFractions[i], leaderWeights[i]);
                 if (score > bestScore) { bestScore = score; best = i; }
             }
             return best >= 0 ? best : Pick(count, fallbackRoll);

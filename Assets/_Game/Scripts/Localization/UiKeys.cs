@@ -241,7 +241,6 @@ namespace CluckWars.Localization
         public const string CountdownGetReady = "countdown.getReady";
         [UiArgs("n")] public const string HudGoal = "hud.goal";
         public const string HudGoalUnknown = "hud.goal.unknown";
-        [UiArgs("name")] public const string NameplateBounty = "nameplate.bounty";
 
         // ---- Phase 4 menu (GEAR UP caret, join status) ----
         public const string LoadoutSwap = "loadout.swap";
@@ -258,7 +257,6 @@ namespace CluckWars.Localization
         [UiArgs("n")] public const string HudEventHeader = "hud.event.header";
         public const string HudEventGoldenPile = "hud.event.goldenPile";
         public const string HudEventUnderdogSurge = "hud.event.underdogSurge";
-        public const string HudEventLeaderBounty = "hud.event.leaderBounty";
         public const string HudEventRestock = "hud.event.restock";
         /// <summary>Grey floating pop over a victim whose steal was refused by the steal-proof state.</summary>
         public const string HudPopSafe = "hud.pop.safe";

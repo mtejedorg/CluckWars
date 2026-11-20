@@ -17,29 +17,60 @@ namespace CluckWars.Tests
 
         [TestCase(ComebackGrant.None, false)]
         [TestCase(ComebackGrant.UnderdogSurge, true)]
-        [TestCase(ComebackGrant.LeaderBounty, true)]
-        [TestCase(ComebackGrant.UnderdogSurge | ComebackGrant.LeaderBounty, true)]
+        [TestCase((ComebackGrant)2, false)]   // the removed LeaderBounty bit, from an older build
+        [TestCase((ComebackGrant)3, false)]
         [TestCase((ComebackGrant)4, false)]
-        [TestCase((ComebackGrant)5, false)]
         public void IsValid_NeedsAKnownEffect_AndNothingElse(ComebackGrant grant, bool expected) =>
             Assert.AreEqual(expected, ComebackRules.IsValid(grant));
 
-        [TestCase(ComebackGrant.UnderdogSurge, false, false, true, false)]
-        [TestCase(ComebackGrant.LeaderBounty, false, false, false, true)]
-        [TestCase(ComebackGrant.UnderdogSurge | ComebackGrant.LeaderBounty, false, false, true, true)]
-        [TestCase(ComebackGrant.UnderdogSurge, false, true, true, true)]   // never clears the other effect
-        [TestCase(ComebackGrant.LeaderBounty, true, false, true, true)]
-        [TestCase(ComebackGrant.None, true, false, true, false)]           // an invalid grant changes nothing
-        [TestCase((ComebackGrant)5, false, false, false, false)]
-        public void Apply_OnlyEverSwitchesOn(ComebackGrant grant, bool surge, bool bounty, bool expectSurge, bool expectBounty)
+        [TestCase(ComebackGrant.UnderdogSurge, false, true)]
+        [TestCase(ComebackGrant.UnderdogSurge, true, true)]
+        [TestCase(ComebackGrant.None, true, true)]            // an invalid grant changes nothing
+        [TestCase(ComebackGrant.None, false, false)]
+        [TestCase((ComebackGrant)3, false, false)]
+        public void Apply_OnlyEverSwitchesOn(ComebackGrant grant, bool surge, bool expectSurge)
         {
-            ComebackRules.Apply(grant, ref surge, ref bounty);
+            ComebackRules.Apply(grant, ref surge);
             Assert.AreEqual(expectSurge, surge, "surge");
-            Assert.AreEqual(expectBounty, bounty, "bounty");
+        }
+
+        [Test]
+        public void ComebackEvent_IsNeverLeaderBounty()
+        {
+            // Every roll the GameManager can draw maps to one of the three remaining kinds (D7b: Leader Bounty is gone).
+            var allowed = new[] { MatchEventKind.GoldenPile, MatchEventKind.UnderdogSurge, MatchEventKind.Restock };
+            var seen = new System.Collections.Generic.HashSet<MatchEventKind>();
+            for (int roll = 0; roll < ComebackRules.Events.Length; roll++)
+            {
+                var kind = ComebackRules.EventForRoll(roll);
+                CollectionAssert.Contains(allowed, kind, $"roll {roll}");
+                seen.Add(kind);
+            }
+            Assert.AreEqual(3, seen.Count, "all three remaining kinds are reachable, none twice");
+            foreach (var name in System.Enum.GetNames(typeof(MatchEventKind)))
+                StringAssert.DoesNotContain("LeaderBounty", name);
+            Assert.AreEqual(1, (byte)MatchEventKind.GoldenPile, "the remaining members keep their numbers");
+            Assert.AreEqual(2, (byte)MatchEventKind.UnderdogSurge);
+            Assert.AreEqual(4, (byte)MatchEventKind.Restock);
+            string gm = File.ReadAllText($"{ScriptsRoot}/Gameplay/GameManager.cs");
+            StringAssert.Contains("ComebackRules.EventForRoll(Random.Range(0, ComebackRules.Events.Length))", gm,
+                "GameManager rolls over the remaining kinds only");
+        }
+
+        [Test]
+        public void LeaderBountyActive_IsGoneFromTheScripts()
+        {
+            foreach (var path in Directory.GetFiles(ScriptsRoot, "*.cs", SearchOption.AllDirectories))
+            {
+                string file = Path.GetFileName(path);
+                if (file == nameof(ComebackRulesTests) + ".cs") continue;   // this file quotes the name
+                string src = File.ReadAllText(path);
+                StringAssert.DoesNotContain("LeaderBountyActive", src, path);
+                StringAssert.DoesNotContain("LeaderExecuteBountyMultiplier", src, path);
+            }
         }
 
         [TestCase(nameof(ChickenController.UnderdogSurgeActive))]
-        [TestCase(nameof(ChickenController.LeaderBountyActive))]
         public void Flag_SetterIsPrivate(string property)
         {
             var setter = typeof(ChickenController).GetProperty(property).GetSetMethod(nonPublic: true);
@@ -49,9 +80,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void NoOtherFile_AssignsEitherFlag()
+        public void NoOtherFile_AssignsTheFlag()
         {
-            var assignment = new Regex(@"\b(UnderdogSurgeActive|LeaderBountyActive)\s*(=(?!=)|\+\+|--|[-+*/|&^]=)");
+            var assignment = new Regex(@"\b(UnderdogSurgeActive)\s*(=(?!=)|\+\+|--|[-+*/|&^]=)");
             foreach (var path in Directory.GetFiles(ScriptsRoot, "*.cs", SearchOption.AllDirectories))
             {
                 string file = Path.GetFileName(path);
@@ -116,7 +147,6 @@ namespace CluckWars.Tests
 
             string gm = File.ReadAllText($"{ScriptsRoot}/Gameplay/GameManager.cs");
             StringAssert.Contains("RPC_GrantComeback(ComebackGrant.UnderdogSurge)", gm);
-            StringAssert.Contains("RPC_GrantComeback(ComebackGrant.LeaderBounty)", gm);
         }
     }
 }

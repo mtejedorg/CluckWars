@@ -144,6 +144,23 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Kill_PaysTheSameWhoeverTheVictimIs()
+        {
+            // D7b: the payout never looks at the victim. The leader is favoured by the mark's pick, not by the bounty.
+            var resolve = typeof(AssassinExecute).GetMethod("ResolveExecuteBounty",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.IsNotNull(resolve, "ResolveExecuteBounty is gone: the one place the payout is decided");
+            Assert.AreEqual(0, resolve.GetParameters().Length, "the payout takes no victim, so it cannot depend on one");
+            string body = MethodBody(AssassinExecutePath, "private float ResolveExecuteBounty(");
+            StringAssert.Contains("config.ExecuteBounty", body);
+            StringAssert.DoesNotContain("victim", body);
+            StringAssert.DoesNotContain("Leader", body);
+            StringAssert.DoesNotContain("*", body, "no multiplier on the flat bounty");
+            string pay = MethodBody(AssassinExecutePath, "public void PayExecuteBounty(");
+            StringAssert.Contains("ResolveExecuteBounty()", pay);
+        }
+
+        [Test]
         public void Press_ValidatesTheVictimBeforeAnyPayoutOrRpc()
         {
             string press = MethodBody(AssassinExecutePath, "public bool Press(");

@@ -58,6 +58,12 @@ namespace CluckWars.Abilities
         [Tooltip("Cooldown Death Mark opens every round on, counted from GO (first round and every PLAY AGAIN). Bots obey it too.")]
         [Min(0f)] public float RoundStartCooldownSeconds = 4f;
 
+        [Header("Pick")]
+        [Tooltip("How much likelier the mark is to land on the rival with the most banked food (every tied rival): the leader's " +
+                 "pick score is multiplied by this, everyone else's by 1. 1 = no pull. 2 is a placeholder the Balance Oracle " +
+                 "will tune.")]
+        [Range(1f, 4f)] public float LeaderPickWeight = AssassinExecute.DefaultLeaderPickWeight;
+
         public override float RoundStartCooldown => RoundStartCooldownSeconds;
 
         public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts

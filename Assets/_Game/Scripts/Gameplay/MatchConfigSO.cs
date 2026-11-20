@@ -34,14 +34,10 @@ namespace CluckWars.Gameplay
                  "playtest numbers.")]
         [Min(0)] public int ExecuteBounty = 5;
 
-        [Tooltip("Multiplier on ExecuteBounty when the victim was the match leader. The " +
-                 "comeback valve that used to be 8 extra ground pickups. UNRESOLVED VALUE - " +
-                 "2 is a first guess, not a solved number.")]
-        [Min(1f)] public float LeaderExecuteBountyMultiplier = 2f;
         [Min(0f)] public float DeathStunSeconds = 5f;
         [Min(0.5f)] public float DepositRatePerSecond = 9f;
 
-        [Tooltip("The comeback event (golden pile / underdog surge / leader bounty / restock) fires " +
+        [Tooltip("The comeback event (golden pile / underdog surge / restock) fires " +
                  "once, when this many playable seconds are left (re-audit round 2, decision 2: the " +
                  "last 10 s). 0 disables it. Read by GameManager through ComebackEventTiming.")]
         [Min(0f)] public float ComebackEventSecondsLeft = 10f;

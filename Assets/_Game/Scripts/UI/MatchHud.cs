@@ -246,7 +246,6 @@ namespace CluckWars.UI
         {
             MatchEventKind.GoldenPile    => UiText.Get(UiKeys.HudEventGoldenPile),
             MatchEventKind.UnderdogSurge => UiText.Get(UiKeys.HudEventUnderdogSurge),
-            MatchEventKind.LeaderBounty  => UiText.Get(UiKeys.HudEventLeaderBounty),
             MatchEventKind.Restock       => UiText.Get(UiKeys.HudEventRestock),
             // A kind added without a UiText row: its enum name, never a blank banner.
             _ => evt.ToString().ToUpperInvariant(),

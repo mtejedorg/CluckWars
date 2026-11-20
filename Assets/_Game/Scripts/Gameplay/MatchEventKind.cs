@@ -8,7 +8,7 @@ namespace CluckWars.Gameplay
         None = 0,
         GoldenPile = 1,
         UnderdogSurge = 2,
-        LeaderBounty = 3,
+        // 3 was LeaderBounty (removed 2026-11-20, D7b). The values below keep their numbers: the event replicates as a byte.
         Restock = 4
     }
 }

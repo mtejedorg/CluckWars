@@ -64,7 +64,6 @@ namespace CluckWars.Visuals
         private bool _appliedClassValid;
         private bool _appliedLocal;
         private bool _appliedBot;
-        private bool _appliedBountyActive;
         private bool _wasStunned;
         private string _appliedStateIcon = string.Empty;
         private bool _appliedSlowGlyph;
@@ -275,12 +274,11 @@ namespace CluckWars.Visuals
                 var klass = _controller.Class;
                 bool isLocal = _controller.HasInputAuthority;
                 bool isBot = _controller.IsBot;
-                bool bountyActive = _controller.LeaderBountyActive;
                 string stateIcon = StateIcon();
                 bool slowGlyph = _slowGlyphWanted;
                 if (corner != _appliedPlayerId || !_appliedClassValid || klass != _appliedClass
                     || isLocal != _appliedLocal || isBot != _appliedBot
-                    || bountyActive != _appliedBountyActive || stateIcon != _appliedStateIcon
+                    || stateIcon != _appliedStateIcon
                     || slowGlyph != _appliedSlowGlyph)
                 {
                     _appliedPlayerId = corner;
@@ -288,7 +286,6 @@ namespace CluckWars.Visuals
                     _appliedClassValid = true;
                     _appliedLocal = isLocal;
                     _appliedBot = isBot;
-                    _appliedBountyActive = bountyActive;
                     _appliedStateIcon = stateIcon;
                     _appliedSlowGlyph = slowGlyph;
 
@@ -300,7 +297,6 @@ namespace CluckWars.Visuals
                     // colour are never the only way to tell two rivals apart (round-3 finding 11).
                     if (isBot && !isLocal && corner >= 0 && MatchStandings.BotIndex(klass) >= 0)
                         label = UiText.Format(UiKeys.LobbyPlayerTag, ("n", corner + 1)) + " " + label;
-                    if (bountyActive) label = UiText.Format(UiKeys.NameplateBounty, ("name", label));
                     _text.text = stateIcon.Length > 0 ? stateIcon + " " + label : label;
                     _text.color = isLocal ? PlayerPalette.YouMarkInk : PlayerPalette.RivalPillText;
                     FitMarks(isLocal, PlayerPalette.ForCorner(corner));
