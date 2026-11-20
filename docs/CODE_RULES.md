@@ -157,8 +157,8 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 | CODE-PROC-19 | Keep secrets and junk out of git | TEST | PARTIAL |
 | CODE-PROC-20 | Do not edit `.claude/CLAUDE.md` from an agent; propose the line instead | CONFIG | CURRENT |
 | CODE-PROC-21 | On an unattended run, keep going without asking | REVIEW | CURRENT |
-| CODE-DESIGN-01 | Solve stats against the SCT axiom; never hand-tune them | TEST | CURRENT |
-| CODE-DESIGN-02 | Keep the shipped SCT tolerance at ±0.5 s; never widen it | TEST | PARTIAL |
+| CODE-DESIGN-01 | Check a balance change against the Balance Oracle; it guides, it does not gate | TEST | PARTIAL |
+| CODE-DESIGN-02 | RETIRED: the SCT tolerance gate (±0.5 s) is gone with the old oracle; the drift guard replaces it | NONE | RETIRED |
 | CODE-DESIGN-03 | Trust `MatchConfig.asset` over any document for target and time | TEST | CURRENT |
 | CODE-DESIGN-04 | Leave numbers alone until the owner's test | NONE | CURRENT |
 | CODE-DESIGN-05 | Keep it easy and forgiving: it is a children's game | TEST | PARTIAL |
@@ -1122,20 +1122,17 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 
 ## 3.9 DESIGN: balance and design constraints that bind code
 
-### CODE-DESIGN-01 — Solve stats against the SCT axiom; never hand-tune them
-- Rule: "Never pick a Cluck Wars stat because it 'feels right'." `MoveSpeed`, `CargoCapacity`, `PeckAmount`, `PeckCooldown` are dependent variables solved against the Solo Clear Time axiom (a naked Speedy alone wins in a fixed time via a few base trips; targets in `SctTargets`). To change a stat, run the Oracle; arena geometry, pile footprints, deposit radius and collect reach are inputs: if one changes, re-solve.
-- Why: owner, design-reset thread 2026-07-24: create "a way to test this automatically with a bot"; hand-copied fixtures once hid +20% speed drift.
-- Enforced by: TEST `BalanceOracleTests` (Assets/_Game/Scripts/Editor/Tests/BalanceOracleTests.cs, reads the real assets and `ShippedMap.OracleMap(seat)`, all four seats). The dev-tools local balance editor (ARCH-DATA-14, owner ruling 2026-11-18) runs the same SCT check (`BalanceSctCheck`) before a local apply and blocks a failing proposal; that check runs only in the Editor until a baked oracle map exists, and player builds block SCT-relevant edits.
-- Source: M:sct-axiom-is-the-balance-authority.md:11-31; design-reset thread 2026-07-24 (owner)
-- Status: CURRENT
+### CODE-DESIGN-01 — Check a balance change against the Balance Oracle; it guides, it does not gate
+- Rule: The Balance Oracle (`Scripts/Balance`: `OracleRunner`, `FarmSim` on the baked `OracleMapSO`, `OracleKits`) measures what each foraging kit banks in the shipped map, per seat and route, plus the Spoiler and Thief tables, with every number read from the assets. It reports and proposes (`OracleSolver` proposes free values as a balance delta, `OracleSweep` sweeps pile setups); it never blocks a change. Owner ruling 2026-11-20: "el oráculo no es la ley, sólo una guía". This replaces the old Solo Clear Time axiom (`BalanceOracle`, `SctTargets`, deleted) and its "never hand-tune" wording. Run the oracle before a stat, cooldown, pile food or map change, read the report, and decide. Arena geometry, pile footprints and food are inputs: re-bake `OracleMap.asset` when the arena moves.
+- Why: owner ruling 2026-11-20 (oracle is a guide); earlier, hand-copied fixtures hid +20% speed drift, so the oracle reads the real assets.
+- Enforced by: TEST `OracleReferenceTests.Measured_EqualsTheAcceptedReference`, the one oracle test that can go red because of the game's numbers: it fails when a fresh measurement differs from the accepted `OracleReference.asset`, forcing a conscious "Accept" or a revert. Behaviour tests that cannot fail on a design number: `OracleMapTests` (the bake matches the scene), `FarmSimTests`, `OracleKitsTests`, `OracleRunnerTests`, `OracleSweepTests`, `OracleSolverTests`, `BalanceCheckTests.Check_NeverBlocks` (the local balance editor's check, ARCH-DATA-14, reports before and after and never gates an apply). Whether a change is balanced: NONE, by design.
+- Source: owner ruling 2026-11-20; M:oracle-is-a-guide-not-law.md; M:sct-axiom-is-the-balance-authority.md (superseded)
+- Status: PARTIAL
 
-### CODE-DESIGN-02 — Keep the shipped SCT tolerance at ±0.5 s; never widen it
-- Rule: The shipped-asset test uses `SctTargets.ShippedAssetToleranceSeconds` (±0.5 s); ±1.5 s is the GDD design band only. "If shipped values drift past ±0.5, re-solve; never widen." The Assassin is exempt (`SctTargets.Exempt`); passives sit outside the naked axiom.
-- Why: proof that a corner moved 25.65 to 27 turns the test red at ±0.5.
-- Enforced by: TEST `BalanceOracleTests` (uses the tolerance); rest CONVENTION
-- Audit check: `git log -p -S ShippedAssetToleranceSeconds -- Assets/_Game/Scripts/Balance` shows no widening.
-- Source: M:sct-axiom-is-the-balance-authority.md:42-47
-- Status: PARTIAL (the constant's value is not pinned)
+### CODE-DESIGN-02 — RETIRED: the SCT tolerance gate is gone
+- Rule: Retired 2026-11-20 with the old oracle. There is no ±0.5 s Solo Clear Time tolerance, no `SctTargets` and no `BalanceOracleTests`. The check that a shipped number moved is the drift guard in CODE-DESIGN-01. Do not reuse this ID.
+- Enforced by: NONE (retired)
+- Status: RETIRED
 
 ### CODE-DESIGN-03 — Trust `MatchConfig.asset` over any document for target and time
 - Rule: `MatchConfig.asset` is the authority (40 food / 45 s at b7c2616e): "trust the asset over any doc". A winner is the first to bank the target, else the most banked at the timer.

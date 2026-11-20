@@ -48,11 +48,11 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
 | `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 27 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 172 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 176 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 144 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 30 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 283 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 289 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -89,17 +89,17 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 <!-- BEGIN GENERATED: script-folders -->
 | Folder (`Assets/_Game/Scripts/`) | Assembly | `.cs` files directly in it |
 |---|---|---|
-| `Abilities` | `CluckWars.Gameplay` | 44 |
+| `Abilities` | `CluckWars.Gameplay` | 45 |
 | `Abilities/Passives` | `CluckWars.Gameplay` | 8 |
 | `AbilityLab` | `CluckWars.Diagnostics` | 5 |
 | `App` | `CluckWars.App` | 3 |
 | `Audio` | `CluckWars.Gameplay` | 9 |
-| `Balance` | `CluckWars.Gameplay` | 18 |
+| `Balance` | `CluckWars.Gameplay` | 21 |
 | `Bootstrap` | `CluckWars.Core` | 1 |
 | `Diagnostics` | `CluckWars.Diagnostics` | 25 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 8 |
-| `Editor` | `Assembly-CSharp-Editor` | 17 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 258 |
+| `Editor` | `Assembly-CSharp-Editor` | 18 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 263 |
 | `Gameplay` | `CluckWars.Gameplay` | 85 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
@@ -147,7 +147,7 @@ Non-script file counts by folder (depth 3):
 | `Data` | 10 `.asset` |
 | `Data/Abilities` | 30 `.asset` |
 | `Data/Abilities/Passives` | 8 `.asset` |
-| `Data/Balance` | 1 `.asset` |
+| `Data/Balance` | 2 `.asset` |
 | `Data/Classes` | 4 `.asset` |
 | `Editor` | 8 `.cs` |
 | `Materials` | 1 `.mat` |
@@ -176,7 +176,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Abilities` (+ `Passives/`) | Gameplay | Ability ScriptableObjects and their shared vocabulary (below) |
 | `Scripts/Networking` | Gameplay | `INetworkService` (all Fusion runner lifecycle), `PlayerNetworkInput` (the per-tick input struct; its aim byte is always 0 since 2026-11-20), `AimRules` (aim decode, the soft-lock pick; no device aims any more), `DisconnectRules` |
 | `Scripts/Audio` | Gameplay | `IAudioService` with `UnityAudioService` / `NullAudioService`, `AudioTicker`, `SfxId`, `AudioRegistrySO`, `UiAudioSO`, `ProceduralAudioBank`, `MissingSfxReporter` |
-| `Scripts/Balance` | Gameplay | `BalanceOracle` (Solo Clear Time simulator), `SctTargets`, `SpecSctTargets`, `BalanceTypes`; the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice`; the dev-tools-only local path (ARCH-DATA-14): `BalanceBook.Local.cs` (partial, local apply entry points), `BalanceLocalOverride` (apply window, stored/applied state), `BalanceLocalStore` (dev-only local file), `BalanceSctCheck` (SCT check before a local apply; Editor only until a baked oracle map exists) |
+| `Scripts/Balance` | Gameplay | The Balance Oracle, which reports and proposes and never blocks (decision 2026-11-20): `OracleMapSO` (the shipped arena baked as data, built by `Editor/OracleMapBaker`), `OraclePaths` (wall-aware shortest paths for the bake), `OracleKit` and `OracleKits` (assets resolved to kits, through `BalanceBook.Preview` copies for a proposal), `FarmSim` (fixed-tick farming run on the baked map), `OracleRunner` (economy per kit, Spoiler and Thief tables), `SneakyTables`, `OracleReport`, `OracleReferenceSO` (the accepted reference the drift guard compares to), `OracleSweep` (food sweep per pile setup), `OracleSolver` (proposes free values as a balance delta), `FoodRules` (the starting pile food rules); the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice`; the dev-tools-only local path (ARCH-DATA-14): `BalanceBook.Local.cs` (partial, local apply entry points), `BalanceLocalOverride` (apply window, stored/applied state), `BalanceLocalStore` (dev-only local file), `BalanceSctCheck` (the oracle's before and after numbers for a local apply, with the `OracleMapSO` the book was handed; reports, never blocks) |
 | `Scripts/Settings` | Gameplay | `PlayerPreferences` (persisted display options, the `KeyboardScheme` choice and the dev-tools gate), `LastSetup` (last committed menu choices) |
 | `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators and the floor arrows (`RivalIndicator`, `FloorRivalArrows`, `FloorArrowRules`, `MarkedTargetArrowRules`), the Death Mark / Hunt hunter feedback (`MarkFeedback`, `HuntBrackets`, `HuntRules`), `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
 | `Scripts/UI` | Presentation | UI Toolkit controllers (`MenuUiController` and its partials, `MatchOverlaysController` and its partials, `MatchHudController`, `MarkHudController`), `UiElements`, ability icon/palette mapping, pure layout/flow rules (`MatchStandings`, `WaitingRoomRules`, `SafeAreaPadding`, `OrientationPolicy`), `DebugHud`, and `MatchHud` (a UGUI canvas built in code for the hit flash and the comeback banner) |
@@ -185,7 +185,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/AbilityLab` | Diagnostics | The Ability Lab dev scene: `AbilityLabBootstrapper`, `AbilityLabPanel`, `AbilityLabHud`, `AbilityLabDummy`, `AbilityLabLoadout` |
 | `Scripts/App` | App (asmdef) | `FusionNetworkService` (Fusion implementation of `INetworkService`), `UGSService` (live UGS auth + lobby, lobby `bal` hash check), `RemoteConfigBalanceSource` (the only Remote Config user) |
 | `Scripts/Installers` | App | `ProjectInstaller` (app-wide bindings, on `Assets/_Game/Resources/ProjectContext.prefab`), `GameInstaller` (scene bindings, on the SceneContext of `Game.unity` and `AbilityLab.unity`) |
-| `Scripts/Editor` | Assembly-CSharp-Editor | Build menu (`CluckWarsBuildMenu`, `BuildGuards`, `BuildInfoWriter`), import stampers (`UiAudioImportSettings`, `UiSpriteImportSettings`, `TmpEssentialsAutoImport`, `AndroidVibratePermission`), animation authoring (`ChickenAnimationSetup`, `CastArchetypeClipGenerator`, `CastArchetypePreview`), capture probes (`ParticleProbe`, `PeckEdgeProbe`), `AbilityLabMenu`, `AutoTestEditorHooks`, `BalanceEditorHooks` (Remote Config In Editor toggle, restores the assets on reload / Play Mode exit), `AbilityIconStyleChecker` (no header; on load it logs any registered ability without an `AbilityIconStyle` mapping) |
+| `Scripts/Editor` | Assembly-CSharp-Editor | Build menu (`CluckWarsBuildMenu`, `BuildGuards`, `BuildInfoWriter`), import stampers (`UiAudioImportSettings`, `UiSpriteImportSettings`, `TmpEssentialsAutoImport`, `AndroidVibratePermission`), animation authoring (`ChickenAnimationSetup`, `CastArchetypeClipGenerator`, `CastArchetypePreview`), capture probes (`ParticleProbe`, `PeckEdgeProbe`), `AbilityLabMenu`, `AutoTestEditorHooks`, `BalanceEditorHooks` (Remote Config In Editor toggle, restores the assets on reload / Play Mode exit), `AbilityIconStyleChecker` (no header; on load it logs any registered ability without an `AbilityIconStyle` mapping), Oracle tooling (`OracleMapBaker` bakes `Game.unity` into `OracleMap.asset`, `OracleMenu` writes the oracle report to `Captures/oracle/`) |
 | `Scripts/Editor/Tests` | Assembly-CSharp-Editor | The EditMode suite (section 6) |
 
 **`Scripts/Gameplay` sub-areas** (all 87 files):
@@ -204,11 +204,11 @@ Non-script file counts by folder (depth 3):
 | Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics` |
 | Shared config assets | `MatchConfigSO`, `PrefabRegistrySO`, `ColorSchemeSO` |
 
-**`Scripts/Abilities`** (44 files + 8 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
+**`Scripts/Abilities`** (45 files + 8 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
 abstract bases `AbilityBaseSO`, `PassiveAbilitySO` and `StunBurstAbilitySO` (shared base of `AmbushAbilitySO` and
 `WingSlamAbilitySO`, which is why it has no asset), and the shared vocabulary: `AbilityContext`, `AbilityAim`,
 `AbilityTargeting`, `AbilityJob`, `AccentKey`, `CastArchetype`, `ChickenSubclass`, `AreaEffectKind`,
-`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`. `Passives/` holds the 8 `<Name>PassiveSO` classes.
+`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`, `AbilityOracleFacts` (the numbers the oracle reads off an ability, declared by the ability). `Passives/` holds the 8 `<Name>PassiveSO` classes.
 
 ### 3.2 `Assets/_Game/Data`
 
@@ -313,7 +313,7 @@ runtime theme.
 All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each, from the file's own header.
 
 **Composition roots and bootstrap**
-- `Installers/ProjectInstaller.cs`: app-wide Zenject bindings (logging, UGS, audio, registries, `MatchConfigSO`, the chicken presenter); lives on `Assets/_Game/Resources/ProjectContext.prefab`.
+- `Installers/ProjectInstaller.cs`: app-wide Zenject bindings (logging, UGS, audio, registries, `MatchConfigSO`, the baked `OracleMapSO` handed to `BalanceBook`, the chicken presenter); lives on `Assets/_Game/Resources/ProjectContext.prefab`.
 - `Installers/GameInstaller.cs`: scene bindings (`INetworkService` and the rest) on the SceneContext of `Game.unity`; inherits the project bindings.
 - `Bootstrap/SceneLoader.cs`: in `Bootstrap.unity`; loads the next scene (`Game.unity` by default) unless the menu takes over.
 - `Gameplay/MatchBootstrapper.cs`: entry point of a match in `Game.unity`; reads the session selection and spawns the match objects.
@@ -380,7 +380,7 @@ All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each,
 
 **Tuning**
 - `Visuals/FeedbackTuning.cs`: every timing/magnitude/colour constant of the feedback system.
-- `Gameplay/MatchConfigSO.cs`: match-wide tunables; asset `Assets/_Game/Data/MatchConfig.asset`.
+- `Gameplay/MatchConfigSO.cs`: match-wide tunables, including the three starting pile amounts (`PersonalPileFood`, `ContestedPileFood`, `CentrePileFood`; `MapGenerator` reads them by injection, the oracle measures them); asset `Assets/_Game/Data/MatchConfig.asset`.
 - `Visuals/FeedbackPaletteSO.cs`: the feedback colours; asset `Assets/_Game/Data/FeedbackPalette.asset`.
 
 **Diagnostics**
@@ -452,6 +452,7 @@ Every `.asset` under `Assets/_Game/Data`, with the class its `m_Script` GUID res
 | `Data/Abilities/Passives` | `SpoilerPassiveSO` | `Abilities/Passives/SpoilerPassiveSO.cs` | `Spoiler.asset` (registered) |
 | `Data/Abilities/Passives` | `ThiefPassiveSO` | `Abilities/Passives/ThiefPassiveSO.cs` | `Thief.asset` (registered) |
 | `Data/Balance` | `OracleMapSO` | `Balance/OracleMapSO.cs` | `OracleMap.asset` |
+| `Data/Balance` | `OracleReferenceSO` | `Balance/OracleReferenceSO.cs` | `OracleReference.asset` |
 | `Data/Classes` | `ChickenStatsSO` | `Gameplay/ChickenStatsSO.cs` | `Assassin.asset`, `Fatty.asset`, `Speedy.asset`, `Warrior.asset` |
 
 Ability assets: 19 registered, 19 retired.
@@ -482,8 +483,7 @@ Shared helpers (all in `Assets/_Game/Scripts/Editor/Tests/`):
 | `TestSources.cs` | Reads a runtime source file as ONE class (the file plus its partial siblings) for source-scan guards | 28 |
 | `TestAssets.cs` | Loads the real shipped assets (registries, configs, scenes) through one place | 83 |
 | `RegistryTestAccess.cs` | Writes into the read-only scene-object registries (`ChickenController.ActiveControllers` and siblings) | 3 |
-| `ShippedMap.cs` | The arena as `Game.unity` configures it, rebuilt in pure C# from values read through `TestAssets` | - |
-| `OracleMapHook.cs` | An `[InitializeOnLoadMethod]` Editor hook that hands `BalanceSctCheck` the shipped oracle map, so the local balance editor can run the SCT check in the Editor | - |
+| `ShippedMap.cs` | The arena as `Game.unity` configures it, rebuilt in pure C# from values read through `TestAssets`; `OracleMapBaker` and `OracleMapTests` read the same accessors | - |
 | `IconStrokeMetrics.cs` | Pixel metrics on shipped icon PNGs (used by `AbilityIconArtTests`, `StateGlyphArtTests`) | - |
 
 Recording fakes are not shared: each test file declares its own private nested class (`RecordingLog` in 9 files, e.g.
@@ -592,6 +592,7 @@ Each row cites an existing example. Folder paths are under `Assets/_Game/Scripts
 | Service implementation | Fusion/UGS-dependent: `App`; otherwise beside the interface | App, or the interface's assembly | the installer binding | `FusionNetworkService`, `UGSService`; `NullUGSService`, `UnityAudioService` |
 | Diagnostic probe | `Diagnostics` (state lower layers read: `Diagnostics/Shared`) | Diagnostics (Shared: Core) | gate on `DevTools`; its pure rules in a `*Rules.cs` | `InvariantProbe`, `PerfProbe` + `PerfRules` |
 | Editor tool | `Scripts/Editor` (map/scene bakers: `Assets/_Game/Editor`) | Assembly-CSharp-Editor | none | `CluckWarsBuildMenu`, `MapSceneBaker` |
+| Oracle input (a number the balance oracle reads) | `Balance` (reader), `Abilities` (a fact an ability owns, via `AbilityOracleFacts`) | Gameplay | `OracleKits` if a new kit input; `OracleReference.asset` re-accepted with `Cluck Wars / Balance / Oracle / Accept as balanced` when the drift guard goes red; `OracleMap.asset` re-baked when the arena moves | `OracleKits`, `AbilityOracleFacts` |
 | Test | `Scripts/Editor/Tests/<Subject>Tests.cs` | Assembly-CSharp-Editor | source scans read through `TestSources`, shipped assets through `TestAssets` | `FoodTransferRulesTests.cs` |
 | ScriptableObject | class `<Name>SO` beside its domain (`Gameplay`, `Audio`, `Visuals`); asset in `Assets/_Game/Data/` | the class's folder's assembly | binding in `ProjectInstaller` if injected | `MatchConfigSO`, `AudioRegistrySO`, `FeedbackPaletteSO` |
 | Prefab | `Assets/_Game/Prefabs` (`Props/`, `Abilities/`) | - | `PrefabRegistry.asset` if spawned at runtime | `Chicken.prefab`, `AbilityZone.prefab` |
