@@ -325,7 +325,7 @@ namespace CluckWars.Tests
         {
             CollectionAssert.AreEqual(new[] { "1", "2", "3", "4" }, Labels(HudDeviceMode.Touch));
             CollectionAssert.AreEqual(new[] { "Q", "E", "R", "F" }, Labels(HudDeviceMode.KeyboardMouse));
-            CollectionAssert.AreEqual(new[] { "RB", "RT", "LB", "LT" }, Labels(HudDeviceMode.Gamepad));
+            CollectionAssert.AreEqual(new[] { "A", "Y", "B", "X" }, Labels(HudDeviceMode.Gamepad));
             Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, 4));
             Assert.AreEqual(string.Empty, HudLayoutRules.BadgeLabel(HudDeviceMode.Touch, -1));
         }
@@ -344,10 +344,14 @@ namespace CluckWars.Tests
             {
                 Assert.AreEqual(KeyboardInputProvider.AbilityKeys[slot][0].ToString(),
                     HudLayoutRules.BadgeLabel(HudDeviceMode.KeyboardMouse, slot), "Badge = the slot's first key.");
-                Assert.AreEqual(HudLayoutRules.PadLabel(GamepadInputProvider.AbilityButtons[slot]),
+                Assert.AreEqual(HudLayoutRules.PadLabel(GamepadInputProvider.AbilityButtons[slot][0]),
                     HudLayoutRules.BadgeLabel(HudDeviceMode.Gamepad, slot));
             }
             Assert.AreEqual("RB", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.RightShoulder));
+            Assert.AreEqual("A", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.South));
+            Assert.AreEqual("Y", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.North));
+            Assert.AreEqual("B", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.East));
+            Assert.AreEqual("X", HudLayoutRules.PadLabel(UnityEngine.InputSystem.LowLevel.GamepadButton.West));
         }
 
         private static float Luminance(Color c)

@@ -474,7 +474,7 @@ namespace CluckWars.UI
 
             if (!_leavingToLobby && _input != null && _input.GetBackPressed())
             {
-                // Esc / B are also the ability cancel: with a move held it only cancels it. B never opens the sheet (Start does).
+                // Esc is also the ability cancel: with a move held it only cancels it. A pad's B is slot 3 in a match: it never opens the sheet or leaves the waiting room (Start does).
                 switch (MatchBackRules.Resolve(state, _leaveSheetOpen, _leavingToLobby, AnyAbilityHeld(), _input.GetPausePressed()))
                 {
                     case MatchBackAction.LeaveWaitingRoom: OnLobbyLeave(); return;

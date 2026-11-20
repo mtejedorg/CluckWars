@@ -49,7 +49,7 @@ namespace CluckWars.Input
         /// <summary>
         /// Edge-triggered (Phase 7 A, finding 9): the button that opens the Leave sheet in a match - Esc, or a pad's
         /// Start. <see cref="GetBackPressed"/> is a superset (a pad's B also backs out of a sheet, the podium and
-        /// menus, but must not OPEN the sheet mid-match, where B is the ability cancel).
+        /// menus, but must not OPEN the sheet or leave the waiting room mid-match, where B fires slot 3).
         /// </summary>
         bool GetPausePressed() => GetBackPressed();
 

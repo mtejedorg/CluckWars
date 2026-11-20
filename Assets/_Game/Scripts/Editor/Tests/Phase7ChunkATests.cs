@@ -71,20 +71,26 @@ namespace CluckWars.Tests
             Assert.AreEqual(MatchBackAction.OpenLeaveSheet, MatchBackRules.Resolve(MatchState.Active, false, false, false, opensSheet: true));
             Assert.AreEqual(MatchBackAction.CloseLeaveSheet, MatchBackRules.Resolve(MatchState.Active, true, false, false, opensSheet: false));
             Assert.AreEqual(MatchBackAction.BackToLobby, MatchBackRules.Resolve(MatchState.Ended, false, false, false, opensSheet: false));
-            Assert.AreEqual(MatchBackAction.LeaveWaitingRoom, MatchBackRules.Resolve(MatchState.WaitingForPlayers, false, false, false, opensSheet: false));
+            // A pad's B fires slot 3 in the waiting room too: it must not leave the room (Esc / Start / the button do).
+            Assert.AreEqual(MatchBackAction.None, MatchBackRules.Resolve(MatchState.WaitingForPlayers, false, false, false, opensSheet: false));
+            Assert.AreEqual(MatchBackAction.LeaveWaitingRoom, MatchBackRules.Resolve(MatchState.WaitingForPlayers, false, false, false, opensSheet: true));
+            Assert.AreEqual(MatchBackAction.None, MatchBackRules.Resolve(MatchState.Starting, false, false, false, opensSheet: false), "B in GET READY / countdown");
+            Assert.AreEqual(MatchBackAction.CloseLeaveSheet, MatchBackRules.Resolve(MatchState.Starting, true, false, false, opensSheet: false));
         }
 
         [Test]
-        public void PadB_IsBack_AndStartIsThePausePress()
+        public void PadB_IsMenuBack_AndStartIsThePausePress()
         {
             string src = Read("Assets/_Game/Scripts/Input/GamepadInputProvider.cs");
             var back = Regex.Match(src, @"public bool GetBackPressed\(\)\s*\{(?<b>.*?)\n        \}", RegexOptions.Singleline);
             Assert.IsTrue(back.Success);
-            StringAssert.Contains("CancelButton", back.Groups["b"].Value, "B backs out of menus / sheet / podium");
+            StringAssert.Contains("MenuBackButton", back.Groups["b"].Value, "B backs out of menus / sheet / podium");
+            StringAssert.DoesNotContain("CancelButton", back.Groups["b"].Value, "L3 (the hold cancel) never backs out");
             StringAssert.Contains("BackButton", back.Groups["b"].Value, "Start still backs out");
             var pause = Regex.Match(src, @"public bool GetPausePressed\(\)\s*\{(?<b>.*?)\n        \}", RegexOptions.Singleline);
             Assert.IsTrue(pause.Success);
-            StringAssert.DoesNotContain("CancelButton", pause.Groups["b"].Value, "B never opens the Leave sheet");
+            StringAssert.DoesNotContain("MenuBackButton", pause.Groups["b"].Value, "B never opens the Leave sheet");
+            StringAssert.DoesNotContain("CancelButton", pause.Groups["b"].Value, "L3 never opens the Leave sheet");
             StringAssert.Contains("GetPausePressed()", Read("Assets/_Game/Scripts/UI/MatchOverlaysController.cs"));
             StringAssert.Contains("GetPausePressed", Read("Assets/_Game/Scripts/Input/CompositeInputProvider.cs"));
         }

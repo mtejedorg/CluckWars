@@ -25,14 +25,14 @@ namespace CluckWars.Gameplay
         /// <param name="state">The match phase, or null while there is no GameManager yet.</param>
         /// <param name="abilityHeld">A move is being held / aimed. Esc is also the keyboard's ability cancel, so a Back
         /// that would open the sheet only cancels the hold instead (Back again opens it).</param>
-        /// <param name="opensSheet">False for a press that may only close things (a pad's B): it never OPENS the sheet,
-        /// but still closes it, leaves the waiting room and leaves the podium.</param>
+        /// <param name="opensSheet">False for a press that is not an explicit back (a pad's B, which fires slot 3 in a match):
+        /// it never OPENS the sheet and never leaves the waiting room, but still closes the sheet and leaves the podium.</param>
         public static MatchBackAction Resolve(MatchState? state, bool sheetOpen, bool leaving, bool abilityHeld = false, bool opensSheet = true)
         {
             if (leaving || !state.HasValue) return MatchBackAction.None;
             switch (state.Value)
             {
-                case MatchState.WaitingForPlayers: return MatchBackAction.LeaveWaitingRoom;
+                case MatchState.WaitingForPlayers: return opensSheet ? MatchBackAction.LeaveWaitingRoom : MatchBackAction.None;
                 case MatchState.Ended:             return MatchBackAction.BackToLobby;
                 default:
                     if (sheetOpen) return MatchBackAction.CloseLeaveSheet;

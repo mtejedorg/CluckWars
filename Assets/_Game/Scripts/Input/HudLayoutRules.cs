@@ -53,7 +53,7 @@ namespace CluckWars.Input
 
         /// <summary>
         /// What the slot badge shows: the slot number on touch, the slot's first key on keyboard (Q / E / R / F), the
-        /// slot's pad button on a controller (RB / RT / LB / LT). Derived from the REAL binding tables, so the badge
+        /// slot's face button on a controller (A / Y / B / X). Derived from the REAL binding tables, so the badge
         /// can never advertise a key the provider does not read.
         /// </summary>
         public static string BadgeLabel(HudDeviceMode mode, int slot)
@@ -64,15 +64,19 @@ namespace CluckWars.Input
                 case HudDeviceMode.KeyboardMouse:
                     return KeyboardInputProvider.AbilityKeys[slot][0].ToString();
                 case HudDeviceMode.Gamepad:
-                    return PadLabel(GamepadInputProvider.AbilityButtons[slot]);
+                    return PadLabel(GamepadInputProvider.AbilityButtons[slot][0]);
                 default:
                     return (slot + 1).ToString();
             }
         }
 
-        /// <summary>Shoulder / trigger button as printed on the pad.</summary>
+        /// <summary>Pad button as printed on the pad.</summary>
         public static string PadLabel(GamepadButton button) => button switch
         {
+            GamepadButton.South         => "A",
+            GamepadButton.North         => "Y",
+            GamepadButton.East          => "B",
+            GamepadButton.West          => "X",
             GamepadButton.RightShoulder => "RB",
             GamepadButton.RightTrigger  => "RT",
             GamepadButton.LeftShoulder  => "LB",

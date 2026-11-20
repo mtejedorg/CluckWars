@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
@@ -300,29 +301,39 @@ namespace CluckWars.Tests
         // ---- Gamepad table ----------------------------------------------------------------------------
 
         [Test]
-        public void Gamepad_AbilityTable_IsTotal_RB_RT_LB_LT()
+        public void Gamepad_AbilityTable_IsTotal_ShoulderAndFaceButtonPerSlot()
         {
+            Assert.AreEqual(AbilityController.SlotCount, GamepadInputProvider.AbilityButtons.Length, "One row per slot.");
+            // Face buttons: A, Y, B, X = slots 1-4 (the diamond mirrors the slot roles).
+            CollectionAssert.AreEqual(
+                new[] { GamepadButton.South, GamepadButton.North, GamepadButton.East, GamepadButton.West },
+                GamepadInputProvider.AbilityButtons.Select(r => r[0]).ToArray());
+            // Shoulders and triggers: RB, RT, LB, LT = slots 1-4.
             CollectionAssert.AreEqual(
                 new[] { GamepadButton.RightShoulder, GamepadButton.RightTrigger, GamepadButton.LeftShoulder, GamepadButton.LeftTrigger },
-                GamepadInputProvider.AbilityButtons);
-            Assert.AreEqual(AbilityController.SlotCount, GamepadInputProvider.AbilityButtons.Length, "One button per slot.");
+                GamepadInputProvider.AbilityButtons.Select(r => r[1]).ToArray());
+            foreach (var row in GamepadInputProvider.AbilityButtons) Assert.AreEqual(2, row.Length);
         }
 
         [Test]
         public void Gamepad_NoButtonDrivesTwoThings()
         {
             var seen = new HashSet<GamepadButton>();
-            foreach (var b in GamepadInputProvider.AbilityButtons)
-                Assert.IsTrue(seen.Add(b), $"{b} is bound to two ability slots.");
+            foreach (var row in GamepadInputProvider.AbilityButtons)
+                foreach (var b in row)
+                    Assert.IsTrue(seen.Add(b), $"{b} is bound to two ability slots.");
 
-            Assert.IsFalse(seen.Contains(GamepadInputProvider.CancelButton), "B must not also fire an ability.");
+            Assert.IsFalse(seen.Contains(GamepadInputProvider.CancelButton), "L3 must not also fire an ability.");
             Assert.IsFalse(seen.Contains(GamepadInputProvider.BackButton), "Start must not also fire an ability.");
-            Assert.AreNotEqual(GamepadInputProvider.CancelButton, GamepadInputProvider.BackButton);
-            Assert.AreEqual(GamepadButton.East, GamepadInputProvider.CancelButton, "B is East.");
+            Assert.AreEqual(GamepadButton.LeftStick, GamepadInputProvider.CancelButton, "The hold cancel is L3.");
             Assert.AreEqual(GamepadButton.Start, GamepadInputProvider.BackButton);
+            Assert.AreNotEqual(GamepadInputProvider.CancelButton, GamepadInputProvider.BackButton, "cancel != pause");
 
-            foreach (var face in new[] { GamepadButton.South, GamepadButton.West, GamepadButton.North })
-                Assert.IsFalse(seen.Contains(face), $"{face} fights the right stick and must stay unbound.");
+            // The menu back button is B and is the ONE shared button: it is slot 3 by design.
+            Assert.AreEqual(GamepadButton.East, GamepadInputProvider.MenuBackButton);
+            CollectionAssert.Contains(GamepadInputProvider.AbilityButtons[2], GamepadInputProvider.MenuBackButton);
+            for (int slot = 0; slot < 4; slot++)
+                if (slot != 2) CollectionAssert.DoesNotContain(GamepadInputProvider.AbilityButtons[slot], GamepadInputProvider.MenuBackButton);
         }
 
         // ---- Composite -----------------------------------------------------------------------------------

@@ -6,14 +6,15 @@ namespace CluckWars.Input
 {
     /// <summary>
     /// Gamepad input (Phase 6 chunk 5, A8). Left stick moves (the right stick does nothing: no aim, as on touch), and the four ability slots sit on the
-    /// shoulders and triggers (the face buttons fight the right stick). B cancels a hold (and backs out of menus, the Leave sheet and the podium), Start opens the Leave sheet.
+    /// shoulders and triggers AND on the face buttons (A, Y, B, X = slots 1-4). Clicking the left stick (L3) cancels a hold, Start opens the Leave sheet,
+    /// and B backs out of menus, the Leave sheet and the podium (in a match B is only slot 3).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Binding table.</b> <see cref="AbilityButtons"/> is the one slot-to-button table, as an enum table for the same
+    /// <b>Binding table.</b> <see cref="AbilityButtons"/> is the one slot-to-buttons table (every slot has its shoulder or trigger and its face button), as an enum table for the same
     /// reason as <see cref="KeyboardInputProvider.AbilityKeys"/>: a live <see cref="Gamepad"/> does not exist in an
     /// EditMode run, so an enum table is the difference between the mapping being pinned by tests and being
-    /// unverifiable. Layout: RB, RT, LB, LT = slots 1, 2, 3, 4. The triggers are read as buttons through the Input
+    /// unverifiable. Layout: RB, RT, LB, LT = slots 1, 2, 3, 4, and A, Y, B, X = slots 1, 2, 3, 4 (the diamond mirrors the slot roles: A bottom, Y top, B right, X left). The triggers are read as buttons through the Input
     /// System's press point (0.5 by default), so a half pull is a press.
     /// </para>
     /// <para>
@@ -22,17 +23,20 @@ namespace CluckWars.Input
     /// </remarks>
     public sealed class GamepadInputProvider : IInputProvider
     {
-        /// <summary><c>AbilityButtons[slot]</c> fires that slot: RB, RT, LB, LT.</summary>
-        public static readonly GamepadButton[] AbilityButtons =
+        /// <summary><c>AbilityButtons[slot]</c> fires that slot. The FIRST entry is the one the HUD badge prints (the face button).</summary>
+        public static readonly GamepadButton[][] AbilityButtons =
         {
-            GamepadButton.RightShoulder,
-            GamepadButton.RightTrigger,
-            GamepadButton.LeftShoulder,
-            GamepadButton.LeftTrigger,
+            new[] { GamepadButton.South, GamepadButton.RightShoulder },
+            new[] { GamepadButton.North, GamepadButton.RightTrigger },
+            new[] { GamepadButton.East,  GamepadButton.LeftShoulder },
+            new[] { GamepadButton.West,  GamepadButton.LeftTrigger },
         };
 
-        /// <summary>B cancels the hold in progress.</summary>
-        public const GamepadButton CancelButton = GamepadButton.East;
+        /// <summary>Clicking the left stick (L3) cancels the hold in progress.</summary>
+        public const GamepadButton CancelButton = GamepadButton.LeftStick;
+
+        /// <summary>B backs out of menu pages, the Leave sheet and the podium. In a match it is slot 3 and nothing else.</summary>
+        public const GamepadButton MenuBackButton = GamepadButton.East;
 
         /// <summary>Start opens the Leave sheet in a match.</summary>
         public const GamepadButton BackButton = GamepadButton.Start;
@@ -65,7 +69,10 @@ namespace CluckWars.Input
         public bool GetAbilityHeld(int slot)
         {
             var gp = Gamepad.current;
-            return gp != null && slot >= 0 && slot < AbilityButtons.Length && gp[AbilityButtons[slot]].isPressed;
+            if (gp == null || slot < 0 || slot >= AbilityButtons.Length) return false;
+            foreach (var button in AbilityButtons[slot])
+                if (gp[button].isPressed) return true;
+            return false;
         }
 
         public bool GetAbilityCancelPressed()
@@ -78,11 +85,11 @@ namespace CluckWars.Input
         public bool IsAbilityCancelArmed() => false;
 
         /// <summary>Start or B: back out of a menu page, the Leave sheet or the podium. In a match only Start opens the
-        /// sheet (<see cref="GetPausePressed"/>); B there is the hold cancel.</summary>
+        /// sheet (<see cref="GetPausePressed"/>); B there fires slot 3 and <see cref="MatchBackRules"/> ignores it.</summary>
         public bool GetBackPressed()
         {
             var gp = Gamepad.current;
-            return gp != null && (gp[BackButton].wasPressedThisFrame || gp[CancelButton].wasPressedThisFrame);
+            return gp != null && (gp[BackButton].wasPressedThisFrame || gp[MenuBackButton].wasPressedThisFrame);
         }
 
         public bool GetPausePressed()
@@ -94,7 +101,10 @@ namespace CluckWars.Input
         private static bool Pressed(int slot)
         {
             var gp = Gamepad.current;
-            return gp != null && slot >= 0 && slot < AbilityButtons.Length && gp[AbilityButtons[slot]].wasPressedThisFrame;
+            if (gp == null || slot < 0 || slot >= AbilityButtons.Length) return false;
+            foreach (var button in AbilityButtons[slot])
+                if (gp[button].wasPressedThisFrame) return true;
+            return false;
         }
 
         /// <summary>Once per frame: stamps activity when the left stick leaves its dead zone or a mapped button is down.</summary>
@@ -110,7 +120,7 @@ namespace CluckWars.Input
             bool active = gp.leftStick.ReadValue().magnitude > JoystickRules.DeadZone ||
                           gp[CancelButton].isPressed || gp[BackButton].isPressed;
             for (int slot = 0; slot < AbilityButtons.Length && !active; slot++)
-                active = gp[AbilityButtons[slot]].isPressed;
+                active = GetAbilityHeld(slot);
 
             if (active) _lastActiveTime = Time.unscaledTime;
         }
