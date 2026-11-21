@@ -79,14 +79,14 @@
         <thead><tr><th>Class</th><th class="num">Design target</th><th class="num">Trips</th><th class="num">Oracle: seconds to 40</th><th>Strategy</th></tr></thead>
         <tbody>
           <!-- Source: docs/GDD.md §2.1 class table -->
-          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td class="num">22.3 to 22.9</td><td>Throughput: many small loads, roams wide</td></tr>
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td class="num">18.0 to 18.6</td><td>Payload: one huge sweep, barely returns</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td class="num">24.1 to 24.8</td><td>The ability class: mid stats, leans on the kit</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">30 s</td><td class="num">4</td><td class="num">24.0 to 24.6</td><td>Throughput: many small loads, roams wide</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">30 s</td><td class="num">2</td><td class="num">19.4 to 20.0</td><td>Payload: one huge sweep, barely returns</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">35 s</td><td class="num">3</td><td class="num">27.4 to 27.6</td><td>The ability class: mid stats, leans on the kit</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">40 s</td><td class="num">4</td><td class="num">does not forage</td><td>Denial: never farms, robs and executes</td></tr>
         </tbody>
       </table>
     </div>
-    <!-- Source: docs/GDD.md §2.1 (trips formula, Balance Oracle v2); oracle column: Captures/oracle/report-20261120-140431.md, seat means of the kits of each class on their best route, each kit against three plain Warriors, nobody fighting -->
+    <!-- Source: docs/GDD.md §2.1 (trips formula, Balance Oracle v2); oracle column: Captures/oracle/report-20261121-002302.md, "Seconds to goal (seat mean)" of the kits of each class, seat means of the kits of each class on their best route, each kit against three plain Warriors, nobody fighting -->
     <p>Trips are the win target divided by cargo capacity, rounded up. The design target is the original goal for each class. The Balance Oracle is a pure-C# simulator that plays four-chicken matches on the real map and reports, for every kit, how much food it banks and how fast it reaches 40. It reports and proposes values; it never blocks a change. It is a guide, not a gate: the designer's own tuning is recorded and the oracle learns from it. A kit counts as balanced when it wins 20 to 30 % of mixed four-player matches and the same holds for its class. The match simulator that measures that comes later; today the oracle measures the food economy.</p>
     <!-- Source: Assets/_Game/Data/MatchConfig.asset (PersonalPileFood 10, ContestedPileFood 15, CentrePileFood 40; 4 x 10 + 4 x 15 + 40 = 140) -->
     <p>The map holds 140 food, three and a half times the win target, but your own pile plus one contested pile is not enough to win and your own pile plus two contested piles is. Several players could in theory max out by farming alone. That is why combat exists: it buys time, and stealing is the only mechanic that turns a won fight directly into food.</p>
@@ -96,13 +96,13 @@
     <h2>The roster and its specializations</h2>
     <div class="tw wide">
       <table>
-        <thead><tr><th>Class</th><th class="num">Move</th><th class="num">Cargo</th><th class="num">Peck cooldown</th><th>Fantasy</th></tr></thead>
+        <thead><tr><th>Class</th><th class="num">Move</th><th class="num">Cargo</th><th class="num">Peck cooldown</th><th class="num">Peck cast</th><th>Fantasy</th></tr></thead>
         <tbody>
-          <!-- Source: docs/GDD.md §5.2 roster table -->
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td>"Slow, but it all fits in the beak."</td></tr>
-          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.125</td><td class="num">14</td><td class="num">0.79 s</td><td>"The farm is a battlefield."</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">11.1</td><td class="num">10</td><td class="num">cannot forage</td><td>"Blink and your food is gone."</td></tr>
+          <!-- Source: docs/GDD.md §5.2 roster table; Peck cast: Assets/_Game/Data/Classes/{Fatty,Speedy,Warrior}.asset PeckCastSeconds -->
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td class="num">0.7 s</td><td>"Slow, but it all fits in the beak."</td></tr>
+          <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.125</td><td class="num">14</td><td class="num">0.79 s</td><td class="num">0.5 s</td><td>"The farm is a battlefield."</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">11.1</td><td class="num">10</td><td class="num">cannot forage</td><td class="num">n/a</td><td>"Blink and your food is gone."</td></tr>
         </tbody>
       </table>
     </div>
@@ -219,7 +219,7 @@
           <tr data-c="everyone"><td>Hide <span class="tag t-shared">Everyone</span></td><td class="num">4.5 s</td><td>Fades you to a ghostly outline for 2 s. Using a move breaks it.</td></tr>
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">2 s</td><td>A quick dash forward, straight over walls (3&times; speed for 0.18 s: about 6 m for Sneaky, 5.5 m for Warrior).</td></tr>
-          <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>Take a beakful from the pile you stand on. Forced for every forager.</td></tr>
+          <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>A cast of 0.4 to 0.7 s by class (Speedy 0.4, Warrior 0.5, Fatty 0.7): you are rooted, and the beakful is taken when it ends. A stun, a shove, an execution or your own next move cuts it and takes nothing; a slow or being robbed does not. Forced for every forager.</td></tr>
           <tr data-c="limited"><td>Hunt <span class="tag t-assassin">Spoiler</span></td><td class="num">4 / 8 s</td><td>The execute. Marks a rival anywhere for 4 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last second. Cooldown 4 s after a miss, 8 s after a kill. Within 6.2 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
         </tbody>
       </table>
@@ -255,6 +255,8 @@
       <li><b>Keyboard, scheme B:</b> the arrows move; Q, W, R and E fire slots 1 to 4. The choice is a Settings row.</li>
       <li>Digits 1 to 4 fire the slots in both schemes. Esc or the right mouse button cancels.</li>
       <li><b>Peck is the exception to hold-and-release.</b> A tap pecks. Holding the Peck slot for 0.5 s toggles Auto-Peck, and an AUTO tag shows on the hex while it is on.</li>
+      <li><b>Peck is a cast.</b> A tap starts a cast of 0.4 s (Speedy), 0.5 s (Warrior) or 0.7 s (Fatty) and roots you; the food is taken when it ends. A stun, a shove, an execution or your own next move cuts it and nothing is taken, while the cooldown is still spent. A slow or being robbed does not cut it. <!-- Source: docs/GDD.md section 5.2 (BL-206); PeckCastSeconds in Assets/_Game/Data/Classes/*.asset --></li>
+      <li><b>Superseded design (design note, 2026-11-21).</b> Peck used to take its food at the press and then lock movement for 0.4 s. That rule is gone: the food now comes at the end of the cast.</li>
     </ul>
     <figure>
       <img src="assets/hold.jpg" width="1280" height="720" loading="lazy" alt="Capture of a red chicken while ability button 3, Stun, is held. A yellow circle on the grass around the bird shows the ability range, and a rival chicken inside it is marked with small yellow arrows at its feet. On the touch layout the held button is enlarged and the other three are dimmed. The scoreboard is at top left and the timer reads 00:35.">

@@ -447,7 +447,7 @@ Classes differ by stat spread, passive pool, and **class-gated ability access** 
 | Stat | Meaning |
 |---|---|
 | **Cargo Capacity** | Food carried before a forced return (also caps how much you can *steal* in one go) |
-| **Peck** (amount / cooldown) | Food per press (3 for every class) and the per-class seconds between presses; the Assassin cannot forage |
+| **Peck** (amount / cooldown / cast) | Food per cast (3 for every class), the per-class seconds between presses, and the per-class cast length (`PeckCastSeconds`: Speedy 0.4 s, Warrior 0.5 s, Fatty 0.7 s, placeholders for Maestro and the oracle); the Assassin cannot forage |
 | **Move Speed** | Across-map speed |
 
 There is **no HP and no Resistance** — durability is expressed through *control resistance*
@@ -455,11 +455,11 @@ There is **no HP and no Resistance** — durability is expressed through *contro
 
 ### 5.2 The roster (stats are Oracle-solved to hit §2.1 targets)
 
-| Class | Move | Cargo | Peck cooldown | SCT | Fantasy |
+| Class | Move | Cargo | Peck cooldown / cast | SCT | Fantasy |
 |---|---|---|---|---|---|
-| **Fatty** 🐔 | 10.125 | 35 | 0.71 s | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
-| **Speedy** 🐤 | 12.15 | 10 | 0.71 s | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
-| **Warrior** ⚔️ | 10.125 | 14 | 0.79 s | 35 s / 3 trips | *"The farm is a battlefield."* |
+| **Fatty** 🐔 | 10.125 | 35 | 0.71 s / 0.7 s | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
+| **Speedy** 🐤 | 12.15 | 10 | 0.71 s / 0.4 s | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
+| **Warrior** ⚔️ | 10.125 | 14 | 0.79 s / 0.5 s | 35 s / 3 trips | *"The farm is a battlefield."* |
 | **Assassin** 🗡️ | 11.1 | 10 | n/a (cannot forage) | 40 s / 4 trips | *"Blink and your food is gone."* |
 
 > **Move speeds are the x1.35 values** from the 2026-08-14 arena rescale (38 m -> 51.3 m).
@@ -476,6 +476,8 @@ target 30 s vs 40 s — the gap is that Speedy forages (Peck every 0.71 s) and t
 cannot forage at all (the oracle report has no farming number for him: "does not forage"). The
 Assassin is a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he
 denies instead of collects.
+
+**Peck is a cast (BL-206, 2026-11-21).** Pressing Peck starts a cast of `PeckCastSeconds` (table above; `ChickenStatsSO`, Fatty 0.7 s, Warrior 0.5 s, Speedy 0.4 s). The chicken is rooted for the whole cast. The food is asked of the pile when the cast ends, not at the press: amount = min(`PeckAmount` 3, free cargo, pile food), re-checked at the end. A stun, a shove, an execution or the chicken's own next move cuts the cast and nothing is taken; a slow or being robbed does not cut it (a Snatch cuts only if a balance delta ever gives it knockback, and a Bulwark-damped push too weak to count as a knockback does not cut). The cooldown counts from the press, so a cut cast spends it. A stun landing in the same tick the cast completes lets the food land. Auto-Peck and bots are unchanged: they press again after the cast ends. This replaces the old rule "food at the press, then a 0.4 s movement lock", which is gone. Cast lengths are placeholders until Maestro and the oracle set them.
 
 **Speedy never gets terrain traversal.** Not a jump, not a Blink, not a Vault — Maestro,
 2026-08-21: *"Speedy can use control on other chickens and escape just by having more speed.
@@ -599,6 +601,7 @@ steal outright: the thief is not credited, so the formula never runs.
 | **Stuck** (rooted) | ❌ | ✅ | ❌ | trap abilities |
 | **Stunned** | ❌ | **❌** | ❌ | the Stun ability |
 
+A Peck cast (§5.2) sits beside the ladder: the caster is rooted by the cast itself, and a **stun, a shove (knockback) or an execution cuts it** with nothing taken. Slowed, and being robbed, do not cut it.
 Stun is the only state that locks *casting* — which is exactly why it's the qualifier for
 the Assassin execute. There is one stun, 1.3 s (`WingSlam.asset`, now called Stun; 1.3 s against Slippery too since the later 2026-11-05 rework, 0.845 s against Bulwark, 0.975 s against Relentless, 1.69 s from a Relentless caster). **Protections:** control immunity (the Egg Shell egg stops the whole ladder; the Egg Shell walk stops ability slows only, §7.2); **steal-proof** (Egg Shell) is separate and only stops cargo being taken (§7.2). **Slow sources** (collision, pile, ability) are tagged separately so
 passives like Slippery can target one without the others. Bulwark and Relentless shorten
@@ -820,7 +823,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 | **Jump** | JUMP | 2 s | everyone but Speedy | Dashes forward at 3x speed for 0.18 s (about 6 m for the Sneaky at 11.1, 5.5 m for the Warrior), straight over walls. Unchanged (Shadowstep); Speedy never gets terrain traversal (§5.2). |
 | **Egg Shell** | EGG | 8 s | everyone | **Walk, then egg, on one press.** Phase 1 (`WalkSeconds` 1): walk at 0.5x speed, immune to ability slows only (timed slow, zone, Slow aura); stun, root, shove, theft and execution still land. Phase 2 (`EggSeconds` 2, starts automatically): cannot move; immune to stun, slow, root and shove; steal-proof and unkillable. Duration 3 s, cooldown 8 s from the cast. Press again to end it. Was Shield (until 2026-11-07), before that Turtle Mode (Fatty-only). |
 | **Hide** | HIDE | 4.5 s | everyone | Fades you to a ghostly outline for 2 s (opacity 0.2; 4 s until 2026-11-05). Using a move breaks it. Was Invisibility (Sneaky-only). |
-| **Peck** | PECK | 0.8 s | none (pre-equip) | Take a beakful of food from the pile you are standing at. Forced for every forager. |
+| **Peck** | PECK | 0.8 s | none (pre-equip) | Start a cast (0.4 to 0.7 s by class, §5.2) rooted at the pile you stand at; when it ends you take a beakful, unless a stun, shove, execution or your own move cut it. Forced for every forager. |
 | **Hunt** (code Death Mark) | HUNT | 4 s after a miss, 8 s after a kill | none (pre-equip) | The hunt (§6.4): mark a rival far from home, stun them within 6.2 m, press again to pounce. `KillRange` 8 -> 6.2 m on 2026-11-05 (later); its stun comes from the generic Stun (1.3 s). |
 
 **Retired 2026-11-05** (the `Retired` flag, out of the registry and every kit, asset and code kept, like Egg Shell): Scrap, Dive Bomb, Sneaky Steal, Ambush, Belly Flop, Ground Quake, Headbutt, Roll & Push, Dust Kick, Feather Trap, Sticky Egg (`RootEggAbilitySO`), Smoke Roost, Ruffle, Feint, Immovable, Spine Coat, Doppelganger. **Quick Drop** (`QuickDrop.asset`, `Retired` 1, out of the registry) was retired later the same day: its 4x banking burst became Featherfoot's permanent `DepositRateMultiplier` (1.5x, tuned to 1.1x the same day) (19 retired in all, 10 active). Egg Shell was retired earlier (2026-11-03). Their old numbers are in git history; the rest of this section describes only the 10.
@@ -888,7 +891,7 @@ different kinds).
 Outside the rule: Underdog Surge (x1.4) and the slow done *to* you by rivals.
 
 **Stealth breaks on your next move.** Hide's fade ends the moment
-you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. **Peck's 0.4 s movement lock ends when you cast.** So Hide
+you cast anything else. Peck counts as a move; a fizzle (§10.1) does not. **Peck's cast (the movement root, §5.2) is cut when you cast another move.** So Hide
 is an opener for Steal / Stun, not a 2 s cast lock.
 
 **Combos that are now legal on one bird** (flagged for balance, no value changed): Speed + Slow is about 2.4x relative speed against

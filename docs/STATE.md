@@ -11,15 +11,25 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 🎯 2026-11-21 - BL-206: Peck is an interruptible cast (`ae0be79c`..`4a3c33fb`, `develop`, not pushed)
+
+- **What Peck does now:** the press starts a cast; the chicken is rooted for it; the food is asked of the pile when the cast ends (amount, room and reach re-checked then; first to land wins). A stun or a shove cuts it (`AbilityController.CutPeckIfInterrupted`, authority only), and so do an execution and the chicken's own next move (existing teardown); a slow, a root, a robbery and the chicken's own dodge do not. A cut takes nothing and still spends the cooldown (it counts from the press, unchanged). A stun landing on the very tick the cast completes lets the food land. Auto-Peck and bots unchanged. The old 0.4 s post-peck lock is gone (`Peck.asset` `Duration` is only the no-stats fallback).
+- **Data:** `ChickenStatsSO.PeckCastSeconds` `[Range(0.2, 1.2)]`, placeholders for Maestro and the oracle: Warrior 0.5, Speedy 0.4, Fatty 0.7 (time per peck, max of cooldown and cast, unchanged for every class). A delta field like any class stat (Kit Lab lists, balance editor, debug HUD). The published Kit Lab page is not refreshed yet (`/balance kitlab`).
+- **Animation:** Peck state speed = the `PeckSpeed` parameter = clip length / the effective cast the caster's stats serve, set every frame on every peer; `TriggerPeck` plays the state from frame 0; the `Pecking` bool drops to Idle with no blend when the slot ends. The per-class Peck clip is now bound in the override controller (before, every Peck played the empty 1 s placeholder). Mound bite beat keyed on the new event.
+- **Protocol change:** `[Networked] byte AbilityController.PeckLandedEventId` (observed by `ChickenLocalEvents.PeckLanded`). Live two-peer check still owed (ARCH-NET-14).
+- **Oracle:** reads the cast from the class stat through `BalanceBook.Preview`; the solver tunes `<Class asset>.PeckCastSeconds`; the oracle-only input and `OracleKit.PeckLockSeconds` are gone. `OracleReference.asset` re-recorded, prices kept. Report `Captures/oracle/report-20261121-002302.md`: Fatty 19.4 / 20.0 s, Speedy 24.0 / 24.6 s, Warrior 27.4 / 27.6 s to the goal.
+- **Verified in Play mode (solo vs 3 bots, Editor, autoplay):** Fatty and Speedy: Peck state length equals the cast (0.700 / 0.400 s), the clip runs frame 0 to the end over the cast, food lands on the cast's last tick (pile -3, beak +3, `PeckLandedEventId` +1); a stun mid-cast (written straight into the state on the authority) ends the cast on the next tick with pile and beak unchanged. The probe found the clip starting up to 0.25 s late behind a locomotion blend; fixed in `65593113`.
+- **Not exercised:** two real peers (a rival's view, the landed beat on a proxy, a late joiner), a phone, a real Stun/Shove ability cut, an execution mid-cast.
+- **Suite:** 4031 passed, 0 failed (live Editor, `4a3c33fb`).
+- **Deferred (backlog):** HUD hex cast-progress sweep; cut puff and own-hex flash.
+
 ## 🎯 2026-11-21 - Oracle v2: the result is seconds to the goal (`a804a9cb`, `develop`, not pushed)
 
 - **Why:** Maestro found that the solver ignored Peck time. The kit result was food banked at the clock end, and four farmers empty the 140-food map by about 21 s, so the number did not react to speed, Peck cooldown or Peck cast.
 - **Now:** a kit's result is the seat-mean seconds to bank the win target on its best route, minus its offset (a positive offset is a credit; Warrior kits +5 s, the rest 0, unchanged). A seat that misses the goal is extrapolated past the clock at its own income. `OracleReference.asset` was re-recorded with the prices kept. Food, seat range and seats reaching the goal stay as supporting columns.
-- **Peck time in `FarmSim`:** the chicken is rooted from the start of a peck until its food lands, then for the game's own post-peck lock (`Peck.asset` `Duration`, read through the balance preview as `OracleKit.PeckLockSeconds`). The cast is still an oracle-only input until BL-206 ships.
+- **Peck time in `FarmSim`:** the chicken is rooted from the start of a peck until its food lands, then (until BL-206, entry above) for the game's old post-peck lock. Superseded by BL-206: no lock after the cast, the cast is the class stat.
 - **Solver:** scores the variance of the seconds results; `OracleProblem.MaxFlatSteps` (default 4) lets it cross a flat stretch.
 - **Suite:** 4012 passed, 0 failed, in the live Editor.
-- **BL-206 batches 1-2 in the tree (uncommitted):** `ChickenStatsSO.PeckCastSeconds` (placeholders Warrior 0.5, Speedy 0.4, Fatty 0.7), Kit Lab `peckCast`, `PeckCastRules`, the Peck cast on the state authority (food asked at the natural end via `AbilityContext.EndedNaturally`; a stun or shove cuts it in `AbilityController.CutPeckIfInterrupted`). **Protocol change:** one networked byte added, `AbilityController.PeckLandedEventId`; live check owed (ARCH-NET-14). Not done: batch 3 (animation, mound beat), the live check, the Oracle reading the real stat (batch 5), the Kit Lab refresh.
-- **In progress, another session:** BL-206, Peck as an interruptible cast in the game, with the animation fitted to the cast time. Its spec is `docs/superpowers/specs/2026-11-21-peck-cast-design.md`. That session moves the cast from an oracle-only input to a real class stat and then brings the rules docs in line with the renamed oracle fields (`Entry.BestSeconds`, `RouteSpreadSeconds`, `PeckLockSeconds`, `MaxFlatSteps`; `IncomePerSecond` and `Spread` are gone).
 
 ## 🎯 2026-11-20 - Oracle v2: tasks 8 and 9 done, docs brought in line (`develop`, not pushed)
 
@@ -6571,8 +6581,3 @@ had URP/ProjectSettings assets self-corrupt or drift twice — see commit `9a0b9
 - All work on `develop`.
 - `main` has not been merged since project start (per Maestro's decision — wait for stable test pass before promoting).
 - `develop` and `v0.3.1-alpha` pushed to origin. Branch is clean.
-
-## BL-206 batch 5 and review fixes (2026-11-21, uncommitted)
-- Review fixes: `AbilityController.Deactivate` clears `ActiveMask` in a `finally`; `PeckCastRules.ObserveKnock`; `PeckAbilitySO` splits missing GameManager (warns) from a finished match; DebugHud shows the cast seconds and aligned columns; BalanceEditorWindow clamps the cast to its `[Range]`.
-- Oracle reads `ChickenStatsSO.PeckCastSeconds` through `BalanceBook.Preview`; `OracleInputs.PeckCastSeconds`, the "Oracle" pseudo-asset, `OracleKit.PeckLockSeconds` and FarmSim's post-peck lock are gone. The solver addresses the cast as "<Class asset>.PeckCastSeconds". `OracleReference.asset` re-recorded (Fatty_Hoarder, Fatty_Bulwark, Warrior_Relentless, Warrior_Bully moved).
-- No Maestro prefab wiring needed.
