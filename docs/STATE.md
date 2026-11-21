@@ -11,7 +11,7 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
-## 2026-11-21 - Peck cut when the pile empties (BL-206 follow-up, uncommitted)
+## 2026-11-21 - Peck cut when the pile empties (BL-206 follow-up, `414b1a31`)
 
 A running Peck is cut (no food, no landing bump, cooldown stays spent) on the first authority tick where no pile with collectable food is in reach: `AbilityBaseSO.HasLostItsTarget` (default false, `PeckAbilitySO` = `FindPile == null`), read by `AbilityController.CutPeckIfInterrupted` into `PeckCastRules.IsCut(stunned, knocked, targetGone)`. A pile with some food left does not cut. The pile's Amount on the pecker's peer can lag one round trip; accepted. `FarmSim` ends a cast on a pile another farmer emptied at once; `OracleReference` re-recorded (only Warrior_Relentless moved, 27.37 s to 27.12 s). No prefab wiring needed.
 
