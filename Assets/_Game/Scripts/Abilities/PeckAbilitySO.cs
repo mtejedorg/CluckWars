@@ -56,6 +56,11 @@ namespace CluckWars.Abilities
         /// <summary>Casting any other move cuts the cast: the chicken rooted itself for it and no food is asked.</summary>
         public override bool EndsOnNextMove => true;
 
+        /// <summary>A pile with no collectable food left in reach (emptied by another chicken, or never there) cuts the cast:
+        /// it would land nothing. A pile with only some food left does not cut; the cast lands what remains. Same test as
+        /// the landing, so the two cannot disagree.</summary>
+        public override bool HasLostItsTarget(ChickenController caster) => caster != null && FindPile(caster) == null;
+
         /// <summary>The cast length: the class's <see cref="ChickenStatsSO.PeckCastSeconds"/>. Falls back to
         /// <see cref="AbilityBaseSO.Duration"/> only if stats are somehow missing. Every reader (run timer, ring drain,
         /// HUD, animator) goes through this.</summary>

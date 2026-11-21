@@ -13,8 +13,8 @@ namespace CluckWars.Gameplay
         public static float CastSeconds(ChickenStatsSO stats, float fallbackSeconds) =>
             stats != null && stats.PeckCastSeconds > 0f ? stats.PeckCastSeconds : fallbackSeconds;
 
-        /// <summary>A stun or a shove cuts a running cast. A slow, a robbery or a self dodge never does.</summary>
-        public static bool IsCut(bool stunned, bool knockedSinceLastTick) => stunned || knockedSinceLastTick;
+        /// <summary>A stun, a shove or a pile that has run out of food cuts a running cast. A slow, a robbery or a self dodge never does.</summary>
+        public static bool IsCut(bool stunned, bool knockedSinceLastTick, bool targetGone) => stunned || knockedSinceLastTick || targetGone;
 
         /// <summary>Compares the chicken's shove id with the last one seen and always stores the current one, so a shove seen
         /// before the press never cuts a later cast. Returns true when the id changed (wraps 255 to 0 by design).</summary>

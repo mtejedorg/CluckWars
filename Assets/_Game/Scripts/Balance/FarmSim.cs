@@ -414,7 +414,9 @@ namespace CluckWars.Balance
                 // Rooted from the start of a peck until its food lands: nothing below may walk away before that.
                 if (ch.Pecking)
                 {
-                    if (_time + Eps < ch.PeckDoneAt) return false;
+                    // The game cuts a cast whose pile ran dry (another farmer emptied it): freed at once, nothing taken, cooldown spent.
+                    bool pileGone = _left[p] <= Eps;
+                    if (!pileGone && _time + Eps < ch.PeckDoneAt) return false;
                     ch.Pecking = false;
                     float take = PeckTake(s, p);
                     if (take > 0f)

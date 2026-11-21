@@ -68,10 +68,30 @@ namespace CluckWars.Tests
         [Test]
         public void IsCut_AStunOrAShove_Cuts_NothingElseDoes()
         {
-            Assert.IsTrue(PeckCastRules.IsCut(true, false));
-            Assert.IsTrue(PeckCastRules.IsCut(false, true));
-            Assert.IsTrue(PeckCastRules.IsCut(true, true));
-            Assert.IsFalse(PeckCastRules.IsCut(false, false));
+            Assert.IsTrue(PeckCastRules.IsCut(true, false, false));
+            Assert.IsTrue(PeckCastRules.IsCut(false, true, false));
+            Assert.IsTrue(PeckCastRules.IsCut(true, true, false));
+            Assert.IsTrue(PeckCastRules.IsCut(false, false, true), "a pile with nothing left cuts");
+            Assert.IsTrue(PeckCastRules.IsCut(true, true, true));
+            Assert.IsFalse(PeckCastRules.IsCut(false, false, false));
+        }
+
+        [Test]
+        public void PeckAbility_OverridesHasLostItsTarget_ThroughFindPile()
+        {
+            var m = typeof(PeckAbilitySO).GetMethod("HasLostItsTarget");
+            Assert.AreEqual(typeof(PeckAbilitySO), m.DeclaringType, "Peck overrides the virtual");
+            StringAssert.Contains("FindPile(caster) == null", Body(PeckPath, "public override bool HasLostItsTarget("));
+        }
+
+        [Test]
+        public void AbilityController_CutsThroughTheVirtual_NotAConcreteType()
+        {
+            string body = Body(ControllerPath, "private void CutPeckIfInterrupted(");
+            StringAssert.Contains("GetSlot(peck)", body);
+            StringAssert.Contains(".HasLostItsTarget(_controller)", body);
+            Assert.IsFalse(body.Contains("PeckAbilitySO"), "code outside Abilities never names a concrete ability");
+            Assert.IsFalse(body.Contains("FoodPile"), "the pile test lives in the ability");
         }
 
         [Test]

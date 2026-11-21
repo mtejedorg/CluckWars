@@ -1029,6 +1029,13 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual bool EndsOnNextMove => IsStealth;
 
+        /// <summary>
+        /// True when a RUNNING cast has nothing left to act on, so the controller cuts it (no landing, cooldown stays
+        /// spent). Asked every authority tick while the slot runs. Default false: only a cast with a target that others can
+        /// remove (Peck's pile) overrides it. The answer is read from this peer's replicated view, so it can lag one round trip.
+        /// </summary>
+        public virtual bool HasLostItsTarget(Gameplay.ChickenController caster) => false;
+
         // ---- Declared traits (A15) -------------------------------------------------------------------------------
         // Code outside this folder asks an ability what it does, never which class it is: no "is XxxAbilitySO"
         // anywhere else (AbilityTraitTests). A new ability answers these and every bot, kit rule, HUD and effect

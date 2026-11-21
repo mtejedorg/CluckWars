@@ -241,6 +241,35 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void PeckCast_OnAPileAnotherFarmerEmptied_EndsAtOnce_AndTheChickenIsFreed()
+        {
+            // Both seats reach pile 5 together. Seat 1 (instant cast) empties it; seat 0 is mid a long cast on it. The game cuts that
+            // cast: seat 0 is freed at once and turns to pile 6, instead of standing rooted until the cast would have ended.
+            const float leg = 1f, between = 3f, toSecond = 2f, amount = 4f, slowCast = 3f;
+            var map = Synth();
+            int pile5 = OracleMapSO.ContestedIndex(0), pile6 = OracleMapSO.ContestedIndex(1);
+            SetLeg(map, B0, pile5, leg);
+            SetLeg(map, B1, pile5, leg);
+            SetLeg(map, pile5, pile6, between);
+            SetLeg(map, B0, pile6, toSecond);
+
+            var seats = new FarmSeat[4];
+            seats[0] = new FarmSeat { Present = true, Kit = Kit(speed: 5f, capacity: 4, amount: amount, cooldown: 0.5f, cast: slowCast, deposit: 4f) };
+            seats[1] = new FarmSeat { Present = true, Kit = Kit(speed: 5f, capacity: 4, amount: amount, cooldown: 0.5f, cast: 0f, deposit: 4f) };
+            var r = FarmSim.Run(map, new OracleFood { Contested = amount }, seats, Rules(amount, 60f, true));
+
+            // Seat 0 is freed at leg/speed and walks to pile 6 while its cooldown (the cast length here) is still running, so the
+            // second cast starts exactly one cycle after the first. Uncut it could not even start walking before that cycle ended.
+            const float speed = 5f;
+            float cycle = slowCast;
+            float expected = leg / speed + cycle + slowCast + toSecond / speed + amount / 4f;
+            float uncut = leg / speed + cycle + between / speed + slowCast + toSecond / speed + amount / 4f;
+            Assert.AreEqual(amount, r[0].Banked, 1e-3f, "Seat 0 must end up with the food of the second pile.");
+            Assert.AreEqual(expected, r[0].SecondsToTarget, Tol, "The cast on the emptied pile must end when the pile does.");
+            Assert.Less(r[0].SecondsToTarget, uncut - 0.5f);
+        }
+
+        [Test]
         public void IdenticalKits_SymmetricSeats_BankTheSame()
         {
             var map = AssetDatabase.LoadAssetAtPath<OracleMapSO>(OracleMapBaker.AssetPath);

@@ -1335,8 +1335,8 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// A stun or a shove cuts a running Peck cast: no food lands (D2a). Runs right after the natural-expiry loop, so a stun that
-        /// lands on the completing tick still lets the food land. Reads only <c>IsStunned</c> and <c>KnockbackEventId</c>: a slow,
+        /// A stun, a shove or a pile that ran out of food cuts a running Peck cast: no food lands (D2a). Runs right after the natural-expiry loop, so a stun that
+        /// lands on the completing tick still lets the food land. Reads only <c>IsStunned</c>, <c>KnockbackEventId</c> and the ability's <c>HasLostItsTarget</c>: a slow,
         /// a robbery, a root and the chicken's own dodge never cut. The chicken's own next move and an execution already end the
         /// slot through <c>EndStealthAndPeckForCast</c> / <c>EndAllForRemoval</c>.
         /// </summary>
@@ -1348,9 +1348,12 @@ namespace CluckWars.Gameplay
             int peck = FindPeckSlot();
             if (peck == InvalidSlot || !IsSlotActive(peck)) return;
             bool stunned = _controller.IsStunned;
-            if (!PeckCastRules.IsCut(stunned, knocked)) return;
+            // The pile's Amount on this peer is replicated state and can lag one round trip: a cut may come that much late, never wrong.
+            var ability = GetSlot(peck);
+            bool targetGone = ability != null && ability.HasLostItsTarget(_controller);
+            if (!PeckCastRules.IsCut(stunned, knocked, targetGone)) return;
             Deactivate(peck);                                 // not natural: no food, no expire cue
-            _log?.Debug(Source, $"Peck cut by {(stunned ? "a stun" : "a shove")}.");
+            _log?.Debug(Source, $"Peck cut: {(stunned ? "a stun" : knocked ? "a shove" : "the pile is empty")}.");
         }
 
         /// <summary>

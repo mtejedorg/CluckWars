@@ -13,8 +13,7 @@ MonoBehaviour:
   m_Name: OracleReference
   m_EditorClassIdentifier: 
   AcceptedOn: 2026-11-21
-  Note: 'BL-206 batch 5: oracle reads ChickenStatsSO.PeckCastSeconds; no post-peck
-    lock'
+  Note: 'BL-206: a Peck cast on a pile another farmer emptied ends at once'
   MapFingerprint: be5e5449aca95e44
   Origin: 1
   Entries:
@@ -31,7 +30,7 @@ MonoBehaviour:
     BestSeconds: 20.022224
     OffsetSeconds: 0
   - Label: Warrior_Relentless
-    BestSeconds: 27.366676
+    BestSeconds: 27.116676
     OffsetSeconds: 5
   - Label: Warrior_Bully
     BestSeconds: 27.566675
