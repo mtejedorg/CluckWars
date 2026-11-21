@@ -161,6 +161,12 @@ namespace CluckWars.Tests
             StringAssert.Contains("SetBool(PeckingHash, pecking)", body);
             int pushParams = src.IndexOf("private void PushAnimatorParameters", StringComparison.Ordinal);
             StringAssert.Contains("PushPeckParameters();", src.Substring(pushParams, 400));
+            int trigger = src.IndexOf("public void TriggerPeck()", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(trigger, 0);
+            string triggerBody = src.Substring(trigger, src.IndexOf('}', trigger) - trigger);
+            StringAssert.Contains("_animator.Play(PeckStateHash, 0, 0f)", triggerBody,
+                "the Peck clip starts on the cast's first frame, never queued behind a locomotion blend");
+            StringAssert.DoesNotContain("SetTrigger(PeckHash)", triggerBody);
         }
 
         [Test]

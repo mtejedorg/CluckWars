@@ -70,6 +70,7 @@ namespace CluckWars.Visuals
         private static readonly int AbilityCastHash = Animator.StringToHash("AbilityCast");
         private static readonly int CastArchetypeHash = Animator.StringToHash("CastArchetype");
         private static readonly int PeckHash        = Animator.StringToHash("Peck");
+        private static readonly int PeckStateHash   = Animator.StringToHash("Peck"); // the state, same name as the trigger
         private static readonly int PeckSpeedHash   = Animator.StringToHash("PeckSpeed");
         private static readonly int PeckingHash     = Animator.StringToHash("Pecking");
         private static readonly int HitHash         = Animator.StringToHash("Hit");
@@ -793,10 +794,13 @@ namespace CluckWars.Visuals
         /// <remarks>
         /// Speed = clip length / effective cast (<see cref="PushPeckParameters"/>), so one play spans the
         /// cast on every peer; the exit is the replicated slot bit, so a cut stops the clip at once.
+        /// The state is entered with <c>Play</c> from frame 0, not through the Any State trigger: a trigger waits for a running
+        /// Idle/Walk blend (not interruptible) to finish, which started the clip up to a quarter second late and left it short
+        /// of the cast's end (BL-206 Play-mode probe, 2026-11-21).
         /// </remarks>
         public void TriggerPeck()
         {
-            if (AnimatorReady) _animator.SetTrigger(PeckHash);
+            if (AnimatorReady) _animator.Play(PeckStateHash, 0, 0f);
         }
 
         /// <param name="archetype">
