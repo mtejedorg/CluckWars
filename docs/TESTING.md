@@ -535,10 +535,12 @@ Always on (breadcrumbs): `MatchOverlays` `Cover on/off`, `Cover off: covered= la
 | `cw_autostart N` | host: press the waiting room's START once N humans are in (1 = at once) |
 | `cw_autostart_timeout S` | …or after S seconds with whoever is there (default 90) |
 | `cw_autoloop N` | host: PLAY AGAIN for N extra rounds (round 2+ re-STARTs as soon as the previous round's humans are back, max 15 s: `AutoTest loop restart humans=k wait=Xs`), then stay on the results; joiners just follow. Every peer logs `AutoTest loop round=k/N`; the host logs an Error if its PLAY AGAIN did not restart the round within 10 s |
-| `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s |
+| `cw_autoplay 1` | fake local input: piles → base, weave, unstick, an ability every 3 s. Runs on **simulation time** (BL-208): one decision per two ticks (`AutoPlayInputProvider.DecisionStepSeconds`), holds and press latches in sim seconds, so a time scale changes the speed of the match, not what the bird decides per second of it |
+| `cw_personality aggressive\|runner\|balanced\|fighter` | this seat's auto-play style (default: PlayerId mod 3, which never gives the fighter). **fighter** plays the kit's attacks at legal targets through the normal input path: Stun / Shove at the nearest rival in reach, a rival with a Peck cast running first; Steal at a loaded rival in reach; Spoiler: mark, chase the marked rival, stun it so the stun outlives the 3 s arm, press Kill. It forages and banks in between and casts nothing else (`FighterTactics`) |
+| `cw_seed N` | dev tools, solo: fixes the arena's interior obstacles, the corner permutation, the bot kit lineup and `UnityEngine.Random` (`DevSeed`); the MapGen line reads `solo-random (seed N)`. Windows command line only. Same seed + same `cw_perk` / `cw_botperks` / `cw_personality` = the same match to start from |
 | `cw_devmode 1` | Developer Mode on |
 | `cw_profile NAME` | Unity Services authentication profile (A-Z a-z 0-9 - _, max 30; other characters dropped). Give each EXE on one PC its own (`-cw_profile client2`): they otherwise share one anonymous identity and the second join fails with "player is already a member of the lobby". Unset: default profile |
-| `cw_timescale N` | simulation speed of a **solo** match (dev tools only; 1 to 20, clamped; shared matches ignore it). Clean log up to x5; x10 and x20 run but trip the round-start invariant probes, and banked food per seat differs between speeds (cause not proven) |
+| `cw_timescale N` | simulation speed of a **solo** match (dev tools only; 1 to 20, clamped; shared matches ignore it). Auto-play, the invariant probes and the Telemetry first-contact check run on simulation time (`SimClock`), so the round-start probes hold at any speed; what still varies between speeds is in "Accelerated runs" below |
 | `cw_hud 1` / `cw_hud 2` | overlay at boot: 1 = compact one-line strip (FPS \| p95 \| hitches \| Visual \| RTT, top-left, translucent; leaves the match HUD visible), 2 = full panel |
 
 Android (`-e` string extras; `--ei` / `--ez` work too). **Always use `am start -S`** (force-stop first): the extras are read once per process and then removed from the intent, and an activity re-opened from Recents ignores them, so a run never re-hosts / re-joins by accident:
@@ -562,6 +564,16 @@ CluckWars.Diagnostics.AutoTest.EditorClear();
 ```
 
 A production build given any `cw_*` key logs one Warn (`AutoTest ignored: dev tools not available in this build`) and does nothing else.
+
+### Accelerated runs and the fighter (BL-208, slice 1, 2026-11-21)
+
+`tools/test-session/scenario-bots.ps1` (Windows EXE only, no adb) drives both runs; `tools/test-session/bots-compare.py LABEL=client1.log ...` tables per-seat banked food from the MATCH SUMMARY blocks and counts Invariant FAIL / Error / Telemetry lines. Output goes to `Captures/bots-<date>/<Label>`.
+
+- **Accelerated solo:** `scenario-bots.ps1 -Mode timescale -Scale 5 -Seed 20261121 -Perk Warrior_Relentless -BotPerks Warrior_Bully,Fatty_Hoarder,Speedy_Slippery -Personality runner`. Same seed and seat flags give the same world (`World ... static=` hash and the corner permutation match at every speed).
+- **Fixed in slice 1:** auto-play and the invariant probes (round-start delay, base-intrusion and aura-orphan timers) read the runner's simulation time (`SimClock`), not `Time.unscaledTime` / `realtimeSinceStartup`; auto-play decides once per two ticks (`TickCadence`, `AutoPlayInputProvider.DecisionStepSeconds`). Before: the round-start probe waited a real 0.5 s, which is 5 s of match at x10 (chickens already walking, pile eaten, timer down), so x10 and x20 logged 74 and 83 Error lines; the peck cadence (0.8 s), cast cadence (3 s), stuck window (2 s) and press holds were real seconds, i.e. N times slower in game terms. After: 0 Invariant FAIL and 0 Error at x1, x5 and x10.
+- **Still varies (measured):** per-seat banked food. Two runs at the SAME speed and seed differ as much as runs at different speeds (x1 against x1: up to 31 food on a seat in a round), so the spread is run-to-run chaos, not the time scale: the stick is set once per rendered frame and Fusion reads it per tick, so the tick at which an input starts depends on the frame phase, and the bots, collisions and Peck cuts amplify that. Seat means over 3 rounds x 4 seats stay within 22.7 to 29.6 food at x1, x1 repeat, x5, x5 repeat and x10, no trend with speed. Use means over many matches (the simulator's validation does), never one seat of one match. Full determinism needs the stick computed inside `OnInput` per tick; not done.
+- **Four clients, fighters:** `scenario-bots.ps1 -Mode fighters -Rounds 6`: Spoiler/fighter (host), Warrior_Bully/fighter, Fatty_Hoarder/runner, Speedy_Slippery/runner. The fighter plays Stun / Shove / Steal at legal targets and the Spoiler marks, chases, stuns and kills (`FighterTactics`).
+- **Telemetry** lines: see the `Telemetry` row under Source tags. Check one against `MatchConfig.asset` (`ExecuteBounty`): `kill ... bounty=` must equal it.
 
 ---
 
@@ -589,6 +601,7 @@ A production build given any `cw_*` key logs one Warn (`AutoTest ignored: dev to
 | `CargoHud` | (legacy IMGUI, disabled by MatchHud on Awake) |
 | `Session` | boot / quality / Performance Mode identity line (every build) |
 | `Perf`, `Sync`, `Visual`, `AutoTest` | test-session probes (dev-tools builds) |
+| `Telemetry` | match events for Balance Oracle v2 (BL-208), `Info`, every build: `steal tick= thief= victim= amount=` (victim's authority, what really drained), `peckcut tick= pecker= class= cause=stun\|shove\|execution\|empty-pile` (pecker's authority), `kill tick= killer= victim= payout= bounty= victim_cargo= victim_pecking=` (killer's authority; payout = bounty + victim_cargo, bounty = `MatchConfig.ExecuteBounty`), `contact tick= seat= rival= round= t= dist=` (first time per round a chicken is within the smallest offensive reach of another; the invariant probe, authority chickens only). Seats are `B<corner>` for a bot, `P<playerId>` for a human. Each event is written by one peer, so a session log set holds each once; a solo log holds all |
 | `Reveal`, `ArenaReadiness`, `MatchOverlays` | reveal gate + first-use breadcrumbs |
 
 ---

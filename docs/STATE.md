@@ -11,6 +11,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-21 - BL-208 slice 1: accelerated clock, fighter personality, telemetry (`develop`, not pushed)
+
+- **Cause of the time-scale differences (proven):** dev-tools code ran on wall time while the simulation ran on scaled ticks. The round-start invariant probe fired a real 0.5 s after Active (5 s of match at x10), auto-play peck / cast / stuck cadences and press holds were real seconds. Fix: `SimClock` (runner simulation time) in `AutoPlayInputProvider`, `AutoTestDriver.TickAutoPlay` and `InvariantProbe` (start check, base intrusion, aura orphan); `TickCadence` decides once per two ticks. Result: 0 Invariant FAIL / 0 Error at x1, x5, x10 (was 74 / 83 Errors at x10 / x20).
+- **Not fixed, bounded:** per-seat banked food still differs between runs, at the same speed as much as across speeds (largest spread 32.5 food on one seat-round over x1, x1 repeat, x5, x5 repeat, x10; seat means 22.7 to 29.6, no trend). Input is set per frame, read per tick; full determinism would need the stick inside `OnInput`. Gameplay code on real time left alone (`StealRules` ledgers, `ExecuteRules` kill credit use `Time.unscaledTime`; lenient at speed, not part of dev tools).
+- **New flags (dev tools):** `cw_personality aggressive|runner|balanced|fighter`, `cw_seed N` (`DevSeed`, Core assembly: map, corners, bot lineup, `UnityEngine.Random`). **Fighter** = `FighterTactics` (pure) driven by `AutoPlayInputProvider`, normal input path only.
+- **Telemetry** (`MatchTelemetry`, source `Telemetry`, Info): steal, peckcut, kill, contact (first contact within the smallest offensive reach, from `InvariantProbe`). Documented in `docs/TESTING.md`.
+- **Runs** (`Captures/bots-2026-11-21/`, git-ignored): four clients, 6 rounds: 5 executions, each `bounty=5.00` = `MatchConfig.ExecuteBounty`; a Stun cut a Peck at tick 6267 with cargo 0 and the centre pile at 40.0 on all four peers until the next peck. No execution on a mid-Peck chicken happened (`victim_pecking=0` x5), no Shove cut. Verdict FAIL is only the known HUD layout offenders (U1/U6) at 960x540.
+- **Tests:** `FighterAutoPlayTests` (23). Scripts: `tools/test-session/scenario-bots.ps1`, `bots-compare.py`.
+
 ## 2026-11-21 - Peck cast cues: hex fill and cut puff (BL-212, BL-213, `develop`, not pushed)
 
 - **BL-212, hex fill:** while the local player's Peck cast runs, a cream layer (`PeckCast{n}` in `TouchControls.uxml`, `.cw-hex-peckcast` in the USS, one layer for the touch arc and the desktop / pad strip) rises from the bottom of the Peck hex over exactly the cast, then vanishes and the cooldown sweep carries on alone. Height = `PeckCastHexRules.Fill01` of `AbilityController.ActiveRemaining01For` (the buff ring's fraction): no second timer, no duration literal; a delta on `PeckCastSeconds` moves it. Tint = `FeedbackTuning.MarkCream` at `PeckCastFillAlpha`.
