@@ -456,11 +456,16 @@ namespace CluckWars.Tests
         [Test]
         public void Peck_AsksThePile_AndIsCreditedOnlyByItsReport()
         {
-            string peck = Code(Scripts + "Abilities/PeckAbilitySO.cs");
-            StringAssert.Contains("cargo.RequestPeck(pile, take)", peck);
+            string peckPath = Scripts + "Abilities/PeckAbilitySO.cs";
+            string peck = Code(peckPath);
+            string activate = Body(peckPath, "public override void OnActivate(");
+            string deactivate = Body(peckPath, "public override void OnDeactivate(");
+            StringAssert.Contains("cargo.RequestPeck(pile, take)", deactivate, "food is asked when the cast ends (BL-206)");
+            Assert.IsFalse(activate.Contains("RequestPeck("), "a press asks nothing; the cast's natural end does");
             Assert.IsFalse(Regex.IsMatch(peck, @"\.Cargo\s*\+="), "Peck credits its own cargo again");
-            Assert.Less(peck.IndexOf("SetMovementLock(ctx.Slot)", System.StringComparison.Ordinal),
-                        peck.IndexOf("RequestPeck(", System.StringComparison.Ordinal), "the movement lock still comes first (balance)");
+            StringAssert.Contains("SetMovementLock(ctx.Slot)", activate, "the cast roots the chicken from its start (balance)");
+            Assert.Less(deactivate.IndexOf("if (!ctx.EndedNaturally) return;", System.StringComparison.Ordinal),
+                        deactivate.IndexOf("RequestPeck(", System.StringComparison.Ordinal), "a cut cast asks for nothing");
 
             string request = Body(CargoPath, "public void RequestPeck(");
             Assert.Less(request.IndexOf("_requests.AskPeck(", System.StringComparison.Ordinal),

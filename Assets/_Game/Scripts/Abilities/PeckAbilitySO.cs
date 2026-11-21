@@ -14,28 +14,17 @@ namespace CluckWars.Abilities
     /// slot buys the per-slot cooldown timer, the HUD hex with its radial sweep and
     /// countdown, the <c>AbilityRefusalRules</c> precedence table, the denied-press bump,
     /// and bot integration through <c>TryGetReadySlotForRole</c>. A parallel "interact"
-    /// system would have had to reimplement every one of those, and the copies would drift.
+    /// system would have had to reimplement every one of those, and the copies drift.
     ///
-    /// <b>Amount and cooldown come from <see cref="ChickenStatsSO"/>, not from this asset.</b>
-    /// Foraging cadence is solved against the SCT axiom per class, so it is a class stat.
-    /// All four classes currently share <c>PeckAmount = 3</c> and differ only in cooldown —
-    /// but the amount is authored per class from day one because with a uniform amount the
-    /// cooldown is the only lever, and it does not separate Speedy from Fatty at all (both 0.71s).
+    /// <b>Amount, cooldown and cast time come from <see cref="ChickenStatsSO"/>, not from this asset.</b>
+    /// <c>PeckAmount</c>, <c>PeckCooldown</c> and <c>PeckCastSeconds</c> are class stats, so BalanceBook
+    /// deltas reach them. <see cref="Duration"/> is only the fallback for a caster with no stats.
     ///
-    /// <b>The movement lock is a balance requirement, not just feel.</b> The Balance Oracle
-    /// charges travel and collection sequentially — walk to the pile, then stand and take
-    /// food. A chicken that could peck while walking would beat its modelled SCT and the
-    /// axiom would quietly stop describing the game. <see cref="Duration"/> is the window
-    /// you are committed for, and it is deliberately shorter than every class's cooldown so
-    /// the lock never fully overlaps the next press.
-    ///
-    /// <b>Food is asked for at activation (and credited when the pile answers), not at the end of the peck.</b> Crediting on
-    /// <see cref="OnDeactivate"/> would read better — the beak reaches the grain — but that
-    /// callback also fires when the ability is torn down early (death, match stop), so it
-    /// would need to distinguish "finished" from "interrupted" before it could pay out. The
-    /// commitment cost is already carried by the lock and the cooldown. Revisit if an
-    /// interrupt mechanic is ever added, since that is the point at which the distinction
-    /// starts to matter.
+    /// <b>Peck is an interruptible cast (BL-206).</b> The chicken is rooted for the whole cast (the movement
+    /// lock is a balance requirement: the Oracle charges travel and collection sequentially). Food is asked of the
+    /// pile when the cast ends naturally (<c>ctx.EndedNaturally</c> in <see cref="OnDeactivate"/>), with the pile's
+    /// reach and food re-checked then. A stun, a shove, an execution or the chicken's own next move cuts the cast and
+    /// nothing is asked. The pile authority still serves and reports the food (ARCH-NET-07), unchanged.
     /// </remarks>
     [CreateAssetMenu(fileName = "Peck",
         menuName = "Cluck Wars/Ability/Utility/Peck", order = 4)]
@@ -64,8 +53,14 @@ namespace CluckWars.Abilities
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool RequiresEnemyInRange => false;
 
-        /// <summary>Casting any other move cancels the 0.4 s lock (the food was already asked for on peck start).</summary>
+        /// <summary>Casting any other move cuts the cast: the chicken rooted itself for it and no food is asked.</summary>
         public override bool EndsOnNextMove => true;
+
+        /// <summary>The cast length: the class's <see cref="ChickenStatsSO.PeckCastSeconds"/>. Falls back to
+        /// <see cref="AbilityBaseSO.Duration"/> only if stats are somehow missing. Every reader (run timer, ring drain,
+        /// HUD, animator) goes through this.</summary>
+        public override float ResolveActiveDuration(ChickenController caster) =>
+            PeckCastRules.CastSeconds(caster != null ? caster.Stats : null, Duration);
 
         /// <summary>Per-class, solved against the SCT axiom. Falls back to the authored
         /// <see cref="AbilityBaseSO.Cooldown"/> only if stats are somehow missing.</summary>
@@ -97,39 +92,33 @@ namespace CluckWars.Abilities
             var chicken = ctx.Controller;
             if (chicken == null) return;
 
-            // Commit the chicken in place for Duration. Cleared in OnDeactivate, which
-            // AbilityController calls on timer expiry AND on every early teardown, so the
-            // lock cannot outlive the peck.
+            // Root the chicken for the whole cast. Cleared in OnDeactivate, which AbilityController calls on natural
+            // end AND on every early teardown, so the lock cannot outlive the cast. No food is asked yet.
             chicken.Effects.SetMovementLock(ctx.Slot);
-
-            // The lock above sits BEFORE this guard on purpose, for the `pile == null` half:
-            // the pile drained between IsUsable and activation, and the player is still
-            // committed for Duration. That commitment is the balance mechanic documented at
-            // the top of this file — do not "fix" the ordering by moving the lock below,
-            // that deletes it. (The `cargo == null` half is only technically behind the lock;
-            // a cargo-less chicken is a decoy, and decoys never cast.)
-            var cargo = chicken.Cargo;
-            var pile = FindPile(chicken);
-            if (cargo == null || pile == null) return;
-
-            float amount = AmountFor(chicken);
-
-            // pile.Available, not pile.Amount — the centre island is permanent and holds a
-            // floor that is terrain, not food. Asking against Amount would make it an
-            // infinite source.
-            float take = Mathf.Min(amount, cargo.FreeSpace, pile.Available);
-            if (take <= 0f) return;
-
-            // Ask, do not credit: this peer's view of the pile can be stale (another chicken
-            // pecking it in the same tick). The pile's authority removes what is really there
-            // and reports it, and only that report credits the cargo (FoodTransferRules) — at
-            // once when this peer owns the pile, one round trip later otherwise.
-            cargo.RequestPeck(pile, take);
         }
 
         public override void OnDeactivate(AbilityContext ctx)
         {
-            if (ctx.Controller != null) ctx.Controller.Effects.RemoveMovementLock(ctx.Slot);
+            var chicken = ctx.Controller;
+            if (chicken == null) return;
+            chicken.Effects.RemoveMovementLock(ctx.Slot);
+            if (!ctx.EndedNaturally) return;                       // cut or torn down: no food, by design
+
+            var gm = GameManager.Instance;
+            if (gm == null || !gm.IsMatchRunning) return;          // legal: the round ended on this tick
+
+            var cargo = chicken.Cargo;
+            var pile = FindPile(chicken);                          // reach and food re-checked now
+            if (cargo == null || pile == null) return;             // legal: pile emptied or chicken moved off it; lands empty
+
+            // pile.Available, not pile.Amount: the centre island is permanent and holds a floor that is terrain, not food.
+            float take = PeckCastRules.LandingTake(AmountFor(chicken), cargo.FreeSpace, pile.Available);
+            if (take <= 0f) return;                                // legal: the beak filled meanwhile
+
+            // Ask, do not credit: this peer's view of the pile can be stale. The pile's authority removes what is really
+            // there and reports it, and only that report credits the cargo (FoodTransferRules).
+            cargo.RequestPeck(pile, take);
+            chicken.Abilities?.NotePeckLanded();
         }
 
         /// <summary>Food taken per press for this caster's class. Also the bound the pile and the pecker's own

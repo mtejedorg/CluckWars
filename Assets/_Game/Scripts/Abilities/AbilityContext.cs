@@ -69,6 +69,12 @@ namespace CluckWars.Abilities
         /// </summary>
         public int Slot = -1;
 
+        /// <summary>
+        /// True only inside <see cref="AbilityBaseSO.OnDeactivate"/> when the slot's own timer ran out; false for every
+        /// teardown (cut, cast, death, reset, swap, authority gain).
+        /// </summary>
+        public bool EndedNaturally;
+
         public AbilityContext(ChickenController controller)
         {
             Controller = controller;

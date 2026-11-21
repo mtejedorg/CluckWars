@@ -61,22 +61,24 @@ namespace CluckWars.Gameplay
         /// did or didn't clean up itself and even when the slot's asset was swapped mid-run (a loadout swap would
         /// otherwise call the NEW asset's OnDeactivate and leak the old one's modifier). Both removals are no-ops
         /// when nothing is held. The context's slot is reset to -1 afterwards so a stray later write is caught.
+        /// <paramref name="natural"/> (the slot's own timer ran out) is exposed to OnDeactivate as <c>ctx.EndedNaturally</c>.
         /// </summary>
         public static void ReleaseSlot(int slot, AbilityBaseSO ability, AbilityContext ctx,
-            AbilityEffectStack effects, Action<int> endTraversal)
+            AbilityEffectStack effects, Action<int> endTraversal, bool natural = false)
         {
             try
             {
                 if (ability != null && ctx != null)
                 {
                     ctx.Slot = slot;
+                    ctx.EndedNaturally = natural;
                     ability.OnDeactivate(ctx);
                 }
             }
             finally
             {
                 // Runs even if OnDeactivate throws (the exception still propagates and is logged by Unity).
-                if (ctx != null) ctx.Slot = -1;
+                if (ctx != null) { ctx.Slot = -1; ctx.EndedNaturally = false; }
                 effects?.RemoveSource(slot);
                 endTraversal?.Invoke(slot);
             }

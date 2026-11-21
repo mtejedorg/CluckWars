@@ -379,7 +379,7 @@ namespace CluckWars.Abilities
         /// <see cref="ActiveDurationIsOutgoingControl"/>. Read by <c>AbilityController</c> for the run timer and the
         /// ring drain, so the two always agree. The cooldown is not affected and still starts at the cast.
         /// </summary>
-        public float ResolveActiveDuration(Gameplay.ChickenController caster) =>
+        public virtual float ResolveActiveDuration(Gameplay.ChickenController caster) =>
             ActiveDurationIsOutgoingControl ? ResolveOutgoingControlSeconds(Duration, caster) : Duration;
 
         /// <summary>

@@ -97,6 +97,11 @@ namespace CluckWars.Gameplay
         /// </summary>
         [Networked] public byte LastCastEventId { get; set; }
 
+        /// <summary>Bumped by the state authority when a Peck cast completes and food is actually asked of a pile (not on a cut,
+        /// not on an empty landing). One-shot, wraps at 255; peers observe it through ChickenLocalEvents.</summary>
+        [Networked] public byte PeckLandedEventId { get; private set; }
+        internal void NotePeckLanded() { if (HasStateAuthority) PeckLandedEventId++; }
+
         /// <summary>
         /// True while the Peck auto-chain runs (Phase 6 chunk 4, A6): the bird keeps pecking on its own each time
         /// the per-class cooldown is ready. Decided on the state authority by <see cref="PeckChainRules"/>; the
@@ -196,6 +201,7 @@ namespace CluckWars.Gameplay
         private int   _castSlotThisTick = InvalidSlot;
         private float _idleSeconds;
         private byte  _lastKnockbackId;
+        private byte  _peckCutKnockbackSeen;
 
         // Scratch for AbilityRunRules (no per-tick allocation).
         private readonly float[] _elapsedScratch = new float[SlotCount];
@@ -310,7 +316,7 @@ namespace CluckWars.Gameplay
 
             // Seed the authority edge so the original authority does not see a spurious "gained" on its first tick.
             _wasAuthority = HasStateAuthority;
-            if (_controller != null) _lastKnockbackId = _controller.KnockbackEventId;
+            if (_controller != null) { _lastKnockbackId = _controller.KnockbackEventId; _peckCutKnockbackSeen = _controller.KnockbackEventId; }
             _initialized = true;
             _log?.Debug(Source, $"Spawned. Passive={(_passive != null ? _passive.name : "(none)")}, {DescribeSlots()}.");
         }
@@ -352,6 +358,8 @@ namespace CluckWars.Gameplay
             {
                 if (AbilityRunRules.IsActive(expired, i)) Deactivate(i, natural: true);
             }
+
+            CutPeckIfInterrupted();
 
             for (int i = 0; i < SlotCount; i++)
                 _rearmRemaining[i] = AbilityFizzleRules.Advance(_rearmRemaining[i], Runner.DeltaTime);
@@ -1327,6 +1335,26 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// A stun or a shove cuts a running Peck cast: no food lands (D2a). Runs right after the natural-expiry loop, so a stun that
+        /// lands on the completing tick still lets the food land. Reads only <c>IsStunned</c> and <c>KnockbackEventId</c>: a slow,
+        /// a robbery, a root and the chicken's own dodge never cut. The chicken's own next move and an execution already end the
+        /// slot through <c>EndStealthAndPeckForCast</c> / <c>EndAllForRemoval</c>.
+        /// </summary>
+        private void CutPeckIfInterrupted()
+        {
+            if (_controller == null) return;
+            byte knock = _controller.KnockbackEventId;
+            bool knocked = knock != _peckCutKnockbackSeen;
+            _peckCutKnockbackSeen = knock;                    // updated every tick: a shove before the press never cuts later
+            int peck = FindPeckSlot();
+            if (peck == InvalidSlot || !IsSlotActive(peck)) return;
+            bool stunned = _controller.IsStunned;
+            if (!PeckCastRules.IsCut(stunned, knocked)) return;
+            Deactivate(peck);                                 // not natural: no food, no expire cue
+            _log?.Debug(Source, $"Peck cut by {(stunned ? "a stun" : "a shove")}.");
+        }
+
+        /// <summary>
         /// Ends the run in <paramref name="slot"/>: removes that ability's own effect modifiers (never anyone
         /// else's), releases its traversal hold, and clears its active flag. Idempotent for a slot not running.
         /// Only <paramref name="natural"/> expiry plays the expire sound (and only for a human-driven chicken);
@@ -1341,7 +1369,7 @@ namespace CluckWars.Gameplay
             System.Action<int> endTraversal = _controller != null && _controller.Traversal != null
                 ? _controller.Traversal.End
                 : null;
-            AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal);
+            AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal, natural);
             if (ability != null)
             {
                 if (natural) _cues.Queue(AbilityCue.Expired);
@@ -1397,6 +1425,7 @@ namespace CluckWars.Gameplay
             ApplyReplicatedLoadout();
             DeactivateAll();
             if (_controller == null) return;
+            _peckCutKnockbackSeen = _controller.KnockbackEventId;
             for (int i = 0; i < SlotCount; i++)
             {
                 _controller.Effects.RemoveSource(i);
