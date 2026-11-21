@@ -47,12 +47,12 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 <!-- BEGIN GENERATED: assemblies -->
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
-| `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 27 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 177 |
+| `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 28 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 178 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 145 |
-| `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 30 |
+| `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 32 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 292 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 293 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -96,11 +96,11 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Audio` | `CluckWars.Gameplay` | 9 |
 | `Balance` | `CluckWars.Gameplay` | 21 |
 | `Bootstrap` | `CluckWars.Core` | 1 |
-| `Diagnostics` | `CluckWars.Diagnostics` | 25 |
-| `Diagnostics/Shared` | `CluckWars.Core` | 8 |
+| `Diagnostics` | `CluckWars.Diagnostics` | 27 |
+| `Diagnostics/Shared` | `CluckWars.Core` | 9 |
 | `Editor` | `Assembly-CSharp-Editor` | 18 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 266 |
-| `Gameplay` | `CluckWars.Gameplay` | 86 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 267 |
+| `Gameplay` | `CluckWars.Gameplay` | 87 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
 | `Injection` | `CluckWars.Core` | 1 |
@@ -171,7 +171,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Services` | Core | `IUGSService` / `NullUGSService` / `LobbyInfo`, `IBalanceSource` / `NullBalanceSource` (live-ops balance fetch), haptics (`IHapticsService`, `HapticsService`, `AndroidHapticDevice`, `HapticRules`), `FrameRatePolicy` |
 | `Scripts/Bootstrap` | Core | `SceneLoader` (in `Bootstrap.unity`; loads the next scene) |
 | `Scripts/Geometry` | Core | `Planar` |
-| `Scripts/Diagnostics/Shared` | Core | `BuildInfo`, `DevTools`, `IDevBalanceEditor` (the interface the menu sees), `DiagnosticsState`, `DebugHudMode`, `DepositDiagnostics`, `CornerTapDetector`, `PerKeyRateLimiter` |
+| `Scripts/Diagnostics/Shared` | Core | `BuildInfo`, `DevTools`, `DevSeed` (the `cw_seed` seed for solo runs), `IDevBalanceEditor` (the interface the menu sees), `DiagnosticsState`, `DebugHudMode`, `DepositDiagnostics`, `CornerTapDetector`, `PerKeyRateLimiter` |
 | `Scripts/Gameplay` (+ `Session/`) | Gameplay (asmdef) | The simulation; sub-areas below |
 | `Scripts/Abilities` (+ `Passives/`) | Gameplay | Ability ScriptableObjects and their shared vocabulary (below) |
 | `Scripts/Networking` | Gameplay | `INetworkService` (all Fusion runner lifecycle), `PlayerNetworkInput` (the per-tick input struct; its aim byte is always 0 since 2026-11-20), `AimRules` (aim decode, the soft-lock pick; no device aims any more), `DisconnectRules` |
@@ -181,7 +181,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators and the floor arrows (`RivalIndicator`, `FloorRivalArrows`, `FloorArrowRules`, `MarkedTargetArrowRules`), the Death Mark / Hunt hunter feedback (`MarkFeedback`, `HuntBrackets`, `HuntRules`), `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
 | `Scripts/UI` | Presentation | UI Toolkit controllers (`MenuUiController` and its partials, `MatchOverlaysController` and its partials, `MatchHudController`, `MarkHudController`), `UiElements`, ability icon/palette mapping, pure layout/flow rules (`MatchStandings`, `WaitingRoomRules`, `SafeAreaPadding`, `OrientationPolicy`), `DebugHud`, and `MatchHud` (a UGUI canvas built in code for the hit flash and the comeback banner) |
 | `Scripts/Input` | Presentation | `IInputProvider` and its providers (`KeyboardInputProvider`, `GamepadInputProvider`, `TouchInputProvider`, `CompositeInputProvider`); `TouchControlsController` and its `.Hud` partial; pure input and hex rules (`JoystickRules`, `HoldCancelRules`, `PeckLongPressRules` (tap pecks, long press flips Auto-Peck), `HudLayoutRules` (slot roles, per-device strip arrangement, hex tilt), `CasterStunCountdownRules`, `EggPhaseHexRules`, `HuntHexRules`, `PeckCastHexRules` (the Peck hex fill over the cast)) |
-| `Scripts/Diagnostics` | Diagnostics (asmdef) | `AutoTestDriver` (+ `.Aura`, `.Mark` partials), `AutoTestArgs`, `AutoTestConfig`, `AutoPlayBrain`, `AutoPlayInputProvider`, `InvariantProbe` / `RoundInvariants`, `PerfProbe` / `PerfRules`, `VisualProbe` / `VisualScanRules`, `UiLayoutProbe` / `UiLayoutRules` / `UiLayoutAllowList`, `SyncHeartbeat` / `SyncHeartbeatFormat`, `SessionStamp`, `DevBalanceEditor` (dev-only UI Toolkit local balance editor, implements `IDevBalanceEditor`; bound in `InstallDiagnostics`), `DevBuildStamp` (dev-only UI Toolkit overlay, version + build number bottom-right; bound in `ProjectInstaller.InstallDiagnostics`), `MenuShotsDriver`, `DebugHudSpawner`, `RevealBreadcrumbs`, `DiagnosticsObjects` (keeps a probe alive across scene loads) |
+| `Scripts/Diagnostics` | Diagnostics (asmdef) | `AutoTestDriver` (+ `.Aura`, `.Mark` partials), `AutoTestArgs`, `AutoTestConfig`, `AutoPlayBrain`, `AutoPlayInputProvider`, `FighterTactics` (pure: the fighter auto-play personality), `SimClock` (also holds `TickCadence`; the simulation-time clock of the auto-play and the probes), `InvariantProbe` / `RoundInvariants`, `PerfProbe` / `PerfRules`, `VisualProbe` / `VisualScanRules`, `UiLayoutProbe` / `UiLayoutRules` / `UiLayoutAllowList`, `SyncHeartbeat` / `SyncHeartbeatFormat`, `SessionStamp`, `DevBalanceEditor` (dev-only UI Toolkit local balance editor, implements `IDevBalanceEditor`; bound in `InstallDiagnostics`), `DevBuildStamp` (dev-only UI Toolkit overlay, version + build number bottom-right; bound in `ProjectInstaller.InstallDiagnostics`), `MenuShotsDriver`, `DebugHudSpawner`, `RevealBreadcrumbs`, `DiagnosticsObjects` (keeps a probe alive across scene loads) |
 | `Scripts/AbilityLab` | Diagnostics | The Ability Lab dev scene: `AbilityLabBootstrapper`, `AbilityLabPanel`, `AbilityLabHud`, `AbilityLabDummy`, `AbilityLabLoadout` |
 | `Scripts/App` | App (asmdef) | `FusionNetworkService` (Fusion implementation of `INetworkService`), `UGSService` (live UGS auth + lobby, lobby `bal` hash check), `RemoteConfigBalanceSource` (the only Remote Config user) |
 | `Scripts/Installers` | App | `ProjectInstaller` (app-wide bindings, on `Assets/_Game/Resources/ProjectContext.prefab`), `GameInstaller` (scene bindings, on the SceneContext of `Game.unity` and `AbilityLab.unity`) |
@@ -193,6 +193,7 @@ Non-script file counts by folder (depth 3):
 | Sub-area | Files |
 |---|---|
 | Match lifecycle and flow | `GameManager` (match state machine, timer, win check; spawned from `Assets/_Game/Prefabs/GameManager.prefab` by `MatchBootstrapper`), `MatchState`, `MatchBootstrapper` (match entry point in `Game.unity`), `MatchSignals`, `MatchFlowRules`, `MatchBackRules`, `MatchPresentationRules`, `MatchSummaryLines`, `MatchEventKind`, `ComebackRules`, `RoundTeleportRules`, `RoundStartCooldownRules`, `LocalJoinClock`, `ArenaReadiness`, `ArenaWarmup`, `ISessionSelectionService` and `SessionSelectionService` (both in `Gameplay/Session/`) |
+| Match telemetry | `MatchTelemetry` (pure formatting of the `steal`, `peckcut`, `kill` and `contact` lines under the `Telemetry` source tag; BL-208) |
 | Spawn corners and player identity | `CornerAssignment`, `CornerSlotRules`, `SpawnPlacement`, `PlayerColors` |
 | The chicken | `ChickenController` (motion, control windows, RPC entry points, `Local` / `LocalDriven`), `ChickenCargo`, `ChickenCombat` (execute removal/respawn; hosts `SenderLatency` / `PeerLatency`), `ChickenMovement`, `ChickenTraversal`, `ChickenCapsule`, `ChickenMatchStats`, `ChickenLocalEvents`, `EventEdge`, `ListenerList`, `ControlState`, `EffectWindow`, `ContactHysteresis`, `RecentPositions`, `LocalChickenRules`, `IChickenModelPresenter`, `Doppelganger`, `SilentCargoWrite` |
 | Chicken classes | `ChickenClass` (the enum), `ChickenClassInfo` (holds `ChickenClasses`), `ChickenStatsSO`, `ChickenClassRegistrySO` |
@@ -386,6 +387,9 @@ All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each,
 **Diagnostics**
 - `Diagnostics/InvariantProbe.cs`: logs match state transitions and checks round invariants on every peer.
 - `Diagnostics/AutoPlayBrain.cs`: the auto-play bot's pile choice and steering (pure).
+- `Diagnostics/SimClock.cs`: `SimClock` (simulation time) and `TickCadence` (decisions on a fixed simulated step); the clock of the auto-play and the probes.
+- `Diagnostics/FighterTactics.cs`: the fighter auto-play personality's decisions (pure).
+- `Gameplay/MatchTelemetry.cs`: the telemetry line formats and the `Telemetry` source tag.
 - `Diagnostics/AutoTestConfig.cs`: the `cw_*` auto-test keys from intent extras or the command line.
 - `Diagnostics/VisualProbe.cs`: scans live renderers for pink / missing shaders.
 - `Diagnostics/Shared/DevTools.cs`: the one gate for every developer-only tool.
@@ -502,7 +506,7 @@ Recording fakes are not shared: each test file declares its own private nested c
 | `tools/run-clients.ps1` | Launch N windowed Windows clients for local multiplayer testing |
 | `tools/generate-uss-tokens.ps1` | Design token JSX to `Assets/UI/Styles/CluckWarsTokens.uss` |
 | `tools/export-design-assets.ps1` | Render design atoms from `Design/export.html` (headless Chrome) to PNG sprites |
-| `tools/test-session/` | Multi-device test sessions (11 `.ps1` + `README.md` + `fixtures/`): `start.ps1` / `stop.ps1` (logcat, rolling screenrecord via `rec-loop.ps1`, EXE clients), `merge.ps1` (one UTC timeline + findings), `verify.ps1` (PASS/FAIL verdict), `scenario-pc.ps1` (PC-only unattended scenario), `scenario-4seat.ps1` (EXE host + Pixel + 2 EXE clients), `get-code.ps1` (join code from logs), `shot.ps1` (timestamped screenshots), `selftest.ps1` (merge.ps1 against a synthetic fixture), `lib.ps1` (shared helpers) |
+| `tools/test-session/` | Multi-device test sessions (12 `.ps1` + `bots-compare.py` + `README.md` + `fixtures/`): `start.ps1` / `stop.ps1` (logcat, rolling screenrecord via `rec-loop.ps1`, EXE clients), `merge.ps1` (one UTC timeline + findings), `verify.ps1` (PASS/FAIL verdict), `scenario-pc.ps1` (PC-only unattended scenario), `scenario-4seat.ps1` (EXE host + Pixel + 2 EXE clients), `scenario-bots.ps1` (four EXE clients on auto-play, accelerated, with telemetry; BL-208), `bots-compare.py` (compares the banked food per round and seat of runs of one seed at different `cw_timescale`), `get-code.ps1` (join code from logs), `shot.ps1` (timestamped screenshots), `selftest.ps1` (merge.ps1 against a synthetic fixture), `lib.ps1` (shared helpers) |
 | `tools/ui_capture/` | 71 files driving the Editor through the MCP bridge (`bridge.py`, JSON-RPC over HTTP): 47 `capture_*.py` renders, metric scripts (`*_metrics.py` and others), `run_editmode_tests.py` (filtered EditMode run), `run_suite_api.py` (full suite via TestRunnerApi), `open_scene.py`, `render_heroes.py`, and `*.cs.txt` C# snippets run through the bridge; see its `README.md` |
 | `tools/audio/` | `match_music.py` (in-match music loop) and `menu/` (`synth.py`, `music.py`, `analyse.py`: procedural menu audio, numpy/scipy) |
 | `tools/art/` | PIL/numpy texture edits for Phase 8: `d4_surround/`, `d5_decals/`, `e3_grass_macro/`, `e4_fatty_recolour/` (with `README.txt`) |

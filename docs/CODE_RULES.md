@@ -136,6 +136,7 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 | CODE-BUILD-16 | Test sessions run at log level Debug, never Warn | REVIEW | CURRENT |
 | CODE-BUILD-17 | After a hard crash, verify state and resume; do not chase hardware | REVIEW | CURRENT |
 | CODE-BUILD-18 | Check ComfyUI's port before diagnosing a generation failure | REVIEW | CURRENT |
+| CODE-BUILD-19 | Dev-tools auto-play and probes read simulation time through `SimClock` | TEST | CURRENT |
 | CODE-PROC-01 | Orient before changing anything non-trivial | REVIEW | CURRENT |
 | CODE-PROC-02 | Route non-trivial work through `code-architect`; let specialists implement; `librarian` looks up before and maintains the docs after | REVIEW | CURRENT |
 | CODE-PROC-03 | Fable is a per-call escalation, never a default and never pinned | REVIEW | CURRENT |
@@ -949,6 +950,14 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Audit check: n/a (environment step).
 - Source: M:comfyui-sageattention-pyd-bug.md:11-41, M:icon-and-fx-generation-pipeline.md:15
 - Status: CURRENT as of 2026-08-21 (not re-verified)
+
+### CODE-BUILD-19 — Dev-tools auto-play and the invariant probes read simulation time through SimClock
+- Rule: The auto-play input provider, `AutoTestDriver.TickAutoPlay` and `InvariantProbe` take their time from `SimClock.Now` (the Fusion runner's simulation time), never `Time.unscaledTime` or `Time.realtimeSinceStartup`. Decisions on a fixed step use `TickCadence`.
+- Why: with `-cw_timescale N` the simulation runs N times faster than the wall clock, so wall-clock delays fire N times too late in game terms and two speeds play different matches (BL-208).
+- Enforced by: TEST `FighterAutoPlayTests.TheDriversAndProbes_ReadSimulationTime_NotTheWallClock` (Tests/FighterAutoPlayTests.cs); a source scan of three files only, so a new dev-tools clock reader elsewhere is not caught
+- Audit check: `git grep -nE "unscaledTime|realtimeSinceStartup" -- Assets/_Game/Scripts/Diagnostics` hits only `SimClock.cs` (its documented fallback before a runner exists) and probes that are not auto-play or invariant code.
+- Source: `Diagnostics/SimClock.cs` header comment; docs/STATE.md (BL-208 slice 1)
+- Status: CURRENT
 
 ## 3.8 PROC: agents, models, branching, commits, docs upkeep, backlog
 
