@@ -127,6 +127,7 @@ namespace CluckWars.Editor
             ColHeader("Cap",     wI);
             ColHeader("Peck", wF);
             ColHeader("PkCD", wF);
+            ColHeader("PkCast", wF);
             ColHeader("Rate",    wF);
             ColHeader("Scale",   wF);
             EditorGUILayout.EndHorizontal();
@@ -145,6 +146,7 @@ namespace CluckWars.Editor
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);
                 s.PeckAmount     = FloatField(s.PeckAmount,     wF, minVal: 0.1f);
                 s.PeckCooldown   = FloatField(s.PeckCooldown,   wF, minVal: 0.05f);
+                s.PeckCastSeconds = FloatField(s.PeckCastSeconds, wF, minVal: 0.2f);
                 s.Scale          = FloatField(s.Scale,          wF, minVal: 0.1f);
 
                 EditorGUILayout.EndHorizontal();

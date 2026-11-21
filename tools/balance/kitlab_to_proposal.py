@@ -8,8 +8,8 @@ Input (the artifact database collections, document id -> document):
    "classstats":  {"Warrior": {"values": {"move": 11}}},
    "kits":        {"Bully": {"passive": "Bully", "slots": ["Peck","Snatch","WingSlam","Shadowstep"], "stats": {"cdr": 30}}}}
 Output: {"note", "assets", "kits", "needsBuild": [...], "leftOut": [...]}; make_delta.py reads note/assets/kits and ignores
-the rest. Same mapping as the page's buildDelta (kitlab_map.py): class base stats move/carry/peckAmt/peckCd/turn/size ->
-MoveSpeed/CargoCapacity/PeckAmount/PeckCooldown/TurnSpeed/Scale; passive percentages cdr/steal/cc/slowIn/kb/bank/ccOut ->
+the rest. Same mapping as the page's buildDelta (kitlab_map.py): class base stats move/carry/peckAmt/peckCd/peckCast/turn/size ->
+MoveSpeed/CargoCapacity/PeckAmount/PeckCooldown/PeckCastSeconds/TurnSpeed/Scale; passive percentages cdr/steal/cc/slowIn/kb/bank/ccOut ->
 CooldownMultiplier=1-v/100, StealMultiplier=1+v/100, DurationMultiplier, Resist, KnockbackMultiplier,
 DepositRateMultiplier, OutgoingDurationMultiplier = v/100; a slot swap with an unchanged passive -> `kits`.
 "needsBuild": passive swaps, NEW (custom:) abilities and retired moves, which a delta cannot carry. Deviation from the page:

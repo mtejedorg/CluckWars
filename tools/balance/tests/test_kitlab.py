@@ -54,6 +54,18 @@ class KitLabTests(DataCopyCase):
         self.assertEqual(again["assets"], p["assets"])
         self.assertEqual(again["kits"], p["kits"])
 
+    def test_peck_cast_maps_both_ways(self):
+        p = k2p.convert({"classstats": {"Fatty": {"values": {"peckCast": 0.6}}}})
+        self.assertEqual(p["assets"]["Fatty"], {"PeckCastSeconds": 0.6})
+        docs = d2k.convert({"schema": 1, "assets": p["assets"]})
+        self.assertEqual(docs["classstats"]["Fatty"]["values"], {"peckCast": 0.6})
+
+    def test_peck_cast_field_range_is_read_from_the_source(self):
+        import schema
+        f = schema.class_fields("ChickenStatsSO")["PeckCastSeconds"]
+        self.assertEqual(f.kind, "float")
+        self.assertEqual((f.lo, f.hi), (0.2, 1.2))
+
     def test_match_config_is_unsupported(self):
         docs = d2k.convert({"schema": 1, "assets": {"MatchConfig": {"FoodTargetToWin": 50}}})
         self.assertEqual(len(docs["unsupported"]), 1)

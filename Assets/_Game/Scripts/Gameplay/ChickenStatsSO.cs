@@ -11,7 +11,8 @@ namespace CluckWars.Gameplay
     /// available to all classes (GDD §7.1).
     /// v0.7: <c>Passive</c> removed — the class specialization is the equipped
     /// <c>PassiveAbilitySO</c> now, not an enum here. <c>CollectionRate</c> removed —
-    /// foraging is <c>PeckAmount</c> / <c>PeckCooldown</c>.
+    /// foraging is <c>PeckAmount</c> / <c>PeckCooldown</c>; one forage cycle is
+    /// <c>max(PeckCooldown, PeckCastSeconds)</c> (BL-206: Peck is an interruptible cast).
     /// </remarks>
     [CreateAssetMenu(
         fileName = "ChickenStats",
@@ -45,6 +46,11 @@ namespace CluckWars.Gameplay
                  "sits ~20-30% above the old CollectionRate for the same clear time. That gap is " +
                  "quantisation waste, not a buff.")]
         [Min(0.05f)] public float PeckCooldown = 1f;
+
+        [Tooltip("Seconds a Peck takes from press to food landing; the chicken is rooted for the whole cast and a stun, a shove, " +
+                 "an execution or its own next move cuts it (no food). PLACEHOLDER values for Maestro and the Balance Oracle to tune; " +
+                 "keep it readable, under about 0.9 s. The Peck clip is scaled to this value on every peer.")]
+        [Range(0.2f, 1.2f)] public float PeckCastSeconds = 0.4f;
 
         [Header("Visuals")]
         [Tooltip("Uniform scale applied to the chicken's transform at spawn.")]

@@ -373,7 +373,31 @@ namespace CluckWars.Tests
                     $"{s.name}: PeckAmount {s.PeckAmount} exceeds CargoCapacity {s.CargoCapacity}, " +
                     "so a single press always overfills and the class fills in one press regardless " +
                     "of its cooldown.");
+
+                // The cast is a placeholder per class, but it must sit inside the field's own authored range
+                // (read by reflection, not restated here) or the Range clamp and the Oracle disagree.
+                var range = (UnityEngine.RangeAttribute)System.Attribute.GetCustomAttribute(
+                    typeof(ChickenStatsSO).GetField(nameof(ChickenStatsSO.PeckCastSeconds)), typeof(UnityEngine.RangeAttribute));
+                Assert.IsNotNull(range, "PeckCastSeconds lost its [Range].");
+                Assert.GreaterOrEqual(s.PeckCastSeconds, range.min, $"{s.name}: PeckCastSeconds below its range.");
+                Assert.LessOrEqual(s.PeckCastSeconds, range.max, $"{s.name}: PeckCastSeconds above its range.");
             }
+        }
+
+        [Test]
+        public void Peck_ShippedCast_FattyIsTheLongest()
+        {
+            var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
+            var peck = abilities.Find(a => a is PeckAbilitySO);
+            var passives = abilities.OfType<PassiveAbilitySO>().ToList();
+            var foragers = TestAssets.LoadAllIn<ChickenStatsSO>(TestAssets.ClassesDir)
+                .Where(s => System.Enum.TryParse<ChickenClass>(s.DisplayName, out var cls) &&
+                            PreEquippedLoadout.ClassForages(cls, passives, abilities, peck)).ToList();
+            var fatty = foragers.Find(s => s.DisplayName == nameof(ChickenClass.Fatty));
+            Assert.IsNotNull(fatty, "Fatty is not a forager in the shipped data.");
+            foreach (var other in foragers.Where(s => s != fatty))
+                Assert.Greater(fatty.PeckCastSeconds, other.PeckCastSeconds,
+                    $"Fatty's Peck cast must be the longest (Maestro's ruling); {other.name} is not shorter.");
         }
 
         // ---- The Peck invariant -------------------------------------------------

@@ -19,7 +19,7 @@ CAT = {0: "Steal", 1: "Control", 2: "Defense", 3: "Utility"}
 CLASS_BITS = [(1, "Warrior"), (2, "Speedy"), (4, "Fatty"), (8, "Assassin")]
 NOT_NUMS = {"AccentKey", "Category", "TerrainTraversal", "JumpTier", "AllowedClasses", "PeckSlotPreEquippedBy",
             "SignaturePreEquippedBy", "BotRole", "CastMotion", "Subclass", "SlotKind"}
-CLASS_STATS = ("MoveSpeed", "TurnSpeed", "CargoCapacity", "PeckAmount", "PeckCooldown", "Scale")
+CLASS_STATS = ("MoveSpeed", "TurnSpeed", "CargoCapacity", "PeckAmount", "PeckCooldown", "PeckCastSeconds", "Scale")
 
 
 def num(v):

@@ -5,7 +5,7 @@ Mirrors the Kit Lab page's `buildDelta` (BASEKEY, DP_PASSIVE and r4 in the page 
 
 # class base stat key in the `classstats` documents -> ChickenStatsSO field
 BASEKEY = {"move": "MoveSpeed", "carry": "CargoCapacity", "peckAmt": "PeckAmount", "peckCd": "PeckCooldown",
-           "turn": "TurnSpeed", "size": "Scale"}
+           "peckCast": "PeckCastSeconds", "turn": "TurnSpeed", "size": "Scale"}
 
 # passive stat key in the `kits` documents (a percentage) -> (PassiveAbilitySO field, percentage -> field value,
 # field value -> percentage)

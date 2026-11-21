@@ -337,6 +337,7 @@ var STD=[
  {k:'carry',label:'Carry capacity',unit:'',std:10,better:'up',dec:0,why:'Shared by Speedy and Sneaky'},
  {k:'peckAmt',label:'Peck amount',unit:'',std:3,better:'up',dec:1,why:'Shared by every class'},
  {k:'peckCd',label:'Peck cooldown',unit:' s',std:0.71,better:'down',dec:2,why:'Shared by Speedy and Fatty'},
+ {k:'peckCast',label:'Peck cast',unit:' s',std:0.5,better:'down',dec:2,why:'Placeholder per class; Fatty longest'},
  {k:'cdr',label:'Cooldown reduction',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Relentless'},
  {k:'steal',label:'Steal bonus',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Bully and Thief'},
  {k:'cc',label:'Stun/slow taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Relentless and Bulwark'},
@@ -350,7 +351,7 @@ var STD=[
 function stdOf(r){var o=state.std&&state.std.values&&state.std.values[r.k];return (typeof o==='number'&&isFinite(o))?o:r.std;}
 function fmtStd(r,v){return (r.dec?(Math.round(v*Math.pow(10,r.dec))/Math.pow(10,r.dec)):Math.round(v))+r.unit;}
 // Base stats are class values (both specializations share them); the passive stats belong to one kit.
-var BASEKEY={move:'MoveSpeed',carry:'CargoCapacity',peckAmt:'PeckAmount',peckCd:'PeckCooldown',turn:'TurnSpeed',size:'Scale'};
+var BASEKEY={move:'MoveSpeed',carry:'CargoCapacity',peckAmt:'PeckAmount',peckCd:'PeckCooldown',peckCast:'PeckCastSeconds',turn:'TurnSpeed',size:'Scale'};
 function num(x){return typeof x==='number'&&isFinite(x);}
 function baseOf(c){var b=Object.assign({},CSTATS[c]||{}),o=(state.cstats[c]||{}).values||{};
   Object.keys(BASEKEY).forEach(function(k){if(num(o[k]))b[BASEKEY[k]]=o[k];});return b;}
@@ -367,7 +368,7 @@ function statsOf(s,k){
     kb:pn.KnockbackMultiplier?Math.round(pn.KnockbackMultiplier*100):100,
     bank:pn.DepositRateMultiplier?Math.round(pn.DepositRateMultiplier*100):100,
     ccOut:pn.OutgoingDurationMultiplier?Math.round(pn.OutgoingDurationMultiplier*100):100};
-  var v={move:b.MoveSpeed,carry:carry,peckAmt:hasPeck?(num(b.PeckAmount)?b.PeckAmount:3):null,peckCd:hasPeck?(num(b.PeckCooldown)?b.PeckCooldown:1):null,turn:b.TurnSpeed,size:b.Scale};
+  var v={move:b.MoveSpeed,carry:carry,peckAmt:hasPeck?(num(b.PeckAmount)?b.PeckAmount:3):null,peckCd:hasPeck?(num(b.PeckCooldown)?b.PeckCooldown:1):null,peckCast:hasPeck?(num(b.PeckCastSeconds)?b.PeckCastSeconds:0.4):null,turn:b.TurnSpeed,size:b.Scale};
   Object.keys(raw).forEach(function(x){v[x]=num(k.stats[x])?k.stats[x]:raw[x];});
   return {custom:custom,hasPeck:hasPeck,v:v,raw:raw,base:b,baseCarry:baseCarry};}
 // The value the input edits (carry edits the class base, before the passive's bonus) and its shipped value.

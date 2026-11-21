@@ -414,7 +414,7 @@ namespace CluckWars.UI
         {
             // ── Classes ─────────────────────────────────────────────────────────
             sb.AppendLine("[Classes]");
-            sb.AppendLine("Name          Spd  Turn  Passive       Cap  Rate");
+            sb.AppendLine("Name          Spd  Turn  Passive       Cap  Rate  Cast");
 
             if (_classRegistry != null)
             {
@@ -430,6 +430,7 @@ namespace CluckWars.UI
                       .Append(s.CargoCapacity.ToString().PadLeft(5))
                       .Append(s.PeckAmount.ToString("0.#").PadLeft(6))
                       .Append(s.PeckCooldown.ToString("0.00").PadLeft(6))
+                      .Append(s.PeckCastSeconds.ToString("0.00").PadLeft(6))
                       .AppendLine();
                 }
             }

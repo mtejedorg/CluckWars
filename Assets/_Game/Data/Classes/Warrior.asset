@@ -19,4 +19,5 @@ MonoBehaviour:
   CargoCapacity: 14
   PeckAmount: 3
   PeckCooldown: 0.79
+  PeckCastSeconds: 0.5
   Scale: 1
