@@ -145,6 +145,11 @@ namespace CluckWars.Gameplay
         private MatchPhase _phase   = MatchPhase.Opening;
         private bool       _leading;
 
+        /// <summary>What this bot believes of each rival's position (<see cref="BotSightRules"/>): live while the rival is
+        /// visible, the last position seen while it is hidden. Every decision reads rival positions through
+        /// <see cref="Sight"/>, never off the rival's transform (<c>BotSightTests</c> guards it).</summary>
+        private readonly System.Collections.Generic.Dictionary<ChickenController, RivalSighting> _sightings = new();
+
         // ---- Injection ------------------------------------------------------
 
         [Inject]
@@ -302,7 +307,7 @@ namespace CluckWars.Gameplay
             // for every other strategy the base is just a drop-off.
             if (_profile.Strategy == BotStrategy.Bunker && _profile.GuardRadius > 0f &&
                 _nearestRival != null &&
-                Planar.Distance(_nearestRival.transform.position, homePos) <= _profile.GuardRadius)
+                Planar.Distance(Sight(_nearestRival).Position, homePos) <= _profile.GuardRadius)
             {
                 _state      = BotState.Guard;
                 _moveTarget = homePos;
@@ -330,7 +335,7 @@ namespace CluckWars.Gameplay
                 if (_nearestRival != null)
                 {
                     _state      = BotState.Search;
-                    _moveTarget = _nearestRival.transform.position;
+                    _moveTarget = Sight(_nearestRival).Position;
 
                     if (_state != _prevState)
                         _log?.Debug(Source, $"{Who} → Search (nearest rival {_nearestRivalDist:0.0}m, " +
@@ -362,7 +367,7 @@ namespace CluckWars.Gameplay
                 // because a centre-distance threshold is never satisfied once the pile is
                 // wider than the threshold itself.
                 bool contested = _nearestRival != null &&
-                                 pile.DistanceToSurface(_nearestRival.transform.position) < _arrivalRadius;
+                                 pile.DistanceToSurface(Sight(_nearestRival).Position) < _arrivalRadius;
 
                 if (contested)
                 {
@@ -427,7 +432,7 @@ namespace CluckWars.Gameplay
 
             _state = standoff > 0f ? BotState.Stalk : BotState.Hunt;
 
-            var preyPos = _preyTarget.transform.position;
+            var preyPos = Sight(_preyTarget).Position;
             if (standoff > 0f && _preyDist > 0.01f)
             {
                 var away = (_controller.transform.position - preyPos);
@@ -519,8 +524,12 @@ namespace CluckWars.Gameplay
             var  selfPos    = _controller.transform.position;
             var  forward    = _controller.transform.forward;
             bool haveTarget = target != null;
-            var  toTarget   = haveTarget ? target.transform.position - selfPos : Vector3.zero;
-            float targetDist = haveTarget ? Planar.Distance(selfPos, target.transform.position) : 0f;
+            // Where the bot believes the target is. A hidden target is aimed at, ranged and cast at on that belief alone,
+            // and the game's own "would it land" check is skipped for it: that check reads the real position.
+            var  sight      = haveTarget ? Sight(target) : default;
+            var  targetPos  = sight.Position;
+            var  toTarget   = haveTarget ? targetPos - selfPos : Vector3.zero;
+            float targetDist = haveTarget ? Planar.Distance(selfPos, targetPos) : 0f;
 
             int   bestSlot  = AbilityController.InvalidSlot;
             float bestScore = float.MaxValue;
@@ -561,13 +570,13 @@ namespace CluckWars.Gameplay
             {
                 // In reach, wrong way round. Turn now, fire next think — cancelling here is
                 // what used to make a bot walk in circles next to a rival it never hit.
-                _faceIntent = target.transform.position;
+                _faceIntent = targetPos;
                 return false;
             }
 
-            if (chosen.RequiresEnemyInRange && (!haveTarget || !chosen.WouldAffect(_controller, target)))
+            if (chosen.RequiresEnemyInRange && (!haveTarget || (!sight.Hidden && !chosen.WouldAffect(_controller, target))))
             {
-                if (haveTarget) _faceIntent = target.transform.position;
+                if (haveTarget) _faceIntent = targetPos;
                 return false;
             }
 
@@ -601,14 +610,19 @@ namespace CluckWars.Gameplay
             }
             if (!Runner.TryFindBehaviour(_execute.MarkedTarget, out ChickenController mark) || mark == null) return false;
 
+            // A mark that hid is hunted to where it was last seen; once the bot has searched that spot the ordinary FSM
+            // takes over until the mark shows itself. A hidden mark is not stunned: "would it land" reads the real position.
+            var markSight = Sight(mark);
+            if (markSight.GivenUp) return false;
+
             _state      = BotState.Hunt;
-            _moveTarget = mark.transform.position;
+            _moveTarget = markSight.Position;
 
             // The longest ready stun that would land now, measured on THIS target (its passive may shorten it: Bulwark, Relentless; Slippery no longer does). Never at a shelled
             // target (it takes the stun but cannot be executed) or a control-immune one (the stun does not land).
             int stunSlot = AbilityController.InvalidSlot;
             float stunSeconds = 0f;
-            bool stunnable = !mark.IsStealProof && !mark.IsControlImmune;
+            bool stunnable = !mark.IsStealProof && !mark.IsControlImmune && !markSight.Hidden;
             for (int slot = 0; stunnable && slot < _abilities.EquippedSlotCount; slot++)
             {
                 var ability = _abilities.GetSlot(slot);
@@ -655,7 +669,9 @@ namespace CluckWars.Gameplay
                 var c = all[i];
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && (c.Combat.IsRemoved || c.Combat.IsDead)) continue;
-                float dist = Planar.Distance(selfPos, c.transform.position);
+                var sight = Sight(c);
+                if (sight.GivenUp) continue;
+                float dist = Planar.Distance(selfPos, sight.Position);
                 if (dist >= nearest || dist > BotTactics.StealGuardRadius) continue;
                 if (HasStealAbility(c)) nearest = dist;
             }
@@ -894,7 +910,12 @@ namespace CluckWars.Gameplay
                 if (c == null || c == _controller) continue;
                 if (c.Combat != null && c.Combat.IsRemoved) continue;
 
-                float dist = Planar.Distance(selfPos, c.transform.position);
+                // One look per rival per think: a hidden rival is where the bot last saw it, or dropped altogether once
+                // the bot has searched there (BotSightRules).
+                var sight = ObserveRival(c, selfPos);
+                if (sight.GivenUp) continue;
+
+                float dist = Planar.Distance(selfPos, sight.Position);
 
                 if (dist < _nearestRivalDist)
                 {
@@ -923,6 +944,20 @@ namespace CluckWars.Gameplay
             _phase   = gm != null ? BotTactics.ResolvePhase(gm.TimeRemaining, gm.MatchDurationSeconds)
                                   : MatchPhase.Mid;
             _leading = IsLeading();
+        }
+
+        /// <summary>This bot's belief about <paramref name="rival"/>, as of the last <see cref="Perceive"/> (looks once if it has not seen it yet).</summary>
+        private RivalSighting Sight(ChickenController rival) =>
+            _sightings.TryGetValue(rival, out var s) ? s : ObserveRival(rival, _controller.transform.position);
+
+        /// <summary>The one place a rival's real position is read: feeds <see cref="BotSightRules.Observe"/> and stores the belief.</summary>
+        private RivalSighting ObserveRival(ChickenController rival, Vector3 selfPos)
+        {
+            RivalSighting? previous = _sightings.TryGetValue(rival, out var p) ? p : (RivalSighting?)null;
+            var s = BotSightRules.Observe(previous, rival.transform.position /* SIGHT-SOURCE */, rival.VisualOpacity,
+                selfPos, (float)Runner.SimulationTime, _arrivalRadius);
+            _sightings[rival] = s;
+            return s;
         }
 
         /// <summary>

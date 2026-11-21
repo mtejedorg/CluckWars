@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Bots lose track of a hidden rival (BL-214, `develop`, not pushed)
+
+- **Fix:** Hide only faded the bird; bots targeted it as if visible (Maestro: technical debt, "stay with the last position and suppose it is there"). New pure rule `BotSightRules.Observe` + `RivalSighting` (Gameplay assembly, Fusion-free, reusable by the Balance simulator): a rival is hidden when `VisualOpacity` is faded (`BotSightRules.IsHidden`, the one home of the 0.99 threshold, `ControlStateVFX.FadedOpacityThreshold` now reads it); a visible rival is read live; a hidden one is remembered where the bot last saw it; reaching that spot (`_arrivalRadius`) or `GiveUpSeconds` (4 s) drops it until it reappears. A rival hidden before the first look is unknown.
+- **`BotController`:** `Perceive`, `TryCast` (aim, reach, facing), Engage/Search/Guard/Contest, `TryStealGuard` and the Death Mark hunt read rival positions only through `Sight()`; one raw read remains, in `ObserveRival` (guarded by `BotSightTests`). A cast at a hidden target skips `WouldAffect` (it reads the real position) and goes on belief; area abilities still hit whoever is really in range. A hidden mark is walked to but not stunned.
+- **Unchanged:** Hide for players, own-team/self logic, auto-play (`FighterTactics` has its own view), every balance number. No new profile field (timeout is a constant in the rule). A rival's cargo is still read live.
+- **Not watched in a match.** See it: Editor, solo vs bots, give yourself Hide (Spoiler/Thief kit), let a bot get near, press Hide and walk away: the bot should go to where you were, stop there and wander off; cast something and it picks you up again.
+- **Tests:** `BotSightTests` (EditMode).
+
 ## 2026-11-21 - BL-208 slice 1: accelerated clock, fighter personality, telemetry (`develop`, not pushed)
 
 - **Cause of the time-scale differences (proven):** dev-tools code ran on wall time while the simulation ran on scaled ticks. The round-start invariant probe fired a real 0.5 s after Active (5 s of match at x10), auto-play peck / cast / stuck cadences and press holds were real seconds. Fix: `SimClock` (runner simulation time) in `AutoPlayInputProvider`, `AutoTestDriver.TickAutoPlay` and `InvariantProbe` (start check, base intrusion, aura orphan); `TickCadence` decides once per two ticks. Result: 0 Invariant FAIL / 0 Error at x1, x5, x10 (was 74 / 83 Errors at x10 / x20).

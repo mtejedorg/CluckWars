@@ -626,7 +626,7 @@ namespace CluckWars.Visuals
         public static bool IsFadedOpacity(float visualOpacity) => visualOpacity > 0f && visualOpacity < FadedOpacityThreshold;
 
         /// <summary>Opacity below which a caster counts as invisible for the wind-up tell.</summary>
-        public const float FadedOpacityThreshold = 0.99f;
+        public const float FadedOpacityThreshold = BotSightRules.HiddenOpacityThreshold;
 
         private static bool IsFaded(ChickenController controller)
         {

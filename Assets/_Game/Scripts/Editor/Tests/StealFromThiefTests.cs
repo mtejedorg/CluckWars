@@ -72,7 +72,7 @@ namespace CluckWars.Tests
         [Test]
         public void TheBotsPreyScan_SkipsOnlyRemovedBirds_AndValuesTheBeak_SourceGuard()
         {
-            string scan = Between(Src("Gameplay/BotController.cs"), "if (c.Combat != null && c.Combat.IsRemoved) continue;\n\n                float dist", "if (_nearestRival == null)");
+            string scan = Between(Src("Gameplay/BotController.cs"), "if (c.Combat != null && c.Combat.IsRemoved) continue;\n\n                // One look", "if (_nearestRival == null)");
             foreach (var gate in new[] { "ChickenClass", ".Class", "Subclass", "Invisib", "IsStealth", "Alpha" })
                 StringAssert.DoesNotContain(gate, scan);
             StringAssert.Contains("StealableFraction", scan);
