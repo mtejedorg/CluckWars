@@ -11,6 +11,10 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-21 - Peck cut when the pile empties (BL-206 follow-up, uncommitted)
+
+A running Peck is cut (no food, no landing bump, cooldown stays spent) on the first authority tick where no pile with collectable food is in reach: `AbilityBaseSO.HasLostItsTarget` (default false, `PeckAbilitySO` = `FindPile == null`), read by `AbilityController.CutPeckIfInterrupted` into `PeckCastRules.IsCut(stunned, knocked, targetGone)`. A pile with some food left does not cut. The pile's Amount on the pecker's peer can lag one round trip; accepted. `FarmSim` ends a cast on a pile another farmer emptied at once; `OracleReference` re-recorded (only Warrior_Relentless moved, 27.37 s to 27.12 s). No prefab wiring needed.
+
 ## 🎯 2026-11-21 - BL-206: Peck is an interruptible cast (`ae0be79c`..`4a3c33fb`, `develop`, not pushed)
 
 - **What Peck does now:** the press starts a cast; the chicken is rooted for it; the food is asked of the pile when the cast ends (amount, room and reach re-checked then; first to land wins). A stun or a shove cuts it (`AbilityController.CutPeckIfInterrupted`, authority only), and so do an execution and the chicken's own next move (existing teardown); a slow, a root, a robbery and the chicken's own dodge do not. A cut takes nothing and still spends the cooldown (it counts from the press, unchanged). A stun landing on the very tick the cast completes lets the food land. Auto-Peck and bots unchanged. The old 0.4 s post-peck lock is gone (`Peck.asset` `Duration` is only the no-stats fallback).
