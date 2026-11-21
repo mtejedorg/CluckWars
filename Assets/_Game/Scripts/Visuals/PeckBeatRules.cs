@@ -35,6 +35,14 @@ namespace CluckWars.Visuals
             return best;
         }
 
+        /// <summary>True from the landing stamp until <see cref="FeedbackTuning.PeckLandedWindowSeconds"/> later (never before the stamp).</summary>
+        public static bool LandedRecently(float now, float landedAt) =>
+            now >= landedAt && now - landedAt <= FeedbackTuning.PeckLandedWindowSeconds;
+
+        /// <summary>Animator speed that makes one play of a <paramref name="clipSeconds"/> clip last <paramref name="castSeconds"/>; 1 when either is unknown.</summary>
+        public static float ClipSpeed(float clipSeconds, float castSeconds) =>
+            clipSeconds > 0f && castSeconds > 0f ? clipSeconds / castSeconds : 1f;
+
         public static int KernelCount(bool reducedMotion) =>
             reducedMotion ? FeedbackTuning.PeckKernelCountReduced : FeedbackTuning.PeckKernelCount;
 

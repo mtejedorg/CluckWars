@@ -84,6 +84,7 @@ namespace CluckWars.EditorTools
 
             var placeholders = CreatePlaceholders(problems);
             AssignMotions(placeholders, problems);
+            WirePeckCast(problems);
 
             // Must precede PopulateRegistry: fixing the loop flags reimports each .fbx, which
             // replaces its AnimationClip sub-asset objects. Populating first would cache
@@ -106,6 +107,81 @@ namespace CluckWars.EditorTools
                 Debug.Log("[ChickenAnimationSetup] Wired 5 placeholder clips, 5 controller states, " +
                           "clip loop flags on 4 .fbx importers, and 4 registry entries successfully.");
             }
+        }
+
+        [MenuItem("Cluck Wars/Animation/Wire Peck Cast")]
+        public static void WirePeckCastMenu()
+        {
+            var problems = new List<string>();
+            WirePeckCast(problems);
+            AssetDatabase.SaveAssets();
+            if (problems.Count > 0)
+                Debug.LogError("[ChickenAnimationSetup] Wire Peck Cast FAILED:\n  - " + string.Join("\n  - ", problems));
+        }
+
+        private static void WirePeckCast(List<string> problems)
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            if (controller == null) { problems.Add($"No AnimatorController at '{ControllerPath}'."); return; }
+            if (!EnsurePeckCastWiring(controller)) problems.Add("Chicken.controller has no 'Peck' state or no Peck to Idle transition to rewire.");
+        }
+
+        /// <summary>
+        /// BL-206: the Peck clip's speed is the <c>PeckSpeed</c> float (clip length / effective cast, set by <c>ChickenAnimator</c>) and the
+        /// Peck to Idle exit is the <c>Pecking</c> bool going false: no exit time, no blend, so a cut stops the clip at once. Idempotent;
+        /// edits through the AnimatorController API so the fileID-linked YAML stays valid. Returns false when the state or its exit is missing.
+        /// </summary>
+        public static bool EnsurePeckCastWiring(AnimatorController c)
+        {
+            if (c == null) return false;
+            AddParameterIfMissing(c, "PeckSpeed", AnimatorControllerParameterType.Float, 1f, false);
+            AddParameterIfMissing(c, "Pecking", AnimatorControllerParameterType.Bool, 0f, false);
+
+            bool wired = false;
+            foreach (var layer in c.layers)
+            {
+                foreach (var child in layer.stateMachine.states)
+                {
+                    var state = child.state;
+                    if (state.name != "Peck") continue;
+                    if (!state.speedParameterActive || state.speedParameter != "PeckSpeed" || state.speed != 1f)
+                    {
+                        state.speedParameterActive = true;
+                        state.speedParameter = "PeckSpeed";
+                        state.speed = 1f;
+                        EditorUtility.SetDirty(state);
+                    }
+                    foreach (var t in state.transitions)
+                    {
+                        if (t.destinationState == null || t.destinationState.name != "Idle") continue;
+                        bool ok = !t.hasExitTime && t.duration == 0f && t.hasFixedDuration && t.offset == 0f
+                                  && t.conditions.Length == 1 && t.conditions[0].parameter == "Pecking"
+                                  && t.conditions[0].mode == AnimatorConditionMode.IfNot;
+                        if (!ok)
+                        {
+                            t.hasExitTime = false;
+                            t.hasFixedDuration = true;
+                            t.duration = 0f;
+                            t.offset = 0f;
+                            foreach (var old in t.conditions) t.RemoveCondition(old);
+                            t.AddCondition(AnimatorConditionMode.IfNot, 0f, "Pecking");
+                            EditorUtility.SetDirty(state);
+                        }
+                        wired = true;
+                    }
+                }
+            }
+            EditorUtility.SetDirty(c);
+            return wired;
+        }
+
+        private static void AddParameterIfMissing(AnimatorController c, string name, AnimatorControllerParameterType type, float defaultFloat, bool defaultBool)
+        {
+            if (c.parameters.Any(p => p.name == name)) return;
+            c.AddParameter(new AnimatorControllerParameter
+            {
+                name = name, type = type, defaultFloat = defaultFloat, defaultBool = defaultBool,
+            });
         }
 
         /// <summary>

@@ -344,15 +344,18 @@ namespace CluckWars.Visuals
                 if (!_pile.IsWithinCollectRange(pos)) continue;
                 s_candidates.Add(c);
                 s_candDistance.Add(_pile.DistanceToSurface(pos));
-                s_candOpen.Add(PeckWindowOpen(c.Abilities));
+                s_candOpen.Add(PeckWindowOpen(c));
             }
             int pick = PeckBeatRules.PickPecker(s_candDistance, s_candOpen);
             return pick >= 0 ? s_candidates[pick] : null;
         }
 
-        /// <summary>True while the bird Peck slot (the slot holding a <see cref="PeckAbilitySO"/>) is running: the 0.4 s commitment window.</summary>
-        public static bool PeckWindowOpen(AbilityController abilities)
+        /// <summary>True when this bird's Peck just landed (its replicated landed counter, a short window) or its Peck slot still reads active
+        /// on this peer: the slot fallback keeps the pile-authority peer right when the RPC-driven <c>Amount</c> drop beats the pecker's snapshot.</summary>
+        public static bool PeckWindowOpen(ChickenController c)
         {
+            if (PeckBeatRules.LandedRecently(Time.unscaledTime, c.LocalEvents.LastPeckLandedTime)) return true;
+            var abilities = c.Abilities;
             for (int i = 0; i < AbilityController.SlotCount; i++)
                 if (abilities.IsSlotActive(i) && abilities.GetSlot(i).Is(AbilityJob.Peck)) return true;
             return false;

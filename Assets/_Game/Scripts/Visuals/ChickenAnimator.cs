@@ -70,6 +70,8 @@ namespace CluckWars.Visuals
         private static readonly int AbilityCastHash = Animator.StringToHash("AbilityCast");
         private static readonly int CastArchetypeHash = Animator.StringToHash("CastArchetype");
         private static readonly int PeckHash        = Animator.StringToHash("Peck");
+        private static readonly int PeckSpeedHash   = Animator.StringToHash("PeckSpeed");
+        private static readonly int PeckingHash     = Animator.StringToHash("Pecking");
         private static readonly int HitHash         = Animator.StringToHash("Hit");
         private static readonly int StunnedHash     = Animator.StringToHash("Stunned");
 
@@ -592,6 +594,32 @@ namespace CluckWars.Visuals
 
             _animator.SetFloat(SpeedHash, _smoothedSpeed01);
             _animator.SetBool(StunnedHash, _stunned);
+            PushPeckParameters();
+        }
+
+        private RuntimeAnimatorController _peckClipController;
+        private float _peckClipSeconds;
+
+        /// <summary>
+        /// The Peck clip plays at clip length / effective cast, so one play spans the cast on every peer; the exit is the replicated slot
+        /// bit (natural end or a cut clears it, <c>Pecking</c> goes false, the controller cuts to Idle with no blend). BL-206.
+        /// </summary>
+        private void PushPeckParameters()
+        {
+            var rac = _animator.runtimeAnimatorController;
+            if (!ReferenceEquals(rac, _peckClipController))
+            {
+                _peckClipController = rac;
+                var clip = (rac as AnimatorOverrideController)?[ChickenController.ClipKeyPeck];
+                _peckClipSeconds = clip != null ? clip.length : 0f;
+            }
+
+            var abilities = _controller != null ? _controller.Abilities : null;
+            int peck = abilities != null ? abilities.FindPeckSlot() : AbilityController.InvalidSlot;
+            bool pecking = peck != AbilityController.InvalidSlot && abilities.IsSlotActive(peck);
+            float cast = peck != AbilityController.InvalidSlot ? abilities.GetSlot(peck).ResolveActiveDuration(_controller) : 0f;
+            _animator.SetFloat(PeckSpeedHash, PeckBeatRules.ClipSpeed(_peckClipSeconds, cast));
+            _animator.SetBool(PeckingHash, pecking);
         }
 
         /// <summary>
@@ -763,9 +791,8 @@ namespace CluckWars.Visuals
         /// <see cref="AbilityController"/> when the ability that fired is Peck.
         /// </summary>
         /// <remarks>
-        /// The clip is 0.4s, matching <c>PeckAbilitySO.Duration</c>, so the animation and the
-        /// movement lock start and end together. If they ever diverge the chicken either
-        /// snaps out of a half-played peck or stands frozen after the animation finished.
+        /// Speed = clip length / effective cast (<see cref="PushPeckParameters"/>), so one play spans the
+        /// cast on every peer; the exit is the replicated slot bit, so a cut stops the clip at once.
         /// </remarks>
         public void TriggerPeck()
         {

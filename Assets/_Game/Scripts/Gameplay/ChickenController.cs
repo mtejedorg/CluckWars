@@ -832,6 +832,9 @@ namespace CluckWars.Gameplay
         private const string ClipKeyHit     = "Hit";
         private const string ClipKeyStunned = "Stunned";
 
+        /// <summary>The Peck state's placeholder clip name. Public: <c>ChickenAnimator</c> reads the bound clip's length by it (BL-206).</summary>
+        public const string ClipKeyPeck     = "Peck";
+
         private static AnimatorOverrideController GetOrBuildOverride(
             ChickenClass cls,
             RuntimeAnimatorController baseController,
@@ -851,6 +854,7 @@ namespace CluckWars.Gameplay
                 [ClipKeyCast]    = entry.Clips.Cast,
                 [ClipKeyHit]     = entry.Clips.Hit,
                 [ClipKeyStunned] = entry.Clips.Stunned,
+                [ClipKeyPeck]    = entry.Clips.Peck,
             };
 
             // The eight cast archetypes. Keyed by the placeholder clip name sitting in each

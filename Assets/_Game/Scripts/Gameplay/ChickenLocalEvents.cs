@@ -84,6 +84,9 @@ namespace CluckWars.Gameplay
         public byte StealEventId;
         public NetworkBehaviourId Thief;
         public byte DepositEventId;
+
+        /// <summary>The Peck's food-landed counter (BL-206): bumped on the authority at the natural end of the cast.</summary>
+        public byte PeckLandedEventId;
     }
 
     /// <summary>
@@ -124,13 +127,14 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private bool _siblingsResolved;
 
-        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit;
+        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit, _peckLanded;
         private AbilityBaseSO _lastCharging;
         private bool _raising;
 
         // One list per event instead of a multicast delegate: every subscriber is called on its own, so one that
         // throws is reported and the rest still get the beat (S-1). A raise allocates nothing.
         private readonly ListenerList<Action<CastEvent>> _castListeners = new ListenerList<Action<CastEvent>>();
+        private readonly ListenerList<Action> _peckLandedListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _knockbackListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _selfImpulseListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _jumpListeners = new ListenerList<Action>();
@@ -159,6 +163,12 @@ namespace CluckWars.Gameplay
         /// <summary><c>AbilityController.LastCastEventId</c> moved: this chicken cast.</summary>
         public event Action<CastEvent> Cast { add => _castListeners.Add(value); remove => _castListeners.Remove(value); }
         /// <summary><c>ChickenController.KnockbackEventId</c> moved: somebody knocked this chicken back.</summary>
+        /// <summary>The Peck's food landed (natural end of the cast), every peer. Pile-side beats read <see cref="LastPeckLandedTime"/>.</summary>
+        public event Action PeckLanded { add => _peckLandedListeners.Add(value); remove => _peckLandedListeners.Remove(value); }
+
+        /// <summary><c>Time.unscaledTime</c> of the last observed <see cref="PeckLanded"/>; negative infinity before the first.</summary>
+        public float LastPeckLandedTime { get; private set; } = float.NegativeInfinity;
+
         public event Action Knockback { add => _knockbackListeners.Add(value); remove => _knockbackListeners.Remove(value); }
         /// <summary><c>ChickenController.SelfImpulseEventId</c> moved: this chicken displaced itself (a dodge, not a hit).</summary>
         public event Action SelfImpulse { add => _selfImpulseListeners.Add(value); remove => _selfImpulseListeners.Remove(value); }
@@ -231,6 +241,7 @@ namespace CluckWars.Gameplay
                 s.HasAbilities = true;
                 s.CastEventId = _abilities.LastCastEventId;
                 s.ChargingAbility = _abilities.ChargingAbility;
+                s.PeckLandedEventId = _abilities.PeckLandedEventId;
                 if (_cast.WouldFire(s.CastEventId))
                 {
                     s.CastSlot = _abilities.LastCastSlot;
@@ -268,6 +279,11 @@ namespace CluckWars.Gameplay
                             new CastEvent(s.CastSlot, CodeOf(s.CastAbility), CodeOf(aimed), s.CastHitCount,
                                 aimed != null ? aimed.CastMotion : CastArchetype.None, aimed.Is(AbilityJob.Peck)));
                     }
+                    if (_peckLanded.Observe(s.PeckLandedEventId))
+                    {
+                        LastPeckLandedTime = Time.unscaledTime;
+                        LocalRaise.Invoke(_peckLandedListeners, nameof(PeckLanded), Log, _controller);
+                    }
                 }
 
                 if (_knockback.Observe(s.KnockbackEventId)) LocalRaise.Invoke(_knockbackListeners, nameof(Knockback), Log, _controller);
@@ -296,6 +312,8 @@ namespace CluckWars.Gameplay
             _jump.Reset();
             _steal.Reset();
             _deposit.Reset();
+            _peckLanded.Reset();
+            LastPeckLandedTime = float.NegativeInfinity;
             _lastCharging = null;
             _siblingsResolved = false;
             _abilities = null;

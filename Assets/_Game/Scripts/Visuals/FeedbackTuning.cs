@@ -2080,6 +2080,10 @@ namespace CluckWars.Visuals
         public const float PeckSquashScaleY = 0.94f;
         public const float PeckSquashSeconds = 0.12f;
 
+        /// <summary>How long after a Peck lands (BL-206, ux spec 2) the pile-side beat still belongs to that pecker: covers the gap between the
+        /// pile's replicated <c>Amount</c> drop and the pecker's own landed counter reaching this peer.</summary>
+        public const float PeckLandedWindowSeconds = 0.25f;
+
         // ---- Particle budget (batch D, vfx.md 0.2) --------------------------------------------------
 
         /// <summary>Hard cap on ParticleSystems per chicken (one draw call each on the shared Fx material).</summary>

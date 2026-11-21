@@ -48,8 +48,8 @@ namespace CluckWars.Tests
         {
             var peck = Peck();
             Assert.IsNotNull(peck, PeckPath);
-            Assert.Greater(peck.Duration, FeedbackTuning.PeckKernelSeconds);
-            Assert.Greater(peck.Duration, FeedbackTuning.PeckSquashSeconds);
+            // The beat plays after the landing (BL-206), not inside a lock: it only needs a window to be claimed by its pecker.
+            Assert.Greater(FeedbackTuning.PeckLandedWindowSeconds, 0f);
             // Four piles of kernels (the 4-pile arena) take a small, fixed slice of the arena budget (vfx.md 0.2).
             Assert.LessOrEqual(4 * FeedbackTuning.PeckKernelMaxPerPile, FeedbackTuning.ParticlesPerArenaCap / 10);
             // One bite never overflows the pile system: the shipped Peck can bite again after its cooldown only.
@@ -110,6 +110,8 @@ namespace CluckWars.Tests
         public void TheWindowIsTheShippedPeckSlot()
         {
             string src = Src("FoodPileVisuals.cs");
+            StringAssert.Contains("PeckWindowOpen(ChickenController c)", src);
+            StringAssert.Contains("PeckBeatRules.LandedRecently(", src);
             StringAssert.Contains("abilities.IsSlotActive(i) && abilities.GetSlot(i).Is(AbilityJob.Peck)", src);
             Assert.IsInstanceOf<PeckAbilitySO>(Peck());
         }

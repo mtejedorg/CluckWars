@@ -1071,6 +1071,8 @@ namespace CluckWars.Tests
                 { "AbilityCast", AnimatorControllerParameterType.Trigger },
                 { "Hit",         AnimatorControllerParameterType.Trigger },
                 { "Stunned",     AnimatorControllerParameterType.Bool    },
+                { "PeckSpeed",   AnimatorControllerParameterType.Float   },
+                { "Pecking",     AnimatorControllerParameterType.Bool    },
             };
 
             var actual = controller.parameters.ToDictionary(p => p.name, p => p.type);

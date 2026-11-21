@@ -73,6 +73,6 @@ namespace CluckWars.EditorTools
             }
         }
 
-        private static bool FoodPileVisualsWindow(ChickenController c) => CluckWars.Visuals.FoodPileVisuals.PeckWindowOpen(c.Abilities);
+        private static bool FoodPileVisualsWindow(ChickenController c) => CluckWars.Visuals.FoodPileVisuals.PeckWindowOpen(c);
     }
 }
