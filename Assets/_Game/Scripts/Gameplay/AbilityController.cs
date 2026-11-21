@@ -108,6 +108,13 @@ namespace CluckWars.Gameplay
         [Networked] public byte PeckCutEventId { get; private set; }
         private void NotePeckCut() { if (HasStateAuthority) PeckCutEventId++; }
 
+        /// <summary>The telemetry line for a cut (BL-213 / BL-208), next to the bump, on the authority only.</summary>
+        private void LogPeckCut(string cause)
+        {
+            if (HasStateAuthority && _controller != null)
+                _log?.Info(MatchTelemetry.Source, MatchTelemetry.PeckCut(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(_controller), _controller.Class.ToString(), cause));
+        }
+
         /// <summary>
         /// True while the Peck auto-chain runs (Phase 6 chunk 4, A6): the bird keeps pecking on its own each time
         /// the per-class cooldown is ready. Decided on the state authority by <see cref="PeckChainRules"/>; the
@@ -1360,6 +1367,7 @@ namespace CluckWars.Gameplay
             if (!PeckCastRules.IsCut(stunned, knocked, targetGone)) return;
             Deactivate(peck);                                 // not natural: no food, no expire cue
             NotePeckCut();                                    // the one bump per cut: every cutter above passes this single line
+            LogPeckCut(stunned ? MatchTelemetry.CauseStun : knocked ? MatchTelemetry.CauseShove : MatchTelemetry.CauseEmptyPile);
             _log?.Debug(Source, $"Peck cut: {(stunned ? "a stun" : knocked ? "a shove" : "the pile is empty")}.");
         }
 
@@ -1428,6 +1436,7 @@ namespace CluckWars.Gameplay
             bool peckRunning = peck != InvalidSlot && IsSlotActive(peck);
             DeactivateAll();
             if (peckRunning) NotePeckCut();   // an execution cuts a running Peck like a stun does
+            if (peckRunning) LogPeckCut(MatchTelemetry.CauseExecution);
             CancelCharge();
             if (PeckChainActive) PeckChainActive = false;
         }

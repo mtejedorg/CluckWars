@@ -81,6 +81,9 @@ namespace CluckWars.Gameplay
         private bool _pressedHadLast;
         private NetworkBehaviourId _pressedLastMark;
 
+        // Authority-local, telemetry only: the victim had a Peck cast running when the Kill was pressed.
+        private bool _killedWhilePecking;
+
         // Authority-local: the "Mark armed" line was written for the live mark.
         private bool _armLogged;
 
@@ -115,6 +118,9 @@ namespace CluckWars.Gameplay
         public void PayExecuteBounty(ChickenController victim)
         {
             float bounty = ResolveExecuteBounty();
+            if (_cargo != null)
+                _log?.Info(MatchTelemetry.Source, MatchTelemetry.Kill(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(_controller), MatchTelemetry.Seat(victim),
+                    bounty, _cargo.TakeExecuteLootForTelemetry(victim.Id), _killedWhilePecking));
             if (bounty <= 0f || _cargo == null) return;
             _cargo.BountyBag += bounty;
             _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag for {victim.name}.");
@@ -245,6 +251,9 @@ namespace CluckWars.Gameplay
                     // because CreditKillToAttacker resolves a ChickenCombat - passing this
                     // behaviour's own Id (CW-050) meant no execute ever scored a kill. Sent while
                     // MarkedTarget still names the victim: the receiver checks the mark (CW-230).
+                    var victimAbilities = target.Abilities;
+                    int victimPeck = victimAbilities != null ? victimAbilities.FindPeckSlot() : AbilityController.InvalidSlot;
+                    _killedWhilePecking = victimPeck != AbilityController.InvalidSlot && victimAbilities.IsSlotActive(victimPeck);
                     target.Combat.RPC_ExecuteRemoval(_combat.Id, RemovalSeconds);
 
                     // The execute bounty follows the kill report (PayExecuteBounty), so a removal the victim's

@@ -223,6 +223,19 @@ namespace CluckWars.Gameplay
         // from the steal requests so a loot report can never close a steal request or vice versa,
         // and with its own longer window (StealRules.ExecuteLootWindowSeconds): the report makes
         // two relayed trips in Shared Mode, not the refund's one round trip.
+        // Telemetry only (MatchTelemetry "kill" line): the loot the last execute credited, read once by AssassinExecute.PayExecuteBounty.
+        private float _executeLootSeen;
+        private NetworkBehaviourId _executeLootVictim;
+
+        /// <summary>The loot credited for the execute on <paramref name="victimId"/> (0 if none was), then forgotten. Telemetry only.</summary>
+        internal float TakeExecuteLootForTelemetry(NetworkBehaviourId victimId)
+        {
+            float loot = _executeLootVictim == victimId ? _executeLootSeen : 0f;
+            _executeLootSeen = 0f;
+            _executeLootVictim = default;
+            return loot;
+        }
+
         private readonly PendingStealLedger<NetworkBehaviourId> _pendingExecutes = StealRules.NewExecuteLootLedger<NetworkBehaviourId>();
 
         // Accumulators for batched RPCs (Stage D)
@@ -766,6 +779,7 @@ namespace CluckWars.Gameplay
             _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
                                $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
 
+            _log?.Info(MatchTelemetry.Source, MatchTelemetry.Steal(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(thief), MatchTelemetry.Seat(_controller), actual));
             ReportSteal(thief, actual, requestId);
         }
 
@@ -1142,6 +1156,8 @@ namespace CluckWars.Gameplay
             }
 
             BountyBag += allowed;
+            _executeLootSeen = allowed;
+            _executeLootVictim = victimId;
             if (allowed + 1e-4f < amount)
             {
                 _log?.Warn(Source, $"{name}: execute loot from {victim.name} clamped {amount:0.00} -> {allowed:0.00} (above the victim's carry cap).");

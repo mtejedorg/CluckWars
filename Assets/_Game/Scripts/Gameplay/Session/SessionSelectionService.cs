@@ -46,7 +46,7 @@ namespace CluckWars.Services
         public bool DisconnectNoticeOnMenuLoad { get; set; }
 
         // Random until the menu rolls one, so a Play straight into Game.unity still varies.
-        public int SoloCornerSeed { get; set; } = Environment.TickCount;
+        public int SoloCornerSeed { get; set; } = CluckWars.Diagnostics.DevSeed.TryGet(out int devSeed) ? devSeed : Environment.TickCount;
 
         public System.Collections.Generic.IReadOnlyList<ChickenSubclass> DevBotSubclasses { get; set; }
 

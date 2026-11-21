@@ -254,7 +254,7 @@ namespace CluckWars.UI
             // THE COOP opens; a host's is known once its join code exists (below); a guest's is not known.
             if (isSolo)
             {
-                _selection.SoloCornerSeed = new System.Random().Next();
+                _selection.SoloCornerSeed = CluckWars.Diagnostics.DevSeed.TryGet(out int devSeed) ? devSeed : new System.Random().Next();
                 _lobbyPermutation = CornerAssignment.Permutation(
                     CornerAssignment.SeedFor(SessionMode.Solo, null, _selection.SoloCornerSeed));
             }

@@ -602,7 +602,8 @@ namespace CluckWars.Gameplay
         {
             bool online = _selection != null && _selection.Mode != SessionMode.Solo;
             string sessionName = online ? _selection.SessionName : null;
-            int seed = online ? SessionNameSeed(sessionName) : new System.Random().Next();
+            int seed = online ? SessionNameSeed(sessionName)
+                : CluckWars.Diagnostics.DevSeed.TryGet(out int devSeed) ? devSeed : new System.Random().Next();
 
             float half = _planeSize * 0.5f;
             float centerKeepClear = FootprintRadius(_centerPileFootprint);
