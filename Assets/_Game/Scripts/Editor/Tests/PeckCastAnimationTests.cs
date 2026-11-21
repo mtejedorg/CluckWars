@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using CluckWars.Abilities;
+using CluckWars.Balance;
 using CluckWars.Gameplay;
+using CluckWars.Logging;
 using CluckWars.Visuals;
 using NUnit.Framework;
 using UnityEditor;
@@ -17,6 +19,17 @@ namespace CluckWars.Tests
     /// </summary>
     public sealed class PeckCastAnimationTests
     {
+        private sealed class SilentLog : ILogService
+        {
+            public LogLevel MinLevel { get; set; }
+            public bool IsEnabled(LogLevel level) => false;
+            public void Verbose(string source, string message) { }
+            public void Debug(string source, string message) { }
+            public void Info(string source, string message) { }
+            public void Warn(string source, string message) { }
+            public void Error(string source, string message, Exception exception = null) { }
+        }
+
         private const string ControllerPath = "Assets/_Game/Art/Animations/Chicken.controller";
         private const string Scripts = "Assets/_Game/Scripts/";
 
@@ -55,13 +68,24 @@ namespace CluckWars.Tests
                 float cast = PeckCastRules.CastSeconds(entry.Stats, peck.Duration);
                 AssertSpansCast(entry.Clips.Peck, cast, entry.Class.ToString());
 
-                // A served balance value (BalanceBook patches the stats asset) moves the speed with it.
-                var changed = UnityEngine.Object.Instantiate(entry.Stats);
+                // A served balance value moves the speed with it, through the same BalanceBook.Preview path the game uses.
+                var range = typeof(ChickenStatsSO).GetField(nameof(ChickenStatsSO.PeckCastSeconds))
+                    .GetCustomAttributes(typeof(UnityEngine.RangeAttribute), false).Cast<UnityEngine.RangeAttribute>().Single();
+                float v = (entry.Stats.PeckCastSeconds + range.max) * 0.5f;
+                Assert.AreNotEqual(cast, v);
+                string json = "{\"schema\":1,\"assets\":{\"" + entry.Stats.name + "\":{\"PeckCastSeconds\":" +
+                              v.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "}}}";
+                using var book = new BalanceBook(new SilentLog(),
+                    TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath),
+                    TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath),
+                    TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath));
+                var verdict = book.Evaluate(json, "test");
+                Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
+                var changed = book.Preview(entry.Stats, verdict);
                 try
                 {
-                    changed.PeckCastSeconds = entry.Stats.PeckCastSeconds * 1.5f;
                     float served = PeckCastRules.CastSeconds(changed, peck.Duration);
-                    Assert.AreNotEqual(cast, served);
+                    Assert.AreEqual(v, served, 1e-4f);
                     AssertSpansCast(entry.Clips.Peck, served, entry.Class + " (changed cast)");
                 }
                 finally { UnityEngine.Object.DestroyImmediate(changed); }

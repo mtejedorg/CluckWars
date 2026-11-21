@@ -146,7 +146,7 @@ namespace CluckWars.Editor
                 s.CargoCapacity  = IntField(s.CargoCapacity,    wI, minVal: 1);
                 s.PeckAmount     = FloatField(s.PeckAmount,     wF, minVal: 0.1f);
                 s.PeckCooldown   = FloatField(s.PeckCooldown,   wF, minVal: 0.05f);
-                s.PeckCastSeconds = FloatField(s.PeckCastSeconds, wF, minVal: 0.2f);
+                s.PeckCastSeconds = Mathf.Clamp(FloatField(s.PeckCastSeconds, wF, minVal: 0f), PeckCastRange.min, PeckCastRange.max);
                 s.Scale          = FloatField(s.Scale,          wF, minVal: 0.1f);
 
                 EditorGUILayout.EndHorizontal();
@@ -675,6 +675,16 @@ namespace CluckWars.Editor
         {
             var r = EditorGUILayout.GetControlRect(false, 1f);
             EditorGUI.DrawRect(r, new Color(0.3f, 0.3f, 0.3f, 0.5f));
+        }
+
+        // The field's own [Range], read by reflection so the window never restates the bounds.
+        private static readonly (float min, float max) PeckCastRange = ReadRange(nameof(ChickenStatsSO.PeckCastSeconds));
+
+        private static (float min, float max) ReadRange(string fieldName)
+        {
+            var field = typeof(ChickenStatsSO).GetField(fieldName);
+            var range = field != null ? (RangeAttribute)System.Attribute.GetCustomAttribute(field, typeof(RangeAttribute)) : null;
+            return range != null ? (range.min, range.max) : (0f, float.MaxValue);
         }
 
         private static float FloatField(float value, float width, float minVal)

@@ -1344,8 +1344,7 @@ namespace CluckWars.Gameplay
         {
             if (_controller == null) return;
             byte knock = _controller.KnockbackEventId;
-            bool knocked = knock != _peckCutKnockbackSeen;
-            _peckCutKnockbackSeen = knock;                    // updated every tick: a shove before the press never cuts later
+            bool knocked = PeckCastRules.ObserveKnock(ref _peckCutKnockbackSeen, knock);   // updates the seen id every tick
             int peck = FindPeckSlot();
             if (peck == InvalidSlot || !IsSlotActive(peck)) return;
             bool stunned = _controller.IsStunned;
@@ -1369,13 +1368,20 @@ namespace CluckWars.Gameplay
             System.Action<int> endTraversal = _controller != null && _controller.Traversal != null
                 ? _controller.Traversal.End
                 : null;
-            AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal, natural);
-            if (ability != null)
+            try
             {
-                if (natural) _cues.Queue(AbilityCue.Expired);
-                _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
+                AbilityRunRules.ReleaseSlot(slot, ability, _ctx, _controller != null ? _controller.Effects : null, endTraversal, natural);
+                if (ability != null)
+                {
+                    if (natural) _cues.Queue(AbilityCue.Expired);
+                    _log?.Debug(Source, $"Deactivated {ability.DisplayName}.");
+                }
             }
-            ActiveMask = AbilityRunRules.End(ActiveMask, slot);
+            finally
+            {
+                // Even if an OnDeactivate throws, the slot must not stay active: Peck would land food again next tick.
+                ActiveMask = AbilityRunRules.End(ActiveMask, slot);
+            }
             _controller?.SyncAbilityEffects();
         }
 

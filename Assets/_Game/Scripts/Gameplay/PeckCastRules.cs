@@ -16,6 +16,15 @@ namespace CluckWars.Gameplay
         /// <summary>A stun or a shove cuts a running cast. A slow, a robbery or a self dodge never does.</summary>
         public static bool IsCut(bool stunned, bool knockedSinceLastTick) => stunned || knockedSinceLastTick;
 
+        /// <summary>Compares the chicken's shove id with the last one seen and always stores the current one, so a shove seen
+        /// before the press never cuts a later cast. Returns true when the id changed (wraps 255 to 0 by design).</summary>
+        public static bool ObserveKnock(ref byte seen, byte current)
+        {
+            bool knocked = current != seen;
+            seen = current;
+            return knocked;
+        }
+
         /// <summary>Food asked of the pile when the cast lands: the bite, bounded by the room left and what the pile
         /// still offers. Never negative.</summary>
         public static float LandingTake(float amount, float freeSpace, float available) =>

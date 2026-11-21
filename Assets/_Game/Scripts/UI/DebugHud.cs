@@ -414,7 +414,9 @@ namespace CluckWars.UI
         {
             // ── Classes ─────────────────────────────────────────────────────────
             sb.AppendLine("[Classes]");
-            sb.AppendLine("Name          Spd  Turn  Passive       Cap  Rate  Cast");
+            sb.Append("Name".PadRight(13)).Append("Spd".PadLeft(6)).Append("Turn".PadLeft(6))
+              .Append("  Passive".PadRight(14)).Append("Cap".PadLeft(5))
+              .Append("Peck".PadLeft(6)).Append("CD".PadLeft(6)).AppendLine("Cast".PadLeft(6));
 
             if (_classRegistry != null)
             {
@@ -453,8 +455,8 @@ namespace CluckWars.UI
 
             var a = localCtrl.Abilities;
             sb.AppendLine("Slot  Ability              Duration  Cooldown");
-            AppendAbilityLine(sb, 0, a.Slot0);
-            AppendAbilityLine(sb, 1, a.Slot1);
+            AppendAbilityLine(sb, 0, a.Slot0, localCtrl);
+            AppendAbilityLine(sb, 1, a.Slot1, localCtrl);
 
             AppendActiveSlots(sb, a, "  Active slot ");
         }
@@ -466,7 +468,7 @@ namespace CluckWars.UI
                 if (a.IsSlotActive(i)) sb.Append(prefix).AppendLine(i.ToString());
         }
 
-        private static void AppendAbilityLine(StringBuilder sb, int slot, AbilityBaseSO ability)
+        private static void AppendAbilityLine(StringBuilder sb, int slot, AbilityBaseSO ability, ChickenController caster)
         {
             if (ability == null)
             {
@@ -475,7 +477,7 @@ namespace CluckWars.UI
             }
             sb.Append("  ").Append(slot).Append("    ")
               .Append(ability.DisplayName.PadRight(20))
-              .Append(ability.Duration.ToString("0.00").PadLeft(6))
+              .Append(ability.ResolveActiveDuration(caster).ToString("0.00").PadLeft(6))   // Peck: the class cast seconds
               .Append("s")
               .Append(ability.Cooldown.ToString("0.0").PadLeft(9))
               .AppendLine("s");

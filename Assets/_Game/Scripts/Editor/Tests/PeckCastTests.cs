@@ -181,6 +181,32 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void ObserveKnock_ShoveSeenBeforeThePress_DoesNotCutALaterCast()
+        {
+            byte seen = 7;
+            Assert.IsTrue(PeckCastRules.ObserveKnock(ref seen, 8), "the shove tick itself reports a knock");
+            Assert.AreEqual(8, seen, "the id is stored even with no cast running");
+            Assert.IsFalse(PeckCastRules.ObserveKnock(ref seen, 8), "the next tick, with the cast running, sees nothing new");
+        }
+
+        [Test]
+        public void ObserveKnock_NewIdCuts_AndWrapCounts()
+        {
+            byte seen = 3;
+            Assert.IsTrue(PeckCastRules.ObserveKnock(ref seen, 4));
+            seen = 255;
+            Assert.IsTrue(PeckCastRules.ObserveKnock(ref seen, 0), "255 to 0 is a new shove");
+            Assert.AreEqual(0, seen);
+        }
+
+        [Test]
+        public void AbilityController_UsesObserveKnock_AndReSeedsOnAuthorityGained()
+        {
+            StringAssert.Contains("PeckCastRules.ObserveKnock(", Body(ControllerPath, "private void CutPeckIfInterrupted("));
+            StringAssert.Contains("_peckCutKnockbackSeen = _controller.KnockbackEventId", Body(ControllerPath, "private void OnAuthorityGained("));
+        }
+
+        [Test]
         public void Peck_HasNoPostPeckLock_TheCastIsTheOnlyTime()
         {
             string raw = File.ReadAllText(PeckPath);

@@ -105,7 +105,12 @@ namespace CluckWars.Abilities
             if (!ctx.EndedNaturally) return;                       // cut or torn down: no food, by design
 
             var gm = GameManager.Instance;
-            if (gm == null || !gm.IsMatchRunning) return;          // legal: the round ended on this tick
+            if (gm == null)
+            {
+                ctx.Log?.Warn(LogSource, "Peck landed with no GameManager: wiring fault, no food taken.");
+                return;
+            }
+            if (!gm.IsMatchRunning) return;                        // legal: the round ended on this tick
 
             var cargo = chicken.Cargo;
             var pile = FindPile(chicken);                          // reach and food re-checked now
@@ -118,7 +123,7 @@ namespace CluckWars.Abilities
             // Ask, do not credit: this peer's view of the pile can be stale. The pile's authority removes what is really
             // there and reports it, and only that report credits the cargo (FoodTransferRules).
             cargo.RequestPeck(pile, take);
-            chicken.Abilities?.NotePeckLanded();
+            chicken.Abilities.NotePeckLanded();
         }
 
         /// <summary>Food taken per press for this caster's class. Also the bound the pile and the pecker's own
