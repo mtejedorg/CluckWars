@@ -95,7 +95,8 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, animatorComponent.CastBeatsPlayed);
             if (animator.runtimeAnimatorController != null && animator.isInitialized)
             {
-                Assert.IsTrue(animator.GetBool("Peck"), "the peck trigger is set");
+                animator.Update(0f);   // TriggerPeck plays the Peck state from frame 0 (BL-206), applied on the next update
+                Assert.IsTrue(animator.GetCurrentAnimatorStateInfo(0).IsName("Peck"), "the Peck state is playing");
                 Assert.IsFalse(animator.GetBool("AbilityCast"), "a peck is not a combat cast");
             }
         }
