@@ -353,6 +353,7 @@ namespace CluckWars.Input
             if (refs.Drain != null)
                 refs.Drain.style.height = new Length(active01 * 100f, LengthUnit.Percent);
             RefreshEggPhase(slot, abilities, equipped);
+            RefreshPeckCastFill(slot, abilities, equipped);
 
             // Phase 6 (A1): while the ability runs, a duration ring around the hex rim drains with it.
             // While a hunt is on, the same ring shows the mark window draining in the marker's colour; the hunt takes it over
@@ -517,6 +518,34 @@ namespace CluckWars.Input
             if (seconds == _appliedCdSeconds[slot]) return;
             _appliedCdSeconds[slot] = seconds;
             refs.CdNum.text = HudLayoutRules.TouchCooldownText(remaining);
+        }
+
+        /// <summary>
+        /// BL-212: while this Peck hex's cast runs, the cream layer rises over exactly the effective cast. The fraction is the buff ring's
+        /// (<see cref="AbilityController.ActiveRemaining01For"/>: replicated slot timer over the resolved cast), so there is no second timer and no
+        /// duration here. The clip disappears the tick the slot ends, whether it landed or was cut, and the cooldown sweep carries on alone.
+        /// Writes only when the shown state or the height changes.
+        /// </summary>
+        private void RefreshPeckCastFill(int slot, AbilityController abilities, AbilityBaseSO equipped)
+        {
+            var refs = _slots[slot];
+            if (refs.PeckCast == null) return;
+            bool active = abilities != null && abilities.IsSlotActive(slot);
+            bool shown = PeckCastHexRules.FillShown(equipped.Is(AbilityJob.Peck), active);
+            if (shown != _peckCastShown[slot])
+            {
+                _peckCastShown[slot] = shown;
+                refs.PeckCast.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+                if (shown && refs.PeckCastFill != null)
+                {
+                    var tint = FeedbackTuning.MarkCream;
+                    tint.a = FeedbackTuning.PeckCastFillAlpha;
+                    refs.PeckCastFill.style.unityBackgroundImageTintColor = tint;
+                }
+            }
+            if (!shown) return;
+            float fill = PeckCastHexRules.Fill01(true, abilities.ActiveRemaining01For(slot));
+            refs.PeckCast.style.height = new Length(fill * 100f, LengthUnit.Percent);
         }
 
         /// <summary>

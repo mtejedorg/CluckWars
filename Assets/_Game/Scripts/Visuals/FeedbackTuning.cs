@@ -1381,6 +1381,12 @@ namespace CluckWars.Visuals
         /// translucent so the icon stays readable), fading to 0 over <see cref="FizzleFlashSeconds"/>.</summary>
         public const float FizzlePuffStartAlpha = 0.7f;
 
+        // ---- Peck cast cues (BL-212, BL-213) ----------------------------------------
+
+        /// <summary>Opacity of the cream fill that rises on the Peck hex over the cast (cream = the palette's <see cref="MarkCream"/>; the
+        /// cooldown clip is black and the drain is the category accent, so the three read apart).</summary>
+        public const float PeckCastFillAlpha = 0.80f;
+
         /// <summary>Play volumes of the fizzle whiff and the cancel tick. The clips are mastered to the same loudness as
         /// the menu cues, so these keep two "nothing happened" sounds well under the real ability cue.</summary>
         public const float FizzleSfxVolume = 0.55f;

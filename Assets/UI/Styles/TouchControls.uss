@@ -176,6 +176,27 @@
     /* tint (accent, semi-transparent) written per-frame by the controller */
 }
 
+/* --- Layer 6 (third) : Peck cast fill (BL-212) ------------------------------
+   While the local chicken's Peck cast runs, this clip RISES from the bottom over the effective cast time (height % =
+   elapsed / cast, written by the controller from the replicated slot timer: no second clock), in cream. Cream is neither
+   the cooldown's black nor the drain's category accent, so the three layers read apart. It hands over to the cooldown
+   sweep by disappearing the tick the cast ends. Same clip mechanism as .cw-hex-cd; the tint is written from code. Touch
+   arc and desktop / pad strip share it. */
+.cw-hex-peckcast {
+    position: absolute;
+    left: 3px; right: 3px; bottom: 3px;   /* inside the ink rim, like .cw-hex-fill */
+    height: 0%;
+    overflow: hidden;
+    display: none;
+}
+.cw-hex-peckcast-fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 144px;                    /* == .cw-hex-fill height, so the silhouette aligns */
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
 /* --- Layer 7 : ability icon (design-exported sprite, swapped per-ability) -- */
 .cw-hex-icon {
     width: 88px; height: 88px;        /* the icon alone identifies the move (Phase 2 art) */

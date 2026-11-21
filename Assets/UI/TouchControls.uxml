@@ -102,6 +102,9 @@
             <ui:VisualElement name="ActiveDrain1" class="cw-hex-drain" picking-mode="Ignore">
                 <ui:VisualElement name="ActiveDrainFill1" class="cw-hex-drain-fill" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="PeckCast1" class="cw-hex-peckcast" picking-mode="Ignore">
+                <ui:VisualElement name="PeckCastFill1" class="cw-hex-peckcast-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Icon1" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label1" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum1" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
@@ -128,6 +131,9 @@
             </ui:VisualElement>
             <ui:VisualElement name="ActiveDrain2" class="cw-hex-drain" picking-mode="Ignore">
                 <ui:VisualElement name="ActiveDrainFill2" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="PeckCast2" class="cw-hex-peckcast" picking-mode="Ignore">
+                <ui:VisualElement name="PeckCastFill2" class="cw-hex-peckcast-fill" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Icon2" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label2" text="" class="cw-hex-label" picking-mode="Ignore" />
@@ -158,6 +164,9 @@
             <ui:VisualElement name="ActiveDrain3" class="cw-hex-drain" picking-mode="Ignore">
                 <ui:VisualElement name="ActiveDrainFill3" class="cw-hex-drain-fill" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement name="PeckCast3" class="cw-hex-peckcast" picking-mode="Ignore">
+                <ui:VisualElement name="PeckCastFill3" class="cw-hex-peckcast-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="Icon3" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label3" text="" class="cw-hex-label" picking-mode="Ignore" />
             <ui:Label name="CooldownNum3" text="" class="cw-hex-cdnum" picking-mode="Ignore" />
@@ -185,6 +194,9 @@
             </ui:VisualElement>
             <ui:VisualElement name="ActiveDrain4" class="cw-hex-drain" picking-mode="Ignore">
                 <ui:VisualElement name="ActiveDrainFill4" class="cw-hex-drain-fill" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="PeckCast4" class="cw-hex-peckcast" picking-mode="Ignore">
+                <ui:VisualElement name="PeckCastFill4" class="cw-hex-peckcast-fill" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement name="Icon4" class="cw-hex-icon" picking-mode="Ignore" />
             <ui:Label name="Label4" text="" class="cw-hex-label" picking-mode="Ignore" />
