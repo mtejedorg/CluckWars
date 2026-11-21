@@ -11,6 +11,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-21 - Peck cast cues: hex fill and cut puff (BL-212, BL-213, `develop`, not pushed)
+
+- **BL-212, hex fill:** while the local player's Peck cast runs, a cream layer (`PeckCast{n}` in `TouchControls.uxml`, `.cw-hex-peckcast` in the USS, one layer for the touch arc and the desktop / pad strip) rises from the bottom of the Peck hex over exactly the cast, then vanishes and the cooldown sweep carries on alone. Height = `PeckCastHexRules.Fill01` of `AbilityController.ActiveRemaining01For` (the buff ring's fraction): no second timer, no duration literal; a delta on `PeckCastSeconds` moves it. Tint = `FeedbackTuning.MarkCream` at `PeckCastFillAlpha`.
+- **BL-213, cut cue:** new `[Networked] byte AbilityController.PeckCutEventId` (next to `PeckLandedEventId`), bumped by the state authority in `CutPeckIfInterrupted` (stun, shove, emptied pile) and in `EndAllForRemoval` when a Peck was running (execution). Observed through `ChickenLocalEvents.PeckCut`. Cue: the existing Peck puff at the bird's beak on every peer (`ChickenVFX.EmitPeckCutPuff`) and a 0.3 s red flash (`cw-hex-peckcut`, `FeedbackTuning.PeckCutFlashSeconds`) on the local Peck hex. A completed cast and the chicken's own next move (`EndStealthAndPeckForCast`) do NOT cue: the spec is silent on the own move, so none. **Protocol change:** one more networked byte on `AbilityController`; live two-peer check still owed (ARCH-NET-14).
+- **Tests:** `PeckCastCuesTests` (fill rule against shipped and `BalanceBook`-previewed casts, observer on a proxy, source guards on the bump sites, UXML/USS layer).
+- **Not seen on screen:** the look of the fill and of the puff and flash (batch mode only). To see both: open Bootstrap in the Editor, solo match vs bots with a Peck kit, press Peck at a pile (cream rises over the cast), then stun yourself or get shoved mid-cast (or run `-cw_perk` with 2 clients).
+
 ## 2026-11-21 - Peck cut when the pile empties (BL-206 follow-up, `414b1a31`)
 
 A running Peck is cut (no food, no landing bump, cooldown stays spent) on the first authority tick where no pile with collectable food is in reach: `AbilityBaseSO.HasLostItsTarget` (default false, `PeckAbilitySO` = `FindPile == null`), read by `AbilityController.CutPeckIfInterrupted` into `PeckCastRules.IsCut(stunned, knocked, targetGone)`. A pile with some food left does not cut. The pile's Amount on the pecker's peer can lag one round trip; accepted. `FarmSim` ends a cast on a pile another farmer emptied at once; `OracleReference` re-recorded (only Warrior_Relentless moved, 27.37 s to 27.12 s). No prefab wiring needed.

@@ -1387,6 +1387,10 @@ namespace CluckWars.Visuals
         /// cooldown clip is black and the drain is the category accent, so the three read apart).</summary>
         public const float PeckCastFillAlpha = 0.80f;
 
+        /// <summary>The Peck hex's flash when a cast is cut: seconds it fades over, and its colour (the refusal cross red, the HUD's "no" colour).</summary>
+        public const float PeckCutFlashSeconds = 0.3f;
+        public static Color PeckCutFlashColor => RefusalStunnedCrossColor;
+
         /// <summary>Play volumes of the fizzle whiff and the cancel tick. The clips are mastered to the same loudness as
         /// the menu cues, so these keep two "nothing happened" sounds well under the real ability cue.</summary>
         public const float FizzleSfxVolume = 0.55f;

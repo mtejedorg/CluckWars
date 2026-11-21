@@ -251,6 +251,7 @@ namespace CluckWars.Visuals
         private bool _castPending;
         private CastEvent _cast;
         private bool _knockPending;
+        private bool _peckCutPending;
 
         // ---- Unity lifecycle --------------------------------------------------
 
@@ -507,6 +508,14 @@ namespace CluckWars.Visuals
             ObserveShoveVictim(hidden);
             ObserveHideBeats();
 
+            // BL-213: a Peck cast cut by a stun, shove, execution or emptied pile puffs at the bird, on every peer. A bird that was just
+            // removed already has its own death burst. A completed cast or the chicken's own next move never raises PeckCut.
+            if (_peckCutPending)
+            {
+                _peckCutPending = false;
+                if (!isRemoved) EmitPeckCutPuff();
+            }
+
             // Ability activation: AccentColor burst + caster micro-shake on cast. Detection used to be a rising-edge
             // test on the old single ActiveSlot (since retired: abilities now run concurrently on a per-slot mask).
             // That was broken three ways: (1) a short ability can set and clear its active flag inside a single
@@ -709,6 +718,20 @@ namespace CluckWars.Visuals
             EmitDustAt(in e, contact);
         }
 
+        /// <summary>
+        /// The Peck cut puff (BL-213): the Peck contact puff's straw-cream dust, at beak height on the bird itself (3, or 2 fading in place,
+        /// under Reduced Motion). Called on the replicated PeckCut edge; nothing on a hidden or faded bird.
+        /// </summary>
+        private void EmitPeckCutPuff()
+        {
+            if (_controller == null || FoodChunkFlight.IsQuiet(_controller)) return;
+            bool reduced = PlayerPreferences.ReducedMotionEnabled;
+            var e = _peckPuff;
+            e.Count = PeckBeatRules.PuffCount(reduced);
+            if (reduced) e.SpeedMin = e.SpeedMax = 0f;
+            EmitDust(in e, FeedbackTuning.PeckBeakHeight / Mathf.Max(1e-4f, transform.lossyScale.y));   // FxPoint is root-local: keep the puff at world beak height
+        }
+
         /// <summary>The caster half: accent sparkles in a ring at body height (8, or 4 fading in place under Reduced Motion).</summary>
         private void EmitShoveRing(Color accent)
         {
@@ -729,6 +752,7 @@ namespace CluckWars.Visuals
             _events = _controller.LocalEvents;
             _events.Cast      += OnCast;
             _events.Knockback += OnKnockback;
+            _events.PeckCut   += OnPeckCut;
         }
 
         private void OnDisable()
@@ -737,10 +761,12 @@ namespace CluckWars.Visuals
             {
                 _events.Cast      -= OnCast;
                 _events.Knockback -= OnKnockback;
+                _events.PeckCut   -= OnPeckCut;
                 _events = null;
             }
             _castPending  = false;
             _knockPending = false;
+            _peckCutPending = false;
 
             if (_animator != null) { _animator.ExtraPitchDegrees = 0f; _animator.ExtraScale = Vector3.one; }
         }
@@ -752,6 +778,8 @@ namespace CluckWars.Visuals
         }
 
         private void OnKnockback() => _knockPending = true;
+
+        private void OnPeckCut() => _peckCutPending = true;
 
         /// <summary>
         /// The Speed body cue, observed from replicated state (the slot active mask) and the bird's own planar motion: a

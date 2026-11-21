@@ -140,12 +140,15 @@ namespace CluckWars.Input
         /// A cast that happened before the bind is never delivered, which is the baseline.</summary>
         private void BindStunCastEvents(ChickenController chicken)
         {
-            if (_stunCastEvents != null) _stunCastEvents.Cast -= OnLocalCast;
+            if (_stunCastEvents != null) { _stunCastEvents.Cast -= OnLocalCast; _stunCastEvents.PeckCut -= OnLocalPeckCut; }
             _stunCastFor = chicken;
             _stunCastEvents = chicken != null ? chicken.LocalEvents : null;
             _stunCastPending = false;
-            if (_stunCastEvents != null) _stunCastEvents.Cast += OnLocalCast;
+            _peckCutPending = false;
+            if (_stunCastEvents != null) { _stunCastEvents.Cast += OnLocalCast; _stunCastEvents.PeckCut += OnLocalPeckCut; }
         }
+
+        private void OnLocalPeckCut() => _peckCutPending = true;
 
         private void OnLocalCast(CastEvent e)
         {
@@ -549,6 +552,38 @@ namespace CluckWars.Input
         }
 
         /// <summary>
+        /// BL-213: the local bird's cut Peck cast flashes its Peck hex(es) for <see cref="FeedbackTuning.PeckCutFlashSeconds"/>. The event comes
+        /// from <c>ChickenLocalEvents.PeckCut</c> (latched in <see cref="OnLocalPeckCut"/>, observed in <see cref="UpdateCasterStunCountdown"/>
+        /// just before this runs); a completed cast or the chicken's own next move never raises it. Driven by <c>unscaledDeltaTime</c> like the other
+        /// hex flashes.
+        /// </summary>
+        private void UpdatePeckCutFlash(AbilityController abilities)
+        {
+            if (_peckCutPending)
+            {
+                _peckCutPending = false;
+                for (int slot = 0; slot < SlotCount; slot++)
+                    if (abilities != null && SlotAbility(abilities, slot).Is(AbilityJob.Peck)) _peckCutTimer[slot] = 0f;
+            }
+
+            for (int slot = 0; slot < SlotCount; slot++)
+            {
+                var flash = _slots[slot].PeckCutFlash;
+                if (_peckCutTimer[slot] < 0f || flash == null) continue;
+                _peckCutTimer[slot] += Time.unscaledDeltaTime;
+                float opacity = PeckCastHexRules.FlashOpacity(_peckCutTimer[slot], FeedbackTuning.PeckCutFlashSeconds);
+                if (opacity <= 0f)
+                {
+                    _peckCutTimer[slot] = -1f;
+                    flash.style.display = DisplayStyle.None;
+                    continue;
+                }
+                flash.style.display = DisplayStyle.Flex;
+                flash.style.opacity = opacity;
+            }
+        }
+
+        /// <summary>
         /// J3: reads the Egg Shell slot's phase off the replicated run (the badge row's read: remaining run = active fraction x
         /// the resolved duration, egg when it is within <c>EggSeconds</c>) and swaps the hex icon to the cracked egg only when
         /// the phase moves. A hatch press (slot goes inactive) restores the whole egg on the next frame.
@@ -826,6 +861,13 @@ namespace CluckWars.Input
             auto.AddToClassList(PeckLongPressRules.AutoTagClass);
             auto.style.display = DisplayStyle.None;
 
+            // BL-213: the hex wash after a cut Peck cast (colour from FeedbackTuning, fade driven by UpdatePeckCutFlash).
+            var peckCut = new VisualElement { pickingMode = PickingMode.Ignore };
+            peckCut.AddToClassList(PeckCastHexRules.CutFlashClass);
+            peckCut.style.unityBackgroundImageTintColor = FeedbackTuning.PeckCutFlashColor;
+            peckCut.style.display = DisplayStyle.None;
+
+            hex.Add(peckCut);
             hex.Add(puff);
             hex.Add(slash);
             hex.Add(x);
@@ -834,6 +876,7 @@ namespace CluckWars.Input
             slot.CancelX = x;
             slot.Puff = puff;
             slot.FizzleSlash = slash;
+            slot.PeckCutFlash = peckCut;
         }
 
         private void SetFizzleVisible(int slot, bool on)

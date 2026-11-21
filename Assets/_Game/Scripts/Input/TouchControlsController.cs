@@ -133,6 +133,7 @@ namespace CluckWars.Input
             public VisualElement DrainFill;  // accent-tinted silhouette inside the drain clip
             public VisualElement PeckCast;   // layer 6 third: bottom-up cream clip over the Peck cast (BL-212), shown only on a Peck hex while it runs
             public VisualElement PeckCastFill; // cream silhouette inside the Peck cast clip
+            public VisualElement PeckCutFlash; // built in code: the hex-shaped wash after a cut Peck cast (BL-213)
             public VisualElement Icon;       // layer 7: sprite swapped via .cw-hex-icon--* class
             public Label         Label;      // layer 7: short label under the icon
             public Label         CdNum;      // layer 9: seconds remaining
@@ -172,8 +173,10 @@ namespace CluckWars.Input
 
         // Phase 6 chunk 2: fizzle flash timers (seconds into the 0.3 s flash; -1 = idle) and the touch edge-band cancel.
         private readonly float[] _fizzleTimer  = new float[SlotCount] { -1f, -1f, -1f, -1f };
-        // BL-212: the Peck cast fill's shown state.
+        // BL-212 / BL-213: the Peck cast fill's shown state, the cut flash timers (seconds in; -1 = idle) and the latch of the local bird's PeckCut event.
         private readonly bool[]  _peckCastShown = new bool[SlotCount];
+        private readonly float[] _peckCutTimer  = new float[SlotCount] { -1f, -1f, -1f, -1f };
+        private bool _peckCutPending;
         private readonly bool[]  _cancelArmed  = new bool[SlotCount];
         private readonly ScreenEdge[] _armedEdge = new ScreenEdge[SlotCount];
         private readonly bool[]  _appliedCancelX = new bool[SlotCount];
@@ -901,6 +904,7 @@ namespace CluckWars.Input
             UpdateMarkHexes(abilities);
             UpdateCasterStunCountdown(abilities);
             PollDeniedPress(abilities);
+            UpdatePeckCutFlash(abilities);
             for (int i = 0; i < SlotCount; i++)
                 _heldSeconds[i] = _held[i] ? _heldSeconds[i] + Time.unscaledDeltaTime : 0f;
             RefreshHeldVisuals();

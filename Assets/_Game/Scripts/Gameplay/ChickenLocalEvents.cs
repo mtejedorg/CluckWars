@@ -87,6 +87,9 @@ namespace CluckWars.Gameplay
 
         /// <summary>The Peck's food-landed counter (BL-206): bumped on the authority at the natural end of the cast.</summary>
         public byte PeckLandedEventId;
+
+        /// <summary>The Peck's cut counter (BL-213): bumped on the authority when a stun, shove, execution or emptied pile ends a running cast.</summary>
+        public byte PeckCutEventId;
     }
 
     /// <summary>
@@ -127,7 +130,7 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private bool _siblingsResolved;
 
-        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit, _peckLanded;
+        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit, _peckLanded, _peckCut;
         private AbilityBaseSO _lastCharging;
         private bool _raising;
 
@@ -135,6 +138,7 @@ namespace CluckWars.Gameplay
         // throws is reported and the rest still get the beat (S-1). A raise allocates nothing.
         private readonly ListenerList<Action<CastEvent>> _castListeners = new ListenerList<Action<CastEvent>>();
         private readonly ListenerList<Action> _peckLandedListeners = new ListenerList<Action>();
+        private readonly ListenerList<Action> _peckCutListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _knockbackListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _selfImpulseListeners = new ListenerList<Action>();
         private readonly ListenerList<Action> _jumpListeners = new ListenerList<Action>();
@@ -168,6 +172,10 @@ namespace CluckWars.Gameplay
 
         /// <summary><c>Time.unscaledTime</c> of the last observed <see cref="PeckLanded"/>; negative infinity before the first.</summary>
         public float LastPeckLandedTime { get; private set; } = float.NegativeInfinity;
+
+        /// <summary><c>AbilityController.PeckCutEventId</c> moved: a running Peck cast was cut (stun, shove, execution, emptied pile), every peer.
+        /// Never raised for a completed cast or for the chicken's own next move.</summary>
+        public event Action PeckCut { add => _peckCutListeners.Add(value); remove => _peckCutListeners.Remove(value); }
 
         public event Action Knockback { add => _knockbackListeners.Add(value); remove => _knockbackListeners.Remove(value); }
         /// <summary><c>ChickenController.SelfImpulseEventId</c> moved: this chicken displaced itself (a dodge, not a hit).</summary>
@@ -242,6 +250,7 @@ namespace CluckWars.Gameplay
                 s.CastEventId = _abilities.LastCastEventId;
                 s.ChargingAbility = _abilities.ChargingAbility;
                 s.PeckLandedEventId = _abilities.PeckLandedEventId;
+                s.PeckCutEventId = _abilities.PeckCutEventId;
                 if (_cast.WouldFire(s.CastEventId))
                 {
                     s.CastSlot = _abilities.LastCastSlot;
@@ -284,6 +293,7 @@ namespace CluckWars.Gameplay
                         LastPeckLandedTime = Time.unscaledTime;
                         LocalRaise.Invoke(_peckLandedListeners, nameof(PeckLanded), Log, _controller);
                     }
+                    if (_peckCut.Observe(s.PeckCutEventId)) LocalRaise.Invoke(_peckCutListeners, nameof(PeckCut), Log, _controller);
                 }
 
                 if (_knockback.Observe(s.KnockbackEventId)) LocalRaise.Invoke(_knockbackListeners, nameof(Knockback), Log, _controller);
@@ -313,6 +323,7 @@ namespace CluckWars.Gameplay
             _steal.Reset();
             _deposit.Reset();
             _peckLanded.Reset();
+            _peckCut.Reset();
             LastPeckLandedTime = float.NegativeInfinity;
             _lastCharging = null;
             _siblingsResolved = false;

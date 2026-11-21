@@ -102,6 +102,12 @@ namespace CluckWars.Gameplay
         [Networked] public byte PeckLandedEventId { get; private set; }
         internal void NotePeckLanded() { if (HasStateAuthority) PeckLandedEventId++; }
 
+        /// <summary>Bumped by the state authority when a running Peck cast is CUT by something done to the chicken (a stun, a shove, an
+        /// emptied pile, an execution): never when the cast completes (that is <see cref="PeckLandedEventId"/>), never when the chicken ends
+        /// it with its own next move (a handoff the player chose). One-shot, wraps at 255; peers observe it through ChickenLocalEvents (BL-213).</summary>
+        [Networked] public byte PeckCutEventId { get; private set; }
+        private void NotePeckCut() { if (HasStateAuthority) PeckCutEventId++; }
+
         /// <summary>
         /// True while the Peck auto-chain runs (Phase 6 chunk 4, A6): the bird keeps pecking on its own each time
         /// the per-class cooldown is ready. Decided on the state authority by <see cref="PeckChainRules"/>; the
@@ -1353,6 +1359,7 @@ namespace CluckWars.Gameplay
             bool targetGone = ability != null && ability.HasLostItsTarget(_controller);
             if (!PeckCastRules.IsCut(stunned, knocked, targetGone)) return;
             Deactivate(peck);                                 // not natural: no food, no expire cue
+            NotePeckCut();                                    // the one bump per cut: every cutter above passes this single line
             _log?.Debug(Source, $"Peck cut: {(stunned ? "a stun" : knocked ? "a shove" : "the pile is empty")}.");
         }
 
@@ -1417,7 +1424,10 @@ namespace CluckWars.Gameplay
         public void EndAllForRemoval()
         {
             if (!HasStateAuthority || !_initialized) return;
+            int peck = FindPeckSlot();
+            bool peckRunning = peck != InvalidSlot && IsSlotActive(peck);
             DeactivateAll();
+            if (peckRunning) NotePeckCut();   // an execution cuts a running Peck like a stun does
             CancelCharge();
             if (PeckChainActive) PeckChainActive = false;
         }

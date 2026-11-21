@@ -569,6 +569,17 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* The Peck cut flash (BL-213): a hex-shaped wash over the whole hex for a moment when a stun, shove, execution or an
+   emptied pile cuts the local chicken's cast. Built in code (BuildFlashElements), hidden until driven; colour and
+   fade come from FeedbackTuning / PeckCastHexRules. Same hex silhouette as the fill layers, inside the ink rim. */
+.cw-hex-peckcut {
+    position: absolute;
+    left: 3px; top: 3px;
+    width: 144px; height: 144px;
+    background-image: url("project://database/Assets/_Game/Art/UI/Atoms/HexGlossy.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
 /* The "AUTO" tag of the Peck hex while Auto-Peck is on (PeckLongPressRules.AutoTagClass, built in code, shown by
    PeckLongPressRules.AutoPeckBadgeVisible): a cream pill with an ink rim across the bottom of the hex, 28 px text (the HUD
    floor). It sits over the cooldown seconds only for the short Peck cooldown. Same on the touch arc and the desktop / pad strip. */
