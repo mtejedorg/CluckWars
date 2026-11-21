@@ -608,6 +608,7 @@ namespace CluckWars.Diagnostics
         private void TickAutoPlay(GameManager gm)
         {
             if (_autoPlay == null || !_cfg.AutoPlay) return;
+            if (gm != null && gm.Runner != null) SimClock.Bind(gm.Runner);   // auto-play and the probes run on simulation time (BL-208)
             bool run = gm != null && gm.IsMatchRunning;
             var self = run ? LocalChicken() : null;
             if (run != _autoPlayOn)
@@ -617,7 +618,7 @@ namespace CluckWars.Diagnostics
                 {
                     // One personality per client, from its PlayerId, so the clients of a session play differently.
                     int playerId = self != null ? self.Object.InputAuthority.PlayerId : 0;
-                    _autoPlay.Configure(playerId);
+                    _autoPlay.Configure(playerId, AutoPlayPersonality.TryParse(_cfg.Personality, out var forced) ? forced : (AutoPlayPersonality?)null);
                     _lastAutoPlayState = _autoPlay.State;
                     _lastAutoPlayGoal = _autoPlay.Goal;
                     _nextAutoPlayBeatAt = 0f;
@@ -630,9 +631,9 @@ namespace CluckWars.Diagnostics
             }
             if (!run) return;
 
-            _autoPlay.Tick(self, Time.unscaledTime);
-            // Every state or goal change, and a heartbeat every 5 s: the next run's log explains itself.
-            float now = Time.realtimeSinceStartup;
+            _autoPlay.Tick(self, SimClock.Now());
+            // Every state or goal change, and a heartbeat every 5 simulated s: the next run's log explains itself.
+            float now = SimClock.Now();
             if (_autoPlay.State != _lastAutoPlayState || _autoPlay.Goal != _lastAutoPlayGoal)
             {
                 _log.Info(AutoPlaySource, AutoPlayLog.Line(

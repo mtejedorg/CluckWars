@@ -114,6 +114,7 @@ namespace CluckWars.Diagnostics
                 World(gm);
                 Auras(gm.Runner);
                 BaseWalls(gm);
+                Contacts(gm);
             }
             catch (Exception e)
             {
@@ -135,7 +136,7 @@ namespace CluckWars.Diagnostics
             if (_intrusionRound != _round) { _intrusionRound = _round; _intruding.Clear(); _intrusionReported.Clear(); }
             if (!gm.IsMatchRunning || gm.Config == null) { _intruding.Clear(); return; }
 
-            float radius = gm.Config.BaseKeepOutRadius, now = Time.unscaledTime;
+            float radius = gm.Config.BaseKeepOutRadius, now = SimClock.Now(gm.Runner);
             var bases = PlayerBase.ActiveBases;
             var all = ChickenController.ActiveControllers;
             for (int i = 0; i < all.Count; i++)
@@ -164,6 +165,60 @@ namespace CluckWars.Diagnostics
             }
         }
 
+        private readonly HashSet<uint> _contactSeen = new HashSet<uint>();
+        private int _contactRound = -1;
+        private float _contactMetres = -1f;
+
+        /// <summary>
+        /// The distance that counts as contact: the smallest offensive reach in the registry (Stun, Shove, Steal), the
+        /// definition of the match simulator (BL-208). 0 when no registry or no such ability is bound (then no line is written).
+        /// </summary>
+        private float ContactMetres
+        {
+            get
+            {
+                if (_contactMetres >= 0f) return _contactMetres;
+                if (_abilityRegistry == null) return 0f;
+                float min = float.MaxValue;
+                foreach (var ab in _abilityRegistry.ActiveAbilities)
+                    if (ab != null && (ab.Job == AbilityJob.Stun || ab.Job == AbilityJob.Shove || ab.Job == AbilityJob.Steal) && ab.IndicatorRange > 0f)
+                        min = Mathf.Min(min, ab.IndicatorRange);
+                return _contactMetres = min == float.MaxValue ? 0f : min;
+            }
+        }
+
+        /// <summary>
+        /// <c>Telemetry contact</c>: the first time, per round, a chicken this peer holds authority over is within
+        /// <see cref="ContactMetres"/> of another chicken (one line per seat across a session). Read-only.
+        /// </summary>
+        private void Contacts(GameManager gm)
+        {
+            if (_contactRound != _round) { _contactRound = _round; _contactSeen.Clear(); }
+            if (!gm.IsMatchRunning || _log == null) return;
+            float reach = ContactMetres;
+            if (reach <= 0f) return;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Object == null || !c.Object.IsValid || !c.HasStateAuthority || c.IsDecoy) continue;
+                if (c.Combat != null && c.Combat.IsRemoved) continue;
+                if (_contactSeen.Contains(c.Object.Id.Raw)) continue;
+                for (int j = 0; j < all.Count; j++)
+                {
+                    var o = all[j];
+                    if (o == null || o == c || o.Object == null || !o.Object.IsValid || o.IsDecoy) continue;
+                    if (o.Combat != null && o.Combat.IsRemoved) continue;
+                    float d = Planar.Distance(c.transform.position, o.transform.position);
+                    if (d > reach) continue;
+                    _contactSeen.Add(c.Object.Id.Raw);
+                    _log.Info(MatchTelemetry.Source, MatchTelemetry.Contact(MatchTelemetry.Tick(gm.Runner), MatchTelemetry.Seat(c), MatchTelemetry.Seat(o),
+                        _round, gm.MatchDurationSeconds - gm.TimeRemaining, d));
+                    break;
+                }
+            }
+        }
+
         private void Observe(GameManager gm)
         {
             var st = gm.State;
@@ -175,10 +230,11 @@ namespace CluckWars.Diagnostics
                 if (_haveState) _log?.Info(Source, $"Invariant state {_state}->{st} round={_round}");
                 _haveState = true;
                 _state = st;
-                if (st == MatchState.Active) _startCheckAt = Time.realtimeSinceStartup + StartCheckDelaySeconds;
+                // Simulation time, not wall time: under cw_timescale the sim runs seconds ahead of a real 0.5 s (BL-208).
+                if (st == MatchState.Active) _startCheckAt = SimClock.Now(gm.Runner) + StartCheckDelaySeconds;
                 if (st == MatchState.Ended) CheckEnd(gm);
             }
-            if (_startCheckAt >= 0f && Time.realtimeSinceStartup >= _startCheckAt)
+            if (_startCheckAt >= 0f && SimClock.Now(gm.Runner) >= _startCheckAt)
             {
                 _startCheckAt = -1f;
                 if (gm.State == MatchState.Active) CheckStart(gm);
@@ -375,7 +431,7 @@ namespace CluckWars.Diagnostics
         /// </summary>
         private void Auras(NetworkRunner runner)
         {
-            float now = Time.realtimeSinceStartup;
+            float now = SimClock.Now(runner);
             _auraSeen.Clear();
             var zones = AbilityZone.ActiveZones;
             for (int i = 0; i < zones.Count; i++)

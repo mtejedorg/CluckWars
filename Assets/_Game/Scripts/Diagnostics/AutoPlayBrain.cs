@@ -65,9 +65,15 @@ namespace CluckWars.Diagnostics
         public readonly float AttackEverySeconds;
         /// <summary>Whether the periodic casts may use Steal / Control moves (a runner keeps to Utility / Defense).</summary>
         public readonly bool CastsOffense;
+        /// <summary>
+        /// The fighter (<c>cw_personality fighter</c>): plays the kit's attacks at legal targets through <see cref="FighterTactics"/>
+        /// instead of the periodic round-robin casts; forages and banks like the others in between. Never picked by <see cref="For"/>.
+        /// </summary>
+        public readonly bool Fights;
 
-        public AutoPlayPersonality(string name, float returnFraction, float attackRange, float attackEverySeconds, bool castsOffense)
+        public AutoPlayPersonality(string name, float returnFraction, float attackRange, float attackEverySeconds, bool castsOffense, bool fights = false)
         {
+            Fights = fights;
             Name = name;
             ReturnFraction = returnFraction;
             AttackRange = attackRange;
@@ -80,6 +86,22 @@ namespace CluckWars.Diagnostics
         public static readonly AutoPlayPersonality Aggressive = new AutoPlayPersonality("aggressive", 0.8f, 9f, 6f, true);
         public static readonly AutoPlayPersonality Runner = new AutoPlayPersonality("runner", 0.6f, 0f, 0f, false);
         public static readonly AutoPlayPersonality Balanced = new AutoPlayPersonality("balanced", 0.7f, 5f, 12f, true);
+        public static readonly AutoPlayPersonality Fighter = new AutoPlayPersonality("fighter", 0.7f, 0f, 0f, false, fights: true);
+
+        public const string Names = "aggressive|runner|balanced|fighter";
+
+        /// <summary>The personality called <paramref name="name"/> (any case); false for anything else.</summary>
+        public static bool TryParse(string name, out AutoPlayPersonality personality)
+        {
+            switch ((name ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "aggressive": personality = Aggressive; return true;
+                case "runner":     personality = Runner;     return true;
+                case "balanced":   personality = Balanced;   return true;
+                case "fighter":    personality = Fighter;    return true;
+                default:           personality = Balanced;   return false;
+            }
+        }
 
         /// <summary>PlayerId mod 3: 0 aggressive, 1 runner, 2 balanced (so three clients in a session get three styles).</summary>
         public static AutoPlayPersonality For(int playerId)

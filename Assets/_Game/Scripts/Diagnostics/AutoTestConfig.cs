@@ -32,9 +32,13 @@ namespace CluckWars.Diagnostics
         /// <summary><c>cw_timescale 5</c> (dev tools, solo only): see <see cref="TimeScale"/>.</summary>
         public const string TimeScaleKey = "cw_timescale";
         public const float MinTimeScale = 1f, MaxTimeScale = 20f;
+        /// <summary><c>cw_personality fighter</c> (dev tools): the auto-play personality of this seat, see <see cref="Personality"/>.</summary>
+        public const string PersonalityKey = "cw_personality";
+        /// <summary><c>cw_seed 12345</c> (dev tools, solo): fixes the map, corner and kit-lineup seeds, see <see cref="DevSeed"/>.</summary>
+        public const string SeedKey = DevSeed.Key;
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, ShotSuperKey, TimeScaleKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, ShotSuperKey, TimeScaleKey, PersonalityKey, SeedKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -59,6 +63,11 @@ namespace CluckWars.Diagnostics
         /// <see cref="MinTimeScale"/>..<see cref="MaxTimeScale"/>; 1 = real time. Shared matches ignore it.
         /// </summary>
         public float TimeScale = 1f;
+        /// <summary>
+        /// <c>cw_personality</c>: aggressive | runner | balanced | fighter. Null = the PlayerId rule
+        /// (<see cref="AutoPlayPersonality.For"/>), which never yields the fighter.
+        /// </summary>
+        public string Personality;
         /// <summary><c>cw_shotsuper</c>: capture supersize for the Death Mark shots (1 = the window's own size).</summary>
         public int ShotSuper = 1;
         /// <summary>Humans to wait for before the host starts; 0 = not set (a human presses START).</summary>
@@ -235,6 +244,13 @@ namespace CluckWars.Diagnostics
                         if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float scale) && !float.IsNaN(scale))
                             cfg.TimeScale = Math.Min(MaxTimeScale, Math.Max(MinTimeScale, scale));
                         else cfg.Problems.Add($"{key} '{value}' is not a number; using 1");
+                        break;
+                    case PersonalityKey:
+                        if (AutoPlayPersonality.TryParse(value, out _)) cfg.Personality = value.ToLowerInvariant();
+                        else cfg.Problems.Add($"{key} '{value}' is not a personality ({AutoPlayPersonality.Names}); the PlayerId rule picks one");
+                        break;
+                    case SeedKey:
+                        if (!DevSeed.TryParse(value, out _)) cfg.Problems.Add($"{key} '{value}' is not a whole number; random seeds");
                         break;
                     case ShotSuperKey: cfg.ShotSuper = cfg.ParseInt(key, value, 1, 4, 1); break;
                     case BotPerksKey:

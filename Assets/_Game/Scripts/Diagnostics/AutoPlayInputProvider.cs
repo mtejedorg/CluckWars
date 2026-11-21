@@ -2,6 +2,7 @@ using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using CluckWars.Input;
 using CluckWars.Visuals;
+using Fusion;
 using UnityEngine;
 
 namespace CluckWars.Diagnostics
@@ -32,6 +33,14 @@ namespace CluckWars.Diagnostics
         /// <summary>An unread press is dropped after this long (a press is meant for the next input read, not later).</summary>
         public const float PressLatchSeconds = 0.25f;
         private const int MaxPiles = 64, MaxRivals = 16;
+        /// <summary>
+        /// The decision step, in SIMULATED seconds (two ticks at the 32 Hz tick rate): the stick, the presses and the brain
+        /// run once per step whatever the frame rate or <c>cw_timescale</c> (BL-208), so a time scale changes how fast the
+        /// match runs, not what the bird decides per second of it.
+        /// </summary>
+        public const float DecisionStepSeconds = 0.0625f;
+        /// <summary>After a fighter press, the shortest gap before the next one (the hold plus the cast settling).</summary>
+        public const float FighterPressGapSeconds = 0.3f;
 
         private AutoPlayBrain _brain = new AutoPlayBrain(AutoPlayPersonality.Balanced);
         private readonly AutoPlayPile[] _piles = new AutoPlayPile[MaxPiles];
@@ -41,11 +50,17 @@ namespace CluckWars.Diagnostics
         private readonly bool[] _pressPending = new bool[AbilityController.SlotCount];
         private readonly float[] _pressExpires = new float[AbilityController.SlotCount];
         private readonly float[] _holdUntil = new float[AbilityController.SlotCount];
-        private readonly System.Func<float> _clock;
+        private readonly System.Func<float> _clock, _frameSeconds;
         private Vector2 _stick;
         private float _nextCastAt, _nextPeckAt;
         private int _nextSlot = 1;
         private readonly System.Random _rng = new System.Random(20261020);
+        private TickCadence _cadence;
+        // The fighter personality scratch (FighterTactics): rivals with the extra facts, the equipped attacks.
+        private readonly FighterRival[] _fRivals = new FighterRival[MaxRivals];
+        private readonly FighterAttack[] _fAttacks = new FighterAttack[AbilityController.SlotCount];
+        private float _fighterNextPressAt;
+        private bool _chasing;
 
         /// <summary>True while the driver wants the fake player to play (a running round on this peer).</summary>
         public bool Active { get; private set; }
@@ -82,17 +97,26 @@ namespace CluckWars.Diagnostics
         /// <summary>Peck presses made this round (a forager standing at a pile should rack these up).</summary>
         public int PeckPresses { get; private set; }
 
-        /// <param name="clock">Seconds, unscaled (default <c>Time.unscaledTime</c>); injectable for tests.</param>
-        public AutoPlayInputProvider(System.Func<float> clock = null)
+        /// <param name="clock">Seconds of SIMULATED time (default <see cref="SimClock.Now()"/>: the runner simulation time, so
+        /// holds and press latches follow <c>cw_timescale</c>); injectable for tests.</param>
+        /// <param name="frameSeconds">Simulated seconds one rendered frame spans (default <c>Time.deltaTime</c>, which is scaled);
+        /// with an injected clock and no value it is 0, so a test controls time through the clock alone.</param>
+        public AutoPlayInputProvider(System.Func<float> clock = null, System.Func<float> frameSeconds = null)
         {
-            _clock = clock ?? (() => Time.unscaledTime);
+            _clock = clock ?? SimClock.Now;
+            _frameSeconds = frameSeconds ?? (clock == null ? (System.Func<float>)(() => Time.deltaTime) : () => 0f);
         }
 
-        /// <summary>Picks the personality for this client (<see cref="AutoPlayPersonality.For"/> of its PlayerId).</summary>
-        public void Configure(int playerId)
+        /// <summary>
+        /// Picks the personality for this client: <paramref name="forced"/> (<c>cw_personality</c>) when given, else
+        /// <see cref="AutoPlayPersonality.For"/> of its PlayerId.
+        /// </summary>
+        public void Configure(int playerId, AutoPlayPersonality? forced = null)
         {
-            _brain = new AutoPlayBrain(AutoPlayPersonality.For(playerId));
+            _brain = new AutoPlayBrain(forced ?? AutoPlayPersonality.For(playerId));
             PeckPresses = 0;
+            _fighterNextPressAt = 0f;
+            _cadence.Reset();
         }
 
         public void SetActive(bool active)
@@ -101,12 +125,16 @@ namespace CluckWars.Diagnostics
             Active = active;
             _stick = Vector2.zero;
             for (int i = 0; i < _holdUntil.Length; i++) { _holdUntil[i] = 0f; _pressPending[i] = false; }
+            _cadence.Reset();
+            _chasing = false;
         }
 
         /// <summary>Called once per rendered frame by the driver: decide the stick and the presses for this frame.</summary>
         public void Tick(ChickenController self, float now)
         {
             if (!Active || self == null || self.Object == null || !self.Object.IsValid) { _stick = Vector2.zero; return; }
+            // One decision per step of simulated time: the stick and presses of the last decision stand in between.
+            if (!_cadence.TryAdvance(now, DecisionStepSeconds, out now)) return;
 
             var mine3 = self.transform.position;
             var view = new AutoPlayView { Piles = _piles, Rivals = _rivals };
@@ -155,12 +183,16 @@ namespace CluckWars.Diagnostics
             }
             else OwnBaseFood = -1f;
 
+            bool fights = _brain.Personality.Fights;
+            var execute = fights ? self.GetComponent<AssassinExecute>() : null;
+            NetworkBehaviourId marked = execute != null ? execute.MarkedTarget : NetworkBehaviourId.None;
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count && view.RivalCount < MaxRivals; i++)
             {
                 var c = chickens[i];
                 if (c == null || c == self || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
                 var cp = c.transform.position;
+                if (fights) _fRivals[view.RivalCount] = FighterFacts(c, mine3, marked);
                 _rivals[view.RivalCount++] = new AutoPlayRival
                 {
                     Position = new Vector2(cp.x, cp.z),
@@ -174,6 +206,23 @@ namespace CluckWars.Diagnostics
             CanForage = view.CanForage;
             view.Capacity = self.Cargo != null ? self.Cargo.Capacity : 0f;
             var world = _brain.Tick(now, view, (float)_rng.NextDouble());
+            _chasing = false;
+            if (fights)
+            {
+                var decision = FighterChoose(self, execute, view);
+                if (decision.Slot >= 0 && now >= _fighterNextPressAt)
+                {
+                    Press(decision.Slot, HoldSeconds);
+                    _fighterNextPressAt = now + HoldSeconds + FighterPressGapSeconds;
+                }
+                // Banking comes first: a full bird walks home, it does not turn round for a rival.
+                if (decision.Chase >= 0 && _brain.State != AutoPlayState.Deposit)
+                {
+                    var to = view.Rivals[decision.Chase].Position - view.Self;
+                    world = to.sqrMagnitude > 0.01f ? to.normalized : Vector2.zero;
+                    _chasing = true;
+                }
+            }
             if (SteerOverride.HasValue)
             {
                 var toTarget = SteerOverride.Value - view.Self;
@@ -194,6 +243,18 @@ namespace CluckWars.Diagnostics
         {
             var abilities = self.Abilities;
             if (abilities == null) return;
+
+            // The fighter presses come from FighterTactics; it keeps only the Peck here, none of the periodic casts.
+            if (_brain.Personality.Fights)
+            {
+                _brain.TakeAttackCast();
+                if (!_chasing && abilities.GetSlot(0).Is(AbilityJob.Peck) && _brain.Goal == AutoPlayGoal.AtPile &&
+                    _brain.State == AutoPlayState.Forage && now >= _nextPeckAt)
+                {
+                    Press(0, PeckHoldSeconds); _nextPeckAt = now + PeckEverySeconds; PeckPresses++;
+                }
+                return;
+            }
 
             if (_brain.TakeAttackCast())
             {
@@ -236,13 +297,66 @@ namespace CluckWars.Diagnostics
             return -1;
         }
 
+        private static FighterRival FighterFacts(ChickenController c, Vector3 selfPos, NetworkBehaviourId marked)
+        {
+            var abilities = c.Abilities;
+            int peck = abilities != null ? abilities.FindPeckSlot() : AbilityController.InvalidSlot;
+            var cp = c.transform.position;
+            return new FighterRival
+            {
+                Position = new Vector2(cp.x, cp.z),
+                Cargo = c.Cargo != null ? c.Cargo.Cargo : 0f,
+                CastingPeck = peck != AbilityController.InvalidSlot && abilities.IsSlotActive(peck),
+                Stunned = c.CurrentControlState == ControlState.Stunned,
+                Untouchable = c.IsStealProof || PlayerBase.WallBetween(selfPos, cp),
+                Marked = marked != NetworkBehaviourId.None && c.Id == marked,
+            };
+        }
+
+        private FighterDecision FighterChoose(ChickenController self, AssassinExecute execute, in AutoPlayView view)
+        {
+            var abilities = self.Abilities;
+            if (abilities == null) return FighterDecision.None;
+            bool canCast = ControlRules.CanCast(self.CurrentControlState);
+            var fv = new FighterView
+            {
+                Self = view.Self, Rivals = _fRivals, RivalCount = view.RivalCount, Attacks = _fAttacks, MarkSlot = -1,
+            };
+            for (int slot = 0; slot < AbilityController.SlotCount; slot++)
+            {
+                var ab = abilities.GetSlot(slot);
+                if (ab == null) continue;
+                bool ready = canCast && !abilities.IsSlotActive(slot) && abilities.IsReady(slot) && ab.IsUsable(self);
+                if (ab.Is(AbilityJob.DeathMark))
+                {
+                    fv.MarkSlot = slot;
+                    if (execute != null && execute.MarkedTarget != NetworkBehaviourId.None)
+                    {
+                        fv.Mark = FighterMarkPhase.Marked;
+                        fv.CanKillNow = canCast && execute.CanKillNow;
+                        fv.ArmRemaining = execute.ArmTimer.RemainingTime(execute.Runner) ?? 0f;
+                        fv.WindowRemaining = execute.WindowTimer.RemainingTime(execute.Runner) ?? 0f;
+                    }
+                    else if (ready) fv.Mark = FighterMarkPhase.Ready;
+                    continue;
+                }
+                if (ab.Job != AbilityJob.Stun && ab.Job != AbilityJob.Shove && ab.Job != AbilityJob.Steal) continue;
+                _fAttacks[fv.AttackCount++] = new FighterAttack
+                {
+                    Slot = slot, Job = ab.Job, Ready = ready, Reach = ab.IndicatorRange, ControlSeconds = ab.EmittedControl.Seconds,
+                };
+            }
+            return FighterTactics.Choose(fv);
+        }
+
         /// <summary>Presses <paramref name="slot"/> now and holds it for <paramref name="hold"/> seconds (release = cast).</summary>
         public void Press(int slot, float hold)
         {
             if (slot < 0 || slot >= _pressPending.Length) return;
             float now = _clock();
             _pressPending[slot] = true;
-            _pressExpires[slot] = now + PressLatchSeconds;
+            // Never shorter than two frames of simulated time: at x20 a frame is 0.3 s of the match, and a press must outlive the read.
+            _pressExpires[slot] = now + Mathf.Max(PressLatchSeconds, 2f * _frameSeconds());
             _holdUntil[slot] = now + hold;
         }
 
