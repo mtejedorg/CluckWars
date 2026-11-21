@@ -7,22 +7,21 @@ using CluckWars.Gameplay;
 
 namespace CluckWars.Balance
 {
-    /// <summary>One value the solver may move: a field of a named asset (as a schema-1 delta names it) or an oracle-only value.</summary>
+    /// <summary>One value the solver may move: a field of a named asset, as a schema-1 delta names it.</summary>
     public sealed class FreeValue
     {
-        /// <summary>The asset name a delta uses ("Fatty", "Snatch", "MatchConfig"), or <see cref="OracleSolver.OracleAsset"/> for an oracle-only value.</summary>
+        /// <summary>The asset name a delta uses ("Fatty", "Snatch", "MatchConfig").</summary>
         public string Asset;
-        /// <summary>The field ("CargoCapacity"), or for an oracle-only value "&lt;Class&gt;.PeckCastSeconds".</summary>
+        /// <summary>The field ("CargoCapacity", "PeckCastSeconds").</summary>
         public string Field;
-        /// <summary>Lower limit of the search; NaN takes the field's own [Range] / [Min] (an oracle-only value: 0).</summary>
+        /// <summary>Lower limit of the search; NaN takes the field's own [Range] / [Min].</summary>
         public float Min = float.NaN;
-        /// <summary>Upper limit of the search; NaN takes the field's [Range] maximum (a field without one, and an oracle-only value, must state it).</summary>
+        /// <summary>Upper limit of the search; NaN takes the field's [Range] maximum (a field without one must state it).</summary>
         public float Max = float.NaN;
         /// <summary>Size of one move; positive.</summary>
         public float Step;
 
         public string Key => Asset + "." + Field;
-        public bool IsOracleOnly => Asset == OracleSolver.OracleAsset;
     }
 
     /// <summary>What to search and what to aim at. Everything not listed in <see cref="Free"/> stays as it is.</summary>
@@ -144,17 +143,13 @@ namespace CluckWars.Balance
         public string Field;
         public float Old;
         public float New;
-        /// <summary>True for a value the game cannot take yet (the Peck cast): reported, never written into the delta.</summary>
-        public bool OracleOnly;
         public bool Changed;
     }
 
     public sealed class OracleProposal
     {
-        /// <summary>A schema-1 balance delta holding every changed game value (<c>{"schema":1}</c> when none changed). Never holds an oracle-only value.</summary>
+        /// <summary>A schema-1 balance delta holding every changed game value (<c>{"schema":1}</c> when none changed).</summary>
         public string DeltaJson = "{\"schema\":1}";
-        /// <summary>Every free oracle-only value at its proposed value, key "&lt;Class&gt;.PeckCastSeconds".</summary>
-        public Dictionary<string, float> OracleOnly = new Dictionary<string, float>();
         public OracleReport Before;
         public OracleReport After;
         public float ScoreBefore;
@@ -172,22 +167,13 @@ namespace CluckWars.Balance
             sb.Append("{\"scoreBefore\":").Append(N(ScoreBefore)).Append(",\"scoreAfter\":").Append(N(ScoreAfter));
             sb.Append(",\"passes\":").Append(Passes.ToString(Inv));
             sb.Append(",\"delta\":").Append(DeltaJson);
-            sb.Append(",\"oracleOnly\":{");
-            bool first = true;
-            foreach (var kv in OracleOnly.OrderBy(k => k.Key, StringComparer.Ordinal))
-            {
-                if (!first) sb.Append(',');
-                first = false;
-                sb.Append(BalanceJson.Quote(kv.Key)).Append(':').Append(N(kv.Value));
-            }
-            sb.Append("},\"values\":[");
+            sb.Append(",\"values\":[");
             for (int i = 0; i < Values.Count; i++)
             {
                 var v = Values[i];
                 if (i > 0) sb.Append(',');
                 sb.Append("{\"asset\":").Append(BalanceJson.Quote(v.Asset)).Append(",\"field\":").Append(BalanceJson.Quote(v.Field));
-                sb.Append(",\"old\":").Append(N(v.Old)).Append(",\"new\":").Append(N(v.New));
-                sb.Append(",\"oracleOnly\":").Append(v.OracleOnly ? "true" : "false").Append('}');
+                sb.Append(",\"old\":").Append(N(v.Old)).Append(",\"new\":").Append(N(v.New)).Append('}');
             }
             sb.Append("],\"before\":").Append(Before.ToJson()).Append(",\"after\":").Append(After.ToJson()).Append('}');
             return sb.ToString();
@@ -206,13 +192,10 @@ namespace CluckWars.Balance
             sb.AppendLine();
             sb.AppendLine("## Proposed values");
             sb.AppendLine();
-            sb.AppendLine("| Value | Now | Proposed | Goes into |");
-            sb.AppendLine("|---|---|---|---|");
+            sb.AppendLine("| Value | Now | Proposed |");
+            sb.AppendLine("|---|---|---|");
             foreach (var v in Values)
-            {
-                string where = v.OracleOnly ? "oracle only (the game has no Peck cast yet)" : "the balance delta";
-                sb.AppendLine($"| {v.Asset}.{v.Field} | {F2(v.Old)} | {F2(v.New)}{(v.Changed ? "" : " (unchanged)")} | {where} |");
-            }
+                sb.AppendLine($"| {v.Asset}.{v.Field} | {F2(v.Old)} | {F2(v.New)}{(v.Changed ? "" : " (unchanged)")} |");
             sb.AppendLine();
             sb.AppendLine("Balance delta (schema 1):");
             sb.AppendLine();
@@ -259,10 +242,6 @@ namespace CluckWars.Balance
     /// </summary>
     public static class OracleSolver
     {
-        /// <summary>The asset key of an oracle-only value; the field is "&lt;Class&gt;.PeckCastSeconds".</summary>
-        public const string OracleAsset = "Oracle";
-        public const string PeckCastField = "PeckCastSeconds";
-
         /// <summary>A move must beat the current score by more than this to count (stops float noise from moving values).</summary>
         private const float MinGain = 1e-4f;
 
@@ -306,9 +285,8 @@ namespace CluckWars.Balance
                 proposal.Values.Add(new ProposedValue
                 {
                     Asset = s.Free.Asset, Field = s.Free.Field, Old = s.Start, New = values[i],
-                    OracleOnly = s.Free.IsOracleOnly, Changed = values[i] != s.Start,
+                    Changed = values[i] != s.Start,
                 });
-                if (s.Free.IsOracleOnly) proposal.OracleOnly[s.Free.Field] = values[i];
             }
             return proposal;
         }
@@ -346,8 +324,6 @@ namespace CluckWars.Balance
         private sealed class Spec
         {
             public FreeValue Free;
-            /// <summary>For an oracle-only value, the class name before ".PeckCastSeconds".</summary>
-            public string ClassName;
             public float Start;
             public float Lo;
             public float Hi;
@@ -364,23 +340,9 @@ namespace CluckWars.Balance
                 if (!seen.Add(free.Key)) throw new ArgumentException($"{free.Key} is listed twice.", nameof(problem));
 
                 var spec = new Spec { Free = free };
-                float attrMin = float.NegativeInfinity, attrMax = float.PositiveInfinity;
-                if (free.IsOracleOnly)
-                {
-                    int dot = free.Field.IndexOf('.');
-                    string className = dot > 0 ? free.Field.Substring(0, dot) : string.Empty;
-                    if (dot < 0 || free.Field.Substring(dot + 1) != PeckCastField || !Enum.IsDefined(typeof(ChickenClass), className))
-                        throw new ArgumentException($"{free.Key}: an oracle-only value is \"<Class>.{PeckCastField}\" with a ChickenClass name.", nameof(problem));
-                    spec.ClassName = className;
-                    spec.Start = inputs.PeckCastSeconds != null && inputs.PeckCastSeconds.TryGetValue(className, out float cast) ? cast : 0f;
-                    attrMin = 0f;
-                }
-                else
-                {
-                    if (inputs.Book == null) throw new ArgumentException($"{free.Key}: reading a game value needs OracleInputs.Book.", nameof(problem));
-                    if (!inputs.Book.TryProbe(free.Asset, free.Field, out spec.Start, out attrMin, out attrMax, out string why))
-                        throw new ArgumentException($"{free.Key}: {why}.", nameof(problem));
-                }
+                if (inputs.Book == null) throw new ArgumentException($"{free.Key}: reading a game value needs OracleInputs.Book.", nameof(problem));
+                if (!inputs.Book.TryProbe(free.Asset, free.Field, out spec.Start, out float attrMin, out float attrMax, out string why))
+                    throw new ArgumentException($"{free.Key}: {why}.", nameof(problem));
 
                 spec.Lo = float.IsNaN(free.Min) ? attrMin : Math.Max(free.Min, attrMin);
                 spec.Hi = float.IsNaN(free.Max) ? attrMax : Math.Min(free.Max, attrMax);
@@ -416,15 +378,10 @@ namespace CluckWars.Balance
                     return new Candidate { Usable = false, DeltaJson = delta };
             }
 
-            var cast = new Dictionary<string, float>();
-            if (inputs.PeckCastSeconds != null) foreach (var kv in inputs.PeckCastSeconds) cast[kv.Key] = kv.Value;
-            for (int i = 0; i < specs.Count; i++)
-                if (specs[i].Free.IsOracleOnly) cast[specs[i].ClassName] = values[i];
-
             var run = new OracleInputs
             {
                 Map = inputs.Map, Book = inputs.Book, Verdict = verdict, Abilities = inputs.Abilities, Classes = inputs.Classes,
-                Match = inputs.Match, FoodOverride = inputs.FoodOverride, PeckCastSeconds = cast,
+                Match = inputs.Match, FoodOverride = inputs.FoodOverride,
             };
             var report = OracleRunner.Run(run, offsets);
 
@@ -444,7 +401,7 @@ namespace CluckWars.Balance
             for (int i = 0; i < specs.Count; i++)
             {
                 var s = specs[i];
-                if (s.Free.IsOracleOnly || values[i] == s.Start) continue;
+                if (values[i] == s.Start) continue;
                 if (!byAsset.TryGetValue(s.Free.Asset, out var fields))
                     byAsset[s.Free.Asset] = fields = new SortedDictionary<string, float>(StringComparer.Ordinal);
                 fields[s.Free.Field] = values[i];

@@ -99,7 +99,7 @@ namespace CluckWars.Balance
         private static OracleInputs With(OracleInputs inputs, OracleFood food) => new OracleInputs
         {
             Map = inputs.Map, Book = inputs.Book, Verdict = inputs.Verdict, Abilities = inputs.Abilities,
-            Classes = inputs.Classes, Match = inputs.Match, FoodOverride = food, PeckCastSeconds = inputs.PeckCastSeconds,
+            Classes = inputs.Classes, Match = inputs.Match, FoodOverride = food,
         };
 
         // ------------------------------------------------------------ output

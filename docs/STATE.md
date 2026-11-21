@@ -6571,3 +6571,8 @@ had URP/ProjectSettings assets self-corrupt or drift twice — see commit `9a0b9
 - All work on `develop`.
 - `main` has not been merged since project start (per Maestro's decision — wait for stable test pass before promoting).
 - `develop` and `v0.3.1-alpha` pushed to origin. Branch is clean.
+
+## BL-206 batch 5 and review fixes (2026-11-21, uncommitted)
+- Review fixes: `AbilityController.Deactivate` clears `ActiveMask` in a `finally`; `PeckCastRules.ObserveKnock`; `PeckAbilitySO` splits missing GameManager (warns) from a finished match; DebugHud shows the cast seconds and aligned columns; BalanceEditorWindow clamps the cast to its `[Range]`.
+- Oracle reads `ChickenStatsSO.PeckCastSeconds` through `BalanceBook.Preview`; `OracleInputs.PeckCastSeconds`, the "Oracle" pseudo-asset, `OracleKit.PeckLockSeconds` and FarmSim's post-peck lock are gone. The solver addresses the cast as "<Class asset>.PeckCastSeconds". `OracleReference.asset` re-recorded (Fatty_Hoarder, Fatty_Bulwark, Warrior_Relentless, Warrior_Bully moved).
+- No Maestro prefab wiring needed.

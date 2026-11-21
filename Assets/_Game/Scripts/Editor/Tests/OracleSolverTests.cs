@@ -84,7 +84,6 @@ namespace CluckWars.Tests
 
             Assert.AreEqual(proposal.ScoreBefore, proposal.ScoreAfter);
             Assert.AreEqual(0, proposal.Passes);
-            Assert.AreEqual(0, proposal.OracleOnly.Count);
             Assert.AreEqual(0, proposal.Values.Count);
             Assert.AreEqual(_baseline.ToJson(), proposal.After.ToJson(), "no free value, so the numbers must not move");
             var verdict = _book.Evaluate(proposal.DeltaJson, "test");
@@ -187,26 +186,23 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void OracleOnlyValues_StayOutOfTheDelta()
+        public void PeckCastSeconds_IsAnOrdinaryDeltaField()
         {
             var problem = new OracleProblem
             {
                 MaxPasses = 2,
                 Free =
                 {
-                    new FreeValue { Asset = OracleSolver.OracleAsset, Field = "Fatty." + OracleSolver.PeckCastField, Min = 0f, Max = 1f, Step = 0.25f },
-                    new FreeValue { Asset = OracleSolver.OracleAsset, Field = StandardClass + "." + OracleSolver.PeckCastField, Min = 0f, Max = 1f, Step = 0.25f },
+                    new FreeValue { Asset = "Fatty", Field = "PeckCastSeconds", Step = 0.1f },
+                    new FreeValue { Asset = StandardClass, Field = "PeckCastSeconds", Step = 0.1f },
                 },
             };
             var proposal = OracleSolver.Solve(Inputs(), problem, _offsets);
 
-            StringAssert.DoesNotContain(OracleSolver.OracleAsset, proposal.DeltaJson);
-            StringAssert.DoesNotContain(OracleSolver.PeckCastField, proposal.DeltaJson);
-            CollectionAssert.AreEquivalent(
-                new[] { "Fatty." + OracleSolver.PeckCastField, StandardClass + "." + OracleSolver.PeckCastField },
-                proposal.OracleOnly.Keys);
+            Assert.AreEqual(2, proposal.Values.Count);
             Assert.IsTrue(_book.Evaluate(proposal.DeltaJson, "test").IsAccepted);
-            Assert.IsTrue(proposal.Values.All(v => v.OracleOnly));
+            foreach (var v in proposal.Values)
+                Assert.AreEqual(v.Changed, proposal.DeltaJson.Contains($"\"{v.Asset}\""), $"{v.Asset}: the delta holds exactly the changed values");
         }
     }
 }

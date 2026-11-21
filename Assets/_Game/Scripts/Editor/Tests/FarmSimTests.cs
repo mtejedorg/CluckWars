@@ -171,21 +171,6 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void PostPeckLock_DelaysLeavingOncePerTrip_NotThePecks()
-        {
-            const float leg = 12f, food = 6f;
-            var plain = Kit(capacity: 6, amount: 2f, cooldown: 0.5f, cast: 0f);
-            var locked = plain;
-            locked.PeckLockSeconds = 0.8f; // longer than the cooldown: it must still not hold up the next peck
-            var map = PersonalMap(leg);
-
-            float without = FarmSim.Run(map, PersonalOnly(food), Seat0(plain), Rules(food, 60f, true))[0].SecondsToTarget;
-            float with = FarmSim.Run(map, PersonalOnly(food), Seat0(locked), Rules(food, 60f, true))[0].SecondsToTarget;
-
-            Assert.AreEqual(locked.PeckLockSeconds, with - without, Tol);
-        }
-
-        [Test]
         public void ARootedChicken_DoesNotWalkAwayBeforeItsFoodLands()
         {
             const float leg = 6f, food = 2f;

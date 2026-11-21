@@ -22,12 +22,6 @@ namespace CluckWars.Balance
         public MatchConfigSO Match;
         /// <summary>Pile food to use instead of the amounts in <see cref="Match"/> (what a test or a proposal sets).</summary>
         public OracleFood? FoodOverride;
-        /// <summary>
-        /// The Peck cast per class (key = <see cref="ChickenClass"/> name), seconds; oracle-only, because the game has no Peck cast yet.
-        /// Null or a missing class reads 0: the food comes at the press, as in today's game (the post-peck movement lock still applies,
-        /// see <see cref="OracleKit.PeckLockSeconds"/>).
-        /// </summary>
-        public IReadOnlyDictionary<string, float> PeckCastSeconds;
     }
 
     /// <summary>
@@ -118,9 +112,6 @@ namespace CluckWars.Balance
             throw new InvalidOperationException("The ability registry holds no Peck ability.");
         }
 
-        private static float PeckCastOf(OracleInputs inputs, ChickenClass cls) =>
-            inputs.PeckCastSeconds != null && inputs.PeckCastSeconds.TryGetValue(cls.ToString(), out float seconds) ? seconds : 0f;
-
         /// <summary>The passive's four abilities: a kit the verdict proposes, else the one <see cref="FixedKit"/> resolves. A malformed kit is an error, never a silent fallback.</summary>
         private static AbilityBaseSO[] ResolveKit(OracleInputs inputs, PassiveAbilitySO shipped)
         {
@@ -158,8 +149,7 @@ namespace CluckWars.Balance
                 CargoCapacity = Mathf.RoundToInt(cargo),
                 PeckAmount = stats.PeckAmount,
                 PeckCooldown = peckCooldown,
-                PeckCastSeconds = PeckCastOf(inputs, cls),
-                PeckLockSeconds = scope.Of(peck).Duration,
+                PeckCastSeconds = stats.PeckCastSeconds,
                 DepositRate = deposit,
                 IgnoresPileSlow = ignoresSlow,
             };

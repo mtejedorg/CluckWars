@@ -17,10 +17,8 @@ namespace CluckWars.Balance
     /// With <see cref="FarmRules.StopAtTarget"/> each seat stops on its own; the other seats keep farming until the clock ends.
     /// Ties between equally near piles go by an order relative to the chicken's own seat (centre, own personal, next seats' personal,
     /// then the contested edges the same way), so a kit banks the same from every seat on a four-fold symmetric map.
-    /// Peck: the chicken is rooted from the start of a peck until its food lands (<see cref="OracleKit.PeckCastSeconds"/>) and then for
-    /// <see cref="OracleKit.PeckLockSeconds"/> more (the game's post-peck movement lock); it cannot start walking before that. The next peck may
-    /// start as soon as the cooldown allows, lock or not (the game lets another press cancel the lock). A cast of 0 and a lock of 0 give the plain
-    /// "cycle = cooldown" farm.
+    /// Peck: the chicken is rooted from the start of a peck until its food lands (<see cref="OracleKit.PeckCastSeconds"/>) and for nothing after:
+    /// the game's cast is the only lock. The next peck may start as soon as the cooldown allows. A cast of 0 gives the plain "cycle = cooldown" farm.
     /// Clock: a chicken carrying food heads home once the time left is no more than the walk home plus the deposit plus one tick, and
     /// does not leave home for a pile when the round trip plus one peck cycle no longer fits.
     /// </remarks>
@@ -58,8 +56,6 @@ namespace CluckWars.Balance
             public bool Pecking;
             public float PeckDoneAt;
             public float NextPeckStart;
-            /// <summary>The chicken may start walking from this clock time on: the food landed plus <see cref="OracleKit.PeckLockSeconds"/>.</summary>
-            public float MoveFreeAt;
             public float BurstReadyAt;
             public float BurstUntil;
         }
@@ -203,7 +199,7 @@ namespace CluckWars.Balance
             private float TimeLeft => _rules.ClockSeconds - _time;
 
             // Carrying food, and the time left is no more than the walk home (the redirect's triangle estimate when mid-leg) + deposit + one tick.
-            // `extraFood` / `extraSeconds` count a peck about to start (its food lands after its cast and the chicken stays rooted for the lock).
+            // `extraFood` / `extraSeconds` count a peck about to start (its food lands after its cast).
             private bool TimeIsShort(int s, bool walking, float extraFood = 0f, float extraSeconds = 0f)
             {
                 ref Chicken ch = ref _c[s];
@@ -211,14 +207,9 @@ namespace CluckWars.Balance
                 if (ch.Carrying <= Eps || kit.DepositRate <= 0f || kit.MoveSpeed <= 0f) return false;
                 int home = OracleMapSO.BaseIndex(s);
                 float metres = walking ? RedirectCost(s, home, out _) : _map.Leg(ch.At, home, kit.Jumps);
-                // A rooted chicken cannot leave before its lock ends; a peck about to start roots it for its own cast and lock instead.
-                float wait = Math.Max(extraSeconds, walking ? 0f : LockLeft(ch));
-                return TimeLeft <= metres / kit.MoveSpeed + (ch.Carrying + extraFood) / kit.DepositRate + _tick + wait;
+                // A peck about to start roots the chicken for its cast before it can leave.
+                return TimeLeft <= metres / kit.MoveSpeed + (ch.Carrying + extraFood) / kit.DepositRate + _tick + extraSeconds;
             }
-
-            private float LockLeft(in Chicken ch) => Math.Max(0f, ch.MoveFreeAt - _time);
-
-        private bool Rooted(in Chicken ch) => _time + Eps < ch.MoveFreeAt;
 
         // A round trip to pile p from here plus one peck cycle fits the clock.
             private bool RoundTripFits(int s, int p)
@@ -227,7 +218,7 @@ namespace CluckWars.Balance
                 if (kit.MoveSpeed <= 0f) return true;
                 int home = OracleMapSO.BaseIndex(s);
                 float metres = _map.Leg(_c[s].At, p, kit.Jumps) + _map.Leg(p, home, kit.Jumps);
-                return LockLeft(_c[s]) + metres / kit.MoveSpeed + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds + kit.PeckLockSeconds) <= TimeLeft;
+                return metres / kit.MoveSpeed + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds) <= TimeLeft;
             }
 
             // Idle: pick the next thing. Returns true when the phase changed (keep stepping).
@@ -238,7 +229,6 @@ namespace CluckWars.Balance
 
                 if (ReturnDue(s))
                 {
-                    if (Rooted(ch)) return false; // the peck's lock is still on
                     StartWalk(s, OracleMapSO.BaseIndex(s));
                     return true;
                 }
@@ -247,7 +237,6 @@ namespace CluckWars.Balance
                 if (p < 0) return false; // nothing to take: wait here (a food event may refill the piles)
                 if (p == ch.At) { ch.Phase = Phase.Collect; return true; }
                 if (!RoundTripFits(s, p)) return false; // too late to go out: stay put (carried food was already sent home by ReturnDue)
-                if (Rooted(ch)) return false;
                 StartWalk(s, p);
                 return true;
             }
@@ -427,7 +416,6 @@ namespace CluckWars.Balance
                 {
                     if (_time + Eps < ch.PeckDoneAt) return false;
                     ch.Pecking = false;
-                    ch.MoveFreeAt = _time + kit.PeckLockSeconds;
                     float take = PeckTake(s, p);
                     if (take > 0f)
                     {
@@ -438,17 +426,15 @@ namespace CluckWars.Balance
 
                 if (ReturnDue(s))
                 {
-                    if (Rooted(ch)) return false; // the lock after the landing is still on
                     StartWalk(s, OracleMapSO.BaseIndex(s));
                     return true;
                 }
                 if (_left[p] <= Eps) { ch.Phase = Phase.Idle; return true; }
 
                 if (_time + Eps < ch.NextPeckStart) return false;
-                // Another peck would land too late to bank its food: walk home with what is in hand (once the lock lets it).
-                if (TimeIsShort(s, false, PeckTake(s, p), kit.PeckCastSeconds + kit.PeckLockSeconds))
+                // Another peck would land too late to bank its food: walk home with what is in hand.
+                if (TimeIsShort(s, false, PeckTake(s, p), kit.PeckCastSeconds))
                 {
-                    if (Rooted(ch)) return false;
                     StartWalk(s, OracleMapSO.BaseIndex(s));
                     return true;
                 }

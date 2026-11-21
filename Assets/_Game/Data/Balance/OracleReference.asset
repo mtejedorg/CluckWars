@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f1c0b7e9d3a4e58b2a47c10d5e8f391, type: 3}
   m_Name: OracleReference
   m_EditorClassIdentifier: 
-  AcceptedOn: 2026-11-20
-  Note: seconds-to-goal result (peck lock and cast modelled); food 10 / 15 / 40 (D1b);
-    v1 prices carried over
+  AcceptedOn: 2026-11-21
+  Note: 'BL-206 batch 5: oracle reads ChickenStatsSO.PeckCastSeconds; no post-peck
+    lock'
   MapFingerprint: be5e5449aca95e44
   Origin: 1
   Entries:
@@ -25,14 +25,14 @@ MonoBehaviour:
     BestSeconds: 24.026766
     OffsetSeconds: 0
   - Label: Fatty_Hoarder
-    BestSeconds: 19.144451
+    BestSeconds: 19.44445
     OffsetSeconds: 0
   - Label: Fatty_Bulwark
-    BestSeconds: 19.422224
+    BestSeconds: 20.022224
     OffsetSeconds: 0
   - Label: Warrior_Relentless
-    BestSeconds: 26.125008
+    BestSeconds: 27.366676
     OffsetSeconds: 5
   - Label: Warrior_Bully
-    BestSeconds: 27.03334
+    BestSeconds: 27.566675
     OffsetSeconds: 5

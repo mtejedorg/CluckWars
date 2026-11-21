@@ -235,69 +235,40 @@ namespace CluckWars.Tests
                 Assert.AreEqual(other.Result, slow.Economy.Single(l => l.Label == other.Label).Result, 1e-4f, $"{other.Label}: another class is untouched");
         }
 
-        private OracleInputs WithCast(string cls, float seconds)
-        {
-            var inputs = Inputs();
-            inputs.PeckCastSeconds = new Dictionary<string, float> { { cls, seconds } };
-            return inputs;
-        }
-
         [Test]
-        public void Result_ReactsToPeckCast()
+        public void Result_ReactsToPeckCast_ThroughTheClassStat()
         {
-            var kits = OracleKits.All(Inputs()).Where(k => k.Forages && k.Label.StartsWith("Fatty", StringComparison.Ordinal)).ToList();
-            Assert.IsNotEmpty(kits);
-            float cooldown = kits.Min(k => k.PeckCooldown);
-            var labels = kits.Select(k => k.Label).ToList();
+            const string asset = "Fatty";
+            Assert.IsTrue(_book.TryProbe(asset, "PeckCastSeconds", out float shipped, out float min, out float max, out string why), why);
+            float longerCast = max;
+            float shorterCast = min;
+            Assume.That(longerCast, Is.GreaterThan(shipped), "the cast has room to rise");
+            Assume.That(shorterCast, Is.LessThan(shipped), "the cast has room to fall");
 
-            // A cast shorter than the cooldown, then one longer than it: each is strictly worse than the one before.
-            var none = _baseline;
-            var shorter = OracleRunner.Run(WithCast("Fatty", cooldown * 0.5f), null);
-            var longer = OracleRunner.Run(WithCast("Fatty", cooldown * 2f), null);
+            var longer = OracleRunner.Run(Inputs(StatDelta(asset, "PeckCastSeconds", longerCast)), null);
+            var shorter = OracleRunner.Run(Inputs(StatDelta(asset, "PeckCastSeconds", shorterCast)), null);
 
+            var labels = LabelsOf(_abilities, ChickenClass.Fatty).ToList();
+            Assert.IsNotEmpty(labels);
             foreach (string label in labels)
             {
-                float r0 = none.Economy.Single(l => l.Label == label).Result;
-                float r1 = shorter.Economy.Single(l => l.Label == label).Result;
-                float r2 = longer.Economy.Single(l => l.Label == label).Result;
-                Assert.Greater(r1, r0, $"{label}: a cast shorter than the cooldown still costs the seconds the chicken stands there");
-                Assert.Greater(r2, r1, $"{label}: a longer cast costs more");
+                float r0 = _baseline.Economy.Single(l => l.Label == label).Result;
+                Assert.Greater(longer.Economy.Single(l => l.Label == label).Result, r0, $"{label}: a longer cast costs the seconds the chicken stands there");
+                Assert.LessOrEqual(shorter.Economy.Single(l => l.Label == label).Result, r0 + 1e-4f, $"{label}: a shorter cast never costs more");
             }
-            foreach (var other in none.Economy.Where(l => l.Applicable && !labels.Contains(l.Label)))
+            foreach (var other in _baseline.Economy.Where(l => l.Applicable && !labels.Contains(l.Label)))
                 Assert.AreEqual(other.Result, longer.Economy.Single(l => l.Label == other.Label).Result, 1e-4f, $"{other.Label}: another class is untouched");
         }
 
         [Test]
-        public void ZeroCast_KeepsTheFarmNumbers_TheGamesPeckLockIsTheOnlyDifference()
+        public void EveryKit_ReadsItsCastFromTheClassStats()
         {
             var inputs = Inputs();
-            var peck = _abilities.All.Single(a => a.Job == AbilityJob.Peck);
-            Assert.Greater(peck.Duration, 0f, "the game locks movement after a peck; the test needs that lock");
-            var food = OracleKits.Food(inputs);
-            var rules = OracleKits.Rules(inputs, true, FarmFoodEvent.None);
-
             foreach (var kit in OracleKits.All(inputs).Where(k => k.Forages))
             {
-                Assert.AreEqual(0f, kit.PeckCastSeconds, kit.Label);
-                Assert.AreEqual(peck.Duration, kit.PeckLockSeconds, 1e-6f, $"{kit.Label}: the lock is the Peck ability's own duration");
-
-                var lockless = kit;
-                lockless.PeckLockSeconds = 0f;
-                // The kit alone on the map, so nobody else's timing can shift with its own: the lock is the only thing that differs.
-                for (int seat = 0; seat < 4; seat++)
-                {
-                    var withLock = FarmSim.Run(_map, food, Alone(seat, kit), rules)[seat];
-                    var without = FarmSim.Run(_map, food, Alone(seat, lockless), rules)[seat];
-                    if (withLock.SecondsToTarget < 0f || without.SecondsToTarget < 0f)
-                    {
-                        Assert.LessOrEqual(withLock.Banked, without.Banked + 1e-3f, $"{kit.Label} seat {seat}: a lock never makes a kit bank more");
-                        continue;
-                    }
-                    Assert.GreaterOrEqual(withLock.SecondsToTarget, without.SecondsToTarget - 1e-4f, $"{kit.Label} seat {seat}: a lock never makes a kit faster");
-                    // The lock delays leaving a pile: once for each pile a trip leaves (at most every pile), plus a tick of rounding on each.
-                    float room = (withLock.Trips + OracleMapSO.PileCount) * (kit.PeckLockSeconds + 2f * FarmRules.DefaultTickSeconds) + 1e-3f;
-                    Assert.LessOrEqual(withLock.SecondsToTarget - without.SecondsToTarget, room, $"{kit.Label} seat {seat}: the lock is the only difference");
-                }
+                var cls = Enum.TryParse<ChickenSubclass>(kit.Label, out var sub) ? sub.ClassOf() : ChickenClass.Warrior;
+                Assert.IsTrue(_classes.TryGet(cls, out var entry), kit.Label);
+                Assert.AreEqual(entry.Stats.PeckCastSeconds, kit.PeckCastSeconds, 1e-6f, $"{kit.Label}: the kit's cast is the class stat");
             }
         }
 
