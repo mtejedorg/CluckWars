@@ -11,6 +11,10 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Match simulator review fixes (BL-207, `develop`, not pushed)
+
+- Ten places where `MatchSim` decided differently from the game were fixed (slows take the strongest, Egg Shell follow-up, running slow through the Shield walk, Golden Pile footprint and retries, strongest speed boost, aura as its own source, stun-gated and sliding pushes, `RejectedIntents` vs `CastsLostToReactionDelay`, removal drift test; Underdog Surge tie kept and documented). `OracleMap.asset` re-baked: one new field, part 1 unchanged. Per-item list: the plan's "Review fixes after Task 4". Maestro steps: none.
+
 ## 2026-11-22 - Match simulator S1 to S4: the match model, combat, Spoiler and Thief (BL-207, `develop`, not pushed)
 
 - **What exists** (pure, Fusion-free, `Scripts/Balance/`, tests in `Editor/Tests/`): `MatchSim` (four chickens, continuous 2D on the wall-aware `OracleNav`, fixed ticks, one policy per seat, deterministic per seed), `MatchRng` (named streams), `MatchKits` (the eight shipped kits through `BalanceBook.Preview`), `MatchCombat` (reach, base wall, controls, shove, steal, timer tie-break), `MatchSight` (rivals seen through the game's `BotSightRules`), the comeback events, and since S4 the Spoiler (Death Mark pick through `MarkPickRules`, arm, window, Kill, removal and respawn, the bounty bag, the end-of-clock bonus), the Thief's steal factor, the forced-kills design (`MatchSetup.Forced`), `MatchStats` (Wilson interval, Kendall tau, the kills-to-win row) and the Spoiler kill targets as data on `OracleReference.asset` (D6: 4 kills no passive at least 0.90, 3 at least 0.80, 2 with passive at most 0.20; labels only, no test on rates).

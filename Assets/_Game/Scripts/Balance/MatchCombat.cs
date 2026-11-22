@@ -72,6 +72,13 @@ namespace CluckWars.Balance
         }
 
         /// <summary>
+        /// The speed factor of the slows on one chicken: slows do not stack, only the strongest applies. Mirrors <c>ChickenController.ApplySlow</c>
+        /// (<c>SlowMultiplier = Mathf.Min(SlowMultiplier, factor)</c> over the pile slow, the timed ability slow and the zone or aura slow, each 1 when
+        /// absent), which sits on a <c>NetworkBehaviour</c> and cannot be called here; a source test pins it.
+        /// </summary>
+        public static float CombineSlows(float pile, float timed, float aura) => Mathf.Min(pile, Mathf.Min(timed, aura));
+
+        /// <summary>
         /// Food a steal takes from one victim: the nominal amount times the thief's factor, clamped to the thief's free room and to what the
         /// victim holds (<c>ChickenCargo.StealFrom</c>, through <see cref="StealMath.Clamp"/> and <see cref="StealRules.Stealable"/>).
         /// </summary>

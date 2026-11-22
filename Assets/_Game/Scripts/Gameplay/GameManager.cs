@@ -1051,6 +1051,10 @@ namespace CluckWars.Gameplay
         /// <summary>Inner and outer radius, from the arena centre, of the ring the Golden Pile spawns on (read by the Balance Oracle).</summary>
         public const float GoldenPileRingMin = 4.5f;
         public const float GoldenPileRingMax = 6.5f;
+        /// <summary>How many candidate spots the spawn tries before it settles for the last one (read by the match simulator).</summary>
+        public const int GoldenPileSpawnAttempts = 8;
+        /// <summary>Radius of the ball that must touch no collider for a candidate spot to count as free (read by the match simulator).</summary>
+        public const float GoldenPileClearRadius = 0.7f;
 
         private void SpawnGoldenPile()
         {
@@ -1062,7 +1066,7 @@ namespace CluckWars.Gameplay
 
             Vector3 pos = Vector3.zero;
             bool foundSpot = false;
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < GoldenPileSpawnAttempts; i++)
             {
                 float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
                 float radius = Random.Range(GoldenPileRingMin, GoldenPileRingMax);
@@ -1070,7 +1074,7 @@ namespace CluckWars.Gameplay
 
                 // Sphere bottom sits at y=0.1 so the ground plane collider never
                 // rejects a candidate — only walls, pile blockers, and bases do.
-                if (!Physics.CheckSphere(pos + Vector3.up * 0.8f, 0.7f))
+                if (!Physics.CheckSphere(pos + Vector3.up * 0.8f, GoldenPileClearRadius))
                 {
                     foundSpot = true;
                     break;
@@ -1079,7 +1083,7 @@ namespace CluckWars.Gameplay
 
             if (!foundSpot)
             {
-                _log?.Warn(Source, "GoldenPile event: Failed to find non-overlapping position after 8 attempts. Spawning at last candidate.");
+                _log?.Warn(Source, $"GoldenPile event: Failed to find non-overlapping position after {GoldenPileSpawnAttempts} attempts. Spawning at last candidate.");
             }
 
             Runner.Spawn(

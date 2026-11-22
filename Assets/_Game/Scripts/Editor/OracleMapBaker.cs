@@ -40,6 +40,24 @@ namespace CluckWars.EditorTools
         /// <summary>Half the side of the box a chicken's centre may use: the value <see cref="Bake"/> hands to the path search. The asset does not store it, so the simulator asks here.</summary>
         public static float ArenaHalf() => PinwheelLayout.ArenaClampLimit(ShippedMap.PlaneSize * 0.5f);
 
+        /// <summary>
+        /// The footprint the Golden Pile has: the serialized <c>_footprintSize</c> of the pile prefab the registry hands the comeback event
+        /// (<c>GameManager.SpawnGoldenPile</c> spawns it without stamping a size, so the prefab's own value is what the game uses).
+        /// </summary>
+        public static Vector2 ReadGoldenFootprint()
+        {
+            var registry = AssetDatabase.LoadAssetAtPath<PrefabRegistrySO>(TestAssets.PrefabRegistryPath);
+            if (registry == null || registry.FoodPile == null)
+                throw new InvalidOperationException($"[OracleMapBaker] {TestAssets.PrefabRegistryPath} has no FoodPile prefab: the Golden Pile footprint cannot be read.");
+            var pile = registry.FoodPile.GetComponent<FoodPile>();
+            if (pile == null)
+                throw new InvalidOperationException("[OracleMapBaker] The registry's FoodPile prefab has no FoodPile component.");
+            var field = new SerializedObject(pile).FindProperty("_footprintSize");
+            if (field == null)
+                throw new InvalidOperationException("[OracleMapBaker] FoodPile has no serialized _footprintSize: the field was renamed, update the bake.");
+            return field.vector2Value;
+        }
+
         public static Inputs ReadInputs() => new Inputs
         {
             PlaneSize = ShippedMap.PlaneSize,
@@ -149,6 +167,7 @@ namespace CluckWars.EditorTools
             map.WallHalfWidth = halfWidth;
             map.BaseRadius = inputs.DepositRadius;
             map.CollectReach = inputs.CollectReach;
+            map.GoldenFootprint = ReadGoldenFootprint();
             map.WalkLegs = walk;
             map.JumpLegs = jump;
             map.SceneFingerprint = Fingerprint(inputs, arms);

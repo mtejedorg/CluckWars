@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CluckWars.Gameplay;
 using UnityEngine;
 
 namespace CluckWars.Balance
@@ -106,6 +107,76 @@ namespace CluckWars.Balance
 
         /// <summary>True when the straight segment a-b keeps the wall clearance everywhere.</summary>
         public bool IsClear(Vector2 a, Vector2 b) => OraclePaths.Clear(a, b, _wallA, _wallB, _halfWidth);
+
+        /// <summary>Half the wall's own thickness: the clearance <see cref="OracleMapSO.WallHalfWidth"/> minus the chicken's body radius (the bake adds it).</summary>
+        private float WallBodyHalf => Math.Max(0f, _halfWidth - PinwheelLayout.ChickenRadius);
+
+        /// <summary>
+        /// True when a ball of <paramref name="radius"/> standing at <paramref name="p"/> touches no wall: the test of the game's
+        /// <c>Physics.CheckSphere</c> for a spot, over the walls' own thickness (a wall's end is taken as round, a hair stricter than its box).
+        /// </summary>
+        public bool SpotClear(Vector2 p, float radius)
+        {
+            float need = WallBodyHalf + radius;
+            for (int w = 0; w < _wallA.Length; w++)
+                if (OraclePaths.PointSegment(p, _wallA[w], _wallB[w]) < need) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// The nearest point a chicken's centre can stand at: <paramref name="p"/> when it is clear, else pushed out of every wall's
+        /// clearance, else (a junction the push cannot resolve) the nearest ring node. Never throws, so a goal inside a wall still has a way to it.
+        /// </summary>
+        public Vector2 NearestClear(Vector2 p)
+        {
+            Vector2 q = PushOut(p, p);
+            if (IsClear(q, q)) return q;
+            if (_nodes.Length == 0) return p;
+            int best = 0;
+            for (int i = 1; i < _nodes.Length; i++)
+                if ((_nodes[i] - p).sqrMagnitude < (_nodes[best] - p).sqrMagnitude) best = i;
+            return _nodes[best];
+        }
+
+        /// <summary>
+        /// Where a walker ends when it tries to go from <paramref name="from"/> to <paramref name="to"/>: <paramref name="to"/> when the
+        /// way is clear; when it runs into a wall, the point of the wall's clearance edge nearest to <paramref name="to"/> (it slides
+        /// along the wall, as the game's <c>CharacterController</c> does); <paramref name="from"/> when even that cannot be reached.
+        /// </summary>
+        public Vector2 Slide(Vector2 from, Vector2 to)
+        {
+            if (IsClear(from, to)) return to;
+            Vector2 slid = PushOut(to, from);
+            return IsClear(from, slid) ? slid : from;
+        }
+
+        // Moves p out of every wall's clearance, to the clearance edge along the line from the wall's nearest axis point. A few passes
+        // settle a corner between two walls. `side` decides the direction when p lies exactly on an axis.
+        private Vector2 PushOut(Vector2 p, Vector2 side)
+        {
+            for (int pass = 0; pass < 4; pass++)
+            {
+                bool moved = false;
+                for (int w = 0; w < _wallA.Length; w++)
+                {
+                    Vector2 c = OraclePaths.ClosestOnSegment(p, _wallA[w], _wallB[w]);
+                    Vector2 away = p - c;
+                    float d = away.magnitude;
+                    if (d >= _halfWidth) continue;
+                    if (d < 1e-5f)
+                    {
+                        Vector2 axis = _wallB[w] - _wallA[w];
+                        Vector2 normal = new Vector2(-axis.y, axis.x).normalized;
+                        away = Vector2.Dot(side - c, normal) >= 0f ? normal : -normal;
+                        d = 1f;
+                    }
+                    p = c + away / d * (_halfWidth + 1e-3f);
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            return p;
+        }
 
         /// <summary>Length of the shortest wall-aware walk from <paramref name="from"/> to <paramref name="to"/>; <c>+Infinity</c> when there is none.</summary>
         public float PathLength(Vector2 from, Vector2 to)

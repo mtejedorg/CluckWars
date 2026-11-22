@@ -79,9 +79,14 @@ namespace CluckWars.Tests
             var shield = MatchTestKit.Shield(0.5f, 1f, 6f, 30f);
             var spoilerPassive = MatchPassive.Identity();
             if (!a.SpoilerStunnable) spoilerPassive.StunInFactor = 0f;   // the Spoiler shrugs the stun off, so only the rivals are stunned
+            // A rival that casts anything after its Shield loses the egg (the game's follow-up rule), so in the shelled variant the stuns come from
+            // the Spoiler: the rivals shell first, and the stun lands in their walk, which only refuses slows.
+            var spoilerAbilities = a.Shell && !float.IsNaN(a.StunAt)
+                ? new[] { Mark(a.Arm, a.Window, a.Range, a.Success, a.Fail, a.Removal), stun }
+                : new[] { Mark(a.Arm, a.Window, a.Range, a.Success, a.Fail, a.Removal) };
             var kits = new[]
             {
-                MatchTestKit.Fighter("spoiler", 100f, new[] { Mark(a.Arm, a.Window, a.Range, a.Success, a.Fail, a.Removal) }, spoilerPassive),
+                MatchTestKit.Fighter("spoiler", 100f, spoilerAbilities, spoilerPassive),
                 Victim("r1", stun, shield), Victim("r2", stun, shield), Victim("r3", stun, shield),
             };
             var setup = MatchTestKit.Setup(map, kits, MatchTestKit.Stand, Half);
@@ -93,9 +98,12 @@ namespace CluckWars.Tests
             Vector2? meet = a.Gather ? map.Places[OracleMapSO.BaseIndex(1)].Pos : (Vector2?)null;
             var shell = a.Shell ? new[] { (0.4f, 1) } : new (float, int)[0];
             var stuns = float.IsNaN(a.StunAt) ? new (float, int)[0] : new[] { (a.StunAt, 0) };
-            setup.Policies[0] = Plan(null, a.Watch, (a.MarkAt, 0), (a.KillAt, 0));
+            var spoilerCasts = a.Shell && !float.IsNaN(a.StunAt)
+                ? new[] { (a.MarkAt, 0), (a.StunAt, 1), (a.KillAt, 0) }
+                : new[] { (a.MarkAt, 0), (a.KillAt, 0) };
+            setup.Policies[0] = Plan(null, a.Watch, spoilerCasts);
             setup.Policies[1] = Plan(null, null, shell);
-            setup.Policies[2] = setup.Policies[3] = Plan(meet, null, shell.Concat(stuns).ToArray());
+            setup.Policies[2] = setup.Policies[3] = Plan(meet, null, a.Shell ? shell : stuns);
             if (a.Gather) setup.Policies[1] = Plan(meet, null, shell);
             return MatchSim.Run(setup, seed);
         }

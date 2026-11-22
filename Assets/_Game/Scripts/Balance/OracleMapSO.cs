@@ -52,6 +52,12 @@ namespace CluckWars.Balance
         public float BaseRadius;
         public float CollectReach;
 
+        /// <summary>
+        /// Full footprint of the Golden Pile: the plain food pile prefab the comeback event spawns (it is not stamped with an island's size),
+        /// read from the prefab's serialized value by the bake. Zero on a map baked before the field existed or on a synthetic map (a point).
+        /// </summary>
+        public Vector2 GoldenFootprint;
+
         /// <summary>13 x 13, row-major, metres between rims; walls respected.</summary>
         public float[] WalkLegs;
 

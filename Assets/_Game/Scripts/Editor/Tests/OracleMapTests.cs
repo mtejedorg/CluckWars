@@ -31,6 +31,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Bake_GoldenFootprint_IsTheFoodPilePrefabsOwn()
+        {
+            // The Golden Pile is the plain pile prefab, spawned without a stamped size, so the prefab's serialized footprint is what it has.
+            Vector2 prefab = OracleMapBaker.ReadGoldenFootprint();
+            Assert.Greater(prefab.x, 0f);
+            Assert.Greater(prefab.y, 0f);
+            var baked = Map().GoldenFootprint;
+            Assert.AreEqual(prefab.x, baked.x, 1e-4f, FixMessage);
+            Assert.AreEqual(prefab.y, baked.y, 1e-4f, FixMessage);
+        }
+
+        [Test]
         public void Bake_WallsAreTheGeneratorsArms()
         {
             var map = Map();

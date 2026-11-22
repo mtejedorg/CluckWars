@@ -95,6 +95,15 @@ namespace CluckWars.Balance
             return true;
         }
 
+        /// <summary>The point of the segment a-b nearest to <paramref name="p"/>.</summary>
+        internal static Vector2 ClosestOnSegment(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float len2 = ab.sqrMagnitude;
+            if (len2 < 1e-12f) return a;
+            return a + ab * Mathf.Clamp01(Vector2.Dot(p - a, ab) / len2);
+        }
+
         private static float SegmentDistance(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2)
         {
             if (SegmentsIntersect(p1, q1, p2, q2)) return 0f;
@@ -103,7 +112,7 @@ namespace CluckWars.Balance
                 Mathf.Min(PointSegment(p2, p1, q1), PointSegment(q2, p1, q1)));
         }
 
-        private static float PointSegment(Vector2 p, Vector2 a, Vector2 b)
+        internal static float PointSegment(Vector2 p, Vector2 a, Vector2 b)
         {
             Vector2 ab = b - a;
             float len2 = ab.sqrMagnitude;

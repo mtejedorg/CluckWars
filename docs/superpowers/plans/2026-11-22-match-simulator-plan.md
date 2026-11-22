@@ -53,6 +53,23 @@ Task 4 deviated from the text of Task 4 in these places; where Task 5 assumes th
 10. **Mark pick inputs**: the base span is the longest distance between two playing seats' bases (`PlayerBase.BaseSpan` over live bases); positions and banked food are true values (the authority's pick). `SeatView` carries `MarkTarget`, `MarkedBy`, `ArmLeft`, `WindowLeft` for every seat (replicated in the game).
 11. **The kills-to-win table test** (`MatchSpoilerTests.KillsToWin_ForcedDesign_WithShippedKits_BuildsTheTable`) is the only place the forced design is built before Task 5's `MatchDesigns`: the shipped Spoiler in seat 0 against every one-per-other-class set in all six orders, kills at 5 s then every 3.5 s (row k takes the first k), all four seats on `FarmOnlyPolicy`. `CW_FORCED_R` sets the replicates per cell (default 1); it asserts structure, never a rate. The shipped Spoiler kit does not forage (`MayForage(Assassin)` is false), so with this policy its only income is the bag.
 
+## Review fixes after Task 4
+
+An independent review (2026-11-22) found places where the simulator decided differently from the game and no test said so. Fixed in one commit, `fix(balance): match simulator follows the game ...` (BL-207 review); the tests are in `MatchReviewFixTests` (new, one test per fix, each shown to fail on the old behaviour) and `OracleMapTests`.
+
+1. **Slows do not stack.** Speed uses the minimum of the pile slow, the timed ability slow and the aura (`MatchCombat.CombineSlows`, mirrors `ChickenController.ApplySlow`).
+2. **Egg Shell follow-up.** Any other cast drops the pending egg (the walk goes on) or ends a running egg (`ShieldRules.RunAfterOtherCast`, called from `MatchSim.CancelShieldFollowUp`); auto-Peck is refused while the follow-up is live; a cast during the egg is legal (the game refuses casts only while stunned), so the sim's `CanCast` no longer refuses on the egg.
+3. **The Shield walk refuses new slows only**; a timed slow already running keeps applying (and the aura is refused as before).
+4. **Golden Pile.** `OracleMapSO.GoldenFootprint` (the plain pile prefab's serialized `_footprintSize`, 3.6 x 3.0, read by `OracleMapBaker.ReadGoldenFootprint` through the registry; `OracleMap.asset` re-baked, one added line, the legs and the fingerprint unchanged so part 1 did not move; `OracleMapTests.Bake_GoldenFootprint_IsTheFoodPilePrefabsOwn` is its stale-bake test). Up to `GameManager.GoldenPileSpawnAttempts` spots, the first one `OracleNav.SpotClear(spot, GameManager.GoldenPileClearRadius)`; after eight misses the last is kept and chickens walk to `OracleNav.NearestClear` of it, so a spot inside a wall never throws. Both constants were literals in `GameManager.SpawnGoldenPile` and are now named there (no behaviour change).
+5. **Speed boosts** go through the game's `AbilityEffectStack` (strongest boost times the Shield walk's penalty): Speed and a Jump's dash no longer multiply, and the pile slow applies during a dash.
+6. **The aura is its own slow source** (`Chick.AuraFactor`, recomputed each tick), no longer merged into the timed slow.
+7. **Pushes.** A stunned chicken is not pushed until the stun ends (`ControlRules.CanMove`); a push that meets a wall slides along it (`OracleNav.Slide`), not stops.
+8. **Underdog Surge tie.** The game takes the first of `ChickenController.ActiveControllers` with a strict `<` (spawn order); the simulator keeps the lowest seat index. Kept, and listed in the design's 2.4 table as a seat bias; `MatchReviewFixTests.Game_UnderdogSurge_TieGoesToTheFirstControllerListed` pins the game's rule.
+9. **`RejectedIntents` counts policy bugs only.** A cast legal on the tick it was decided and not ready when the reaction delay passed is `MatchResult.CastsLostToReactionDelay`.
+10. **Removal clean-up drift test**: `Game_EndEverythingForRemoval_StillClearsExactlyWhatTheSimulatorsRemoveMirrors` lists every statement of `EndEverythingForRemoval`; a new one fails it.
+
+Consequence for an older test: `MatchSpoilerTests.Kill_IsRefusedOnAShelledTarget...` had rivals that cast Stun after their own Shield; by rule 2 that drops their egg, so in the shelled variant the Spoiler casts the stun and the rivals only shell.
+
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.

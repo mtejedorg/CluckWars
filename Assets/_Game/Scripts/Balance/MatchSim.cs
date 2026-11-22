@@ -91,6 +91,12 @@ namespace CluckWars.Balance
         public bool CornerDecided;
         /// <summary>Intents a policy asked for that the rules refuse (a cast no seat can make, an unknown pile). Zero for a sound policy.</summary>
         public int RejectedIntents;
+        /// <summary>
+        /// Casts that were legal when the policy decided (the slot ready, the chicken free to cast) and were no longer ready when the
+        /// reaction delay passed: the slot was spent or a stun landed in between. A sound policy with a delay still produces some; they are the
+        /// delay's doing, not a wiring bug, so they are kept out of <see cref="RejectedIntents"/>.
+        /// </summary>
+        public int CastsLostToReactionDelay;
         /// <summary>One entry per seat (an empty seat has zeros).</summary>
         public SeatCounters[] Counters;
         /// <summary>The comeback event that fired, or <c>None</c> when it did not (the match ended first, or the event is off).</summary>
@@ -153,11 +159,15 @@ namespace CluckWars.Balance
     /// time is up (or whose pile ran dry) lands or is cut, a chicken in its base zone deposits, and a seat that just finished something
     /// is marked to think; (2) every marked or due seat thinks on a snapshot that shows it what it may see; (3) due intents take effect,
     /// then every cast of the tick resolves at once against the state the tick began with (two stuns on one tick both land), then the
-    /// slow auras act; (4) each chicken starts a Peck when it may, is pushed, and walks.
+    /// slow auras act; (4) each chicken starts a Peck when it may, is pushed (a stunned one waits: its movement tick does not run) and walks.
     /// A seat thinks every <see cref="MatchRules.ThinkSeconds"/> and at once when it arrived, a cast landed or was cut, a deposit ended,
     /// its target pile emptied, a stun ended, a rival hit it, or its Peck is ready to start. An intent takes effect
     /// <see cref="PolicyParams.ReactionDelay"/> later. Food leaves a pile only when a Peck lands, in rotating seat order.
-    /// Pile slow: a chicken in reach of any non-empty pile walks at <see cref="FarmRules.PileSlowFactor"/> unless its kit ignores it.
+    /// Slows do not stack: the pile slow (a chicken in reach of any non-empty pile, <see cref="FarmRules.PileSlowFactor"/>, unless its kit ignores it),
+    /// the timed ability slow and the Slow Area aura are three sources and only the strongest applies (<see cref="MatchCombat.CombineSlows"/>); the
+    /// Shield's walk refuses new slows and auras but leaves a timed slow already running alone. Speed boosts (Speed, a Jump's dash, a part 1 burst) go through
+    /// the game's own <see cref="AbilityEffectStack"/>: the strongest boost times the Shield walk's penalty. Any cast other than the Shield's own drops the Shield's
+    /// pending egg (or ends a running egg), and while the egg is live nothing auto-Pecks; the egg does not stop a cast, only a stun does.
     /// A kit with a Jump ability walks straight lines and spends a Jump to cross a wall (see <c>Move</c>); a kit that only has the
     /// <c>Jumps</c> flag (a part 1 farmer) crosses walls for free, as part 1's jump table does.
     /// Death Mark (slice S4): a press with no live mark picks a rival through the game's <see cref="MarkPickRules"/> (rolls from the mark
@@ -245,13 +255,19 @@ namespace CluckWars.Balance
         {
             public MatchIntent Intent;
             public int ApplyTick;
+            /// <summary>The intent's cast (if any) was legal on the tick the policy decided it.</summary>
+            public bool CastLegalWhenDecided;
         }
 
         private struct CastRequest
         {
             public int Slot;
             public int Target;
+            public bool LegalWhenDecided;
         }
+
+        // The sources the simulator registers on a chicken's AbilityEffectStack. The game keys them by ability slot; only distinctness matters here.
+        private const int SrcSpeed = 0, SrcDash = 1, SrcWalk = 2, SrcBurst = 3;
 
         private sealed class Chick
         {
@@ -295,12 +311,19 @@ namespace CluckWars.Balance
             public float ShieldWalkUntil;
             public float EggUntil;
             public float ShieldWalkMult = 1f;
+            public float ShieldEgg;
+            /// <summary>Another cast ended the Shield's pending egg (or the egg itself): the follow-up phase is no longer live.</summary>
+            public bool ShieldCancelled;
+            /// <summary>The game's own resolver of move-speed modifiers: the strongest boost times the strongest penalty.</summary>
+            public readonly AbilityEffectStack Effects = new AbilityEffectStack();
 
             // control
             public float StunUntil;
             public bool WasStunned;
             public float SlowUntil;
             public float SlowFactor = 1f;
+            /// <summary>The factor of the Slow Area aura the chicken stands in this tick (1 when none); recomputed every tick, never merged into the timed slow.</summary>
+            public float AuraFactor = 1f;
             public Vector2 Push;
             public bool Surge;
 
@@ -344,6 +367,8 @@ namespace CluckWars.Balance
             private bool _goldenActive;
             private float _goldenFood;
             private OraclePlace _golden;
+            private Vector2 _goldenWalk;
+            private bool _goldenOffWall;
             private readonly MatchView _view;
             private readonly MatchResult _result = new MatchResult();
             private readonly RivalSighting?[] _sight = new RivalSighting?[Seats * Seats];
@@ -529,15 +554,21 @@ namespace CluckWars.Balance
                 {
                     case CluckWars.Gameplay.MatchEventKind.GoldenPile:
                     {
-                        float angle = _comebackRng.NextFloat() * 360f * Mathf.Deg2Rad;
-                        float radius = Mathf.Lerp(cfg.GoldenRingMin, cfg.GoldenRingMax, _comebackRng.NextFloat());
-                        var centre = _map.Places[OracleMapSO.CentreIndex];
-                        _golden = new OraclePlace
+                        // GameManager.SpawnGoldenPile: up to GoldenPileSpawnAttempts spots on the ring, the first one a ball of
+                        // GoldenPileClearRadius fits at wins, and when none does the last one is used anyway (it may stand inside a wall).
+                        var spot = Vector2.zero;
+                        for (int attempt = 0; attempt < GameManager.GoldenPileSpawnAttempts; attempt++)
                         {
-                            Kind = OraclePlaceKind.Centre, Seat = -1,
-                            Pos = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius),
-                            Footprint = centre.Footprint, Yaw = centre.Yaw,   // the same prefab as every pile
-                        };
+                            float angle = _comebackRng.NextFloat() * 360f * Mathf.Deg2Rad;
+                            float radius = Mathf.Lerp(cfg.GoldenRingMin, cfg.GoldenRingMax, _comebackRng.NextFloat());
+                            spot = new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
+                            if (_nav.SpotClear(spot, GameManager.GoldenPileClearRadius)) break;
+                        }
+                        // The plain pile prefab: its own footprint (baked), no yaw, not an island's size.
+                        _golden = new OraclePlace { Kind = OraclePlaceKind.Centre, Seat = -1, Pos = spot, Footprint = _map.GoldenFootprint, Yaw = 0f };
+                        // A fallback spot inside a wall cannot be walked to; chickens walk to the nearest standing point instead.
+                        _goldenOffWall = !_nav.IsClear(spot, spot);
+                        _goldenWalk = _goldenOffWall ? _nav.NearestClear(spot) : spot;
                         _goldenFood = cfg.GoldenPileFood;
                         _goldenActive = true;
                         _result.GoldenSpot = _golden.Pos;
@@ -661,9 +692,10 @@ namespace CluckWars.Balance
             {
                 var ch = _c[s];
                 if (!ch.HasIntent || ch.Intent.PeckPile < 0 || ch.Pecking) return false;
-                // A stunned or egg-shelled chicken cannot cast; a hidden one does not auto-Peck (AbilityController.AnyStealthRunning:
-                // the chain would break the stealth), and a dashing one is busy.
-                if (Stunned(ch) || EggPhase(ch) || Hidden(ch) || ch.Dashing) return false;
+                // A stunned chicken cannot cast; a hidden one does not auto-Peck, nor one whose Shield still has its egg to come or running
+                // (AbilityController.AnyStealthRunning: the chain would break it, and the Peck would be a cast that cancels the egg), and a
+                // dashing one is busy.
+                if (Stunned(ch) || ShieldLive(ch) || Hidden(ch) || ch.Dashing) return false;
                 int pile = ch.Intent.PeckPile;
                 var kit = _s.Seats[s].Farm;
                 return _time + Eps >= ch.NextPeckAt
@@ -728,7 +760,11 @@ namespace CluckWars.Balance
 
                 BuildView(s);
                 MatchIntent intent = _policy[s].Think(_view, ref _rng[s]);
-                ch.Queue.Enqueue(new Pending { Intent = intent, ApplyTick = _i + _delayTicks[s] });
+                ch.Queue.Enqueue(new Pending
+                {
+                    Intent = intent, ApplyTick = _i + _delayTicks[s],
+                    CastLegalWhenDecided = intent.CastSlot >= 0 && CastReadyNow(s, intent.CastSlot),
+                });
                 ch.ThinkNow = false;
                 // The first periodic think is staggered by seat so the four do not all think on the same tick.
                 ch.NextThink = _i + _thinkTicks + (ch.Thought ? 0 : s * _thinkTicks / Seats);
@@ -741,10 +777,14 @@ namespace CluckWars.Balance
             {
                 var ch = _c[s];
                 if (!ch.Present || ch.Removed) return;
-                while (ch.Queue.Count > 0 && ch.Queue.Peek().ApplyTick <= _i) Apply(s, ch.Queue.Dequeue().Intent);
+                while (ch.Queue.Count > 0 && ch.Queue.Peek().ApplyTick <= _i)
+                {
+                    var due = ch.Queue.Dequeue();
+                    Apply(s, due.Intent, due.CastLegalWhenDecided);
+                }
             }
 
-            private void Apply(int s, MatchIntent intent)
+            private void Apply(int s, MatchIntent intent, bool castLegalWhenDecided)
             {
                 var ch = _c[s];
                 bool badPile = intent.PeckPile < -1
@@ -757,7 +797,7 @@ namespace CluckWars.Balance
                     _result.RejectedIntents++;
                     return;
                 }
-                if (intent.CastSlot >= 0) ch.Casts.Add(new CastRequest { Slot = intent.CastSlot, Target = intent.CastTarget });
+                if (intent.CastSlot >= 0) ch.Casts.Add(new CastRequest { Slot = intent.CastSlot, Target = intent.CastTarget, LegalWhenDecided = castLegalWhenDecided });
 
                 // The movement part of the intent; the cast part is a one-off and is not part of what the chicken keeps doing.
                 intent.CastSlot = -1;
@@ -770,6 +810,7 @@ namespace CluckWars.Balance
                 ch.EmptyNoted = false;
             }
 
+            // The game refuses a cast only while stunned (ControlRules.CanCast); the egg does not stop one, it ends the Shield (BeginCast).
             private bool CanCast(int s, int slot)
             {
                 var ch = _c[s];
@@ -777,7 +818,15 @@ namespace CluckWars.Balance
                 if (ab.Job == AbilityJob.Peck) return false;           // pecking is the PeckPile intent
                 if (ch.Removed) return false;
                 if (_time + Eps < ch.AbReady[slot]) return false;
-                return !_stunSnap[s] && !_egg[s];
+                return ControlRules.CanCast(_stunSnap[s] ? ControlState.Stunned : ControlState.Free);
+            }
+
+            // Could this cast be made on the tick the policy decides it? The same test as CanCast, on live state, for a slot that exists.
+            private bool CastReadyNow(int s, int slot)
+            {
+                var ch = _c[s];
+                if (slot < 0 || slot >= ch.Abilities.Length || ch.Abilities[slot].Job == AbilityJob.Peck || ch.Removed) return false;
+                return _time + Eps >= ch.AbReady[slot] && ControlRules.CanCast(Stunned(ch) ? ControlState.Stunned : ControlState.Free);
             }
 
             private readonly bool[] _stunSnap = new bool[Seats];
@@ -800,7 +849,12 @@ namespace CluckWars.Balance
                     int used = 0;
                     foreach (var req in ch.Casts)
                     {
-                        if ((used & (1 << req.Slot)) != 0 || !CanCast(s, req.Slot)) { _result.RejectedIntents++; continue; }
+                        if ((used & (1 << req.Slot)) != 0 || !CanCast(s, req.Slot))
+                        {
+                            // Legal when decided: the delay spent the slot or let a stun land. Anything else is a policy asking for the impossible.
+                            if (req.LegalWhenDecided) _result.CastsLostToReactionDelay++; else _result.RejectedIntents++;
+                            continue;
+                        }
                         used |= 1 << req.Slot;
                         _valid.Add((s, req));
                     }
@@ -819,6 +873,22 @@ namespace CluckWars.Balance
                 Record(MatchEventKind.CastStart, s, -1, slot, CutCause.None);
                 if (ch.Pecking) Cut(s, CutCause.OwnMove);                          // Peck ends on the next move
                 if (ab.Job != AbilityJob.Hide && Hidden(ch) && ch.HideEndsOnMove) ch.HideUntil = _time; // using a move ends Hide
+                if (ab.Job != AbilityJob.Shield) CancelShieldFollowUp(ch);                              // any other cast cancels the egg
+            }
+
+            // The Shield's egg is live from the cast until it ends, unless another cast cancelled it (AbilityController.HasLiveFollowUp).
+            private bool ShieldLive(Chick ch) => _time + Eps < ch.EggUntil && !ch.ShieldCancelled;
+
+            // AbilityController.EndStealthAndPeckForCast with TurtleModeAbilitySO.OnOtherCast: during the walk the pending egg is dropped and the
+            // walk goes on to its end; during the egg the whole Shield ends now.
+            private void CancelShieldFollowUp(Chick ch)
+            {
+                if (!ShieldLive(ch)) return;
+                ch.ShieldCancelled = true;
+                bool eggRunning = _time + Eps >= ch.ShieldWalkUntil;
+                float next = ShieldRules.RunAfterOtherCast(ch.EggUntil - _time, ch.ShieldEgg, eggRunning);
+                if (next > 0f) ch.EggUntil = ch.ShieldWalkUntil;
+                else ch.ShieldWalkUntil = ch.EggUntil = _time;
             }
 
             private bool RivalCanBeHit(int caster, int victim, float radius)
@@ -883,6 +953,8 @@ namespace CluckWars.Balance
                         ch.ShieldWalkUntil = _time + ab.ShieldWalkSeconds;
                         ch.EggUntil = ch.ShieldWalkUntil + ab.ShieldEggSeconds;
                         ch.ShieldWalkMult = ab.ShieldWalkSpeedMultiplier;
+                        ch.ShieldEgg = ab.ShieldEggSeconds;
+                        ch.ShieldCancelled = false;
                         break;
                     case AbilityJob.Hide:
                         ch.HideUntil = _time + ab.Duration;
@@ -958,9 +1030,11 @@ namespace CluckWars.Balance
                 if (v.Pecking && PeckCastRules.IsCut(false, knocked, false)) Cut(victim, CutCause.Shove);
             }
 
-            // Slow Area: every tick of its run, each rival inside is slowed for one tick (refreshed), through the victim's passive.
+            // Slow Area: every tick of its run, each rival inside gets the aura's factor for that tick, through the victim's passive. The aura
+            // is its own slow source (CheckAbilityZoneSlow), not part of the timed slow, so it ends with the area or the victim leaving it.
             private void AuraTick()
             {
+                for (int s = 0; s < Seats; s++) _c[s].AuraFactor = 1f;
                 for (int s = 0; s < Seats; s++)
                 {
                     var ch = _c[s];
@@ -973,7 +1047,7 @@ namespace CluckWars.Balance
                         {
                             if (!RivalCanBeHit(s, v, ab.AreaRadius)) continue;
                             if (MatchCombat.Refused(IncomingEffect.Slow, EggPhase(_c[v]), WalkPhase(_c[v]))) continue;
-                            ApplySlow(_c[v], PassiveOf(v).ReceivedSlowFactor(ab.AreaSlowFactor), _tick);
+                            _c[v].AuraFactor = Math.Min(_c[v].AuraFactor, PassiveOf(v).ReceivedSlowFactor(ab.AreaSlowFactor));
                         }
                     }
                 }
@@ -1082,7 +1156,9 @@ namespace CluckWars.Balance
                 v.SpeedUntil = 0f;
                 v.Dashing = false;
                 v.HideUntil = 0f;
-                v.ShieldWalkUntil = 0f; v.EggUntil = 0f;
+                v.ShieldWalkUntil = 0f; v.EggUntil = 0f; v.ShieldCancelled = false;
+                v.AuraFactor = 1f;
+                v.Effects.Clear();
                 for (int a = 0; a < v.AuraUntil.Length; a++) v.AuraUntil[a] = 0f;
                 v.Queue.Clear();
                 v.Casts.Clear();
@@ -1166,7 +1242,8 @@ namespace CluckWars.Balance
                 if (ch.Dashing && _time + Eps >= ch.DashUntil && _nav.IsClear(ch.Pos, ch.Pos)) { ch.Dashing = false; ch.WaypointValid = false; }
 
                 if (CanStartPeck(s)) StartPeck(s);
-                ApplyPush(ch);
+                // A stunned chicken's movement tick does not run (ChickenController: ControlRules.CanMove), so its push waits for the stun to end.
+                if (ControlRules.CanMove(Stunned(ch) ? ControlState.Stunned : ControlState.Free)) ApplyPush(ch);
                 if (!ch.Pecking && !Stunned(ch) && !EggPhase(ch)) Move(s);
 
                 if (ch.HasIntent && !ch.Arrived && Standing(s)) { ch.Arrived = true; ch.ThinkNow = true; }
@@ -1216,7 +1293,11 @@ namespace CluckWars.Balance
             // ---- movement ----
 
             private Vector2 TargetOf(MatchIntent intent) =>
-                intent.PeckPile >= 0 ? PlaceOf(intent.PeckPile).Pos : intent.Goal;
+                intent.PeckPile >= 0 ? WalkTarget(intent.PeckPile) : intent.Goal;
+
+            // Where a chicken walks to for a pile: its centre, except for a Golden Pile that fell inside a wall (nobody can stand there).
+            private Vector2 WalkTarget(int pile) =>
+                pile == MatchGeometry.GoldenPile && _goldenOffWall ? _goldenWalk : PlaceOf(pile).Pos;
 
             // How close to the target the chicken stops: the rim of the pile it pecks, the base zone when the goal is its own base, else the point itself.
             private float StopDistance(int s, MatchIntent intent, Vector2 pos)
@@ -1224,7 +1305,9 @@ namespace CluckWars.Balance
                 if (intent.PeckPile >= 0)
                 {
                     var place = PlaceOf(intent.PeckPile);
-                    return MatchGeometry.Rim(_map, place, pos - place.Pos);
+                    float rim = MatchGeometry.Rim(_map, place, pos - place.Pos);
+                    // Walking to a stand-in point beside the pile: stopping that much nearer keeps the chicken inside the pile's reach.
+                    return intent.PeckPile == MatchGeometry.GoldenPile && _goldenOffWall ? Math.Max(0f, rim - Vector2.Distance(_goldenWalk, place.Pos)) : rim;
                 }
                 int home = OracleMapSO.BaseIndex(s);
                 return (intent.Goal - _map.Places[home].Pos).sqrMagnitude < 1e-6f ? _map.BaseRadius : 0f;
@@ -1255,7 +1338,7 @@ namespace CluckWars.Balance
             {
                 if (ch.Push.sqrMagnitude <= PushFloor) { ch.Push = Vector2.zero; return; }
                 Vector2 to = ClampToArena(ch.Pos + ch.Push * _tick);
-                if (_nav.IsClear(ch.Pos, to)) ch.Pos = to; else ch.Push = Vector2.zero;   // a wall stops it
+                ch.Pos = _nav.Slide(ch.Pos, to);                  // a wall does not stop it: it slides along the wall (CharacterController)
                 ch.Push *= 1f - Mathf.Clamp01(_rules.KnockbackDecayRate * _tick);
                 ch.WaypointValid = false;
             }
@@ -1278,14 +1361,8 @@ namespace CluckWars.Balance
             {
                 var ch = _c[s];
                 var kit = _s.Seats[s].Farm;
-                float speed = kit.MoveSpeed;
-                if (WalkPhase(ch)) speed *= ch.ShieldWalkMult;
-                if (_time + Eps < ch.SpeedUntil) speed *= ch.SpeedMult;
-                if (ch.Dashing) speed *= ch.DashMult;
-                if (ch.Surge) speed *= _rules.SurgeSpeedFactor;
-                if (_time + Eps < ch.SlowUntil && !WalkPhase(ch)) speed *= ch.SlowFactor;
-
                 // A part 1 farmer (a kit without the Speed ability) bursts on its own whenever the burst is ready, as FarmSim does.
+                float burst = 1f;
                 if (kit.BurstMultiplier > 1f && kit.BurstSeconds > 0f && !HasSpeedAbility(ch))
                 {
                     if (_time >= ch.BurstUntil && _time + Eps >= ch.BurstReadyAt)
@@ -1293,10 +1370,24 @@ namespace CluckWars.Balance
                         ch.BurstUntil = _time + kit.BurstSeconds;
                         ch.BurstReadyAt = _time + kit.BurstCooldown;
                     }
-                    if (_time < ch.BurstUntil) speed *= kit.BurstMultiplier;
+                    if (_time < ch.BurstUntil) burst = kit.BurstMultiplier;
                 }
-                if (!kit.IgnoresPileSlow && _slow < 1f && !ch.Dashing && InAnyPileReach(ch.Pos)) speed *= _slow;
-                return speed;
+
+                // Speed modifiers go through the game's own stack: the strongest boost (Speed, a Jump's dash, the burst) times the Shield walk's
+                // penalty. A multiplier of exactly 1 registers nothing.
+                var fx = ch.Effects;
+                fx.SetMoveSpeed(SrcSpeed, _time + Eps < ch.SpeedUntil ? ch.SpeedMult : 1f);
+                fx.SetMoveSpeed(SrcDash, ch.Dashing ? ch.DashMult : 1f);
+                fx.SetMoveSpeed(SrcWalk, WalkPhase(ch) ? ch.ShieldWalkMult : 1f);
+                fx.SetMoveSpeed(SrcBurst, burst);
+                float speed = kit.MoveSpeed * fx.MoveSpeedMultiplier;
+                if (ch.Surge) speed *= _rules.SurgeSpeedFactor;
+
+                // Slows do not stack: only the strongest of the pile, the timed ability slow and the aura applies. The timed slow keeps running
+                // through the Shield's walk, which refuses only new ones.
+                float pile = !kit.IgnoresPileSlow && _slow < 1f && InAnyPileReach(ch.Pos) ? _slow : 1f;
+                float timed = _time + Eps < ch.SlowUntil ? ch.SlowFactor : 1f;
+                return speed * MatchCombat.CombineSlows(pile, timed, ch.AuraFactor);
             }
 
             private void Move(int s)

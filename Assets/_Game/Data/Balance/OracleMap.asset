@@ -99,6 +99,7 @@ MonoBehaviour:
   WallHalfWidth: 0.83000004
   BaseRadius: 2.5
   CollectReach: 1
+  GoldenFootprint: {x: 3.6, y: 3}
   WalkLegs:
   - 0
   - 15.620029
