@@ -142,7 +142,7 @@ namespace CluckWars.Balance
             }
 
             // Priority 6: COLLECT, the cheapest pile by round-trip cost.
-            int pile = SelectPile(v, me.Pos, home, out float pileDist);
+            int pile = SelectPile(v, me.Pos, home, ref rng, out float pileDist);
             if (pile >= 0)
             {
                 _state = State.CollectFood;
@@ -462,24 +462,50 @@ namespace CluckWars.Balance
             return Mathf.Max(0f, d.magnitude - surface);
         }
 
-        // The cheapest pile by round-trip cost; ties go to the first in the seat's own order (as the farm policy does), the Golden Pile last.
-        private int SelectPile(MatchView v, Vector2 from, Vector2 home, out float bestSurfaceDist)
+        /// <summary>
+        /// Two pile costs closer than this are a tie. Ties are exact on this map (a chicken on its base's diagonal is as far from its two
+        /// contested piles), so the width only has to cover float noise.
+        /// </summary>
+        public const float PileTieCost = 1e-3f;
+
+        private readonly int[] _pileOf = new int[OracleMapSO.PileCount + 1];
+        private readonly float[] _pileCost = new float[OracleMapSO.PileCount + 1];
+        private readonly float[] _pileDist = new float[OracleMapSO.PileCount + 1];
+
+        // The cheapest pile by round-trip cost (the game's BotTactics.PileCost). A tie is drawn at random from the seat's own stream. The game's
+        // bot keeps the first in its pile list, and its chickens never stand exactly on a symmetry line once physics moves them; an order
+        // relative to the seat instead sent seats 1 and 3 to the contested pile nearer the oval centre island every time (seat tilt, plan
+        // "Findings after Task 5").
+        private int SelectPile(MatchView v, Vector2 from, Vector2 home, ref MatchRng rng, out float bestSurfaceDist)
         {
-            int best = -1;
+            int n = 0;
             float bestCost = float.MaxValue;
-            bestSurfaceDist = float.MaxValue;
             for (int k = 0; k <= OracleMapSO.PileCount; k++)
             {
-                int pile = k < OracleMapSO.PileCount ? FarmOnlyPolicy.PileAtRank(_seat, k) : MatchGeometry.GoldenPile;
+                int pile = k < OracleMapSO.PileCount ? k : MatchGeometry.GoldenPile;
                 float available = PileAvailable(v, pile);
                 if (available <= Eps) continue;
 
                 float toPile = SurfaceDistance(v, pile, from);
                 float toHome = Vector2.Distance(PlaceOf(v, pile).Pos, home);
                 float cost = BotTactics.PileCost(toPile, toHome, available, _profile.RoundTripBias);
-                if (cost < bestCost) { bestCost = cost; best = pile; bestSurfaceDist = toPile; }
+                _pileOf[n] = pile; _pileCost[n] = cost; _pileDist[n] = toPile; n++;
+                bestCost = Math.Min(bestCost, cost);
             }
-            return best;
+
+            bestSurfaceDist = float.MaxValue;
+            int tied = 0;
+            for (int i = 0; i < n; i++) if (_pileCost[i] <= bestCost + PileTieCost) tied++;
+            if (tied == 0) return -1;
+            int pick = tied > 1 ? rng.NextInt(tied) : 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (_pileCost[i] > bestCost + PileTieCost) continue;
+                if (pick-- > 0) continue;
+                bestSurfaceDist = _pileDist[i];
+                return _pileOf[i];
+            }
+            return -1;
         }
     }
 }

@@ -11,6 +11,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Match simulator: seat tilt found and fixed, Spoiler and Thief explained (BL-207, `develop`, not pushed)
+
+- **Seat tilt (simulator artefact, fixed):** the oval centre island is nearer the x-axis contested piles, and P0 broke the exact tie between a corner's two contested piles by a seat-relative order, so seats 1 and 3 always opened next to the centre. P0 now draws such ties at random (`ScriptedPolicy.PileTieCost`). Mirrors went from 21 / 30 / 21 / 28 % to 24 / 25 / 24 / 26 %. `FarmOnlyPolicy` keeps part 1's rule (farm-only mirrors still tilt; it plays no report design). Kit win rates moved (Hoarder 74 -> 68, Bulwark 31 -> 26, Relentless 7 -> 12, Bully 15 -> 19 %).
+- **Spoiler (the game's bot, plus the delay):** the real `BotController` also spends Wing Slam on whoever is near before the mark is up (code and 2026-11-17/18 logs); P0 is faithful there. P0's 0.3 s reaction delay, which the bot does not have, halves the stun-to-Kill conversion (kills a match 0.17 at 0.3 s, 0.62 at 0). A Spoiler that saves its stun is P1's job. **Thief:** P0 steals at least as much as real bot Thieves (3.2 against 2.3 a round).
+- Evidence and numbers: plan, "Findings after Task 5". Maestro steps: none; the reaction delay default is open for the sweep.
+
 ## 2026-11-22 - Match simulator S5: P0, the runner, the designs and the first report (BL-207, `develop`, not pushed)
 
 - **What exists:** `ScriptedPolicy` (P0, the game's bot transcribed through `BotTactics`), `MatchRunner` (parallel, same result for any thread count), `MatchDesigns` (Mixed, One-per-class, Seat check, Forced kills), `MatchReports` (report section, Markdown and JSON) and the menu `Cluck Wars/Balance/Oracle/Match report` (`OracleMenu.MatchReportBatch`). Output goes to `Captures/oracle/match-report-<UTC>.md/.json` (git-ignored). The whole default report takes about 20 s on 12 threads.

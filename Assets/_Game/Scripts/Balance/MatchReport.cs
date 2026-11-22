@@ -155,7 +155,7 @@ namespace CluckWars.Balance
         public List<EconomyShareLine> Economy = new List<EconomyShareLine>();
         public int CornerDecided;
         public int MixedMatches;
-        /// <summary>Share of the mixed design's matches won from each seat. The designs turn the table so each kit sits in each seat about as often; what is left here is the simulator's own seat tilt.</summary>
+        /// <summary>Share of the mixed design's matches won from each seat. The designs turn the table so each kit sits in each seat about as often; what is left here is a seat bias of the model or the map (none was left after the 2026-11-22 tie fix in P0's pile choice).</summary>
         public List<SeatLine> MixedSeats = new List<SeatLine>();
         public List<SeatLine> SeatCheck = new List<SeatLine>();
         public List<SeatKitLine> SeatByKit = new List<SeatKitLine>();
@@ -189,7 +189,7 @@ namespace CluckWars.Balance
             "Underdog Surge on equal banked food goes to the lowest seat here; the game takes an arbitrary chicken. A seat bias on ties, which are common when the event fires early. The designs turn the table by one seat per replicate to share it out.",
             "A Peck cast by hand (the simulator's Peck is the auto-Peck chain): a policy that hand-pecks through its own Shield is not modelled.",
             "A shove that meets a wall slides along the wall's clearance edge; the game slides along the wall's box. Well under 0.1 m a push.",
-            "Aim, misclicks and hesitation: one reaction delay for every policy. Overstates every active kit; the sensitivity sweep (a later task) measures it.",
+            "Aim, misclicks and hesitation: one reaction delay for every policy, P0 included (the game's bot acts on the think itself). Overstates a single cast and understates a chain of two casts in one window: the Spoiler's stun then Kill pays the delay twice inside one stun, so at the default delay about half the marks whose target was stunned once armed end without a kill, against about one in ten at no delay. The sensitivity sweep (a later task) measures it.",
             "Facing: the simulator has no heading, so the game bot's 'turn first, cast next think' costs nothing here. Slightly overstates directional abilities for P0.",
             "A rival base as a limit on walking: chickens may walk into a rival's base zone; only the ability pair rule (no cast across a base wall) is modelled.",
             "A placed Slow Area zone (an aura is modelled; a kit that ships a zone makes the simulator refuse to start).",
@@ -590,7 +590,7 @@ namespace CluckWars.Balance
             sb.AppendLine();
 
             if (r.MixedSeats.Count > 0)
-                sb.AppendLine("- Mixed design, share of matches won from each seat: " + string.Join(", ", r.MixedSeats.Select(x => $"seat {x.Seat} {Pct(x.Win.Rate)} ({Pm(x.Win)})")) + ". Away from 25 % is the simulator's own seat tilt (see the seat check), which the rotating designs spread over the kits.");
+                sb.AppendLine("- Mixed design, share of matches won from each seat: " + string.Join(", ", r.MixedSeats.Select(x => $"seat {x.Seat} {Pct(x.Win.Rate)} ({Pm(x.Win)})")) + ". The designs turn the table so each kit sits in each seat about as often; a share away from 25 % beyond its margin is a seat bias (see the seat check).");
             sb.AppendLine();
             sb.AppendLine("### Runs");
             sb.AppendLine();

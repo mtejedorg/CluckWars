@@ -204,6 +204,52 @@ namespace CluckWars.Tests
             Assert.AreEqual(expected, second);
         }
 
+        // Seat 0 stands on the line of symmetry between its two contested piles (the open map mirrors them across its base's axis), every
+        // other pile empty: the two costs tie.
+        private MatchView TiedBetweenTwoContestedPiles(out int a, out int b)
+        {
+            var view = View(Four(Kit("me"), Kit("rival")));
+            a = OracleMapSO.ContestedIndex(0);
+            b = OracleMapSO.ContestedIndex(3);
+            for (int p = 0; p < view.PileFood.Length; p++) view.PileFood[p] = p == a || p == b ? 10f : 0f;
+            view.Seats[0].Pos = Home(0);
+            view.Seats[1].Pos = Home(2);
+            float ca = BotTactics.PileCost(Vector2.Distance(Home(0), _map.Places[a].Pos), Vector2.Distance(_map.Places[a].Pos, Home(0)), 10f, Profile.RoundTripBias);
+            float cb = BotTactics.PileCost(Vector2.Distance(Home(0), _map.Places[b].Pos), Vector2.Distance(_map.Places[b].Pos, Home(0)), 10f, Profile.RoundTripBias);
+            Assert.AreEqual(ca, cb, ScriptedPolicy.PileTieCost, "The set-up must be a tie by the game's own pile cost.");
+            return view;
+        }
+
+        [Test]
+        public void Collect_ATieBetweenTwoPiles_IsNotSettledBySeatOrder()
+        {
+            var view = TiedBetweenTwoContestedPiles(out int a, out int b);
+            int pickedA = 0, pickedB = 0;
+            for (ulong seed = 1; seed <= 64; seed++)
+            {
+                var rng = MatchRng.Create(seed, 0UL);
+                int pile = ScriptedPolicy.Factory(0, PolicyParams.Default).Think(view, ref rng).PeckPile;
+                if (pile == a) pickedA++;
+                else if (pile == b) pickedB++;
+                else Assert.Fail($"Picked pile {pile}, neither of the two tied piles.");
+            }
+            Assert.Greater(pickedA, 0, "A tie is drawn, so either pile comes up.");
+            Assert.Greater(pickedB, 0, "A tie is drawn, so either pile comes up; an order relative to the seat would pick the same one every time.");
+        }
+
+        [Test]
+        public void Collect_ANearTieStillGoesToTheCheaperPile()
+        {
+            var view = TiedBetweenTwoContestedPiles(out int a, out int b);
+            // A step toward pile a makes it cheaper by far more than a tie.
+            view.Seats[0].Pos = Home(0) + (_map.Places[a].Pos - Home(0)).normalized * 0.1f;
+            for (ulong seed = 1; seed <= 16; seed++)
+            {
+                var rng = MatchRng.Create(seed, 0UL);
+                Assert.AreEqual(a, ScriptedPolicy.Factory(0, PolicyParams.Default).Think(view, ref rng).PeckPile);
+            }
+        }
+
         [Test]
         public void ParamsNotNaN_OverrideTheProfile()
         {
