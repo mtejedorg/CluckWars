@@ -26,22 +26,7 @@ namespace CluckWars.Balance
             if (Clear(a, b, wallA, wallB, walls, halfWidth)) return Vector2.Distance(a, b);
 
             var nodes = new System.Collections.Generic.List<Vector2>(2 + walls * 2 * VerticesPerEnd) { a, b };
-            float ring = halfWidth / Mathf.Cos(Mathf.PI / VerticesPerEnd);
-            for (int w = 0; w < walls; w++)
-            {
-                for (int end = 0; end < 2; end++)
-                {
-                    Vector2 c = end == 0 ? wallA[w] : wallB[w];
-                    for (int k = 0; k < VerticesPerEnd; k++)
-                    {
-                        float ang = 2f * Mathf.PI * k / VerticesPerEnd;
-                        Vector2 p = c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * ring;
-                        if (Mathf.Abs(p.x) > arenaHalf || Mathf.Abs(p.y) > arenaHalf) continue;
-                        if (!Clear(p, p, wallA, wallB, walls, halfWidth)) continue;
-                        nodes.Add(p);
-                    }
-                }
-            }
+            nodes.AddRange(RingNodes(wallA, wallB, halfWidth, arenaHalf));
 
             int n = nodes.Count;
             var dist = new float[n];
@@ -69,6 +54,37 @@ namespace CluckWars.Balance
             }
             return dist[1];
         }
+
+        /// <summary>
+        /// The ring vertices round every wall end, inside the arena box and outside every wall capsule: the nodes a path may bend at.
+        /// Shared by <see cref="ShortestPath"/> and <c>OracleNav</c>, so the bake and the simulator walk the same graph.
+        /// </summary>
+        internal static System.Collections.Generic.List<Vector2> RingNodes(Vector2[] wallA, Vector2[] wallB, float halfWidth, float arenaHalf)
+        {
+            int walls = wallA == null ? 0 : wallA.Length;
+            var nodes = new System.Collections.Generic.List<Vector2>(walls * 2 * VerticesPerEnd);
+            float ring = halfWidth / Mathf.Cos(Mathf.PI / VerticesPerEnd);
+            for (int w = 0; w < walls; w++)
+            {
+                for (int end = 0; end < 2; end++)
+                {
+                    Vector2 c = end == 0 ? wallA[w] : wallB[w];
+                    for (int k = 0; k < VerticesPerEnd; k++)
+                    {
+                        float ang = 2f * Mathf.PI * k / VerticesPerEnd;
+                        Vector2 p = c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * ring;
+                        if (Mathf.Abs(p.x) > arenaHalf || Mathf.Abs(p.y) > arenaHalf) continue;
+                        if (!Clear(p, p, wallA, wallB, walls, halfWidth)) continue;
+                        nodes.Add(p);
+                    }
+                }
+            }
+            return nodes;
+        }
+
+        /// <summary>True when the segment p-q stays at least <paramref name="halfWidth"/> from every wall axis.</summary>
+        internal static bool Clear(Vector2 p, Vector2 q, Vector2[] wallA, Vector2[] wallB, float halfWidth) =>
+            Clear(p, q, wallA, wallB, wallA == null ? 0 : wallA.Length, halfWidth);
 
         /// <summary>True when the segment p-q stays at least <paramref name="halfWidth"/> from every wall axis.</summary>
         private static bool Clear(Vector2 p, Vector2 q, Vector2[] wallA, Vector2[] wallB, int walls, float halfWidth)

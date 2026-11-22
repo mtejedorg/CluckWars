@@ -37,6 +37,9 @@ namespace CluckWars.EditorTools
             public float CollectReach;
         }
 
+        /// <summary>Half the side of the box a chicken's centre may use: the value <see cref="Bake"/> hands to the path search. The asset does not store it, so the simulator asks here.</summary>
+        public static float ArenaHalf() => PinwheelLayout.ArenaClampLimit(ShippedMap.PlaneSize * 0.5f);
+
         public static Inputs ReadInputs() => new Inputs
         {
             PlaneSize = ShippedMap.PlaneSize,

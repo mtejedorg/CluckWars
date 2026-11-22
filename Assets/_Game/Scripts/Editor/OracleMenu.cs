@@ -59,6 +59,43 @@ namespace CluckWars.EditorTools
             return (json, md);
         }
 
+        /// <summary>
+        /// Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.MatchTimingBatch</c>. Plays 1 000 farm-only matches of four
+        /// standard farmers on the shipped inputs, on one thread, and logs the milliseconds one match costs (the figure the match simulator's
+        /// runtime budget rests on). Read-only.
+        /// </summary>
+        public static void MatchTimingBatch() => InBatch("The match timing run failed.", () => MatchTiming(1000));
+
+        /// <summary>Plays <paramref name="matches"/> farm-only matches after a short warm-up and returns the mean milliseconds per match.</summary>
+        public static double MatchTiming(int matches)
+        {
+            const int warmUp = 20;
+            var log = new UnityLogService(LogLevel.Info);
+            var inputs = Inputs();
+            var farmer = OracleKits.StandardFarmer(inputs);
+            var kit = new MatchKit { Label = farmer.Label, Class = ChickenClass.Warrior, Farm = farmer };
+            float half = OracleMapBaker.ArenaHalf();
+            var setup = new MatchSetup
+            {
+                Map = inputs.Map,
+                Nav = OracleNav.For(inputs.Map, half),
+                Food = OracleKits.Food(inputs),
+                Rules = new MatchRules { Farm = OracleKits.Rules(inputs, false, FarmFoodEvent.None), ArenaHalf = half },
+                Seats = new[] { kit, kit, kit, kit },
+                Policies = new[] { FarmOnlyPolicy.Factory, FarmOnlyPolicy.Factory, FarmOnlyPolicy.Factory, FarmOnlyPolicy.Factory },
+            };
+
+            float banked = 0f;
+            for (int i = 0; i < warmUp; i++) banked += MatchSim.Run(setup, MatchRng.MatchSeed(1UL, 0, -1 - i)).Banked[0];
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < matches; i++) banked += MatchSim.Run(setup, MatchRng.MatchSeed(1UL, 0, i)).Banked[0];
+            clock.Stop();
+
+            double perMatch = clock.Elapsed.TotalMilliseconds / matches;
+            log.Info(Source, $"Match timing: {perMatch:0.000} ms per farm-only match over {matches} matches, one thread (seat 0 banked {banked / (matches + warmUp):0.0} on average).");
+            return perMatch;
+        }
+
         [MenuItem(SolveMenuPath, priority = 65)]
         private static void SolveFromMenu() => Solve();
 
