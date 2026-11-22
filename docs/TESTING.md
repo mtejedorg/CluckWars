@@ -518,6 +518,8 @@ All scripts are Python 3, stdlib only, run with `python -I` from the repo root. 
 | Accept as balanced (recompute prices) | `OracleMenu.AcceptBatch -oracleNote "why"` | stores it and recomputes every kit's price |
 | Sweep food | `OracleMenu.SweepFoodBatch` | `sweep-food-<UTC>.md/.json`: ten pile setups, read-only |
 | Solve | `OracleMenu.SolveBatch` | reads `Captures/oracle/problem.json`, writes `proposal-<UTC>.md/.json` with a schema-1 delta; applies nothing |
+| Match timing | `OracleMenu.MatchTimingBatch` | plays 1 000 farm-only matches of four standard farmers on one thread and logs the milliseconds one match costs (the match simulator's runtime budget); read-only |
+| Bot arrival radius | `OracleMenu.BotArrivalRadius` | not a menu or `-executeMethod` batch: a public static that reads the arrival radius authored on the chicken prefab's `BotController`, which the simulator's sight rule needs |
 
 Leave Play mode first (Solve refuses in Play mode). `-cw_timescale` (above, solo dev builds) is for runs of the real game at speed; the oracle itself does not need it.
 

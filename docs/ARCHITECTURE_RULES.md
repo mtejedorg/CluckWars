@@ -129,6 +129,7 @@ Every rule in this document. "Enforced" is the primary mechanism (the first one 
 | ARCH-DATA-12 | Fill every number in ability and passive text from the SO field it describes | TEST | PARTIAL |
 | ARCH-DATA-13 | Keep the retired ability classes until alpha feedback | REVIEW | CURRENT |
 | ARCH-DATA-14 | Change shipped balance only through the BalanceBook delta, which clients read and never write | TEST | CURRENT |
+| ARCH-DATA-15 | Let a bot read a rival's position only through BotSightRules, so a hidden rival is not seen through the fade | TEST | CURRENT |
 | ARCH-ERR-01 | Send all log output through ILogService | TEST | CURRENT |
 | ARCH-ERR-02 | Keep the log line format, and lead an error with its Source line | TEST | PARTIAL |
 | ARCH-ERR-03 | Sort every null guard by whether a legal game state can produce it | REVIEW | CURRENT |
@@ -801,6 +802,13 @@ Code outside the ability folder asks an ability what it does, never which class 
 - Enforced by: TEST `BalanceBookTests` (round trips, whole-delta refusal, schema gate, deny-list, hash, snapshot/restore, `NullBalanceSource`, environment choice); `AssemblyLayoutTests` (the package only in App's pinned list). The local-path exception: TEST `DevBalanceEditorTests` (`EveryLocalEntryPointOfTheBook_ChecksTheDevToolsGateFirst`, `TheLocalFileStore_GatesEveryOperationInsideItself`, `TheOverrideService_ChecksTheGateInApplyAtBootApplyAndReset`, `TheOverrideAndTheEditor_AreBoundOnlyInTheDevToolsInstallPaths`, `TheEditor_RefusesToLiveOrOpenWithoutDevTools`, `TheMenuSeesOnlyTheInterface_AndTheButtonHidesWithoutOne`, `NothingInTheLocalPath_TalksToANetworkServiceOrLogsThroughDebug`) and `BalanceLocalTests` (`LocalAllowed_IsExactlyTheDevToolsAnswer`, `TheStore_IsInertWithoutDevTools_AndWorksWithThem`), all in Assets/_Game/Scripts/Editor/Tests/. The oracle check: TEST `BalanceCheckTests` (`Check_NeverBlocks`, `Check_RunsWithoutTheEditorHook`, `IrrelevantVerdict_SaysSoAndRunsNothing`); it needs no Editor hook, because the map is a baked asset.
 - Audit check: `git grep -n "Unity.Services.RemoteConfig" -- Assets/_Game/Scripts` hits only `App/RemoteConfigBalanceSource.cs`; `git grep -n "FromJsonOverwrite" -- Assets/_Game/Scripts ':!*Editor*'` hits only `Balance/BalanceBook.cs`; `git grep -nE "UGS_SERVICE_|services\.api\.unity\.com" -- Assets` hits nothing; the local-apply entry point in `BalanceBook` checks `DevTools.Available` and the editor is bound only in `ProjectInstaller.InstallDiagnostics`.
 - Source: docs/STATE.md (BalanceBook entry, 2026-11-17); decision page https://claude.ai/artifact/NpJhf84c1ckj7qJthRzC7Q; owner ruling 2026-11-18 (narrow local-editor exception; to be filed in MemPalace by the caller)
+- Status: CURRENT
+
+### ARCH-DATA-15 — Let a bot read a rival's position only through BotSightRules, so a hidden rival is not seen through the fade
+- Rule: `BotController` decides on a rival's position only from the `RivalSighting` the pure rule `BotSightRules.Observe` returns: the live position while the rival is visible, the last position seen while it is hidden (`BotSightRules.IsHidden`, from the Hide opacity), and a dropped target once the bot reached the spot or ran out of patience. The one raw read of a rival's `transform.position` in `BotController` is the line that feeds the rule, marked `SIGHT-SOURCE`. The rule takes the arrival radius as a parameter so the match simulator can run it too.
+- Why: bots tracked a hidden rival through its fade (commit `7a0fc7c5`, docs/STATE.md).
+- Enforced by: TEST `BotSightTests.BotController_ReadsARivalPositionOnlyThroughTheSightRule` (source guard: exactly one raw rival-position read, tagged `SIGHT-SOURCE`, next to a `BotSightRules.Observe` call); behaviour of the rule in the other rows of `BotSightTests` (`HiddenRival_IsRememberedAtItsLastSeenPosition_WhileItMovesAway`, `ArrivingAtAnEmptySpot_DropsTheTarget_AndStaysDropped`, `TheShippedHideOpacity_CountsAsHiddenAndTheUnsetDefaultDoesNot`), all in Assets/_Game/Scripts/Editor/Tests/BotSightTests.cs.
+- Source: commit 7a0fc7c5; Assets/_Game/Scripts/Gameplay/BotSightRules.cs
 - Status: CURRENT
 
 ## 3.6 Logging and error surfacing (ARCH-ERR)
