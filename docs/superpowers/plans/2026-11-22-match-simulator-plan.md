@@ -22,6 +22,21 @@ Task 1 (3dfd9c21) deviated from the text below in five places; where a later tas
 
 Measured cost: 2.45 to 3.13 ms per farm-only match, one thread, batch (`OracleMenu.MatchTimingBatch`).
 
+## Deviations after Task 3
+
+Task 3 deviated from the text of Task 3 in these places; where Task 4 or 5 assumes the original, follow the code.
+
+1. **Arms do not block abilities** (`AbilityBaseSO.cs:852` asks only the base wall; spec 2.2 records it). `MatchCombat.InRange` is the game's `AbilityAim.InShape` circle, no `Nav.IsClear`.
+2. **`ComebackSettings`, not `ComebackRules`**: the name `CluckWars.Gameplay.ComebackRules` exists and the sim calls it (`EventForRoll`, `Events`) with `ComebackEventTiming.ShouldFire`. Fields: `SecondsLeft`, `GoldenPileFood`, `RestockFood`, `GoldenRingMin`, `GoldenRingMax`; `MatchKits.Rules` fills them (`MatchKits.cs` was touched) from `GameManager` constants and `MatchConfig.ComebackEventSecondsLeft`. `GameManager` gained the named constants `GoldenPileRingMin`/`GoldenPileRingMax` (were the literals 4.5 and 6.5, no behaviour change). The game retries the Golden Pile spot up to 8 times against colliders; the sim draws once (no physics).
+3. **The Golden Pile is place index `MatchGeometry.GoldenPile` (13)**: a policy pecks it with `PeckPile = 13` once `MatchView.GoldenActive` (new, with `GoldenPos`, `GoldenFood`). `MatchResult` gains `Comeback`, `ComebackTime`, `GoldenSpot` (no new event kind). The event draws kind, then angle and radius, only from the comeback stream.
+4. **Jump is the dash, not a blink.** Reach is `MoveSpeed x SpeedMultiplier x Duration`, phasing walls (`TerrainTraversal.Blink` clears every `ObstacleClass`, pinned by `Game_JumpTraversal_ClearsEveryInteriorObstacleClass`), never the arena boundary (the arena clamp). A kit with a Jump ability walks straight toward its goal; when the next step would enter a wall it spends a ready Jump (auto-cast, counted as a cast), otherwise it waits for the cooldown. The dash lasts until its seconds are up and the chicken stands clear of every wall. A part 1 farmer that only has the `Jumps` flag (no Jump ability) still crosses walls for free, as before. A policy may also cast Jump itself (`CastSlot`).
+5. **Casts**: `MatchIntent.CastSlot` indexes `MatchKit.Abilities`; a Peck slot and Death Mark (until S4) are refused and counted in `RejectedIntents`, as is a cast that is not ready or made while stunned or egg-shelled. `SeatView.CooldownLeft` has `1 + Abilities.Length` entries (0 = Peck). A cast intent is a one-off: the movement part of an intent is kept, the cast part is not. `MatchEvent.Other` is -1 for an ability `CastStart` and the slot is in `Amount`.
+6. **Hide and the Peck**: the game suppresses auto-Peck while a stealth ability runs (`AbilityController.AnyStealthRunning`, line 612), it does not let the Peck run under Hide as spec 3.2 said; the sim follows the code. Any other cast ends Hide (only when the ability says `EndsOnNextMove`) and cuts a running Peck with cause `own-move`; walking does neither. Peck ending on the next move is mirrored (no flag in `MatchAbility`) and pinned by `Game_PeckEndsOnTheNextMove_AndHideIsStealth`.
+7. **Sight**: each seat thinks on its own view (`BuildView(self)`): itself true, each rival through `MatchSight` (position from the rule; `Hidden`, `Known`, `Seen`). The look is at the start of every tick, so tick 0 looks before any cast. `MatchView.Seats[i].Cargo`, `Banked` and the cooldowns of a hidden rival are its true values (a bot reads those too).
+8. **Mirrored, not called**: the timer tie-break (`MatchCombat.PickTimerWinner`; `GameManager.EndOnTimerExpiry` decides it inline over `PlayerBase`, pinned by `TimerTieBreak_MirrorsTheGamesComparisons`), the shove threshold (impulse squared above 1) and the push floor (velocity squared above 0.001), pinned by `Game_ShoveThresholds_StillMatchTheSimulatorsCopies`. Called directly: `AbilityAim.InShape`, `BaseWallRules.Blocks`, `StealMath.Clamp`, `StealRules.Stealable` and `SplitDrain`, `PeckCastRules.IsCut` and `LandingTake`, `ControlReapplyRules.IncomingExtends` and `MergeSlow`, `ComebackEventTiming.ShouldFire`, `ComebackRules.EventForRoll`, `BotSightRules.Observe`.
+9. **Not modelled**: a rival base as a movement limit (the walk graph ignores it; only the ability pair test exists), body collision, Slow Area as a placed zone (a kit shipping one makes the sim throw at setup). The aura's run time is lengthened by the caster's outgoing control factor by job (`SlowArea`), as `ActiveDurationIsOutgoingControl` does in the game; it is not a field of `MatchAbility`.
+10. **Counters**: `ExposedByCause` and `CutWhileExposedByCause` cover Stun and Shove; Execution exposure and `Bounty` come with S4. `FirstContact` is the first time two chickens are within the smallest offensive reach of any present kit (-1 when never). `Egg` refusal of Execute is `MatchCombat.Refused(IncomingEffect.Execute, ...)`; S4 must call it.
+11. Test helpers added to `MatchTestKit.cs`: ability builders, `Fighter`, `Policy`, `Stand`, `Pecker`, `CastAt`, `Duel`; `MatchPassive.Identity(...)` is new production API (a passive that changes nothing).
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.
@@ -233,11 +248,11 @@ git commit -m "feat(balance): declared oracle facts, named movement constants an
   - `MatchRules` gains `ComebackRules Comeback` with `struct ComebackRules { float GoldenPileFood; float RestockFood; float GoldenRingMin; float GoldenRingMax; /* plus the kinds, odds and timing GameManager uses */ }`.
   - `struct SeatCounters { float Foraged; float Stolen; float LostToSteals; float Bounty; int Casts; int Steals; float FirstContact; float[] StolenFromSeat; int[] CutsByCause; int[] ExposedByCause; int[] CutWhileExposedByCause; }` (cause arrays indexed by `CutCause`; "exposed" = a rival with a ready cutting ability of that cause in range when the cast starts); `MatchResult` gains `SeatCounters[] Counters`.
 
-- [ ] **Step 1: Check the arm-wall assumption**
+- [x] **Step 1: Check the arm-wall assumption**
 
 Read how a cast picks its targets (`AbilityTargeting.cs`, the cast paths in `AbilityController.cs`): do the pinwheel arms block an ability? Write the answer with file and line into the spec's 2.2. If arms block, `MatchCombat.InRange` also requires `Nav.IsClear(caster, target)` and a test pins it.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Synthetic open map and synthetic kits; every number is the test's own.
 
@@ -273,19 +288,19 @@ Synthetic open map and synthetic kits; every number is the test's own.
 [Test] public void Policy_NeverReceivesAHiddenRivalsTruePosition()      // over a whole match, every view of a hidden rival equals the rule's Position
 ```
 
-- [ ] **Step 3: Run them and confirm they fail**
+- [x] **Step 3: Run them and confirm they fail**
 
 `-testFilter "CluckWars.Tests.MatchCombatTests;CluckWars.Tests.MatchSightTests"`. Expected: compile errors or failures.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Casts resolve against the tick's snapshot, all at once (two stuns on one tick both land). Abilities follow the spec's 3.2 table. A cast is legal only when its slot is ready and the caster is not stunned, removed or shelled; the sim refuses anything else. A `RivalSighting?` is kept per (observer, target) pair and updated each tick by `MatchSight.Observe`, starting with a look on tick 0 before any cast resolves. The comeback event uses only `MatchRng.Create(seed, StreamComeback)`. Shove travel is applied as a displacement that decays by `KnockbackDecayRate` per second, on top of the victim's own steering, clamped by walls.
 
-- [ ] **Step 5: Run the tests, then the full suite**
+- [x] **Step 5: Run the tests, then the full suite**
 
 Expected: the new classes pass; Task 1 and 2 classes still pass; the full suite 0 failed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add <every file listed under Files that changed, with .meta for new files>

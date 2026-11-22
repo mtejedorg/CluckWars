@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CluckWars.Abilities;
 using CluckWars.Balance;
 using CluckWars.Gameplay;
 using UnityEngine;
@@ -109,6 +110,119 @@ namespace CluckWars.Tests
                 Policies = policies,
                 Params = param,
             };
+        }
+
+        // ---- abilities, fighters and scripted policies (slice S3) ----
+
+        public static MatchAbility Stun(float radius, float seconds, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Stun, Asset = "test-stun", Cooldown = cooldown, Radius = radius, Control = ControlEmission.Stun(seconds),
+        };
+
+        public static MatchAbility Slow(float radius, float seconds, float factor, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Slow, Asset = "test-slow", Cooldown = cooldown, Radius = radius, Control = ControlEmission.Slow(seconds, factor),
+        };
+
+        public static MatchAbility Shove(float radius, float knockback, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Shove, Asset = "test-shove", Cooldown = cooldown, Radius = radius, Knockback = knockback,
+        };
+
+        public static MatchAbility Steal(float radius, float amount, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Steal, Asset = "test-steal", Cooldown = cooldown, Radius = radius, StealAmount = amount,
+        };
+
+        public static MatchAbility SlowArea(float radius, float factor, float duration, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.SlowArea, Asset = "test-slow-area", Cooldown = cooldown, Duration = duration,
+            AreaAura = true, AreaRadius = radius, AreaSlowFactor = factor,
+        };
+
+        public static MatchAbility Speed(float multiplier, float seconds, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Speed, Asset = "test-speed", Cooldown = cooldown, Duration = seconds, SpeedMultiplier = multiplier,
+        };
+
+        public static MatchAbility Jump(float multiplier, float seconds, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Jump, Asset = "test-jump", Cooldown = cooldown, Duration = seconds, SpeedMultiplier = multiplier,
+        };
+
+        public static MatchAbility Shield(float walkSeconds, float walkMultiplier, float eggSeconds, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Shield, Asset = "test-shield", Cooldown = cooldown, Duration = walkSeconds + eggSeconds,
+            ShieldWalkSeconds = walkSeconds, ShieldWalkSpeedMultiplier = walkMultiplier, ShieldEggSeconds = eggSeconds, StealProof = true,
+        };
+
+        public static MatchAbility Hide(float opacity, float seconds, float cooldown) => new MatchAbility
+        {
+            Job = AbilityJob.Hide, Asset = "test-hide", Cooldown = cooldown, Duration = seconds, HideOpacity = opacity, EndsOnNextMove = true,
+        };
+
+        /// <summary>A forager with the given abilities (slot order = array order) and a passive that changes nothing unless the caller passes one.</summary>
+        public static MatchKit Fighter(string label, float speed, MatchAbility[] abilities, MatchPassive? passive = null,
+            float peckAmount = 3f, float peckCooldown = 1f, float castSeconds = 0.5f, int capacity = 100)
+        {
+            var slow = new List<float>();
+            foreach (var a in abilities)
+            {
+                if (a.Control.Kind == ControlKind.Slow) slow.Add(a.Control.SlowFactor);
+                if (a.AreaAura) slow.Add(a.AreaSlowFactor);
+            }
+            var kit = Farmer(label, speed, capacity, peckAmount, peckCooldown, castSeconds, 5f);
+            kit.Abilities = abilities;
+            kit.Passive = passive ?? MatchPassive.Identity(slow.ToArray());
+            return kit;
+        }
+
+        public delegate MatchIntent Script(MatchView view, int seat);
+
+        private sealed class ScriptPolicy : IMatchPolicy
+        {
+            private readonly Script _f;
+            private readonly int _seat;
+            public ScriptPolicy(int seat, Script f) { _seat = seat; _f = f; }
+            public MatchIntent Think(MatchView view, ref MatchRng rng) => _f(view, _seat);
+        }
+
+        public static PolicyFactory Policy(Script f) => (seat, p) => new ScriptPolicy(seat, f);
+
+        /// <summary>Stand where the chicken is.</summary>
+        public static MatchIntent StandAt(MatchView v, int seat) => MatchIntent.Idle(v.Seats[seat].Pos);
+
+        public static readonly PolicyFactory Stand = Policy(StandAt);
+
+        /// <summary>Walk to the pile and peck it whenever the Peck is ready.</summary>
+        public static MatchIntent PeckAt(MatchView v, int seat, int pile) =>
+            new MatchIntent { Goal = v.Seats[seat].Pos, PeckPile = pile, CastSlot = -1, CastTarget = -1 };
+
+        public static PolicyFactory Pecker(int pile) => Policy((v, seat) => PeckAt(v, seat, pile));
+
+        /// <summary>Stand, and cast <paramref name="slot"/> once on the first think at or after <paramref name="time"/>.</summary>
+        public static PolicyFactory CastAt(float time, int slot, int target = -1)
+        {
+            return (seat, p) =>
+            {
+                bool done = false;
+                return new ScriptPolicy(seat, (v, s) =>
+                {
+                    var intent = StandAt(v, s);
+                    if (!done && v.Time + 1e-4f >= time) { done = true; intent.CastSlot = slot; intent.CastTarget = target; }
+                    return intent;
+                });
+            };
+        }
+
+        /// <summary>A two-seat set-up (seats 0 and 1, the others empty) with one policy per seat.</summary>
+        public static MatchSetup Duel(OracleMapSO map, MatchKit a, MatchKit b, PolicyFactory pa, PolicyFactory pb, float arenaHalf, float clockSeconds)
+        {
+            var setup = Setup(map, new[] { a, b, null, null }, pa, arenaHalf);
+            setup.Policies[1] = pb;
+            setup.Rules.Farm.ClockSeconds = clockSeconds;
+            setup.RecordEvents = true;
+            return setup;
         }
     }
 }

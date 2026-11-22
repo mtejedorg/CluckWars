@@ -1048,6 +1048,9 @@ namespace CluckWars.Gameplay
         public const float GoldenPileFood = 25f;
         /// <summary>Food the Restock event adds to every pile, up to its maximum (read by the Balance Oracle).</summary>
         public const float RestockFood = 10f;
+        /// <summary>Inner and outer radius, from the arena centre, of the ring the Golden Pile spawns on (read by the Balance Oracle).</summary>
+        public const float GoldenPileRingMin = 4.5f;
+        public const float GoldenPileRingMax = 6.5f;
 
         private void SpawnGoldenPile()
         {
@@ -1062,7 +1065,7 @@ namespace CluckWars.Gameplay
             for (int i = 0; i < 8; i++)
             {
                 float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-                float radius = Random.Range(4.5f, 6.5f);
+                float radius = Random.Range(GoldenPileRingMin, GoldenPileRingMax);
                 pos = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
 
                 // Sphere bottom sits at y=0.1 so the ground plane collider never

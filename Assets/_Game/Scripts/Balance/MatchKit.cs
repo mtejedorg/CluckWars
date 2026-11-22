@@ -82,6 +82,21 @@ namespace CluckWars.Balance
         public float[] SlowFactorsEmitted;
         public float[] SlowFactorsReceived;
 
+        /// <summary>A passive that changes nothing: every factor 1. <paramref name="slowFactors"/> are the slow strengths it answers (each unchanged).</summary>
+        public static MatchPassive Identity(params float[] slowFactors) => new MatchPassive
+        {
+            Asset = "identity",
+            StunInFactor = 1f,
+            SlowInDurationFactor = 1f,
+            OutgoingControlFactor = 1f,
+            KnockbackFactor = 1f,
+            StealFactor = 1f,
+            MaxStealMultiplier = 1f,
+            MatchEndBonusFood = 0f,
+            SlowFactorsEmitted = (float[])slowFactors.Clone(),
+            SlowFactorsReceived = (float[])slowFactors.Clone(),
+        };
+
         /// <summary>The slow factor this owner moves at when a slow of <paramref name="emitted"/> lands. Throws for a factor no kit emits.</summary>
         public float ReceivedSlowFactor(float emitted)
         {
@@ -113,5 +128,7 @@ namespace CluckWars.Balance
         public float SurgeSpeedFactor;
         /// <summary>The bot's arrival radius, the distance at which it drops a hidden rival it walked to (<c>OracleMenu.BotArrivalRadius()</c>).</summary>
         public float SightArrivalRadius;
+        /// <summary>The comeback event; default (zero seconds) switches it off.</summary>
+        public ComebackSettings Comeback;
     }
 }

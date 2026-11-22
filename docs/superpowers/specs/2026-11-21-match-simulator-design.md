@@ -86,8 +86,13 @@ so a place graph is too coarse for fights (section 11, D1). The recommended mode
   crossing (section 3). This is closer than part 1, which lets a jumper cross every arm for free.
 - Pursuit re-paths to the target's seen position (section 4, perception) at each policy think (default every 0.25 s).
 - Range checks are Euclidean, planar, as the game's range-only targeting (`AbilityTargeting.cs:9`, per librarian).
-  Assumption: abilities pass through the pinwheel arms in the game (only the base wall blocks them,
-  `BaseWallRules.cs:6`). To be checked in slice S3; if arms block, a segment test against the walls is added.
+  **Checked in slice S3 (2026-11-22): abilities pass through the pinwheel arms.** A cast picks its victims in
+  `AbilityBaseSO.GatherTargets`, which asks `WouldAffect` for each rival: `AbilityBaseSO.cs:852` refuses only when
+  `PlayerBase.WallBetween` says a claimed base's wall stands between the two (`BaseWallRules.Blocks`, the keep-out pair
+  test), after `IsInAimShape` (`AbilityAim.InShape`, pure planar distance, `AbilityAim.cs:53-56`). No ability code in
+  `Abilities/` or `Gameplay/` raycasts for an arm. So `MatchCombat.InRange` is a distance test and nothing else; the arms
+  stop walking only. Pinned by `MatchCombatTests.ArmWalls_GameCode_AsksOnlyTheBaseWall` (fails if `WouldAffect` starts
+  asking the physics world) and `Abilities_PassThroughInteriorWallArms`.
 - Piles are points with the map's `CollectReach`; bases are discs of `MatchConfig.BaseKeepOutRadius` (2.5).
   Expected error: a metre or less on contact distance, against several metres for a place graph (mechanics-designer).
 

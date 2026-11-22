@@ -30,7 +30,8 @@ namespace CluckWars.Balance
     /// <summary>
     /// What a policy asks of its chicken. The chicken walks to <see cref="Goal"/> (stopping at the edge of its own base zone when the
     /// goal is its own base); with <see cref="PeckPile"/> set it walks to that pile instead and pecks it from inside its reach whenever
-    /// the Peck is ready. <see cref="CastSlot"/> and <see cref="CastTarget"/> ask for an ability on a rival seat (slice S3). -1 means none.
+    /// the Peck is ready. <see cref="CastSlot"/> is an index into <c>MatchKit.Abilities</c> (a Peck slot is refused: pecking is <see cref="PeckPile"/>);
+    /// <see cref="CastTarget"/> names a rival seat for an ability that picks one (Death Mark). -1 means none. Area abilities hit whoever is in range.
     /// </summary>
     public struct MatchIntent
     {
@@ -45,11 +46,17 @@ namespace CluckWars.Balance
             Goal == o.Goal && PeckPile == o.PeckPile && CastSlot == o.CastSlot && CastTarget == o.CastTarget;
     }
 
-    /// <summary>What a policy knows about one seat. For a rival it holds what the policy may see (slice S3 narrows it through the bot sight rule).</summary>
+    /// <summary>
+    /// What a policy knows about one seat. For a rival it holds what the policy may see: its position comes from the game's bot sight rule
+    /// (<see cref="MatchSight"/>), never from the rival's true position while it is hidden.
+    /// </summary>
     public struct SeatView
     {
         public bool Present;
+        /// <summary>The rival is visible this tick (always true for the seat itself).</summary>
         public bool Seen;
+        /// <summary>False when the observer has given a hidden rival up (it searched the last seen spot, or ran out of patience): <see cref="Pos"/> then means nothing.</summary>
+        public bool Known;
         public Vector2 Pos;
         /// <summary>Food in the beak.</summary>
         public float Cargo;
@@ -61,7 +68,7 @@ namespace CluckWars.Balance
         public bool Removed;
         public bool Shelled;
         public bool Hidden;
-        /// <summary>Seconds until each slot is ready. Slot 0 is the Peck; slice S2 adds the four ability slots after it.</summary>
+        /// <summary>Seconds until each slot is ready. Index 0 is the Peck, index 1 + i is <c>MatchKit.Abilities[i]</c>.</summary>
         public float[] CooldownLeft;
     }
 
@@ -74,6 +81,10 @@ namespace CluckWars.Balance
         public SeatView[] Seats;
         /// <summary>Food left in each of the nine piles.</summary>
         public float[] PileFood;
+        /// <summary>The comeback event's Golden Pile is on the map (its place index is <see cref="MatchGeometry.GoldenPile"/>).</summary>
+        public bool GoldenActive;
+        public Vector2 GoldenPos;
+        public float GoldenFood;
         public MatchKit[] Kits;
         public OracleMapSO Map;
         public OracleNav Nav;

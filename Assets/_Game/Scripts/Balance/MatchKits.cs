@@ -69,6 +69,14 @@ namespace CluckWars.Balance
                     KnockbackDecayRate = ChickenMovement.KnockbackDecayRate,
                     SurgeSpeedFactor = ChickenMovement.UnderdogSurgeSpeedFactor,
                     SightArrivalRadius = sightArrivalRadius,
+                    Comeback = new ComebackSettings
+                    {
+                        SecondsLeft = match.ComebackEventSecondsLeft,
+                        GoldenPileFood = GameManager.GoldenPileFood,
+                        RestockFood = GameManager.RestockFood,
+                        GoldenRingMin = GameManager.GoldenPileRingMin,
+                        GoldenRingMax = GameManager.GoldenPileRingMax,
+                    },
                 };
             }
         }
