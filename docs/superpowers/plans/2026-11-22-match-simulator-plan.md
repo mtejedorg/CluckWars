@@ -37,6 +37,22 @@ Task 3 deviated from the text of Task 3 in these places; where Task 4 or 5 assum
 9. **Not modelled**: a rival base as a movement limit (the walk graph ignores it; only the ability pair test exists), body collision, Slow Area as a placed zone (a kit shipping one makes the sim throw at setup). The aura's run time is lengthened by the caster's outgoing control factor by job (`SlowArea`), as `ActiveDurationIsOutgoingControl` does in the game; it is not a field of `MatchAbility`.
 10. **Counters**: `ExposedByCause` and `CutWhileExposedByCause` cover Stun and Shove; Execution exposure and `Bounty` come with S4. `FirstContact` is the first time two chickens are within the smallest offensive reach of any present kit (-1 when never). `Egg` refusal of Execute is `MatchCombat.Refused(IncomingEffect.Execute, ...)`; S4 must call it.
 11. Test helpers added to `MatchTestKit.cs`: ability builders, `Fighter`, `Policy`, `Stand`, `Pecker`, `CastAt`, `Duel`; `MatchPassive.Identity(...)` is new production API (a passive that changes nothing).
+## Deviations after Task 4
+
+Task 4 deviated from the text of Task 4 in these places; where Task 5 assumes the original, follow the code.
+
+1. **A Death Mark press ignores `CastTarget`.** With no live mark the press picks through `MarkPickRules` (rolls: one per living candidate in seat order, then the fallback, all from `Create(seed, StreamMark)`; the game's `AssassinExecute` order); with a live mark it is the Kill. A press with no candidate and a refused Kill change nothing (the game's `Press` returns false), cost no cooldown, count no cast and are not `RejectedIntents`. Death Mark's slot is free (cooldown 0) while a mark runs; a kill sets `MarkSuccessCooldown`, a lapsed window or a lost target `MarkFailCooldown`.
+2. **Kill legality** is `ExecuteRules.KillQualifies(armed, stunned now, shelled)` (called) plus `MatchCombat.InRange` over `MarkKillRange` and `!MatchCombat.KeepOutBlocks`, on the tick's snapshot, for a Spoiler who can cast; `Refused(Execute, egg, walk)` supplies "shelled". The window is checked by an upkeep step at the start of each tick (a press on the tick the window ends is too late).
+3. **A kill**: the victim's beak (not its bag, not when it is an egg) plus `ExecuteBounty` go into the Spoiler's bag; `Counters.Bounty` counts both (everything that entered the bag). The victim is removed for `MarkRemovalSeconds`: a running Peck is cut with cause `Execution`, its stun, slow, push, speed, dash, hide, shield and auras end, its queued intents and casts are dropped, its own live mark ends with no cooldown change, its cooldowns keep running. Its body stays where it fell (`SeatView.Removed`); it comes back in phase 0, before the look, at `MatchSim.Spawn` with an empty beak and its bag, so every observer sees it at its base on the very tick. A removed chicken does not think, act, cast or get hit.
+4. **The bag** banks first, then the beak (`ChickenCargo.TryDeposit`); steals take beak then bag (`SplitDrain`, already in Task 3); it ignores capacity.
+5. **Exposure to an execution**: a Peck is exposed to `Execution` when it starts while any rival holds a live mark on its owner (once per cast).
+6. **`MatchResult.NobodyReachedTarget` is `!ReachedTarget`** (the clock ended it); `WinnerWithoutSpoilerBonus` is the clock's pick before the bonus, equal to `Winner` when the target ended the match (the bonus is a clock payout, as in `GameManager.EndOnTimerExpiry`). `MatchResult.Banked` includes the bonus.
+7. **`SpoilerKillRow.Win` is the rate without the passive (`WinnerWithoutSpoilerBonus`), `WinWithPassive` with it (`Winner`)**; `KillsToWin` does not filter by kills: the caller passes the matches of that row. `Label` is `"without passive IN [min, max]"` (or `OUT`, or `NO DATA` for no matches), parts joined by `"; "` when a kills value has both targets, null when the asset has no target for those kills. `WinInterval` is a readonly struct with a constructor. `KendallTau` is tau-b (ties count as neither), NaN for fewer than two points.
+8. **Forced kills**: `ForcedKills.Off` is the explicit off value; any `Kills == 0` is inert. The Spoiler must hold a Death Mark ability (its removal seconds are used) and `Times` must hold at least `Kills` ascending entries, or `MatchSim.Run` throws `ArgumentException`; a scheduled kill with no living rival throws `InvalidOperationException`. A forced kill can hit an egg (it keeps its beak). When the Spoiler banks the target before the last scheduled kill, the match ends and fewer kills happened (the table test allows exactly that, and nothing else).
+9. **The Thief cap is not applied inside the sim**: Task 3's test gives a passive a factor above its ceiling on purpose. The ceiling is pinned instead: every shipped passive with `MaxStealMultiplier > 1` reads (`MatchKits.ReadPassive`) a `StealFactor` within it, and its simulated steal stays within `nominal x MaxStealMultiplier`.
+10. **Mark pick inputs**: the base span is the longest distance between two playing seats' bases (`PlayerBase.BaseSpan` over live bases); positions and banked food are true values (the authority's pick). `SeatView` carries `MarkTarget`, `MarkedBy`, `ArmLeft`, `WindowLeft` for every seat (replicated in the game).
+11. **The kills-to-win table test** (`MatchSpoilerTests.KillsToWin_ForcedDesign_WithShippedKits_BuildsTheTable`) is the only place the forced design is built before Task 5's `MatchDesigns`: the shipped Spoiler in seat 0 against every one-per-other-class set in all six orders, kills at 5 s then every 3.5 s (row k takes the first k), all four seats on `FarmOnlyPolicy`. `CW_FORCED_R` sets the replicates per cell (default 1); it asserts structure, never a rate. The shipped Spoiler kit does not forage (`MayForage(Assassin)` is false), so with this policy its only income is the bag.
+
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.
@@ -329,7 +345,7 @@ git commit -m "feat(balance): match combat rules, sight through the bot rule, co
   - `sealed class SpoilerKillRow { int Kills; ForcedVictims Victims; WinInterval Win; WinInterval WinWithPassive; float MeanFinal; float MeanBestRival; float NobodyReachedTarget; string Label; }` (`Label` null when the reference holds no target for that row).
   - `static class MatchStats { static float KendallTau(IReadOnlyList<float> a, IReadOnlyList<float> b); static SpoilerKillRow KillsToWin(IReadOnlyList<MatchResult> results, int spoilerSeat, int kills, ForcedVictims victims, IReadOnlyList<SpoilerKillTarget> targets); }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 // MatchSpoilerTests (synthetic kits; Death Mark numbers chosen by the test)
@@ -357,19 +373,19 @@ public void ForcedKills_GrantExactlyK_OnSchedule(int k)                 // Kills
 [Test] public void ReferenceAsset_EntriesUnchanged_ByTheNewList()       // Entries and Offsets() equal before and after a load round trip
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 `-testFilter "CluckWars.Tests.MatchSpoilerTests;CluckWars.Tests.MatchStatsTests"`. Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 The mark flow of spec 3.2 (press, arm, window, Kill; success and fail cooldowns; removal for `MarkRemovalSeconds`, respawn at base with cargo 0; victim cargo plus `ExecuteBounty` into the Spoiler's bag). Forced kills bypass the mark: at each scheduled time the sim executes the chosen victim (`Empty`: least cargo, `Loaded`: most cargo) with the same payout. The Spoiler bonus (`MatchEndBonusFood`) is added before the winner is picked; `WinnerWithoutSpoilerBonus` is the same pick without it.
 
-- [ ] **Step 4: Run the tests, then the full suite**
+- [x] **Step 4: Run the tests, then the full suite**
 
 Expected: new classes pass; `OracleReferenceTests` green and unchanged; full suite 0 failed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add <every file listed under Files, with .meta for new files>

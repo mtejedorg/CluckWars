@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Match simulator S1 to S4: the match model, combat, Spoiler and Thief (BL-207, `develop`, not pushed)
+
+- **What exists** (pure, Fusion-free, `Scripts/Balance/`, tests in `Editor/Tests/`): `MatchSim` (four chickens, continuous 2D on the wall-aware `OracleNav`, fixed ticks, one policy per seat, deterministic per seed), `MatchRng` (named streams), `MatchKits` (the eight shipped kits through `BalanceBook.Preview`), `MatchCombat` (reach, base wall, controls, shove, steal, timer tie-break), `MatchSight` (rivals seen through the game's `BotSightRules`), the comeback events, and since S4 the Spoiler (Death Mark pick through `MarkPickRules`, arm, window, Kill, removal and respawn, the bounty bag, the end-of-clock bonus), the Thief's steal factor, the forced-kills design (`MatchSetup.Forced`), `MatchStats` (Wilson interval, Kendall tau, the kills-to-win row) and the Spoiler kill targets as data on `OracleReference.asset` (D6: 4 kills no passive at least 0.90, 3 at least 0.80, 2 with passive at most 0.20; labels only, no test on rates).
+- **Only a policy farm-only so far** (`FarmOnlyPolicy`): no scripted fighter, no runner, no report yet (S5 to S7). The match model is not the game: body collision, rival bases as a movement limit and Slow Area as a placed zone are not modelled; see `docs/superpowers/plans/2026-11-22-match-simulator-plan.md` for every deviation per task.
+- **First reading (scripted forced design, farm-only seats, shipped Spoiler kit, not a playing policy):** kills on empty-handed rivals pay the flat bounty only and never win; kills on loaded rivals decide matches (2 kills about half, 3 or more almost always). The shipped Spoiler does not forage, so its only income is the bag. Treat as a model, not a verdict.
+- **Tests:** `MatchSpoilerTests`, `MatchStatsTests` and the S1 to S3 classes. Full EditMode suite 4196, all passed (batch, with graphics).
+- **Maestro steps:** none.
+
 ## 2026-11-22 - Match simulator S2: declared facts, named constants, kit builder (BL-207, `develop`, not pushed)
 
 - **New pure builder** `MatchKits.All(inputs)` / `Rules(inputs, arenaHalf, sightArrivalRadius)` (Gameplay assembly, `Scripts/Balance/`): the eight kits as `MatchKit` with four `MatchAbility`, a `MatchPassive` of plain factors (each hook called with a unit input and again at 2; a non-linear hook throws) and the bot profile; everything through `BalanceBook.Preview`.

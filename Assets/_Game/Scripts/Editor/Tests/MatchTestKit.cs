@@ -161,6 +161,13 @@ namespace CluckWars.Tests
             Job = AbilityJob.Hide, Asset = "test-hide", Cooldown = cooldown, Duration = seconds, HideOpacity = opacity, EndsOnNextMove = true,
         };
 
+        public static MatchAbility DeathMark(float arm, float window, float range, float success, float fail, float removal, float leaderWeight = 1f) => new MatchAbility
+        {
+            Job = AbilityJob.DeathMark, Asset = "test-death-mark", Cooldown = fail, MarkArmSeconds = arm, MarkWindowSeconds = window,
+            MarkKillRange = range, MarkSuccessCooldown = success, MarkFailCooldown = fail, MarkRemovalSeconds = removal,
+            MarkLeaderPickWeight = leaderWeight,
+        };
+
         /// <summary>A forager with the given abilities (slot order = array order) and a passive that changes nothing unless the caller passes one.</summary>
         public static MatchKit Fighter(string label, float speed, MatchAbility[] abilities, MatchPassive? passive = null,
             float peckAmount = 3f, float peckCooldown = 1f, float castSeconds = 0.5f, int capacity = 100)

@@ -35,3 +35,16 @@ MonoBehaviour:
   - Label: Warrior_Bully
     BestSeconds: 27.566675
     OffsetSeconds: 5
+  KillTargets:
+  - Kills: 4
+    WithPassive: 0
+    MinWinRate: 0.9
+    MaxWinRate: 1
+  - Kills: 3
+    WithPassive: 0
+    MinWinRate: 0.8
+    MaxWinRate: 1
+  - Kills: 2
+    WithPassive: 1
+    MinWinRate: 0
+    MaxWinRate: 0.2

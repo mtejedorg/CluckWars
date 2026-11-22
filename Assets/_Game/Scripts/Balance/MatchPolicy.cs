@@ -68,6 +68,14 @@ namespace CluckWars.Balance
         public bool Removed;
         public bool Shelled;
         public bool Hidden;
+        /// <summary>The seat this seat's live Death Mark is on, -1 for none (replicated in the game, so every seat sees it).</summary>
+        public int MarkTarget;
+        /// <summary>The seat whose live mark is on this one, -1 for none.</summary>
+        public int MarkedBy;
+        /// <summary>Seconds until this seat's live mark arms (0 once armed or with no mark).</summary>
+        public float ArmLeft;
+        /// <summary>Seconds until this seat's live mark runs out (0 with no mark).</summary>
+        public float WindowLeft;
         /// <summary>Seconds until each slot is ready. Index 0 is the Peck, index 1 + i is <c>MatchKit.Abilities[i]</c>.</summary>
         public float[] CooldownLeft;
     }

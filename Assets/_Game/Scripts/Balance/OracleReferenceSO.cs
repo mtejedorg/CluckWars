@@ -16,6 +16,20 @@ namespace CluckWars.Balance
     }
 
     /// <summary>
+    /// One Spoiler kill target (design D6): with <see cref="Kills"/> kills, the Spoiler's win rate, with or without its passive's end-of-clock
+    /// bonus, should lie in [<see cref="MinWinRate"/>, <see cref="MaxWinRate"/>]. Data Maestro edits in the Inspector; it labels a report row
+    /// and nothing else (no test reads it as a gate).
+    /// </summary>
+    [Serializable]
+    public struct SpoilerKillTarget
+    {
+        public int Kills;
+        public bool WithPassive;
+        public float MinWinRate;
+        public float MaxWinRate;
+    }
+
+    /// <summary>
     /// The state of the game Maestro last recorded or accepted: the seconds every foraging kit needs to bank the win target in the oracle's
     /// economy run, with the offset in seconds each kit is worth beyond that (a credit when positive; spec 5.4, 5.6). The offsets feed
     /// <see cref="OracleRunner.Run"/>; the drift test compares a fresh measurement with <see cref="Entry.BestSeconds"/>. Two Editor-only actions write it:
@@ -41,6 +55,8 @@ namespace CluckWars.Balance
         /// <summary>Which action produced the stored offsets.</summary>
         public ReferenceOrigin Origin;
         public List<Entry> Entries = new List<Entry>();
+        /// <summary>The Spoiler's kills-to-win targets (match simulator report labels). Empty for an asset written before they existed.</summary>
+        public List<SpoilerKillTarget> KillTargets = new List<SpoilerKillTarget>();
 
         /// <summary>Offset in seconds per kit label, the shape <see cref="OracleRunner.Run"/> takes.</summary>
         public IReadOnlyDictionary<string, float> Offsets()

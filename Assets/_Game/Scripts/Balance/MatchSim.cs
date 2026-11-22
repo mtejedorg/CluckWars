@@ -37,6 +37,25 @@ namespace CluckWars.Balance
         }
     }
 
+    /// <summary>Which rival a forced kill takes: the one holding the least food in its beak, or the one holding the most.</summary>
+    public enum ForcedVictims : byte { Empty, Loaded }
+
+    /// <summary>
+    /// A scripted design that grants one seat exactly <see cref="Kills"/> kills on schedule, bypassing the mark: at each of
+    /// <see cref="Times"/> the simulator executes the chosen victim with the same payout as a real kill. It measures what a kill is worth
+    /// without the survivor bias of kills a policy happened to land. <c>Kills == 0</c> means off (<c>Spoiler == -1</c> is the explicit form).
+    /// </summary>
+    public struct ForcedKills
+    {
+        public int Spoiler;
+        public int Kills;
+        public ForcedVictims Victims;
+        /// <summary>Seconds into the match, at least <see cref="Kills"/> of them, in ascending order.</summary>
+        public float[] Times;
+
+        public static ForcedKills Off => new ForcedKills { Spoiler = -1 };
+    }
+
     /// <summary>Everything one simulated match needs. The arrays have four entries (index = seat); a null kit is an empty seat.</summary>
     public sealed class MatchSetup
     {
@@ -49,6 +68,8 @@ namespace CluckWars.Balance
         /// <summary>Per seat; null means <see cref="PolicyParams.Default"/> for every seat.</summary>
         public PolicyParams[] Params;
         public bool RecordEvents;
+        /// <summary>Scripted kills; the default (no kills) leaves the match to its policies.</summary>
+        public ForcedKills Forced;
     }
 
     public sealed class MatchResult
@@ -59,6 +80,13 @@ namespace CluckWars.Balance
         public int[] Kills;
         public float EndSeconds;
         public bool ReachedTarget;
+        /// <summary>The match went to the clock, so no seat banked the target first (same as <c>!ReachedTarget</c>; named for the kills-to-win table).</summary>
+        public bool NobodyReachedTarget;
+        /// <summary>
+        /// The seat that would have won had the Spoiler passive's end-of-clock bonus not been paid: the clock's pick over the banked food as
+        /// it stood. Equal to <see cref="Winner"/> when the target ended the match (the bonus is paid on the clock only).
+        /// </summary>
+        public int WinnerWithoutSpoilerBonus;
         /// <summary>The clock ended with banked food and kills level and the lowest corner won (the game's last tie-break).</summary>
         public bool CornerDecided;
         /// <summary>Intents a policy asked for that the rules refuse (a cast no seat can make, an unknown pile). Zero for a sound policy.</summary>
@@ -132,8 +160,13 @@ namespace CluckWars.Balance
     /// Pile slow: a chicken in reach of any non-empty pile walks at <see cref="FarmRules.PileSlowFactor"/> unless its kit ignores it.
     /// A kit with a Jump ability walks straight lines and spends a Jump to cross a wall (see <c>Move</c>); a kit that only has the
     /// <c>Jumps</c> flag (a part 1 farmer) crosses walls for free, as part 1's jump table does.
-    /// Not modelled: body collision, a chicken's own base keep-out as a movement limit (the walk graph ignores rival bases), the
-    /// Death Mark kill (slice S4).
+    /// Death Mark (slice S4): a press with no live mark picks a rival through the game's <see cref="MarkPickRules"/> (rolls from the mark
+    /// stream), arms for <c>MarkArmSeconds</c> and lives <c>MarkWindowSeconds</c>; a press with a live mark is the Kill, legal only when
+    /// <see cref="ExecuteRules.KillQualifies"/> (armed, the target stunned now, not shelled), the target is within <c>MarkKillRange</c>, no
+    /// base wall lies between and the Spoiler can cast. A kill empties the victim's beak into the Spoiler's bounty bag plus
+    /// <see cref="MatchRules.ExecuteBounty"/>, takes the victim out for <c>MarkRemovalSeconds</c> and sends it back to its base with no beak
+    /// food. The bag ignores capacity, banks first at the base and can be stolen. The Spoiler passive's bonus is paid on the clock before
+    /// the winner is picked. Not modelled: body collision, a chicken's own base keep-out as a movement limit (the walk graph ignores rival bases).
     /// </remarks>
     public static class MatchSim
     {
@@ -161,6 +194,7 @@ namespace CluckWars.Balance
             if (s.Seats == null || s.Seats.Length != Seats) throw new ArgumentException($"MatchSetup.Seats needs exactly {Seats} entries.", nameof(s));
             if (s.Policies == null || s.Policies.Length != Seats) throw new ArgumentException($"MatchSetup.Policies needs exactly {Seats} entries.", nameof(s));
             if (s.Params != null && s.Params.Length != Seats) throw new ArgumentException($"MatchSetup.Params needs {Seats} entries or null.", nameof(s));
+            ValidateForced(s);
             for (int i = 0; i < Seats; i++)
             {
                 var kit = s.Seats[i];
@@ -172,6 +206,27 @@ namespace CluckWars.Balance
                     if (a.Job == AbilityJob.SlowArea && !a.AreaAura)
                         throw new InvalidOperationException($"{kit.Label}: '{a.Asset}' places a zone; only the aura form of Slow Area is modelled.");
             }
+        }
+
+        private static void ValidateForced(MatchSetup s)
+        {
+            var f = s.Forced;
+            if (f.Kills <= 0) return;
+            if (f.Spoiler < 0 || f.Spoiler >= Seats || s.Seats[f.Spoiler] == null)
+                throw new ArgumentException($"MatchSetup.Forced names seat {f.Spoiler}, which is not playing.", nameof(s));
+            if (DeathMarkSlot(s.Seats[f.Spoiler].Abilities) < 0)
+                throw new ArgumentException($"MatchSetup.Forced: seat {f.Spoiler} ({s.Seats[f.Spoiler].Label}) holds no Death Mark ability, so it has no removal seconds to apply.", nameof(s));
+            if (f.Times == null || f.Times.Length < f.Kills)
+                throw new ArgumentException($"MatchSetup.Forced asks for {f.Kills} kills and needs that many times (has {f.Times?.Length ?? 0}).", nameof(s));
+            for (int i = 1; i < f.Kills; i++)
+                if (f.Times[i] < f.Times[i - 1]) throw new ArgumentException("MatchSetup.Forced.Times must ascend.", nameof(s));
+        }
+
+        private static int DeathMarkSlot(MatchAbility[] abilities)
+        {
+            if (abilities == null) return -1;
+            for (int a = 0; a < abilities.Length; a++) if (abilities[a].Job == AbilityJob.DeathMark) return a;
+            return -1;
         }
 
         /// <summary>
@@ -248,6 +303,16 @@ namespace CluckWars.Balance
             public float SlowFactor = 1f;
             public Vector2 Push;
             public bool Surge;
+
+            // death mark and removal
+            public bool Removed;
+            public float RemovedUntil;
+            public int MarkTarget = -1;
+            public int MarkSlot = -1;
+            public float ArmEnd;
+            public float WindowEnd;
+            public bool HasLastMark;
+            public int LastMark;
         }
 
         private sealed class Core
@@ -265,6 +330,14 @@ namespace CluckWars.Balance
             private readonly IMatchPolicy[] _policy = new IMatchPolicy[Seats];
             private readonly MatchRng[] _rng = new MatchRng[Seats];
             private MatchRng _comebackRng;
+            private MatchRng _markRng;
+            private readonly float _baseSpan;
+            private int _forcedNext;
+            private readonly List<int> _markCandidates = new List<int>(Seats);
+            private readonly List<float> _markHome = new List<float>(Seats);
+            private readonly List<float> _markNear = new List<float>(Seats);
+            private readonly List<float> _markLeader = new List<float>(Seats);
+            private readonly List<float> _markRolls = new List<float>(Seats);
             private readonly Chick[] _c = new Chick[Seats];
             private readonly float[] _pile = new float[OracleMapSO.PileCount];
             private readonly float[] _pileMax = new float[OracleMapSO.PileCount];
@@ -339,6 +412,7 @@ namespace CluckWars.Balance
                     if (kit == null) continue;
 
                     ch.Abilities = abilities;
+                    ch.MarkSlot = DeathMarkSlot(abilities);
                     ch.AbReady = new float[abilities.Length];
                     ch.AuraUntil = new float[abilities.Length];
                     for (int a = 0; a < abilities.Length; a++)
@@ -358,6 +432,12 @@ namespace CluckWars.Balance
                 _baseCentres = centres.ToArray();
                 _contactRadius = float.IsPositiveInfinity(contact) ? 0f : contact;
                 _comebackRng = MatchRng.Create(matchSeed, MatchRng.StreamComeback);
+                _markRng = MatchRng.Create(matchSeed, MatchRng.StreamMark);
+                // The game weighs the mark by the longest distance between two live bases (PlayerBase.BaseSpan); 0 with fewer than two.
+                float span = 0f;
+                for (int a = 0; a < centres.Count; a++)
+                    for (int b = a + 1; b < centres.Count; b++) span = Mathf.Max(span, Vector2.Distance(centres[a], centres[b]));
+                _baseSpan = span;
                 if (s.RecordEvents) _result.Events = new List<MatchEvent>();
             }
 
@@ -381,9 +461,12 @@ namespace CluckWars.Balance
                     _time = _i * _tick;
                     if (_time >= _clock - Eps) break;
 
+                    Respawn();
                     Look();
                     TickComeback();
                     NoteContact();
+                    ForceKills();
+                    MarkUpkeep();
 
                     for (int k = 0; k < Seats; k++) Complete((_i + k) % Seats);
                     if (_winner >= 0) break;
@@ -483,7 +566,7 @@ namespace CluckWars.Balance
                     if (!_c[a].Present) continue;
                     for (int b = a + 1; b < Seats; b++)
                     {
-                        if (!_c[b].Present || !MatchCombat.InRange(_c[a].Pos, _c[b].Pos, _contactRadius)) continue;
+                        if (!_c[b].Present || _c[a].Removed || _c[b].Removed || !MatchCombat.InRange(_c[a].Pos, _c[b].Pos, _contactRadius)) continue;
                         _contactSeen = true;
                         _result.Counters[a].FirstContact = _result.Counters[b].FirstContact = _time;
                         Record(MatchEventKind.Contact, a, b, 0f, CutCause.None);
@@ -497,7 +580,7 @@ namespace CluckWars.Balance
             private void Complete(int s)
             {
                 var ch = _c[s];
-                if (!ch.Present) return;
+                if (!ch.Present || ch.Removed) return;
                 var kit = _s.Seats[s].Farm;
 
                 if (ch.WasStunned && !Stunned(ch)) { ch.WasStunned = false; ch.ThinkNow = true; }
@@ -509,7 +592,7 @@ namespace CluckWars.Balance
                     else if (_time + Eps >= ch.PeckDoneAt) Land(s);
                 }
 
-                if (ch.Cargo > Eps && kit.DepositRate > 0f && MatchGeometry.InReach(_map, OracleMapSO.BaseIndex(s), ch.Pos)) Deposit(s, kit);
+                if (ch.Cargo + ch.Bag > Eps && kit.DepositRate > 0f && MatchGeometry.InReach(_map, OracleMapSO.BaseIndex(s), ch.Pos)) Deposit(s, kit);
 
                 if (!ch.HasIntent || ch.Intent.PeckPile < 0) return;
                 int pile = ch.Intent.PeckPile;
@@ -549,10 +632,13 @@ namespace CluckWars.Balance
             private void Deposit(int s, OracleKit kit)
             {
                 var ch = _c[s];
-                float dep = Math.Min(ch.Cargo, kit.DepositRate * _tick);
+                // The bounty bag banks first, then the beak (ChickenCargo.TryDeposit).
+                float dep = Math.Min(ch.Cargo + ch.Bag, kit.DepositRate * _tick);
                 float before = ch.Banked;
+                float fromBag = Math.Min(ch.Bag, dep);
+                ch.Bag -= fromBag;
+                ch.Cargo -= dep - fromBag;
                 ch.Banked += dep;
-                ch.Cargo -= dep;
                 ch.Visit += dep;
 
                 float target = _farm.WinTarget;
@@ -562,9 +648,10 @@ namespace CluckWars.Balance
                     float at = _time + (target - before) / kit.DepositRate;
                     if (_winner < 0 || at < _winTime - 1e-6f) { _winner = s; _winTime = at; }
                 }
-                if (ch.Cargo > Eps) return;
+                if (ch.Cargo + ch.Bag > Eps) return;
 
                 ch.Cargo = 0f;
+                ch.Bag = 0f;
                 ch.ThinkNow = true;
                 Record(MatchEventKind.Bank, s, -1, ch.Visit, CutCause.None);
                 ch.Visit = 0f;
@@ -606,8 +693,14 @@ namespace CluckWars.Balance
                     v.Banked = ch.Banked;
                     v.Pecking = ch.Pecking;
                     v.Stunned = Stunned(ch);
-                    v.Removed = false;
+                    v.Removed = ch.Removed;
                     v.Shelled = EggPhase(ch);
+                    v.MarkTarget = ch.MarkTarget;
+                    v.ArmLeft = ch.MarkTarget >= 0 ? Math.Max(0f, ch.ArmEnd - _time) : 0f;
+                    v.WindowLeft = ch.MarkTarget >= 0 ? Math.Max(0f, ch.WindowEnd - _time) : 0f;
+                    v.MarkedBy = -1;
+                    for (int m = 0; m < Seats; m++)
+                        if (m != s && _c[m].MarkTarget == s) { v.MarkedBy = m; break; }
                     if (s == self || !ch.Present)
                     {
                         v.Seen = v.Known = ch.Present;
@@ -631,7 +724,7 @@ namespace CluckWars.Balance
             private void Think(int s)
             {
                 var ch = _c[s];
-                if (!ch.Present || !(ch.ThinkNow || _i >= ch.NextThink)) return;
+                if (!ch.Present || ch.Removed || !(ch.ThinkNow || _i >= ch.NextThink)) return;
 
                 BuildView(s);
                 MatchIntent intent = _policy[s].Think(_view, ref _rng[s]);
@@ -647,7 +740,7 @@ namespace CluckWars.Balance
             private void Due(int s)
             {
                 var ch = _c[s];
-                if (!ch.Present) return;
+                if (!ch.Present || ch.Removed) return;
                 while (ch.Queue.Count > 0 && ch.Queue.Peek().ApplyTick <= _i) Apply(s, ch.Queue.Dequeue().Intent);
             }
 
@@ -682,7 +775,7 @@ namespace CluckWars.Balance
                 var ch = _c[s];
                 var ab = ch.Abilities[slot];
                 if (ab.Job == AbilityJob.Peck) return false;           // pecking is the PeckPile intent
-                if (ab.Job == AbilityJob.DeathMark) return false;      // slice S4
+                if (ch.Removed) return false;
                 if (_time + Eps < ch.AbReady[slot]) return false;
                 return !_stunSnap[s] && !_egg[s];
             }
@@ -731,7 +824,7 @@ namespace CluckWars.Balance
             private bool RivalCanBeHit(int caster, int victim, float radius)
             {
                 var v = _c[victim];
-                return victim != caster && v.Present
+                return victim != caster && v.Present && !v.Removed && !_c[caster].Removed
                     && MatchCombat.InRange(_c[caster].Pos, v.Pos, radius)
                     && !MatchCombat.KeepOutBlocks(_c[caster].Pos, v.Pos, _baseCentres, _rules.KeepOutRadius);
             }
@@ -740,6 +833,8 @@ namespace CluckWars.Balance
             {
                 var ch = _c[s];
                 var ab = ch.Abilities[req.Slot];
+                if (ch.Removed) return;                                // executed earlier this tick: nothing of its own lands
+                if (ab.Job == AbilityJob.DeathMark) { CastDeathMark(s, req.Slot); return; }
                 BeginCast(s, req.Slot);
                 switch (ab.Job)
                 {
@@ -869,7 +964,7 @@ namespace CluckWars.Balance
                 for (int s = 0; s < Seats; s++)
                 {
                     var ch = _c[s];
-                    if (!ch.Present) continue;
+                    if (!ch.Present || ch.Removed) continue;
                     for (int a = 0; a < ch.Abilities.Length; a++)
                     {
                         if (ch.Abilities[a].Job != AbilityJob.SlowArea || _time + Eps >= ch.AuraUntil[a]) continue;
@@ -884,12 +979,188 @@ namespace CluckWars.Balance
                 }
             }
 
+            // ---- death mark, execution, removal ----
+
+            // The press of Death Mark. With no live mark it picks and arms one; with a live mark it is the Kill. Neither refusal is a
+            // wiring bug (the game's Press returns false and changes nothing), so neither is counted in RejectedIntents.
+            private void CastDeathMark(int s, int slot)
+            {
+                var ch = _c[s];
+                var ab = ch.Abilities[slot];
+                if (ch.MarkTarget < 0)
+                {
+                    int pick = PickMark(s, ab);
+                    if (pick < 0) return;                              // "no rival to mark"
+                    BeginCast(s, slot);
+                    ch.AbReady[slot] = _time;                          // the slot is free while a mark runs; the outcome sets the cooldown
+                    ch.MarkTarget = pick;
+                    ch.ArmEnd = _time + ab.MarkArmSeconds;
+                    ch.WindowEnd = _time + ab.MarkWindowSeconds;
+                    _c[pick].ThinkNow = true;                          // everyone sees the replicated mark
+                    return;
+                }
+
+                int victim = ch.MarkTarget;
+                if (!KillLands(s, victim, ab)) return;                 // "Kill refused": nothing changes, the mark runs on
+                BeginCast(s, slot);
+                Execute(s, victim, ab.MarkRemovalSeconds);
+                ch.AbReady[slot] = _time + ab.MarkSuccessCooldown;
+                EndMark(ch, victim);
+            }
+
+            // The game's pick (AssassinExecute.GatherMarkCandidates and PickWeighted): living rivals, the last mark filtered out, one roll each
+            // in seat order then a fallback roll, all from the mark stream. Positions and banked food are true values: it is the authority's pick.
+            private int PickMark(int s, in MatchAbility ab)
+            {
+                var ch = _c[s];
+                _markCandidates.Clear();
+                int rivals = 0;
+                float bestBanked = 0f;
+                for (int t = 0; t < Seats; t++)
+                {
+                    if (t == s || !_c[t].Present) continue;
+                    rivals++;
+                    bestBanked = Math.Max(bestBanked, _c[t].Banked);
+                    if (!_c[t].Removed) _markCandidates.Add(t);
+                }
+                MarkPickRules.Filter(_markCandidates, ch.HasLastMark, ch.LastMark, rivals);
+
+                _markHome.Clear(); _markNear.Clear(); _markLeader.Clear(); _markRolls.Clear();
+                foreach (int t in _markCandidates)
+                {
+                    Vector2 at = _c[t].Pos;
+                    _markHome.Add(MarkPickRules.HomeFraction(Vector2.Distance(at, _map.Places[OracleMapSO.BaseIndex(t)].Pos), _baseSpan));
+                    _markNear.Add(MarkPickRules.AssassinFraction(Vector2.Distance(ch.Pos, at), _baseSpan));
+                    _markLeader.Add(MarkPickRules.LeaderWeight(_c[t].Banked, bestBanked, ab.MarkLeaderPickWeight));
+                    _markRolls.Add(_markRng.NextFloat());
+                }
+                float fallback = _markRng.NextFloat();
+                int pick = MarkPickRules.PickWeighted(_markHome, _markNear, _markLeader, _markRolls, fallback);
+                return pick < 0 ? -1 : _markCandidates[pick];
+            }
+
+            // Would a Kill press land now? The game's CanKillNow over the tick's snapshot (the state the tick began with).
+            private bool KillLands(int s, int victim, in MatchAbility ab)
+            {
+                var sp = _c[s];
+                var t = _c[victim];
+                if (!t.Present || t.Removed) return false;
+                bool shelled = MatchCombat.Refused(IncomingEffect.Execute, _egg[victim], _walk[victim]);
+                bool armed = _time + Eps >= sp.ArmEnd;
+                return ExecuteRules.KillQualifies(armed, _stunSnap[victim], shelled)
+                    && MatchCombat.InRange(sp.Pos, t.Pos, ab.MarkKillRange)
+                    && !MatchCombat.KeepOutBlocks(sp.Pos, t.Pos, _baseCentres, _rules.KeepOutRadius);
+            }
+
+            // One execution: the victim's beak and the flat bounty go into the Spoiler's bag (capacity does not apply), the kill is scored,
+            // the victim is taken out. A shelled victim keeps its beak (AssassinExecute: StealRules.CanStealFrom), a forced kill can hit one.
+            private void Execute(int s, int victim, float removalSeconds)
+            {
+                var sp = _c[s];
+                var v = _c[victim];
+                float loot = EggPhase(v) ? 0f : v.Cargo;
+                float pay = loot + _rules.ExecuteBounty;
+                v.Cargo -= loot;
+                sp.Bag += pay;
+                sp.ThinkNow = true;
+                _result.Kills[s]++;
+                _result.Counters[s].Bounty += pay;
+                Record(MatchEventKind.Kill, s, victim, pay, CutCause.None);
+                Remove(victim, removalSeconds);
+            }
+
+            // EndAllForRemoval and the removal itself: nothing running survives, the queue is dropped, cooldowns keep running.
+            private void Remove(int victim, float seconds)
+            {
+                var v = _c[victim];
+                if (v.Pecking) Cut(victim, CutCause.Execution);
+                v.Removed = true;
+                v.RemovedUntil = _time + seconds;
+                v.StunUntil = 0f; v.WasStunned = false;
+                v.SlowUntil = 0f; v.SlowFactor = 1f;
+                v.Push = Vector2.zero;
+                v.SpeedUntil = 0f;
+                v.Dashing = false;
+                v.HideUntil = 0f;
+                v.ShieldWalkUntil = 0f; v.EggUntil = 0f;
+                for (int a = 0; a < v.AuraUntil.Length; a++) v.AuraUntil[a] = 0f;
+                v.Queue.Clear();
+                v.Casts.Clear();
+                v.HasIntent = false;
+                v.Arrived = false;
+                v.WaypointValid = false;
+                v.ThinkNow = true;
+                if (v.MarkTarget >= 0) EndMark(v, v.MarkTarget);        // a mark ends with its holder; no cooldown change
+            }
+
+            // A mark ended, paid or failed: its target is the one the next press cannot pick.
+            private static void EndMark(Chick ch, int target)
+            {
+                ch.HasLastMark = true;
+                ch.LastMark = target;
+                ch.MarkTarget = -1;
+            }
+
+            // Phase 0: a removed chicken whose time is up stands at its base spawn with an empty beak (its bag stays: it is its own food).
+            // Done before the look, so every observer sees it at its base this very tick.
+            private void Respawn()
+            {
+                for (int s = 0; s < Seats; s++)
+                {
+                    var ch = _c[s];
+                    if (!ch.Present || !ch.Removed || _time + Eps < ch.RemovedUntil) continue;
+                    ch.Removed = false;
+                    ch.Pos = Spawn(_map, s);
+                    ch.Cargo = 0f;
+                    ch.Visit = 0f;
+                    ch.Push = Vector2.zero;
+                    ch.ThinkNow = true;
+                }
+            }
+
+            // A live mark ends without a kill when its target is out of play or the window is over; the fail cooldown follows.
+            private void MarkUpkeep()
+            {
+                for (int s = 0; s < Seats; s++)
+                {
+                    var ch = _c[s];
+                    if (!ch.Present || ch.MarkTarget < 0) continue;
+                    var t = _c[ch.MarkTarget];
+                    if (t.Present && !t.Removed && _time + Eps < ch.WindowEnd) continue;
+                    ch.AbReady[ch.MarkSlot] = _time + ch.Abilities[ch.MarkSlot].MarkFailCooldown;
+                    EndMark(ch, ch.MarkTarget);
+                    ch.ThinkNow = true;
+                }
+            }
+
+            // The forced-kills design: at each scheduled time the chosen rival is executed with the same payout, the mark bypassed.
+            private void ForceKills()
+            {
+                var f = _s.Forced;
+                while (f.Kills > 0 && _forcedNext < f.Kills && _time + Eps >= f.Times[_forcedNext])
+                {
+                    int victim = -1;
+                    for (int t = 0; t < Seats; t++)
+                    {
+                        if (t == f.Spoiler || !_c[t].Present || _c[t].Removed) continue;
+                        bool better = victim < 0
+                            || (f.Victims == ForcedVictims.Loaded ? _c[t].Cargo > _c[victim].Cargo : _c[t].Cargo < _c[victim].Cargo);
+                        if (better) victim = t;
+                    }
+                    if (victim < 0)
+                        throw new InvalidOperationException($"Forced kill {_forcedNext + 1} at {f.Times[_forcedNext]:0.##} s found no living rival to execute; space the times by more than the removal seconds.");
+                    var ab = _c[f.Spoiler].Abilities[_c[f.Spoiler].MarkSlot];
+                    Execute(f.Spoiler, victim, ab.MarkRemovalSeconds);
+                    _forcedNext++;
+                }
+            }
+
             // ---- phase 4: act ----
 
             private void Act(int s)
             {
                 var ch = _c[s];
-                if (!ch.Present) return;
+                if (!ch.Present || ch.Removed) return;
 
                 // The dash of a Jump ends when its seconds are up and the chicken stands clear of every wall.
                 if (ch.Dashing && _time + Eps >= ch.DashUntil && _nav.IsClear(ch.Pos, ch.Pos)) { ch.Dashing = false; ch.WaypointValid = false; }
@@ -922,7 +1193,13 @@ namespace CluckWars.Balance
                 for (int r = 0; r < Seats; r++)
                 {
                     var rv = _c[r];
-                    if (r == s || !rv.Present || Stunned(rv) || EggPhase(rv)) continue;
+                    if (r == s || !rv.Present || rv.Removed || Stunned(rv) || EggPhase(rv)) continue;
+                    // A live mark on this chicken exposes its Peck to an execution (once per cast).
+                    if (rv.MarkTarget == s && (ch.ExposedMask & (1 << (int)CutCause.Execution)) == 0)
+                    {
+                        ch.ExposedMask |= 1 << (int)CutCause.Execution;
+                        _result.Counters[s].ExposedByCause[(int)CutCause.Execution]++;
+                    }
                     for (int a = 0; a < rv.Abilities.Length; a++)
                     {
                         var ab = rv.Abilities[a];
@@ -1086,15 +1363,21 @@ namespace CluckWars.Balance
 
                 if (_winner >= 0)
                 {
-                    _result.Winner = _winner;
+                    _result.Winner = _result.WinnerWithoutSpoilerBonus = _winner;
                     _result.ReachedTarget = true;
                     _result.EndSeconds = _winTime;
                     return _result;
                 }
 
                 _result.EndSeconds = _clock;
+                _result.NobodyReachedTarget = true;
                 var present = new bool[Seats];
                 for (int s = 0; s < Seats; s++) present[s] = _c[s].Present;
+                _result.WinnerWithoutSpoilerBonus = MatchCombat.PickTimerWinner(_result.Banked, _result.Kills, present, out _);
+
+                // The Spoiler pays out BEFORE the winner is picked (GameManager.EndOnTimerExpiry: AwardMatchEndBonuses first).
+                for (int s = 0; s < Seats; s++)
+                    if (present[s]) _result.Banked[s] += _s.Seats[s].Passive.MatchEndBonusFood;
                 _result.Winner = MatchCombat.PickTimerWinner(_result.Banked, _result.Kills, present, out bool corner);
                 _result.CornerDecided = corner;
                 return _result;
