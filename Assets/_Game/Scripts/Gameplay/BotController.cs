@@ -62,7 +62,7 @@ namespace CluckWars.Gameplay
         /// Roughly one Speed Burst's worth of gain on the shipped arena; below it the burst
         /// expires before it has saved anything.
         /// </summary>
-        private const float MinSprintWorthDistance = 6f;
+        public const float MinSprintWorthDistance = 6f;
 
         private enum BotState { Idle, CollectFood, ReturnToBase, Flee, Hunt, Stalk, Guard, Search }
 

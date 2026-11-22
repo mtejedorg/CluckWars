@@ -1,0 +1,795 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using CluckWars.Gameplay;
+
+namespace CluckWars.Balance
+{
+    /// <summary>What the report says about a kit's win rate. With one policy population nothing is final (<see cref="NoCall"/>).</summary>
+    public enum KitCall : byte { InBand, Above, Below, PolicySensitive, NoCall }
+
+    public sealed class KitWinLine
+    {
+        public string Label;
+        public ChickenClass Class;
+        public WinInterval Win;
+        public KitCall Call;
+        /// <summary>Why the call is what it is; with no call, where the kit stands provisionally and what is missing.</summary>
+        public string Reason;
+    }
+
+    public sealed class ClassWinLine
+    {
+        public ChickenClass Class;
+        /// <summary>One kit per class, every class in every match (the headline, D3).</summary>
+        public WinInterval Headline;
+        /// <summary>A seat of this class in the mixed design.</summary>
+        public WinInterval Pooled;
+    }
+
+    public sealed class HeadToHeadLine
+    {
+        public ChickenClass Class;
+        public string KitA;
+        public string KitB;
+        /// <summary>Share of matches holding both kits in which <see cref="KitA"/> banked more than <see cref="KitB"/> (a tie counts half).</summary>
+        public float AAhead;
+        public int Matches;
+    }
+
+    public sealed class ThiefLine
+    {
+        public string Victim;
+        /// <summary>Food taken from this kit per appearance of the Thief in a match that also held it.</summary>
+        public float StolenPerMatch;
+        /// <summary>Share of everything the Thief took.</summary>
+        public float Share;
+    }
+
+    public sealed class PeckCutLine
+    {
+        public ChickenClass Class;
+        public CutCause Cause;
+        /// <summary>Peck casts that began with a rival holding a ready cutter of this cause in range.</summary>
+        public int Exposed;
+        /// <summary>Every cut of this cause (exposed or not).</summary>
+        public int Cut;
+        /// <summary>Of the exposed casts, the share then cut by that cause; NaN where no cast was exposed (empty pile and the chicken's own move have no cutter).</summary>
+        public float Hazard;
+        /// <summary>Nominal food of the cut casts (cuts times the class's peck amount) per match the class played.</summary>
+        public float FoodLostPerMatch;
+    }
+
+    public sealed class ContactLine
+    {
+        public float Median;
+        public float Q1;
+        public float Q3;
+        /// <summary>Matches in which two chickens never came within the smallest offensive reach.</summary>
+        public int Never;
+        public int Matches;
+    }
+
+    public sealed class EconomyShareLine
+    {
+        public string Label;
+        public float Foraged;
+        public float Stolen;
+        public float Bounty;
+    }
+
+    public sealed class SeatLine
+    {
+        public int Seat;
+        /// <summary>Over every match of the seat check.</summary>
+        public WinInterval Win;
+        /// <summary>Over the matches the corner rule did not decide. When nothing separates the four chickens the game gives the win to the lowest corner, a seat bias of the game's own.</summary>
+        public WinInterval WinExCorner;
+        /// <summary>The interval of <see cref="WinExCorner"/> excludes an equal share: a model or map bug (a line, never a test).</summary>
+        public bool Flagged;
+    }
+
+    /// <summary>How the four seats of a full mirror of one kit did: wins per seat and matches the corner rule decided.</summary>
+    public sealed class SeatKitLine
+    {
+        public string Kit;
+        public int Matches;
+        public int[] WinsBySeat;
+        public int CornerDecided;
+    }
+
+    public sealed class DriftLine
+    {
+        public string Label;
+        public float Points;
+    }
+
+    public sealed class RunLine
+    {
+        public MatchDesignKind Design;
+        public PolicyPopulation Population;
+        public int Replicates;
+        public int Matches;
+        public ulong RunSeed;
+        public float ReactionDelay;
+        public float ReactionJitter;
+        public int EndedOnTarget;
+        public int EndedOnClock;
+        public float MeanEndSeconds;
+        public double ElapsedMilliseconds;
+    }
+
+    /// <summary>The Thief's income in the mixed design.</summary>
+    public sealed class ThiefSummary
+    {
+        public string Kit;
+        public int Matches;
+        public float StealsPerMatch;
+        public float StolenPerMatch;
+        public float ForagedPerMatch;
+        public float BankedPerMatch;
+    }
+
+    /// <summary>The match simulator's section of the oracle report (spec 6). Plain data; <see cref="ToMarkdown"/> and <see cref="ToJson"/> print it.</summary>
+    public sealed class MatchReportSection
+    {
+        public string BalanceHash;
+        public string MapFingerprint;
+        public ulong RunSeed;
+        public List<RunLine> Runs = new List<RunLine>();
+        public List<KitWinLine> Kits = new List<KitWinLine>();
+        public List<ClassWinLine> Classes = new List<ClassWinLine>();
+        public List<HeadToHeadLine> HeadToHead = new List<HeadToHeadLine>();
+        /// <summary>The Spoiler's kills-to-win from the forced-kills design.</summary>
+        public List<SpoilerKillRow> KillsToWin = new List<SpoilerKillRow>();
+        /// <summary>The Spoiler's win rate by the kills a policy really made in the mixed design (survivor bias included).</summary>
+        public List<SpoilerKillRow> KillsPlayed = new List<SpoilerKillRow>();
+        public List<ThiefLine> Thief = new List<ThiefLine>();
+        public ThiefSummary ThiefIncome;
+        public List<PeckCutLine> PeckCuts = new List<PeckCutLine>();
+        public ContactLine FirstContact;
+        /// <summary>The same, over the matches that held no Assassin (whose Search walk makes the contact in the first seconds).</summary>
+        public ContactLine FirstContactNoAssassin;
+        public List<EconomyShareLine> Economy = new List<EconomyShareLine>();
+        public int CornerDecided;
+        public int MixedMatches;
+        /// <summary>Share of the mixed design's matches won from each seat. The designs turn the table so each kit sits in each seat about as often; what is left here is the simulator's own seat tilt.</summary>
+        public List<SeatLine> MixedSeats = new List<SeatLine>();
+        public List<SeatLine> SeatCheck = new List<SeatLine>();
+        public List<SeatKitLine> SeatByKit = new List<SeatKitLine>();
+        /// <summary>Matches of the seat check decided by the corner rule (all banked food and kills level, so seat 0 wins).</summary>
+        public int SeatCheckCornerDecided;
+        public int SeatCheckMatches;
+        public List<DriftLine> Drift = new List<DriftLine>();
+        public List<string> LeftOut = new List<string>();
+        /// <summary>The line that says which policy populations exist; empty once every population ran.</summary>
+        public string PopulationNote;
+
+        public string ToMarkdown() => MatchReports.Markdown(this);
+        public string ToJson() => MatchReports.Json(this);
+    }
+
+    public static class MatchReports
+    {
+        public const float Target = 0.25f;
+        public const float BandLow = 0.20f;
+        public const float BandHigh = 0.30f;
+
+        private static readonly CutCause[] Causes = { CutCause.Stun, CutCause.Shove, CutCause.Execution, CutCause.EmptyPile, CutCause.OwnMove };
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        /// <summary>The "left out" column of spec 2.4, with what each costs in accuracy: printed with every report.</summary>
+        public static readonly string[] LeftOut =
+        {
+            "Body collision between chickens and the collision slow: needs physics. Crowding at the centre costs nothing here, so contested piles are slightly too easy; Featherfoot's immunity to the collision slow is worth nothing here (understated).",
+            "Pile footprints as solid ovals: a pile is a point plus its reach. Under 1 m per approach.",
+            "Golden Pile spot: the game also redraws a spot that overlaps a crate, a pile or a base; only the walls are known here, so some Golden Piles stand nearer a prop than in the game. Not quantified.",
+            "Underdog Surge on equal banked food goes to the lowest seat here; the game takes an arbitrary chicken. A seat bias on ties, which are common when the event fires early. The designs turn the table by one seat per replicate to share it out.",
+            "A Peck cast by hand (the simulator's Peck is the auto-Peck chain): a policy that hand-pecks through its own Shield is not modelled.",
+            "A shove that meets a wall slides along the wall's clearance edge; the game slides along the wall's box. Well under 0.1 m a push.",
+            "Aim, misclicks and hesitation: one reaction delay for every policy. Overstates every active kit; the sensitivity sweep (a later task) measures it.",
+            "Facing: the simulator has no heading, so the game bot's 'turn first, cast next think' costs nothing here. Slightly overstates directional abilities for P0.",
+            "A rival base as a limit on walking: chickens may walk into a rival's base zone; only the ability pair rule (no cast across a base wall) is modelled.",
+            "A placed Slow Area zone (an aura is modelled; a kit that ships a zone makes the simulator refuse to start).",
+            "Network latency, prediction, animation, effects, audio and UI: not balance. Latency of 0.05 to 0.15 s is inside the reaction delay.",
+            "Jump's arc and landing: a dash that crosses walls at the ability's speed for its seconds. Under 1 m per jump.",
+            "Retired abilities and free loadouts: fixed kits only. None.",
+            "P0's own slow in the walk-home estimate and the class think interval (0.22 to 0.30 s): the simulator uses one think rhythm of 0.25 s and the unslowed speed. Small.",
+        };
+
+        // ------------------------------------------------------------------ build
+
+        public static MatchReportSection Build(MatchContext context, IReadOnlyList<MatchRunOutput> runs, OracleReferenceSO reference)
+        {
+            if (context == null) throw new ArgumentNullException(nameof(context));
+            if (runs == null) throw new ArgumentNullException(nameof(runs));
+
+            var section = new MatchReportSection
+            {
+                BalanceHash = context.BalanceHash,
+                MapFingerprint = context.Map != null ? context.Map.SceneFingerprint : string.Empty,
+                LeftOut = new List<string>(LeftOut),
+                PopulationNote = PopulationText(runs),
+            };
+            var targets = reference != null ? reference.KillTargets : null;
+
+            MatchRunOutput mixed = null, onePerClass = null, seat = null, forced = null;
+            foreach (var run in runs)
+            {
+                switch (run.Spec.Design)
+                {
+                    case MatchDesignKind.Mixed: mixed = run; break;
+                    case MatchDesignKind.OnePerClass: onePerClass = run; break;
+                    case MatchDesignKind.SeatCheck: seat = run; break;
+                    case MatchDesignKind.ForcedKills: forced = run; break;
+                }
+                section.Runs.Add(RunInfo(run));
+                section.RunSeed = run.Spec.RunSeed;
+            }
+
+            Dictionary<ChickenClass, WinInterval> pooled = null;
+            if (mixed != null) pooled = BuildMixed(section, context, mixed, targets);
+            if (onePerClass != null || pooled != null) BuildClasses(section, context, onePerClass, pooled);
+            if (seat != null) BuildSeatCheck(section, context, seat);
+            if (forced != null) BuildForced(section, forced, targets);
+            return section;
+        }
+
+        private static string PopulationText(IReadOnlyList<MatchRunOutput> runs)
+        {
+            var seen = new HashSet<PolicyPopulation>(runs.Select(r => r.Spec.Population));
+            var missing = new List<string>();
+            if (!seen.Contains(PolicyPopulation.P0)) missing.Add("P0");
+            // P1 and the mixed population arrive with the next task: they are named here so the report never reads as final without them.
+            missing.Add("P1");
+            missing.Add("the mixed population");
+            return "Only P0 (the game's own bot, transcribed) has run so far; missing: " + string.Join(", ", missing) + ". Every call below is provisional: a kit's call is final only when P0, P1 and the mixed population agree.";
+        }
+
+        private static RunLine RunInfo(MatchRunOutput run)
+        {
+            int target = 0;
+            double seconds = 0.0;
+            foreach (var r in run.Results)
+            {
+                if (r.ReachedTarget) target++;
+                seconds += r.EndSeconds;
+            }
+            int n = run.Results.Length;
+            return new RunLine
+            {
+                Design = run.Spec.Design, Population = run.Spec.Population, Replicates = run.Spec.Replicates, Matches = n,
+                RunSeed = run.Spec.RunSeed, ReactionDelay = run.Spec.Params.ReactionDelay, ReactionJitter = run.Spec.Params.ReactionJitter, EndedOnTarget = target, EndedOnClock = n - target,
+                MeanEndSeconds = n > 0 ? (float)(seconds / n) : float.NaN, ElapsedMilliseconds = run.ElapsedMilliseconds,
+            };
+        }
+
+        private static string Provisional(WinInterval w)
+        {
+            if (w.Trials == 0) return "no matches";
+            string where = w.Rate > BandHigh ? "above" : w.Rate < BandLow ? "below" : "inside";
+            bool straddles = w.Low < BandLow && w.High > BandLow || w.Low < BandHigh && w.High > BandHigh;
+            return (where == "inside" ? "inside the band" : where + " the band") + (straddles ? " (the margin reaches a band edge)" : string.Empty);
+        }
+
+        private static Dictionary<ChickenClass, WinInterval> BuildMixed(MatchReportSection section, MatchContext context, MatchRunOutput run, IReadOnlyList<SpoilerKillTarget> targets)
+        {
+            int kits = context.Kits.Length;
+            var appear = new int[kits];
+            var wins = new int[kits];
+            var foraged = new double[kits];
+            var stolen = new double[kits];
+            var bounty = new double[kits];
+            var contacts = new List<float>();
+            var contactsNoAssassin = new List<float>();
+            var cutExposed = new Dictionary<(ChickenClass, CutCause), int>();
+            var cutWhile = new Dictionary<(ChickenClass, CutCause), int>();
+            var cuts = new Dictionary<(ChickenClass, CutCause), int>();
+            var classAppear = new Dictionary<ChickenClass, int>();
+            var classWins = new Dictionary<ChickenClass, int>();
+
+            for (int i = 0; i < run.Results.Length; i++)
+            {
+                var cell = run.Cells[i];
+                var r = run.Results[i];
+                if (r.CornerDecided) section.CornerDecided++;
+                float contact = -1f;
+                for (int s = 0; s < cell.KitOfSeat.Length; s++)
+                {
+                    int k = cell.KitOfSeat[s];
+                    if (k < 0) continue;
+                    var cls = context.Kits[k].Class;
+                    appear[k]++;
+                    Bump(classAppear, cls, 1);
+                    if (r.Winner == s) { wins[k]++; Bump(classWins, cls, 1); }
+                    var c = r.Counters[s];
+                    foraged[k] += c.Foraged; stolen[k] += c.Stolen; bounty[k] += c.Bounty;
+                    if (c.FirstContact >= 0f) contact = Math.Max(contact, c.FirstContact);
+                    foreach (var cause in Causes)
+                    {
+                        Bump(cutExposed, (cls, cause), c.ExposedByCause[(int)cause]);
+                        Bump(cutWhile, (cls, cause), c.CutWhileExposedByCause[(int)cause]);
+                        Bump(cuts, (cls, cause), c.CutsByCause[(int)cause]);
+                    }
+                }
+                contacts.Add(contact);
+                if (!cell.KitOfSeat.Any(k => k >= 0 && context.Kits[k].Class == ChickenClass.Assassin)) contactsNoAssassin.Add(contact);
+            }
+            section.MixedMatches = run.Results.Length;
+            var seatWins = new int[OracleMapSO.SeatCount];
+            foreach (var res in run.Results) if (res.Winner >= 0) seatWins[res.Winner]++;
+            for (int st = 0; st < seatWins.Length; st++)
+            {
+                var w = WinInterval.Wilson(seatWins[st], run.Results.Length);
+                section.MixedSeats.Add(new SeatLine { Seat = st, Win = w, WinExCorner = w, Flagged = w.Low > Target || w.High < Target });
+            }
+
+            for (int k = 0; k < kits; k++)
+            {
+                var win = WinInterval.Wilson(wins[k], appear[k]);
+                section.Kits.Add(new KitWinLine
+                {
+                    Label = context.Kits[k].Label, Class = context.Kits[k].Class, Win = win, Call = KitCall.NoCall,
+                    Reason = "provisional, P0 only: " + Provisional(win) + "; final only when P0, P1 and the mixed population agree (P1 and the mixed population are not built yet).",
+                });
+                int n = Math.Max(1, appear[k]);
+                section.Economy.Add(new EconomyShareLine { Label = context.Kits[k].Label, Foraged = (float)(foraged[k] / n), Stolen = (float)(stolen[k] / n), Bounty = (float)(bounty[k] / n) });
+            }
+
+            section.FirstContact = Contact(contacts);
+            section.FirstContactNoAssassin = Contact(contactsNoAssassin);
+            BuildHeadToHead(section, context, run);
+            BuildThief(section, context, run);
+            BuildPeckCuts(section, context, cutExposed, cutWhile, cuts, classAppear);
+            BuildPlayedKills(section, context, run, targets);
+            var pooled = new Dictionary<ChickenClass, WinInterval>();
+            foreach (var cls in classAppear.Keys)
+                pooled[cls] = WinInterval.Wilson(classWins.TryGetValue(cls, out int w) ? w : 0, classAppear[cls]);
+            return pooled;
+        }
+
+        private static void Bump<K>(Dictionary<K, int> map, K key, int by) { map.TryGetValue(key, out int v); map[key] = v + by; }
+
+        private static ContactLine Contact(List<float> times)
+        {
+            var seen = times.Where(t => t >= 0f).OrderBy(t => t).ToList();
+            var line = new ContactLine { Never = times.Count - seen.Count, Matches = times.Count, Median = float.NaN, Q1 = float.NaN, Q3 = float.NaN };
+            if (seen.Count == 0) return line;
+            line.Median = Quantile(seen, 0.5f);
+            line.Q1 = Quantile(seen, 0.25f);
+            line.Q3 = Quantile(seen, 0.75f);
+            return line;
+        }
+
+        // Linear interpolation between order statistics.
+        private static float Quantile(List<float> sorted, float q)
+        {
+            if (sorted.Count == 1) return sorted[0];
+            float at = q * (sorted.Count - 1);
+            int lo = (int)Math.Floor(at);
+            int hi = Math.Min(sorted.Count - 1, lo + 1);
+            return sorted[lo] + (sorted[hi] - sorted[lo]) * (at - lo);
+        }
+
+        private static void BuildHeadToHead(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        {
+            foreach (var group in context.Kits.Select((k, i) => (k, i)).GroupBy(t => t.k.Class).OrderBy(g => g.Key))
+            {
+                var pair = group.Select(t => t.i).ToArray();
+                if (pair.Length != 2) continue;
+                float ahead = 0f;
+                int matches = 0;
+                for (int i = 0; i < run.Results.Length; i++)
+                {
+                    var seats = run.Cells[i].KitOfSeat;
+                    int a = Array.IndexOf(seats, pair[0]), b = Array.IndexOf(seats, pair[1]);
+                    if (a < 0 || b < 0) continue;
+                    var banked = run.Results[i].Banked;
+                    matches++;
+                    ahead += banked[a] > banked[b] ? 1f : banked[a] < banked[b] ? 0f : 0.5f;
+                }
+                section.HeadToHead.Add(new HeadToHeadLine
+                {
+                    Class = group.Key, KitA = context.Kits[pair[0]].Label, KitB = context.Kits[pair[1]].Label,
+                    AAhead = matches > 0 ? ahead / matches : float.NaN, Matches = matches,
+                });
+            }
+        }
+
+        private static void BuildThief(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        {
+            // The Thief is the kit whose passive makes a steal bigger (its steal factor is above 1).
+            int thief = -1;
+            for (int k = 0; k < context.Kits.Length; k++)
+                if (context.Kits[k].Passive.StealFactor > 1f) { thief = k; break; }
+            if (thief < 0) return;
+
+            int kits = context.Kits.Length;
+            var from = new double[kits];
+            var meetings = new int[kits];
+            int matches = 0, steals = 0;
+            double stolen = 0, foraged = 0, banked = 0;
+            for (int i = 0; i < run.Results.Length; i++)
+            {
+                var seats = run.Cells[i].KitOfSeat;
+                int t = Array.IndexOf(seats, thief);
+                if (t < 0) continue;
+                var c = run.Results[i].Counters[t];
+                matches++;
+                steals += c.Steals;
+                stolen += c.Stolen;
+                foraged += c.Foraged;
+                banked += run.Results[i].Banked[t];
+                for (int v = 0; v < seats.Length; v++)
+                {
+                    if (v == t || seats[v] < 0) continue;
+                    from[seats[v]] += c.StolenFromSeat[v];
+                    meetings[seats[v]]++;
+                }
+            }
+            if (matches == 0) return;
+            section.ThiefIncome = new ThiefSummary
+            {
+                Kit = context.Kits[thief].Label, Matches = matches, StealsPerMatch = steals / (float)matches, StolenPerMatch = (float)(stolen / matches),
+                ForagedPerMatch = (float)(foraged / matches), BankedPerMatch = (float)(banked / matches),
+            };
+            for (int k = 0; k < kits; k++)
+            {
+                if (k == thief || meetings[k] == 0) continue;
+                section.Thief.Add(new ThiefLine
+                {
+                    Victim = context.Kits[k].Label, StolenPerMatch = (float)(from[k] / meetings[k]), Share = stolen > 0 ? (float)(from[k] / stolen) : 0f,
+                });
+            }
+        }
+
+        private static void BuildPeckCuts(MatchReportSection section, MatchContext context, Dictionary<(ChickenClass, CutCause), int> exposed,
+            Dictionary<(ChickenClass, CutCause), int> cutWhile, Dictionary<(ChickenClass, CutCause), int> cuts, Dictionary<ChickenClass, int> classAppear)
+        {
+            foreach (var group in context.Kits.GroupBy(k => k.Class).OrderBy(g => g.Key))
+            {
+                var cls = group.Key;
+                float peck = group.First().Farm.PeckAmount;
+                classAppear.TryGetValue(cls, out int appearances);
+                foreach (var cause in Causes)
+                {
+                    exposed.TryGetValue((cls, cause), out int ex);
+                    cutWhile.TryGetValue((cls, cause), out int cw);
+                    cuts.TryGetValue((cls, cause), out int cut);
+                    section.PeckCuts.Add(new PeckCutLine
+                    {
+                        Class = cls, Cause = cause, Exposed = ex, Cut = cut, Hazard = PeckCutHazard(ex, cw),
+                        FoodLostPerMatch = appearances > 0 ? cut * peck / appearances : 0f,
+                    });
+                }
+            }
+        }
+
+        /// <summary>The hazard of a cut: cuts among the casts that began exposed to that cutter, over those casts. NaN with none exposed.</summary>
+        public static float PeckCutHazard(int exposed, int cutWhileExposed) => exposed > 0 ? cutWhileExposed / (float)exposed : float.NaN;
+
+        private static void BuildPlayedKills(MatchReportSection section, MatchContext context, MatchRunOutput run, IReadOnlyList<SpoilerKillTarget> targets)
+        {
+            var byKills = new SortedDictionary<int, List<(MatchResult, int)>>();
+            int most = 0;
+            for (int i = 0; i < run.Results.Length; i++)
+            {
+                var seats = run.Cells[i].KitOfSeat;
+                for (int s = 0; s < seats.Length; s++)
+                {
+                    if (seats[s] < 0 || !MatchDesigns.HoldsDeathMark(context.Kits[seats[s]])) continue;
+                    int kills = run.Results[i].Kills[s];
+                    most = Math.Max(most, kills);
+                    if (!byKills.TryGetValue(kills, out var list)) byKills[kills] = list = new List<(MatchResult, int)>();
+                    list.Add((run.Results[i], s));
+                }
+            }
+            if (byKills.Count == 0) return;
+            // Every row up to the largest target kill count, so a row with no matches still says "no data" against its target.
+            int last = Math.Max(most, targets != null && targets.Count > 0 ? targets.Max(t => t.Kills) : 0);
+            for (int k = 0; k <= last; k++)
+            {
+                byKills.TryGetValue(k, out var list);
+                section.KillsPlayed.Add(MatchStats.KillsToWin(list ?? new List<(MatchResult, int)>(), k, ForcedVictims.Empty, targets));
+            }
+        }
+
+        private static void BuildClasses(MatchReportSection section, MatchContext context, MatchRunOutput onePerClass, Dictionary<ChickenClass, WinInterval> pooled)
+        {
+            var wins = new Dictionary<ChickenClass, int>();
+            int cells = 0;
+            if (onePerClass != null)
+            {
+                cells = onePerClass.Results.Length;
+                for (int i = 0; i < cells; i++)
+                {
+                    int k = onePerClass.Cells[i].KitOfSeat[onePerClass.Results[i].Winner];
+                    Bump(wins, context.Kits[k].Class, 1);
+                }
+            }
+            foreach (var cls in context.Kits.Select(k => k.Class).Distinct().OrderBy(c => c))
+            {
+                wins.TryGetValue(cls, out int w);
+                section.Classes.Add(new ClassWinLine
+                {
+                    Class = cls,
+                    Headline = onePerClass != null ? WinInterval.Wilson(w, cells) : WinInterval.Wilson(0, 0),
+                    Pooled = pooled != null && pooled.TryGetValue(cls, out var p) ? p : WinInterval.Wilson(0, 0),
+                });
+            }
+        }
+
+        private static void BuildSeatCheck(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        {
+            int seats = OracleMapSO.SeatCount;
+            var wins = new int[seats];
+            var winsEx = new int[seats];
+            int exMatches = 0;
+            var byKit = new Dictionary<int, SeatKitLine>();
+            for (int i = 0; i < run.Results.Length; i++)
+            {
+                var r = run.Results[i];
+                int kit = run.Cells[i].KitOfSeat[0];
+                if (!byKit.TryGetValue(kit, out var line))
+                    byKit[kit] = line = new SeatKitLine { Kit = context.Kits[kit].Label, WinsBySeat = new int[seats] };
+                line.Matches++;
+                if (r.Winner >= 0) { wins[r.Winner]++; line.WinsBySeat[r.Winner]++; }
+                if (r.CornerDecided) { section.SeatCheckCornerDecided++; line.CornerDecided++; continue; }
+                exMatches++;
+                if (r.Winner >= 0) winsEx[r.Winner]++;
+            }
+            section.SeatCheckMatches = run.Results.Length;
+            section.SeatByKit.AddRange(byKit.OrderBy(p => p.Key).Select(p => p.Value));
+            for (int s = 0; s < seats; s++)
+            {
+                var w = WinInterval.Wilson(wins[s], run.Results.Length);
+                var ex = WinInterval.Wilson(winsEx[s], exMatches);
+                section.SeatCheck.Add(new SeatLine { Seat = s, Win = w, WinExCorner = ex, Flagged = ex.Trials > 0 && (ex.Low > Target || ex.High < Target) });
+            }
+        }
+
+        private static void BuildForced(MatchReportSection section, MatchRunOutput run, IReadOnlyList<SpoilerKillTarget> targets)
+        {
+            for (int k = 0; k <= MatchDesigns.MaxForcedKills; k++)
+                foreach (var victims in new[] { ForcedVictims.Empty, ForcedVictims.Loaded })
+                {
+                    var rows = new List<(MatchResult, int)>();
+                    for (int i = 0; i < run.Results.Length; i++)
+                    {
+                        var f = run.Cells[i].Forced;
+                        if (f.Kills == k && f.Victims == victims && f.Spoiler >= 0) rows.Add((run.Results[i], f.Spoiler));
+                    }
+                    section.KillsToWin.Add(MatchStats.KillsToWin(rows, k, victims, targets));
+                }
+        }
+
+        // ------------------------------------------------------------------ markdown
+
+        private static string Pct(float v) => float.IsNaN(v) ? "n/a" : (v * 100f).ToString("0.0", Inv) + " %";
+        private static string Pm(WinInterval w) => w.Trials == 0 ? "n/a" : "+/- " + ((w.High - w.Low) * 50f).ToString("0.0", Inv);
+        private static string Rate(WinInterval w) => Pct(w.Rate) + " (" + Pm(w) + ", " + w.Trials + " seats)";
+        private static string Num(float v, string f = "0.00") => float.IsNaN(v) ? "n/a" : v.ToString(f, Inv);
+
+        public static string Markdown(MatchReportSection r)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# Match simulator report (Balance Oracle v2, part 2)");
+            sb.AppendLine();
+            sb.AppendLine($"Balance `bal={r.BalanceHash}`, map `{r.MapFingerprint}`, run seed `0x{r.RunSeed:x16}`.");
+            sb.AppendLine();
+            sb.AppendLine("## Read this first");
+            sb.AppendLine();
+            sb.AppendLine($"- **{r.PopulationNote}**");
+            sb.AppendLine($"- Balanced means each kit wins {BandLow * 100:0} to {BandHigh * 100:0} % of mixed four-player matches AND each class does (target {Target * 100:0} %). The oracle is a guide: it reports, it never blocks.");
+            sb.AppendLine("- Every rate carries its 95 % Wilson margin (+/- points), which counts the matches as independent trials. They are not quite: the only chance in a match is the comeback event and the random extra reaction delay of each intent, so the margin is a floor on the real uncertainty. A rate whose margin reaches a band edge is not a verdict on its own.");
+            var mixed = r.Runs.FirstOrDefault(x => x.Design == MatchDesignKind.Mixed);
+            if (mixed != null)
+                sb.AppendLine($"- Mixed design: {mixed.Matches} matches; {mixed.EndedOnTarget} ended on the 40 food target and {mixed.EndedOnClock} on the clock; mean match length {Num(mixed.MeanEndSeconds, "0.0")} s.");
+            sb.AppendLine();
+
+            if (r.MixedSeats.Count > 0)
+                sb.AppendLine("- Mixed design, share of matches won from each seat: " + string.Join(", ", r.MixedSeats.Select(x => $"seat {x.Seat} {Pct(x.Win.Rate)} ({Pm(x.Win)})")) + ". Away from 25 % is the simulator's own seat tilt (see the seat check), which the rotating designs spread over the kits.");
+            sb.AppendLine();
+            sb.AppendLine("### Runs");
+            sb.AppendLine();
+            sb.AppendLine("| Design | Population | R | Reaction delay | Matches | Ended on target | Ended on clock | Mean length (s) | Run time |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|---|");
+            foreach (var x in r.Runs)
+                sb.AppendLine($"| {x.Design} | {x.Population} | {x.Replicates} | {Num(x.ReactionDelay)} s + 0 to {Num(x.ReactionJitter)} s | {x.Matches} | {x.EndedOnTarget} | {x.EndedOnClock} | {Num(x.MeanEndSeconds, "0.0")} | {(x.ElapsedMilliseconds / 1000.0).ToString("0.0", Inv)} s |");
+            sb.AppendLine();
+
+            sb.AppendLine("## What this model leaves out");
+            sb.AppendLine();
+            sb.AppendLine("| # | Left out, why and the expected error |");
+            sb.AppendLine("|---|---|");
+            for (int i = 0; i < r.LeftOut.Count; i++) sb.AppendLine($"| {i + 1} | {r.LeftOut[i]} |");
+            sb.AppendLine();
+
+            sb.AppendLine("## Win rate per kit (mixed design)");
+            sb.AppendLine();
+            sb.AppendLine("The share of the seats a kit sat in that won the match. One seat in four wins, so over a whole design the average is 25 %.");
+            sb.AppendLine();
+            sb.AppendLine("| Kit | Class | Win rate | Margin | Seats | Call |");
+            sb.AppendLine("|---|---|---|---|---|---|");
+            foreach (var k in r.Kits)
+                sb.AppendLine($"| {k.Label} | {k.Class} | {Pct(k.Win.Rate)} | {Pm(k.Win)} | {k.Win.Trials} | {k.Call}: {k.Reason} |");
+            sb.AppendLine();
+
+            sb.AppendLine("## Win rate per class");
+            sb.AppendLine();
+            sb.AppendLine("Headline: one kit per class, every class in every match. Second line: a seat of that class in the mixed design.");
+            sb.AppendLine();
+            sb.AppendLine("| Class | Headline (one per class) | Pooled from mixed |");
+            sb.AppendLine("|---|---|---|");
+            foreach (var c in r.Classes) sb.AppendLine($"| {c.Class} | {Rate(c.Headline)} | {Rate(c.Pooled)} |");
+            sb.AppendLine();
+
+            if (r.HeadToHead.Count > 0)
+            {
+                sb.AppendLine("### Class head-to-head (mixed matches holding both kits of a class)");
+                sb.AppendLine();
+                sb.AppendLine("| Class | Kit A | Kit B | A banked more | Matches |");
+                sb.AppendLine("|---|---|---|---|---|");
+                foreach (var h in r.HeadToHead) sb.AppendLine($"| {h.Class} | {h.KitA} | {h.KitB} | {Pct(h.AAhead)} | {h.Matches} |");
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("## Seat check (each kit four times, a full mirror)");
+            sb.AppendLine();
+            sb.AppendLine("Every seat should win 25 % within its margin; outside it is a model or map bug, shown here and never a test.");
+            sb.AppendLine();
+            if (r.SeatCheck.Count == 0) sb.AppendLine("Not run.");
+            else
+            {
+                sb.AppendLine("| Seat | Win rate, all matches | Margin | Win rate, corner-decided matches left out | Margin | Flag (on the second) |");
+                sb.AppendLine("|---|---|---|---|---|---|");
+                foreach (var s in r.SeatCheck)
+                    sb.AppendLine($"| {s.Seat} | {Pct(s.Win.Rate)} | {Pm(s.Win)} | {Pct(s.WinExCorner.Rate)} | {Pm(s.WinExCorner)} | {(s.Flagged ? "OUTSIDE 25 %" : "ok")} |");
+                sb.AppendLine();
+                sb.AppendLine($"{r.SeatCheckMatches} matches ({r.SeatCheck[0].WinExCorner.Trials} not decided by the corner rule); {r.SeatCheckCornerDecided} were decided by it: nothing separated the four chickens, so the lowest corner won. That is the game's own seat bias and it is left out of the flag.");
+                sb.AppendLine();
+                sb.AppendLine("| Mirror of | Matches | Seat 0 | Seat 1 | Seat 2 | Seat 3 | Corner-decided |");
+                sb.AppendLine("|---|---|---|---|---|---|---|");
+                foreach (var k in r.SeatByKit)
+                    sb.AppendLine($"| {k.Kit} | {k.Matches} | {k.WinsBySeat[0]} | {k.WinsBySeat[1]} | {k.WinsBySeat[2]} | {k.WinsBySeat[3]} | {k.CornerDecided} |");
+            }
+            sb.AppendLine();
+
+            sb.AppendLine("## Spoiler: kills to win");
+            sb.AppendLine();
+            sb.AppendLine("Targets are data on `OracleReference.asset` (starting values 90 / 80 / 20 %); a label is a report line, nothing is tested on a rate.");
+            sb.AppendLine();
+            sb.AppendLine("### From played matches (kills the policies really made, mixed design)");
+            sb.AppendLine();
+            sb.AppendLine("Survivor bias applies: a Spoiler who kills often is usually already doing well, so these rates are not the worth of a kill.");
+            sb.AppendLine();
+            KillTable(sb, r.KillsPlayed, false);
+            sb.AppendLine("### From the forced design (exactly k kills on schedule, same victims every time)");
+            sb.AppendLine();
+            KillTable(sb, r.KillsToWin, true);
+
+            sb.AppendLine("## Thief");
+            sb.AppendLine();
+            if (r.ThiefIncome == null) sb.AppendLine("No Thief kit in these matches.");
+            else
+            {
+                var t = r.ThiefIncome;
+                sb.AppendLine($"{t.Kit}: {t.Matches} matches; {Num(t.StealsPerMatch)} steals and {Num(t.StolenPerMatch)} food stolen per match, {Num(t.ForagedPerMatch)} foraged, {Num(t.BankedPerMatch)} banked.");
+                sb.AppendLine();
+                sb.AppendLine("| Victim kit | Food taken per meeting | Share of its income |");
+                sb.AppendLine("|---|---|---|");
+                foreach (var l in r.Thief) sb.AppendLine($"| {l.Victim} | {Num(l.StolenPerMatch)} | {Pct(l.Share)} |");
+            }
+            sb.AppendLine();
+
+            sb.AppendLine("## Peck cuts per class and cutter");
+            sb.AppendLine();
+            sb.AppendLine("Hazard = of the Peck casts that began with a rival holding a ready cutter of that kind in range, the share then cut by it. The raw count is shown but confounds exposure.");
+            sb.AppendLine();
+            sb.AppendLine("| Class | Cutter | Exposed casts | Cuts | Hazard | Food lost per match (nominal) |");
+            sb.AppendLine("|---|---|---|---|---|---|");
+            foreach (var l in r.PeckCuts) sb.AppendLine($"| {l.Class} | {MatchEvent.CauseName(l.Cause)} | {l.Exposed} | {l.Cut} | {Pct(l.Hazard)} | {Num(l.FoodLostPerMatch)} |");
+            sb.AppendLine();
+
+            sb.AppendLine("## Time to first contact");
+            sb.AppendLine();
+            if (r.FirstContact == null) sb.AppendLine("Not measured.");
+            else
+            {
+                sb.AppendLine($"All mixed matches: median {Num(r.FirstContact.Median, "0.0")} s (quartiles {Num(r.FirstContact.Q1, "0.0")} to {Num(r.FirstContact.Q3, "0.0")} s); in {r.FirstContact.Never} of {r.FirstContact.Matches} matches two chickens never came within the smallest offensive reach.");
+                if (r.FirstContactNoAssassin != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"Matches with no Assassin: median {Num(r.FirstContactNoAssassin.Median, "0.0")} s (quartiles {Num(r.FirstContactNoAssassin.Q1, "0.0")} to {Num(r.FirstContactNoAssassin.Q3, "0.0")} s); never in {r.FirstContactNoAssassin.Never} of {r.FirstContactNoAssassin.Matches}. The Assassin's Search walk to the nearest rival makes the contact within the first seconds, so the overall median is its time.");
+                }
+            }
+            sb.AppendLine();
+
+            sb.AppendLine("## Economy per kit (food per appearance)");
+            sb.AppendLine();
+            sb.AppendLine("| Kit | Foraged | Stolen | Bounty |");
+            sb.AppendLine("|---|---|---|---|");
+            foreach (var e in r.Economy) sb.AppendLine($"| {e.Label} | {Num(e.Foraged, "0.0")} | {Num(e.Stolen, "0.0")} | {Num(e.Bounty, "0.0")} |");
+            sb.AppendLine();
+            sb.AppendLine($"Corner tie-breaks in the mixed design: {r.CornerDecided} of {r.MixedMatches} matches.");
+            sb.AppendLine();
+
+            sb.AppendLine("## Drift from the last accepted match record");
+            sb.AppendLine();
+            if (r.Drift.Count == 0) sb.AppendLine("No accepted match record yet.");
+            else
+                foreach (var d in r.Drift) sb.AppendLine($"- {d.Label}: {Num(d.Points, "+0.0;-0.0")} points");
+            return sb.ToString();
+        }
+
+        private static void KillTable(StringBuilder sb, List<SpoilerKillRow> rows, bool victims)
+        {
+            if (rows.Count == 0) { sb.AppendLine("No rows."); sb.AppendLine(); return; }
+            sb.AppendLine(victims
+                ? "| Kills | Victims | Matches | Win, no passive | Win, with passive | Final / best rival | Reached 40 | Label |"
+                : "| Kills | Matches | Win, no passive | Win, with passive | Final / best rival | Reached 40 | Label |");
+            sb.AppendLine(victims ? "|---|---|---|---|---|---|---|---|" : "|---|---|---|---|---|---|---|");
+            foreach (var row in rows)
+            {
+                string reached = float.IsNaN(row.NobodyReachedTarget) ? "n/a" : Pct(1f - row.NobodyReachedTarget);
+                string head = victims ? $"| {row.Kills} | {row.Victims} " : $"| {row.Kills} ";
+                sb.AppendLine($"{head}| {row.Win.Trials} | {Pct(row.Win.Rate)} ({Pm(row.Win)}) | {Pct(row.WinWithPassive.Rate)} ({Pm(row.WinWithPassive)}) | {Num(row.MeanFinal, "0.0")} / {Num(row.MeanBestRival, "0.0")} | {reached} | {row.Label ?? "no target"} |");
+            }
+            sb.AppendLine();
+        }
+
+        // ------------------------------------------------------------------ json
+
+        private static string N(float v) => float.IsNaN(v) || float.IsInfinity(v) ? "null" : v.ToString("R", Inv);
+        private static string S(string v) => v == null ? "null" : "\"" + v.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "") + "\"";
+        private static string W(WinInterval w) => $"{{\"wins\":{w.Wins},\"trials\":{w.Trials},\"rate\":{N(w.Rate)},\"low\":{N(w.Low)},\"high\":{N(w.High)}}}";
+
+        public static string Json(MatchReportSection r)
+        {
+            var sb = new StringBuilder();
+            sb.Append('{');
+            sb.Append($"\"schema\":1,\"balanceHash\":{S(r.BalanceHash)},\"mapFingerprint\":{S(r.MapFingerprint)},\"runSeed\":{S("0x" + r.RunSeed.ToString("x16"))},\"populationNote\":{S(r.PopulationNote)}");
+            sb.Append(",\"runs\":[" + string.Join(",", r.Runs.Select(x =>
+                $"{{\"design\":{S(x.Design.ToString())},\"population\":{S(x.Population.ToString())},\"replicates\":{x.Replicates},\"reactionDelay\":{N(x.ReactionDelay)},\"reactionJitter\":{N(x.ReactionJitter)},\"matches\":{x.Matches},\"endedOnTarget\":{x.EndedOnTarget},\"endedOnClock\":{x.EndedOnClock},\"meanEndSeconds\":{N(x.MeanEndSeconds)},\"elapsedMilliseconds\":{N((float)x.ElapsedMilliseconds)}}}")) + "]");
+            sb.Append(",\"kits\":[" + string.Join(",", r.Kits.Select(k =>
+                $"{{\"label\":{S(k.Label)},\"class\":{S(k.Class.ToString())},\"win\":{W(k.Win)},\"call\":{S(k.Call.ToString())},\"reason\":{S(k.Reason)}}}")) + "]");
+            sb.Append(",\"classes\":[" + string.Join(",", r.Classes.Select(c =>
+                $"{{\"class\":{S(c.Class.ToString())},\"headline\":{W(c.Headline)},\"pooled\":{W(c.Pooled)}}}")) + "]");
+            sb.Append(",\"headToHead\":[" + string.Join(",", r.HeadToHead.Select(h =>
+                $"{{\"class\":{S(h.Class.ToString())},\"kitA\":{S(h.KitA)},\"kitB\":{S(h.KitB)},\"aAhead\":{N(h.AAhead)},\"matches\":{h.Matches}}}")) + "]");
+            sb.Append(",\"killsPlayed\":[" + string.Join(",", r.KillsPlayed.Select(KillJson)) + "]");
+            sb.Append(",\"killsToWin\":[" + string.Join(",", r.KillsToWin.Select(KillJson)) + "]");
+            sb.Append(",\"thief\":[" + string.Join(",", r.Thief.Select(t =>
+                $"{{\"victim\":{S(t.Victim)},\"stolenPerMatch\":{N(t.StolenPerMatch)},\"share\":{N(t.Share)}}}")) + "]");
+            if (r.ThiefIncome != null)
+            {
+                var t = r.ThiefIncome;
+                sb.Append($",\"thiefIncome\":{{\"kit\":{S(t.Kit)},\"matches\":{t.Matches},\"stealsPerMatch\":{N(t.StealsPerMatch)},\"stolenPerMatch\":{N(t.StolenPerMatch)},\"foragedPerMatch\":{N(t.ForagedPerMatch)},\"bankedPerMatch\":{N(t.BankedPerMatch)}}}");
+            }
+            sb.Append(",\"peckCuts\":[" + string.Join(",", r.PeckCuts.Select(l =>
+                $"{{\"class\":{S(l.Class.ToString())},\"cause\":{S(MatchEvent.CauseName(l.Cause))},\"exposed\":{l.Exposed},\"cut\":{l.Cut},\"hazard\":{N(l.Hazard)},\"foodLostPerMatch\":{N(l.FoodLostPerMatch)}}}")) + "]");
+            if (r.FirstContactNoAssassin != null)
+                sb.Append($",\"firstContactNoAssassin\":{{\"median\":{N(r.FirstContactNoAssassin.Median)},\"q1\":{N(r.FirstContactNoAssassin.Q1)},\"q3\":{N(r.FirstContactNoAssassin.Q3)},\"never\":{r.FirstContactNoAssassin.Never},\"matches\":{r.FirstContactNoAssassin.Matches}}}");
+            if (r.FirstContact != null)
+                sb.Append($",\"firstContact\":{{\"median\":{N(r.FirstContact.Median)},\"q1\":{N(r.FirstContact.Q1)},\"q3\":{N(r.FirstContact.Q3)},\"never\":{r.FirstContact.Never},\"matches\":{r.FirstContact.Matches}}}");
+            sb.Append(",\"economy\":[" + string.Join(",", r.Economy.Select(e =>
+                $"{{\"label\":{S(e.Label)},\"foraged\":{N(e.Foraged)},\"stolen\":{N(e.Stolen)},\"bounty\":{N(e.Bounty)}}}")) + "]");
+            sb.Append($",\"cornerDecided\":{r.CornerDecided},\"mixedMatches\":{r.MixedMatches}");
+            sb.Append(",\"mixedSeats\":[" + string.Join(",", r.MixedSeats.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)}}}")) + "]");
+            sb.Append(",\"seatCheck\":[" + string.Join(",", r.SeatCheck.Select(s =>
+                $"{{\"seat\":{s.Seat},\"win\":{W(s.Win)},\"winExCorner\":{W(s.WinExCorner)},\"flagged\":{(s.Flagged ? "true" : "false")}}}")) + "]");
+            sb.Append(",\"seatByKit\":[" + string.Join(",", r.SeatByKit.Select(k =>
+                $"{{\"kit\":{S(k.Kit)},\"matches\":{k.Matches},\"winsBySeat\":[{string.Join(",", k.WinsBySeat)}],\"cornerDecided\":{k.CornerDecided}}}")) + "]");
+            sb.Append($",\"seatCheckMatches\":{r.SeatCheckMatches},\"seatCheckCornerDecided\":{r.SeatCheckCornerDecided}");
+            sb.Append(",\"drift\":[" + string.Join(",", r.Drift.Select(d => $"{{\"label\":{S(d.Label)},\"points\":{N(d.Points)}}}")) + "]");
+            sb.Append(",\"leftOut\":[" + string.Join(",", r.LeftOut.Select(S)) + "]");
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        private static string KillJson(SpoilerKillRow k) =>
+            $"{{\"kills\":{k.Kills},\"victims\":{S(k.Victims.ToString())},\"win\":{W(k.Win)},\"winWithPassive\":{W(k.WinWithPassive)},\"meanFinal\":{N(k.MeanFinal)},\"meanBestRival\":{N(k.MeanBestRival)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";
+    }
+}

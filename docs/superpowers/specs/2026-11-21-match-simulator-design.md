@@ -320,15 +320,17 @@ kits' win shares of the Mixed design add up to 4 x 25 %.
 ### 5.4 Runtime budget on this PC
 
 Measured facts: the PC has 12 logical processors (`nproc`). Measured in S1 (2026-11-22, `OracleMenu.MatchTimingBatch`,
-batch mode, one thread, 1 000 farm-only matches on the shipped inputs): 2.45 to 3.13 ms per match. Combat adds cost
-(pairwise range checks, a policy think every 0.25 s) and is re-measured in Task 5; the 2 to 5 ms assumption still holds
-as the budget below.
+batch mode, one thread, 1 000 farm-only matches on the shipped inputs): 2.45 to 3.13 ms per match. Re-measured in S5
+(2026-11-22, same method, with combat in the model): 4.5 to 9.4 ms per farm-only match (machine load varied) and **10.2 to 14.0 ms per mixed-design match under P0**
+(combat, casts, the comeback event), one thread. The 2 to 5 ms assumption was too low for a real match; the budget below
+is re-stated with 10 ms. Measured run times on 12 threads: Mixed R 10 (4 200 matches) 6.4 s, One per class R 25 (2 400) 4.0 s,
+Seat check R 25 (200) 0.4 s, Forced kills R 5 (2 400) 3.2 s: the whole default report, 20 s.
 
 | Run | Matches | Budget |
 |---|---|---|
-| Default report (Mixed + One per class + Seat check + Forced kills) | about 9 000 | under 60 s |
+| Default report (Mixed + One per class + Seat check + Forced kills) | about 9 200 | measured 20 s on 12 threads (10 ms a match, one thread) |
 | Sensitivity (16 points x 3 populations) | about 60 000 | under 5 min |
-| Solver (D8 (b), common random numbers, up to 6 passes; formula in 7.1) | about 900 000 | 3 to 8 min at 2 to 5 ms, under 30 min with flat steps, batch mode |
+| Solver (D8 (b), common random numbers, up to 6 passes; formula in 7.1) | about 900 000 | about 12 to 15 min on 12 threads at 10 ms a match, up to four times that with flat steps, batch mode |
 
 Matches run in parallel (`Parallel.For` over the match index). Kits are resolved on the main thread first, because they
 read ScriptableObjects; the simulation then touches only plain structs. Results are summed in match-index order, so the
@@ -396,10 +398,10 @@ file gives it.
 - confirm: the best 3 screened moves at R = 10: 3 x 4 200 x 2 = about 25 000 matches.
 
 Matches per solve = passes x (2V x 2 520 + 3 x 8 400), so about 146 000 per pass and about 880 000 for 6 passes, plus
-one holdout run (8 400). At the measured 2.45 to 3.13 ms per farm-only match (S1; combat adds cost, re-measured in Task 5), 880 000 matches take
-about 40 min on one thread and 3 to 6 min on 12 threads (about 10x); a pass
-that needs the flat-step search (up to 4 steps) costs up to four times its screen, so the worst case stays under 30 min.
-S1 measured the farm-only cost; the formula is re-evaluated with the combat cost in Task 5. Batch mode only.
+one holdout run (8 400). At the measured 10.2 ms per P0 match (S5; S1 measured 2.45 to 3.13 ms farm-only), 880 000 matches take
+about 2.5 h on one thread and 12 to 15 min on 12 threads (about 10x); a pass
+that needs the flat-step search (up to 4 steps) costs up to four times its screen, so the worst case is about an hour.
+The combat cost is measured (S5); the earlier "under 30 min" no longer holds. Batch mode only.
 
 **Guard.**
 

@@ -11,6 +11,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Match simulator S5: P0, the runner, the designs and the first report (BL-207, `develop`, not pushed)
+
+- **What exists:** `ScriptedPolicy` (P0, the game's bot transcribed through `BotTactics`), `MatchRunner` (parallel, same result for any thread count), `MatchDesigns` (Mixed, One-per-class, Seat check, Forced kills), `MatchReports` (report section, Markdown and JSON) and the menu `Cluck Wars/Balance/Oracle/Match report` (`OracleMenu.MatchReportBatch`). Output goes to `Captures/oracle/match-report-<UTC>.md/.json` (git-ignored). The whole default report takes about 20 s on 12 threads.
+- **Only P0 exists, so every call is provisional.** First reading (shipped balance, seed 20261122): kit win rates 33 / 37 / 74 / 31 / 7 / 15 / 2 / 1 % (Speedy x2, Fatty x2, Warrior x2, Assassin x2); classes one per class 42 / 52 / 6 / 0.3 % (Speedy, Fatty, Warrior, Assassin). Part 1's farm times already put Fatty first and Warrior last; P0's Spoiler burns its stun on the nearest rival before the mark is up, so kills are rare (0.2 a match).
+- **Deviations** (jitter, walkable goals, seat rotation, P0 simplifications, a seat tilt in mirrors whose cause is open): plan, "Deviations after Task 5".
+- **Maestro steps:** none.
+
 ## 2026-11-22 - Match simulator review fixes (BL-207, `develop`, not pushed)
 
 - Ten places where `MatchSim` decided differently from the game were fixed (slows take the strongest, Egg Shell follow-up, running slow through the Shield walk, Golden Pile footprint and retries, strongest speed boost, aura as its own source, stun-gated and sliding pushes, `RejectedIntents` vs `CastsLostToReactionDelay`, removal drift test; Underdog Surge tie kept and documented). `OracleMap.asset` re-baked: one new field, part 1 unchanged. Per-item list: the plan's "Review fixes after Task 4". Maestro steps: none.

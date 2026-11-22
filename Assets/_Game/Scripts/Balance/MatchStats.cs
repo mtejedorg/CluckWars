@@ -93,9 +93,22 @@ namespace CluckWars.Balance
             IReadOnlyList<SpoilerKillTarget> targets)
         {
             if (results == null) throw new ArgumentNullException(nameof(results));
+            var played = new List<(MatchResult Result, int Seat)>(results.Count);
+            foreach (var r in results) played.Add((r, spoilerSeat));
+            return KillsToWin(played, kills, victims, targets);
+        }
+
+        /// <summary>
+        /// The same row for matches in which the Spoiler sat in a different seat each time: each entry names the match and the seat the Spoiler
+        /// held in it. Used for the table of kills the policies really made, where the Spoiler's seat varies with the seating.
+        /// </summary>
+        public static SpoilerKillRow KillsToWin(IReadOnlyList<(MatchResult Result, int Seat)> played, int kills, ForcedVictims victims,
+            IReadOnlyList<SpoilerKillTarget> targets)
+        {
+            if (played == null) throw new ArgumentNullException(nameof(played));
             int wins = 0, winsWith = 0, clock = 0;
             double final = 0.0, best = 0.0;
-            foreach (var r in results)
+            foreach (var (r, spoilerSeat) in played)
             {
                 if (r.WinnerWithoutSpoilerBonus == spoilerSeat) wins++;
                 if (r.Winner == spoilerSeat) winsWith++;
@@ -106,7 +119,7 @@ namespace CluckWars.Balance
                     if (s != spoilerSeat && r.Banked[s] > rival) rival = r.Banked[s];
                 best += rival;
             }
-            int n = results.Count;
+            int n = played.Count;
             var row = new SpoilerKillRow
             {
                 Kills = kills,

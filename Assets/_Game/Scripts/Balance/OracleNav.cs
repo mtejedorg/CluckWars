@@ -25,6 +25,7 @@ namespace CluckWars.Balance
         private readonly Vector2[] _wallA;
         private readonly Vector2[] _wallB;
         private readonly float _halfWidth;
+        private readonly float _arenaHalf;
         private readonly Vector2[] _nodes;
         private readonly float[] _all;           // n x n shortest distances between ring nodes
         private readonly Vector2[] _places;
@@ -35,6 +36,7 @@ namespace CluckWars.Balance
             _wallA = map.WallA ?? Array.Empty<Vector2>();
             _wallB = map.WallB ?? Array.Empty<Vector2>();
             _halfWidth = map.WallHalfWidth;
+            _arenaHalf = arenaHalf;
             _nodes = OraclePaths.RingNodes(_wallA, _wallB, _halfWidth, arenaHalf).ToArray();
 
             int n = _nodes.Length;
@@ -124,12 +126,14 @@ namespace CluckWars.Balance
         }
 
         /// <summary>
-        /// The nearest point a chicken's centre can stand at: <paramref name="p"/> when it is clear, else pushed out of every wall's
-        /// clearance, else (a junction the push cannot resolve) the nearest ring node. Never throws, so a goal inside a wall still has a way to it.
+        /// The nearest point a chicken's centre can stand at: <paramref name="p"/> when it is clear and inside the arena, else brought inside the
+        /// arena and pushed out of every wall's clearance, else (a junction the push cannot resolve, or a wall's clearance that reaches past the
+        /// arena's edge, where the arena box would push the point back in) the nearest ring node. Never throws, so a goal inside a wall or outside
+        /// the arena still has a way to it.
         /// </summary>
         public Vector2 NearestClear(Vector2 p)
         {
-            Vector2 q = PushOut(p, p);
+            Vector2 q = ClampToArena(PushOut(ClampToArena(p), p));
             if (IsClear(q, q)) return q;
             if (_nodes.Length == 0) return p;
             int best = 0;
@@ -149,6 +153,9 @@ namespace CluckWars.Balance
             Vector2 slid = PushOut(to, from);
             return IsClear(from, slid) ? slid : from;
         }
+
+        private Vector2 ClampToArena(Vector2 p) =>
+            _arenaHalf > 0f ? new Vector2(Mathf.Clamp(p.x, -_arenaHalf, _arenaHalf), Mathf.Clamp(p.y, -_arenaHalf, _arenaHalf)) : p;
 
         // Moves p out of every wall's clearance, to the clearance edge along the line from the wall's nearest axis point. A few passes
         // settle a corner between two walls. `side` decides the direction when p lies exactly on an axis.

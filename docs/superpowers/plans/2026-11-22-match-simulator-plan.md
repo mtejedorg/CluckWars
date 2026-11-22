@@ -70,6 +70,19 @@ An independent review (2026-11-22) found places where the simulator decided diff
 
 Consequence for an older test: `MatchSpoilerTests.Kill_IsRefusedOnAShelledTarget...` had rivals that cast Stun after their own Shield; by rule 2 that drops their egg, so in the shelled variant the Spoiler casts the stun and the rivals only shell.
 
+## Deviations after Task 5
+
+Task 5 deviated from the text of Task 5 in these places; where Task 6 or 7 assumes the original, follow the code.
+
+1. **Reaction jitter** (spec 5.1, which no earlier task built): `PolicyParams.ReactionJitter` (seconds, default 0 in `Default`, so every earlier test is bit-identical) adds a uniform 0 to J extra delay to each intent, drawn from the seat's own stream after the think; `MatchRunSpec.Params` defaults to J = 0.1 s (`MatchRunSpec.DefaultReactionJitter`, an arbitrary "small"). Without it a match of fixed policies is deterministic, replicates of a cell repeat each other and a mirror is won by one seat every time (shown in the first run: Warrior_Relentless mirror, seat 1 won 250 of 250). Test: `MatchRunnerTests.ReactionJitter_...`.
+2. **Goals are made walkable by the simulator**: `MatchSim.Apply` sends a non-pile goal through `OracleNav.NearestClear`, and `NearestClear` now stays inside the arena (`OracleNav` stores the arena half) and falls back to the nearest ring node; `Move` steps a chicken that stands inside a wall's clearance out first. The shipped map's arms poke through the arena edge, so a stalk standoff point or a goal at the edge used to make `NextPoint` throw. Tests: `MatchNavTests.NearestClear_...`, `Sim_AGoalInsideAWallOrOutsideTheArena_...`.
+3. **`MatchAbility` gains `Reach` (`BotTactics.EffectiveReach`) and `NeedsEnemyInRange`** (`MatchKits` fills them); P0 needs both for the game's cast gate. `FarmOnlyPolicy.PileAtRank` is public (P0 uses the seat-relative pile order for ties). `BotController.MinSprintWorthDistance` is a public const (was private, same value). `MatchStats.KillsToWin` has an overload for matches in which the Spoiler's seat varies.
+4. **Designs turn the table**: each cell of a kit set sits one seat further round than the one before (balanced over a set), so a seat's tilt is shared out between the kits; the plan's "6 seatings" are the distinct ones up to rotation. Seat check: the flag is on the matches the corner rule did not decide (when nothing separates the four, the game gives the win to the lowest corner), and a table of wins per seat per mirrored kit is printed.
+5. **P0 simplifications** (listed in `ScriptedPolicy` and in the report's left-out table): one cast per think; no facing; the walk-home estimate ignores the chicken's own slow and the deposit estimate uses the kit's rate; the simulator's 0.25 s think instead of the class interval; `PolicyParams.Route` does not apply and `HuntDetour` replaces the profile's hunt radius; rivals are looked at from the next seat on, so ties go the same way for every seat. `StateExitRadiusFactor` and `StalkStandoffFraction` are mirrored from the prefab's serialized `BotController` fields with a drift test.
+6. **Report additions**: the Spoiler table from played matches (kills the policies made) next to the forced one, per-seat share of the mixed design, first contact split by Assassin present or not, a runs table with how each match ended, `match-sample-<UTC>.md` (six matches event by event). `MatchReportSection` holds no part 1 report (`OracleReport` is untouched; Task 7 adds its `Match` field). `MatchRunner.Run` has an overload taking a policy factory. `OracleMenu.MatchTimingBatch` also times P0 matches with combat.
+7. **Measured cost** (one thread, batch): 4.5 to 9.4 ms per farm-only match (S1: 2.45 to 3.13; the machine was busier), 10.2 to 14.0 ms per P0 mixed match with combat. The spec's 5.4 and 7.1 carry the new figure; the S1 "2 to 5 ms" assumption was too low.
+8. **Known, not fixed: a seat tilt in mirrored matches.** A full mirror of one kit gives a seat share of 17 to 36 % at R 250 (P0), and a farm-only mirror shows it too (seats 0 and 2 win, 1 and 3 almost never, for some kits). The map's walls, places and nav paths are 4-fold symmetric (checked), the think stagger, the comeback event and the within-tick order were each removed in turn and the tilt stayed. Cause not found. In the mixed design the seat shares are 23.7 to 26.5 %.
+
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.
@@ -434,7 +447,7 @@ git commit -m "feat(balance): Spoiler mark and kill, Thief, forced kills and kil
   - `sealed class MatchReportSection { string BalanceHash; string MapFingerprint; ulong RunSeed; List<KitWinLine> Kits; List<ClassWinLine> Classes; List<HeadToHeadLine> HeadToHead; List<SpoilerKillRow> KillsToWin; List<ThiefLine> Thief; List<PeckCutLine> PeckCuts; ContactLine FirstContact; List<EconomyShareLine> Economy; int CornerDecided; List<SeatLine> SeatCheck; List<DriftLine> Drift; List<string> LeftOut; string ToMarkdown(); string ToJson(); }` with line types `KitWinLine { string Label; WinInterval Win; KitCall Call; string Reason; }`, `ClassWinLine { ChickenClass Class; WinInterval Headline; WinInterval Pooled; }`, `HeadToHeadLine { ChickenClass Class; string KitA; string KitB; float AAhead; }`, `ThiefLine { string Victim; float StolenPerMatch; float Share; }`, `PeckCutLine { ChickenClass Class; CutCause Cause; int Exposed; int Cut; float Hazard; float FoodLostPerMatch; }`, `ContactLine { float Median; float Q1; float Q3; }`, `EconomyShareLine { string Label; float Foraged; float Stolen; float Bounty; }`, `SeatLine { int Seat; WinInterval Win; bool Flagged; }`, `DriftLine { string Label; float Points; }` (Drift stays empty until Task 7).
   - `static class MatchReports { const float Target = 0.25f; const float BandLow = 0.20f; const float BandHigh = 0.30f; static readonly string[] LeftOut; static MatchReportSection Build(MatchContext context, IReadOnlyList<MatchRunOutput> runs, OracleReferenceSO reference); }` (`LeftOut` is the "left out" column of spec 2.4).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 // ScriptedPolicyTests (synthetic kits and map)
@@ -465,11 +478,11 @@ git commit -m "feat(balance): Spoiler mark and kill, Thief, forced kills and kil
 [Test] public void PeckCutHazard_IsCutOverExposed()
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 `-testFilter "CluckWars.Tests.ScriptedPolicyTests;CluckWars.Tests.MatchRunnerTests;CluckWars.Tests.MatchReportTests"`. Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `ScriptedPolicy`: the priority list of spec 4.1, each step calling the `BotTactics` function named there; it reads rivals only from `MatchView` (so Hide counts through `MatchSight`).
 - `MatchDesigns`: cells in a fixed order (design, kit set lexicographic, seating, replicate). Forced kills: the Spoiler kit with each One-per-class set that holds it, 6 seatings, k = 0 to 4, both victim modes, R replicates.
@@ -477,11 +490,11 @@ git commit -m "feat(balance): Spoiler mark and kill, Thief, forced kills and kil
 - `MatchReports.Build`: section 6 of the spec. With one population no kit gets a call (D4).
 - Menu: `MatchReportBatch` builds the context with `OracleMapBaker.ArenaHalf()` and `OracleMenu.BotArrivalRadius()`, runs Mixed R 10, One per class R 25, Seat check R 25 and Forced kills R 5 under P0, writes `Captures/oracle/match-report-<UTC>.md` and `.json`, and reads optional `-oracleSeed` and `-oracleThreads` (default 12). Add the row to the oracle menu table in `docs/TESTING.md`.
 
-- [ ] **Step 4: Run the tests, the full suite and the menu**
+- [x] **Step 4: Run the tests, the full suite and the menu**
 
 New classes pass; full suite 0 failed. Then `"$UNITY" -batchmode -quit -projectPath . -executeMethod CluckWars.EditorTools.OracleMenu.MatchReportBatch -logFile Captures/tests/match-report.log`. Expected: both report files exist, the kit table has 8 rows, the class table 4, the kills-to-win table 10 rows with the D6 labels on the rows they cover, and the run time is logged. Paste the run time into the report.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add <every file listed under Files, with .meta for new files>

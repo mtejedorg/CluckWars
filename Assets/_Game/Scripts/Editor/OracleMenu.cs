@@ -25,6 +25,15 @@ namespace CluckWars.EditorTools
         public const string ProblemFileName = "problem.json";
         public const string ReferencePath = "Assets/_Game/Data/Balance/OracleReference.asset";
         public const string NoteArgument = "-oracleNote";
+        public const string MatchMenuPath = "Cluck Wars/Balance/Oracle/Match report";
+        public const string SeedArgument = "-oracleSeed";
+        public const string ThreadsArgument = "-oracleThreads";
+        public const ulong DefaultMatchSeed = 20261122UL;
+        public const int DefaultMatchThreads = 12;
+        /// <summary>Replicates of the four designs the match report plays (spec 5.3).</summary>
+        public const int MixedReplicates = 10, OnePerClassReplicates = 25, SeatCheckReplicates = 25, ForcedKillsReplicates = 5;
+        /// <summary>Matches written out event by event next to the report, so a number that looks wrong can be read in play.</summary>
+        public const int SampleMatches = 6;
         private const string DefaultRecordNote = "baseline recorded from the menu";
         private const string DefaultAcceptNote = "accepted from the menu";
         private const string Source = "OracleReport";
@@ -64,7 +73,28 @@ namespace CluckWars.EditorTools
         /// standard farmers on the shipped inputs, on one thread, and logs the milliseconds one match costs (the figure the match simulator's
         /// runtime budget rests on). Read-only.
         /// </summary>
-        public static void MatchTimingBatch() => InBatch("The match timing run failed.", () => MatchTiming(1000));
+        public static void MatchTimingBatch() => InBatch("The match timing run failed.", () =>
+        {
+            MatchTiming(1000);
+            MatchTimingCombat(1000);
+        });
+
+        /// <summary>
+        /// Plays <paramref name="matches"/> real mixed-design matches under P0 on the shipped kits (combat, casts, the comeback event) on one
+        /// thread after a short warm-up and returns the mean milliseconds per match: the cost the simulator's runtime budget rests on.
+        /// </summary>
+        public static double MatchTimingCombat(int matches)
+        {
+            const int warmUp = 20;
+            var log = new UnityLogService(LogLevel.Info);
+            var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
+            int replicates = Math.Max(1, (matches + 419) / 420);   // 420 cells per replicate of the mixed design
+            MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = 2UL, Threads = 1, CellLimit = warmUp });
+            var run = MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = 1UL, Threads = 1, CellLimit = matches });
+            double perMatch = run.ElapsedMilliseconds / run.Results.Length;
+            log.Info(Source, $"Match timing: {perMatch:0.000} ms per P0 mixed-design match with combat over {run.Results.Length} matches, one thread.");
+            return perMatch;
+        }
 
         /// <summary>Plays <paramref name="matches"/> farm-only matches after a short warm-up and returns the mean milliseconds per match.</summary>
         public static double MatchTiming(int matches)
@@ -94,6 +124,83 @@ namespace CluckWars.EditorTools
             double perMatch = clock.Elapsed.TotalMilliseconds / matches;
             log.Info(Source, $"Match timing: {perMatch:0.000} ms per farm-only match over {matches} matches, one thread (seat 0 banked {banked / (matches + warmUp):0.0} on average).");
             return perMatch;
+        }
+
+        [MenuItem(MatchMenuPath, priority = 66)]
+        private static void MatchReportFromMenu() => MatchReport();
+
+        /// <summary>
+        /// Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.MatchReportBatch [-oracleSeed n] [-oracleThreads n]</c>. Plays the Mixed,
+        /// One-per-class, Seat-check and Forced-kills designs under P0 and writes <c>Captures/oracle/match-report-&lt;UTC&gt;.md</c> and <c>.json</c>
+        /// (read-only: no asset changes).
+        /// </summary>
+        public static void MatchReportBatch() => InBatch("The match report failed.", () => MatchReport());
+
+        public static (string json, string markdown) MatchReport()
+        {
+            var log = new UnityLogService(LogLevel.Info);
+            if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before the match report: it reads the shipped assets.");
+
+            ulong seed = DefaultMatchSeed;
+            int threads = DefaultMatchThreads;
+            var args = Environment.GetCommandLineArgs();
+            int at = Array.IndexOf(args, SeedArgument);
+            if (at >= 0 && at + 1 < args.Length && !ulong.TryParse(args[at + 1], out seed))
+                throw new ArgumentException($"{SeedArgument} wants a whole number, got '{args[at + 1]}'.");
+            at = Array.IndexOf(args, ThreadsArgument);
+            if (at >= 0 && at + 1 < args.Length && !int.TryParse(args[at + 1], out threads))
+                throw new ArgumentException($"{ThreadsArgument} wants a whole number, got '{args[at + 1]}'.");
+
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
+            var runs = new System.Collections.Generic.List<MatchRunOutput>();
+            foreach (var (design, replicates) in new[]
+            {
+                (MatchDesignKind.Mixed, MixedReplicates), (MatchDesignKind.OnePerClass, OnePerClassReplicates),
+                (MatchDesignKind.SeatCheck, SeatCheckReplicates), (MatchDesignKind.ForcedKills, ForcedKillsReplicates),
+            })
+            {
+                var run = MatchRunner.Run(context, new MatchRunSpec
+                {
+                    Design = design, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = seed, Threads = threads,
+                });
+                runs.Add(run);
+                log.Info(Source, $"Match run {design} R={replicates}: {run.Results.Length} matches in {run.ElapsedMilliseconds / 1000.0:0.0} s on {threads} threads ({run.ElapsedMilliseconds / Math.Max(1, run.Results.Length):0.00} ms per match across threads).");
+            }
+
+            var section = MatchReports.Build(context, runs, LoadReference());
+            string dir = OutputDirectory();
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            string json = Path.Combine(dir, $"match-report-{stamp}.json");
+            string md = Path.Combine(dir, $"match-report-{stamp}.md");
+            File.WriteAllText(json, section.ToJson());
+            File.WriteAllText(md, section.ToMarkdown());
+            WriteSample(context, seed, Path.Combine(dir, $"match-sample-{stamp}.md"));
+            log.Info(Source, $"Match report written: {md} and {json} (bal={section.BalanceHash}, map={section.MapFingerprint}, seed={seed}); the four runs and the report took {clock.Elapsed.TotalSeconds:0.0} s.");
+            return (json, md);
+        }
+
+        // A few mixed matches played again with their events recorded, written as plain lines.
+        private static void WriteSample(MatchContext context, ulong seed, string path)
+        {
+            var run = MatchRunner.Run(context, new MatchRunSpec
+            {
+                Design = MatchDesignKind.Mixed, Replicates = 1, Population = PolicyPopulation.P0, RunSeed = seed, Threads = 1,
+                CellLimit = 0, RecordEvents = true,
+            });
+            var sb = new System.Text.StringBuilder("# Sample mixed matches (events)\n");
+            int step = Math.Max(1, run.Results.Length / SampleMatches);
+            for (int i = 0; i < run.Results.Length && i < step * SampleMatches; i += step)
+            {
+                var cell = run.Cells[i];
+                var r = run.Results[i];
+                sb.Append($"\n## cell {i}: ");
+                for (int s = 0; s < cell.KitOfSeat.Length; s++) sb.Append($"seat {s} {context.Kits[cell.KitOfSeat[s]].Label}; ");
+                sb.Append($"winner seat {r.Winner}, ended {r.EndSeconds:0.0} s, banked {string.Join("/", Array.ConvertAll(r.Banked, b => b.ToString("0.0")))}, rejected {r.RejectedIntents}, lost to delay {r.CastsLostToReactionDelay}\n");
+                foreach (var e in r.Events)
+                    sb.Append($"{e.Time:0.00} {e.Kind} seat {e.Seat} other {e.Other} amount {e.Amount:0.0} {MatchEvent.CauseName(e.Cause)}\n");
+            }
+            File.WriteAllText(path, sb.ToString());
         }
 
         [MenuItem(SolveMenuPath, priority = 65)]

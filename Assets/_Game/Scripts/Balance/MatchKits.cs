@@ -165,6 +165,8 @@ namespace CluckWars.Balance
                 MarkRoundStartCooldown = facts.MarkRoundStartCooldown,
                 MarkLeaderPickWeight = facts.MarkLeaderPickWeight,
                 Role = ability.ResolveBotRole(),
+                Reach = BotTactics.EffectiveReach(ability),
+                NeedsEnemyInRange = ability.RequiresEnemyInRange,
                 Category = ability.Category,
                 IsStealer = BotTactics.IsStealer(ability),
                 IsStealShield = BotTactics.IsStealShield(ability),

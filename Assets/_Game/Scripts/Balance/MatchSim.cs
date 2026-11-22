@@ -350,6 +350,7 @@ namespace CluckWars.Balance
             private readonly float _slow;
             private readonly int _thinkTicks;
             private readonly int[] _delayTicks = new int[Seats];
+            private readonly int[] _jitterTicks = new int[Seats];
             private readonly IMatchPolicy[] _policy = new IMatchPolicy[Seats];
             private readonly MatchRng[] _rng = new MatchRng[Seats];
             private MatchRng _comebackRng;
@@ -450,6 +451,8 @@ namespace CluckWars.Balance
                     var p = s.Params != null ? s.Params[seat] : PolicyParams.Default;
                     float delay = float.IsNaN(p.ReactionDelay) ? 0f : Math.Max(0f, p.ReactionDelay);
                     _delayTicks[seat] = Mathf.RoundToInt(delay / _tick);
+                    float jitter = float.IsNaN(p.ReactionJitter) ? 0f : Math.Max(0f, p.ReactionJitter);
+                    _jitterTicks[seat] = Mathf.RoundToInt(jitter / _tick);
                     _policy[seat] = s.Policies[seat](seat, p);
                     if (_policy[seat] == null) throw new InvalidOperationException($"The policy factory of seat {seat} returned null.");
                     _rng[seat] = MatchRng.Create(matchSeed, (ulong)seat);
@@ -760,9 +763,11 @@ namespace CluckWars.Balance
 
                 BuildView(s);
                 MatchIntent intent = _policy[s].Think(_view, ref _rng[s]);
+                // A random extra delay, drawn only when there is one, so a seat without jitter draws nothing and plays as it always did.
+                int jitter = _jitterTicks[s] > 0 ? _rng[s].NextInt(_jitterTicks[s] + 1) : 0;
                 ch.Queue.Enqueue(new Pending
                 {
-                    Intent = intent, ApplyTick = _i + _delayTicks[s],
+                    Intent = intent, ApplyTick = _i + _delayTicks[s] + jitter,
                     CastLegalWhenDecided = intent.CastSlot >= 0 && CastReadyNow(s, intent.CastSlot),
                 });
                 ch.ThinkNow = false;
@@ -802,6 +807,9 @@ namespace CluckWars.Balance
                 // The movement part of the intent; the cast part is a one-off and is not part of what the chicken keeps doing.
                 intent.CastSlot = -1;
                 intent.CastTarget = -1;
+                // A goal inside a wall's clearance or outside the arena cannot be walked to: the chicken goes to the nearest standing point instead.
+                // A pile intent walks to its pile, so its goal is not read.
+                if (intent.PeckPile < 0) intent.Goal = _nav.NearestClear(intent.Goal);
                 if (ch.HasIntent && ch.Intent.SameAs(intent)) return;
                 ch.Intent = intent;
                 ch.HasIntent = true;
@@ -1395,6 +1403,10 @@ namespace CluckWars.Balance
                 var ch = _c[s];
                 if (!ch.HasIntent || Standing(s)) return;
                 var kit = _s.Seats[s].Farm;
+
+                // A chicken that stands inside a wall's clearance without dashing (a clamp at the arena edge) steps out first, as the game's
+                // CharacterController depenetrates, so the path search always starts from a standing point.
+                if (!ch.Dashing && !_nav.IsClear(ch.Pos, ch.Pos)) { ch.Pos = _nav.NearestClear(ch.Pos); ch.WaypointValid = false; }
 
                 // A kit with a Jump ability walks straight and spends a Jump at a wall; a part 1 farmer that only has the flag crosses for free.
                 bool hasJump = HasJump(ch, out int jumpSlot);

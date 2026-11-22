@@ -159,7 +159,8 @@ namespace CluckWars.Balance
 
         private static bool Has(MatchView v, int p) => v.PileFood[p] > Eps;
 
-        private static int PileAtRank(int s, int k)
+        /// <summary>The pile at rank <paramref name="k"/> of seat <paramref name="s"/>'s own order (centre, personal piles round from its own, contested piles round from its own): the order ties go by.</summary>
+        public static int PileAtRank(int s, int k)
         {
             if (k == 0) return OracleMapSO.CentreIndex;
             if (k <= Seats) return OracleMapSO.PersonalIndex((s + k - 1) % Seats);

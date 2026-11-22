@@ -56,6 +56,10 @@ namespace CluckWars.Balance
         public float MarkRoundStartCooldown;
         public float MarkLeaderPickWeight;
         public BotRole Role;
+        /// <summary>How far the ability reaches in metres, as the game bot reads it (<c>BotTactics.EffectiveReach</c>): infinity for one that needs no target.</summary>
+        public float Reach;
+        /// <summary>The ability does nothing without a rival in range (<c>RequiresEnemyInRange</c>): the bot casts it only at one.</summary>
+        public bool NeedsEnemyInRange;
         public AbilityCategory Category;
         public bool IsStealer;
         public bool IsStealShield;

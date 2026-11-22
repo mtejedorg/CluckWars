@@ -10,6 +10,12 @@ namespace CluckWars.Balance
     {
         /// <summary>Seconds from a think to its intent taking effect.</summary>
         public float ReactionDelay;
+        /// <summary>
+        /// A random extra delay per intent, uniform from 0 to this many seconds (rounded to ticks), drawn from the seat's own stream after the think.
+        /// Zero (the default of <see cref="Default"/>) draws nothing. Without it a match of fixed policies is deterministic, so replicates of one
+        /// cell would repeat each other and a mirror would be won by the same seat every time (spec 5.1: "a small reaction jitter").
+        /// </summary>
+        public float ReactionJitter;
         public float ReturnThreshold;
         public float FleeRadius;
         public float HuntDetour;
@@ -19,6 +25,7 @@ namespace CluckWars.Balance
         public static PolicyParams Default => new PolicyParams
         {
             ReactionDelay = 0.3f,
+            ReactionJitter = 0f,
             ReturnThreshold = float.NaN,
             FleeRadius = float.NaN,
             HuntDetour = float.NaN,

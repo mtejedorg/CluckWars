@@ -518,7 +518,8 @@ All scripts are Python 3, stdlib only, run with `python -I` from the repo root. 
 | Accept as balanced (recompute prices) | `OracleMenu.AcceptBatch -oracleNote "why"` | stores it and recomputes every kit's price |
 | Sweep food | `OracleMenu.SweepFoodBatch` | `sweep-food-<UTC>.md/.json`: ten pile setups, read-only |
 | Solve | `OracleMenu.SolveBatch` | reads `Captures/oracle/problem.json`, writes `proposal-<UTC>.md/.json` with a schema-1 delta; applies nothing |
-| Match timing | `OracleMenu.MatchTimingBatch` | plays 1 000 farm-only matches of four standard farmers on one thread and logs the milliseconds one match costs (the match simulator's runtime budget); read-only |
+| Match timing | `OracleMenu.MatchTimingBatch` | plays 1 000 farm-only matches of four standard farmers, then 1 000 P0 mixed-design matches with combat, on one thread each, and logs the milliseconds one match costs (the match simulator's runtime budget); read-only |
+| Match report | menu `Cluck Wars/Balance/Oracle/Match report`, `OracleMenu.MatchReportBatch [-oracleSeed n] [-oracleThreads n]` | plays Mixed (R 10), One per class (R 25), Seat check (R 25) and Forced kills (R 5) under P0 and writes `match-report-<UTC>.md/.json` plus `match-sample-<UTC>.md` (six matches event by event); every call is provisional until P1 and the mixed population exist; read-only |
 | Bot arrival radius | `OracleMenu.BotArrivalRadius` | not a menu or `-executeMethod` batch: a public static that reads the arrival radius authored on the chicken prefab's `BotController`, which the simulator's sight rule needs |
 
 Leave Play mode first (Solve refuses in Play mode). `-cw_timescale` (above, solo dev builds) is for runs of the real game at speed; the oracle itself does not need it.
