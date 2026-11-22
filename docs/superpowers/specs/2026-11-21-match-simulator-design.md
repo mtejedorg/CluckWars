@@ -308,9 +308,10 @@ kits' win shares of the Mixed design add up to 4 x 25 %.
 
 ### 5.4 Runtime budget on this PC
 
-Measured facts: the PC has 12 logical processors (`nproc`). Not measured: the cost of one match.
-Assumption: 2 to 5 ms per match single-threaded in the Editor (part 1's `FarmSim` does 1 350 ticks x 4 chickens; part 2
-adds pairwise range checks and a policy think every 0.25 s). Slice S1 measures it and this table is corrected.
+Measured facts: the PC has 12 logical processors (`nproc`). Measured in S1 (2026-11-22, `OracleMenu.MatchTimingBatch`,
+batch mode, one thread, 1 000 farm-only matches on the shipped inputs): 2.45 to 3.13 ms per match. Combat adds cost
+(pairwise range checks, a policy think every 0.25 s) and is re-measured in Task 5; the 2 to 5 ms assumption still holds
+as the budget below.
 
 | Run | Matches | Budget |
 |---|---|---|
@@ -384,9 +385,10 @@ file gives it.
 - confirm: the best 3 screened moves at R = 10: 3 x 4 200 x 2 = about 25 000 matches.
 
 Matches per solve = passes x (2V x 2 520 + 3 x 8 400), so about 146 000 per pass and about 880 000 for 6 passes, plus
-one holdout run (8 400). At the assumed 2 to 5 ms per match and about 10x from 12 threads, that is 3 to 8 min; a pass
+one holdout run (8 400). At the measured 2.45 to 3.13 ms per farm-only match (S1; combat adds cost, re-measured in Task 5), 880 000 matches take
+about 40 min on one thread and 3 to 6 min on 12 threads (about 10x); a pass
 that needs the flat-step search (up to 4 steps) costs up to four times its screen, so the worst case stays under 30 min.
-S1 measures the cost per match and the formula is re-evaluated with it. Batch mode only.
+S1 measured the farm-only cost; the formula is re-evaluated with the combat cost in Task 5. Batch mode only.
 
 **Guard.**
 

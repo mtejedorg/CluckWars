@@ -10,6 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-21-match-simulator-design.md` (approved 2026-11-22; the section "Maestro's answers" binds and overrides any older line). Part 1 for context: `docs/superpowers/specs/2026-11-20-balance-oracle-v2-design.md` and `docs/superpowers/plans/2026-11-20-balance-oracle-v2-plan.md`.
 
+## Deviations from the plan after Task 1
+
+Task 1 (3dfd9c21) deviated from the text below in five places; where a later task assumes the original, follow the code.
+
+1. The equivalence test compares seats by rank (sorted banked) plus total within 1, with the win target lifted in both models.
+2. A chicken spawns on the edge of its base zone facing the centre (`MatchSim.Spawn`), not at the base centre.
+3. `MatchGeometry` (public static, in `MatchSim.cs`) holds `Rim` and `InReach`.
+4. The nav cache key includes a hash of walls and place positions.
+5. `MatchSim` thinks at once when a Peck is ready to start; `SeatView.CooldownLeft[0]` is the Peck; casts are refused and counted in `RejectedIntents` until Task 3. Tick phases are completions, think, act; `MatchRules.ThinkSeconds` defaults to 0.25.
+
+Measured cost: 2.45 to 3.13 ms per farm-only match, one thread, batch (`OracleMenu.MatchTimingBatch`).
+
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.
@@ -71,11 +83,11 @@
   - `static class MatchSim { static MatchResult Run(MatchSetup setup, ulong matchSeed); }`.
   - `sealed class FarmOnlyPolicy : IMatchPolicy { FarmOnlyPolicy(int seat, PolicyParams p); static readonly PolicyFactory Factory; }`.
 
-- [ ] **Step 0: Take the baseline**
+- [x] **Step 0: Take the baseline**
 
 Run the full EditMode suite in batch before any edit. Record passed, failed and the names of any failures in the report; later tasks compare with this, not with an older count.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `MatchTestKit` (helpers, not tests): `OracleMapSO OpenMap(float half)` (a synthetic map with 13 places on a square, no walls), `OracleMapSO OneWallMap(float half, Vector2 a, Vector2 b, float halfWidth)`, `MatchKit Farmer(string label, float speed, int capacity, float peckAmount, float peckCooldown, float castSeconds, float depositRate)`, `MatchSetup Setup(OracleMapSO map, MatchKit[] seats, PolicyFactory policy, float arenaHalf)`. Every number is the caller's.
 
@@ -104,12 +116,12 @@ public void FourStandardFarmers_BankWithinOneFoodOfFarmSim(FarmRoute route)
 [Test] public void FarmOnly_NeverHasARejectedIntent()          // RejectedIntents == 0 on the shipped map, every route
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 Run: the batch command with `-testFilter "CluckWars.Tests.MatchRngTests;CluckWars.Tests.MatchNavTests;CluckWars.Tests.MatchSimFarmTests"`.
 Expected: compile errors for the missing types.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - `OraclePaths`: move the ring loop into `RingNodes`; `ShortestPath` calls it. `OracleMapTests` must stay green unchanged.
 - `OracleNav`: nodes from `RingNodes`; all-pairs shortest distances and next hops once per build; a per-goal distance field cached for the 13 places, computed on demand for other goals. `NextPoint` picks the node visible from `from` that minimises `|from - node| + field(node)`.
@@ -117,15 +129,15 @@ Expected: compile errors for the missing types.
 - `FarmOnlyPolicy`: the decisions of `FarmSim` (route choice, return when due, redirect when the target pile empties, the time-is-short rule) on continuous positions, with costs from `Nav.PathLength` minus reach as the bake defines legs. Do not edit `FarmSim.cs`; the equivalence test is the guard against drift.
 - `OracleMenu.MatchTimingBatch()`: runs 1 000 farm-only matches on the shipped inputs on one thread and logs milliseconds per match through `ILogService`.
 
-- [ ] **Step 4: Run the tests and confirm they pass**
+- [x] **Step 4: Run the tests and confirm they pass**
 
 Same command. Expected: `failed="0"`. Then the full EditMode suite in batch: baseline plus the new tests, 0 failed.
 
-- [ ] **Step 5: Measure and correct the spec**
+- [x] **Step 5: Measure and correct the spec**
 
 Run `"$UNITY" -batchmode -quit -projectPath . -executeMethod CluckWars.EditorTools.OracleMenu.MatchTimingBatch -logFile Captures/tests/timing.log`. Write the measured ms per match into the spec's 5.4 table and the runtime line of 7.1. If one match costs more than 5 ms, stop and report before Task 2; do not cut ring vertices silently (the equivalence test pins them).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Assets/_Game/Scripts/Balance/OraclePaths.cs Assets/_Game/Scripts/Editor/OracleMapBaker.cs Assets/_Game/Scripts/Editor/OracleMenu.cs Assets/_Game/Scripts/Balance/OracleNav.cs Assets/_Game/Scripts/Balance/OracleNav.cs.meta Assets/_Game/Scripts/Balance/MatchRng.cs Assets/_Game/Scripts/Balance/MatchRng.cs.meta Assets/_Game/Scripts/Balance/MatchKit.cs Assets/_Game/Scripts/Balance/MatchKit.cs.meta Assets/_Game/Scripts/Balance/MatchPolicy.cs Assets/_Game/Scripts/Balance/MatchPolicy.cs.meta Assets/_Game/Scripts/Balance/MatchSim.cs Assets/_Game/Scripts/Balance/MatchSim.cs.meta Assets/_Game/Scripts/Balance/FarmOnlyPolicy.cs Assets/_Game/Scripts/Balance/FarmOnlyPolicy.cs.meta Assets/_Game/Scripts/Editor/Tests/MatchTestKit.cs Assets/_Game/Scripts/Editor/Tests/MatchTestKit.cs.meta Assets/_Game/Scripts/Editor/Tests/MatchNavTests.cs Assets/_Game/Scripts/Editor/Tests/MatchNavTests.cs.meta Assets/_Game/Scripts/Editor/Tests/MatchRngTests.cs Assets/_Game/Scripts/Editor/Tests/MatchRngTests.cs.meta Assets/_Game/Scripts/Editor/Tests/MatchSimFarmTests.cs Assets/_Game/Scripts/Editor/Tests/MatchSimFarmTests.cs.meta docs/superpowers/specs/2026-11-21-match-simulator-design.md
