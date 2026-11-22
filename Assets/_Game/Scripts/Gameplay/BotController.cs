@@ -72,6 +72,9 @@ namespace CluckWars.Gameplay
         [Min(0.1f)]
         [SerializeField] private float _arrivalRadius = 1.5f;
 
+        /// <summary>The distance at which the bot counts as arrived (read by the balance simulator's sight rule).</summary>
+        public float ArrivalRadius => _arrivalRadius;
+
         [Tooltip("How far past a pile's surface the bot aims when collecting. Piles are solid, so aiming at the centre grinds the bot into the blocker forever; aiming a little OUTSIDE the surface gives it a reachable point on walkable ground. Must stay above the NavMesh agent radius (0.5) so the point isn't inside the pile's carve, and inside FoodPile._collectReach so standing there actually collects.")]
         [Min(0.1f)]
         [SerializeField] private float _pileStandoff = 0.7f;

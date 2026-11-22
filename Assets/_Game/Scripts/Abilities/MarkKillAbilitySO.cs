@@ -72,7 +72,14 @@ namespace CluckWars.Abilities
             MarkWindowSeconds = WindowSeconds,
             MarkSuccessCooldown = SuccessCooldownSeconds,
             MarkRemovalSeconds = RemovalSeconds,
+            MarkArmSeconds = ArmSeconds,
+            MarkKillRange = KillRange,
+            MarkFailCooldown = FailCooldownSeconds,
+            MarkLeaderPickWeight = LeaderPickWeight,
         };
+
+        /// <summary>Death Mark has two cooldowns, after a kill and after a miss; the base <c>Cooldown</c> is not what the game waits.</summary>
+        public override string[] CooldownFields => new[] { nameof(SuccessCooldownSeconds), nameof(FailCooldownSeconds) };
 
         public override bool RequiresEnemyInRange => false;
         /// <summary>The Kill is pressed during the stun the bot's own Ambush is still running.</summary>

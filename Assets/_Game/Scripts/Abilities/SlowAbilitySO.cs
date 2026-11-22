@@ -60,6 +60,7 @@ namespace CluckWars.Abilities
 
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => Radius;
+        public override string AimRadiusField => nameof(Radius);
 
         // The slow is the whole of the target effect (see AbilityBaseSO.TargetEffectIsPurelyControl).
         public override bool TargetEffectIsPurelyControl => true;

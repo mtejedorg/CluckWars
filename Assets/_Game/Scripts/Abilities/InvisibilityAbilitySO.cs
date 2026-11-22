@@ -41,6 +41,8 @@ namespace CluckWars.Abilities
 
         public override bool IsStealth => true;
 
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts { HideOpacity = Opacity };
+
         public override void OnActivate(AbilityContext ctx)
         {
             ctx.Controller.Effects.SetOpacity(ctx.Slot, Opacity);

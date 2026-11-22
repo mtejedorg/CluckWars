@@ -172,7 +172,7 @@ git commit -m "feat(balance): match simulator core, navigation and farm equivale
   - `MatchRules` gains `float KeepOutRadius; float ExecuteBounty; float KnockbackDecayRate; float SurgeSpeedFactor; float SightArrivalRadius;`.
   - `static class MatchKits { static MatchKit[] All(OracleInputs inputs); static MatchRules Rules(OracleInputs inputs, float arenaHalf, float sightArrivalRadius); }` (same kits, order and labels as `OracleKits.All`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 // MatchFactsTests: every registry ability, found by Job, read through SerializedObject by field name
@@ -194,19 +194,19 @@ git commit -m "feat(balance): match simulator core, navigation and farm equivale
 [Test] public void NonLinearHook_Throws_NamingThePassive()              // test passive whose ModifyControlDuration(2s) != 2 x ModifyControlDuration(1s)
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 `-testFilter "CluckWars.Tests.MatchFactsTests;CluckWars.Tests.MatchKitsTests"`. Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `MatchKits.All` reuses the `OracleKits` inputs and copy scope (one `CopyScope` per build, disposed at the end; no SO is read after it returns). Dispatch on `Job`; a job the simulator does not model (`Bank`, `None`) throws. Passive factors are read by calling each hook with a unit input and a null owner, and checked linear by a second call at 2; a non-linear hook throws naming the passive. `SlowFactorsEmitted` lists every slow factor the eight kits emit; `SlowFactorsReceived` holds the hook's answer for each.
 
-- [ ] **Step 4: Run the tests, then the full suite**
+- [x] **Step 4: Run the tests, then the full suite**
 
 Expected: the new classes pass; the full EditMode suite has 0 failed (the game's behaviour does not change).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add <every file listed under Files, with the .meta of each new file>

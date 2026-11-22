@@ -244,6 +244,16 @@ namespace CluckWars.EditorTools
             };
         }
 
+        /// <summary>The bot's arrival radius as authored on the chicken prefab (<c>BotController.ArrivalRadius</c>); the match simulator's sight rule needs it.</summary>
+        public static float BotArrivalRadius()
+        {
+            var prefab = Required<GameObject>(TestAssets.ChickenPrefabPath);
+            var bot = prefab.GetComponentInChildren<BotController>(true);
+            if (bot == null)
+                throw new InvalidOperationException($"{TestAssets.ChickenPrefabPath} carries no BotController, so the bot's arrival radius cannot be read.");
+            return bot.ArrivalRadius;
+        }
+
         private static OracleReferenceSO LoadReference() => Required<OracleReferenceSO>(ReferencePath);
 
         private static T Required<T>(string path) where T : UnityEngine.Object =>

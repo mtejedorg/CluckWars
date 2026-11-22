@@ -53,6 +53,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.Cone;
         public override float AimRadius => SnatchRange;
+        public override string AimRadiusField => nameof(SnatchRange);
         public override float AuthoredAimConeAngle => 140f;
 
         public override float NominalStealAmount => StealAmount;

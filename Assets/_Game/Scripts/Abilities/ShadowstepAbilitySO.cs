@@ -40,6 +40,18 @@ namespace CluckWars.Abilities
         public override float AimRadius => JumpLandingRadius;
         public override float AuthoredAimForwardOffset => JumpResolver.GetNominalDistance(JumpTier);
 
+        /// <remarks>
+        /// <c>BlinkMetres</c> is the authored aim offset, which is 0 while <see cref="AbilityBaseSO.JumpTier"/> is None (the shipped asset). The dash
+        /// the ability really performs is a speed multiplier for <see cref="AbilityBaseSO.Duration"/> seconds, declared here like Speed Burst's,
+        /// so the reach is <c>MoveSpeed x SpeedMultiplier x SpeedSeconds</c>.
+        /// </remarks>
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts
+        {
+            BlinkMetres = AuthoredAimForwardOffset,
+            SpeedMultiplier = SpeedMultiplier,
+            SpeedSeconds = Duration,
+        };
+
         /// <summary>
         /// Shadowstep touches nobody — it is a pure mobility cast. It inherited
         /// <c>AffectsEnemies = true</c>, so any rival who happened to be standing in the

@@ -34,6 +34,7 @@ namespace CluckWars.Abilities
         // authored cone (Shaped only; RangeOnly collapses it); AimRadius stays here so both mirror StunRadius.
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => StunRadius;
+        public override string AimRadiusField => nameof(StunRadius);
 
         // FEEDBACK.md §2.2 / §3.2 case 15. The stun is the entire target effect for both
         // subclasses, and it funnels through ChickenController.ApplyPassiveControlDuration —

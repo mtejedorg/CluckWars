@@ -40,6 +40,13 @@ namespace CluckWars.Abilities
         [Tooltip("Phase 2, automatic after the walk: immobile, immune to every control effect, steal-proof and unkillable.")]
         [Min(0.1f)] public float EggSeconds = 2f;
 
+        public override AbilityOracleFacts OracleFacts => new AbilityOracleFacts
+        {
+            ShieldWalkSeconds = WalkSeconds,
+            ShieldWalkSpeedMultiplier = SpeedMultiplier,
+            ShieldEggSeconds = EggSeconds,
+        };
+
         // Self-buff, no target area — marks the caster's own ring instead (FEEDBACK.md §2.2).
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.None;
         public override bool AffectsSelf => true;

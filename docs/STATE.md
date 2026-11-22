@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-22 - Match simulator S2: declared facts, named constants, kit builder (BL-207, `develop`, not pushed)
+
+- **New pure builder** `MatchKits.All(inputs)` / `Rules(inputs, arenaHalf, sightArrivalRadius)` (Gameplay assembly, `Scripts/Balance/`): the eight kits as `MatchKit` with four `MatchAbility`, a `MatchPassive` of plain factors (each hook called with a unit input and again at 2; a non-linear hook throws) and the bot profile; everything through `BalanceBook.Preview`.
+- **Game code, no behaviour change:** `AbilityOracleFacts` gains the Hide, Jump, Shield and Death Mark facts; `AbilityBaseSO.AimRadiusField` / `CooldownFields` (declared on the SOs); `ChickenMovement.KnockbackDecayRate` is public and `UnderdogSurgeSpeedFactor` replaces the `1.4f`; `BotController.ArrivalRadius`; `OracleMenu.BotArrivalRadius()`; `OracleKits.CopyScope` and `ResolveKit` are now `internal`.
+- **Finding:** the shipped Jump has `JumpTier` None, so `BlinkMetres` (the authored aim offset) is 0. Its reach is `MoveSpeed x SpeedMultiplier x Duration`; Jump now declares `SpeedMultiplier` and `SpeedSeconds` too. The design's "3.3 m" does not hold.
+- **Tests:** `MatchFactsTests`, `MatchKitsTests` (+ helper `TestHookPassive`). Full suite 4116: 4115 passed; the one failure (`EachNewHook_HasExactlyOneProductionCallSite`, a second `ModifyIncomingSlowFactor(` call in the builder) was fixed and its class re-run green.
+- **Maestro steps:** none.
+
 ## 2026-11-22 - Bots lose track of a hidden rival (BL-214, `develop`, not pushed)
 
 - **Fix:** Hide only faded the bird; bots targeted it as if visible (Maestro: technical debt, "stay with the last position and suppose it is there"). New pure rule `BotSightRules.Observe` + `RivalSighting` (Gameplay assembly, Fusion-free, reusable by the Balance simulator): a rival is hidden when `VisualOpacity` is faded (`BotSightRules.IsHidden`, the one home of the 0.99 threshold, `ControlStateVFX.FadedOpacityThreshold` now reads it); a visible rival is read live; a hidden one is remembered where the bot last saw it; reaching that spot (`_arrivalRadius`) or `GiveUpSeconds` (4 s) drops it until it reappears. A rival hidden before the first look is unknown.

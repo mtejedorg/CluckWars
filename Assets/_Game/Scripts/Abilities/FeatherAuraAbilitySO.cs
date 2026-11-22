@@ -67,6 +67,7 @@ namespace CluckWars.Abilities
         // An aura is authored as an Aura shape; a placed zone is a plain circle on the caster (no forward offset).
         public override AbilityAimShape AuthoredAimShape => IsPlaced ? AbilityAimShape.SelfCircle : AbilityAimShape.Aura;
         public override float AimRadius => AuraRadius;
+        public override string AimRadiusField => nameof(AuraRadius);
 
         public FeatherAuraAbilitySO()
         {

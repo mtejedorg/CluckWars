@@ -40,6 +40,7 @@ namespace CluckWars.Abilities
 
         public override AbilityAimShape AuthoredAimShape => AbilityAimShape.SelfCircle;
         public override float AimRadius => ShockRadius;
+        public override string AimRadiusField => nameof(ShockRadius);
 
         // FEEDBACK.md §2.2 / §3.2 case 15. Knockback and nothing else, so an Immovable rival is shoved by nothing at all.
         // See AbilityBaseSO.TargetEffectIsPurelyControl for why this is declared

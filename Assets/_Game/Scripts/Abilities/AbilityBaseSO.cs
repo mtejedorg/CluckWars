@@ -472,6 +472,15 @@ namespace CluckWars.Abilities
         public virtual float AimRadius => IndicatorRange;
 
         /// <summary>
+        /// The name of the serialized float behind <see cref="AimRadius"/>, or null where none may be tuned. The balance solver names a
+        /// value by asset and field; this lets it do so without naming a concrete ability type.
+        /// </summary>
+        public virtual string AimRadiusField => null;
+
+        /// <summary>The serialized floats that are this ability's cooldowns (<see cref="Cooldown"/> unless the ability keeps others).</summary>
+        public virtual string[] CooldownFields => new[] { nameof(Cooldown) };
+
+        /// <summary>
         /// How far along the caster's forward the shape's <i>defining point</i> sits, in
         /// metres. Read two ways depending on <see cref="AimShape"/>, and both are
         /// deliberate — one serialized field serves both rather than adding a second one to

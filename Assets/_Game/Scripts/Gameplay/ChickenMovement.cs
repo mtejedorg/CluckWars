@@ -35,7 +35,10 @@ namespace CluckWars.Gameplay
         // ExternalDisplacement (knockback) decays toward zero at this rate (1/s).
         // Tune during the Part B balance pass. A value of 8 means the impulse
         // falls to ~1% of its initial value in about 0.58 seconds.
-        private const float KnockbackDecayRate = 8f;
+        public const float KnockbackDecayRate = 8f;
+
+        /// <summary>Speed factor of an Underdog Surge (the comeback event), applied on top of the ability multiplier.</summary>
+        public const float UnderdogSurgeSpeedFactor = 1.4f;
 
         public ChickenMovement(CharacterController controller, ChickenController owner)
         {
@@ -79,7 +82,7 @@ namespace CluckWars.Gameplay
             float speedMult = _owner.MoveSpeedMultiplier;
             if (_owner.UnderdogSurgeActive)
             {
-                speedMult *= 1.4f;
+                speedMult *= UnderdogSurgeSpeedFactor;
             }
 
             // Speed = base × ability multiplier × slow multiplier (all are ≥ 0).

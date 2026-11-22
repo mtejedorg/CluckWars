@@ -113,7 +113,7 @@ namespace CluckWars.Balance
         }
 
         /// <summary>The passive's four abilities: a kit the verdict proposes, else the one <see cref="FixedKit"/> resolves. A malformed kit is an error, never a silent fallback.</summary>
-        private static AbilityBaseSO[] ResolveKit(OracleInputs inputs, PassiveAbilitySO shipped)
+        internal static AbilityBaseSO[] ResolveKit(OracleInputs inputs, PassiveAbilitySO shipped)
         {
             if (inputs.Verdict != null)
                 foreach (var change in inputs.Verdict.Kits)
@@ -169,7 +169,7 @@ namespace CluckWars.Balance
         }
 
         /// <summary>Owns the <see cref="BalanceBook.Preview{T}"/> copies of one build and destroys them on dispose (as <c>BalanceSctCheck</c> does).</summary>
-        private sealed class CopyScope : IDisposable
+        internal sealed class CopyScope : IDisposable
         {
             private readonly OracleInputs _inputs;
             private readonly List<ScriptableObject> _copies = new List<ScriptableObject>();
