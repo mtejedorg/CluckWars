@@ -932,8 +932,8 @@ PlayerSettings:
   cloudProjectId: 14249009-abbe-423c-8c0c-8391b8974857
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: 
-  organizationId: 
+  projectName: CluckWars
+  organizationId: marco-4480789
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
