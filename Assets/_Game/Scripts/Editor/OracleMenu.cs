@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using CluckWars.Abilities;
 using CluckWars.Balance;
 using CluckWars.Gameplay;
@@ -28,6 +29,9 @@ namespace CluckWars.EditorTools
         public const string MatchMenuPath = "Cluck Wars/Balance/Oracle/Match report";
         public const string SensitivityMenuPath = "Cluck Wars/Balance/Oracle/Match sensitivity";
         public const string AcceptMatchMenuPath = "Cluck Wars/Balance/Oracle/Accept match as balanced";
+        public const string WhatIfMenuPath = "Cluck Wars/Balance/Oracle/Match what-if";
+        public const string WhatIfFileName = "whatif.json";
+        public const string WhatIfArgument = "-oracleWhatIf";
         public const string SeedArgument = "-oracleSeed";
         public const string ThreadsArgument = "-oracleThreads";
         public const ulong DefaultMatchSeed = 20261122UL;
@@ -186,6 +190,57 @@ namespace CluckWars.EditorTools
             File.WriteAllText(md, section.ToMarkdown());
             WriteSample(context, seed, Path.Combine(dir, $"match-sample-{stamp}.md"));
             log.Info(Source, $"Match report written: {md} and {json} (bal={section.BalanceHash}, map={section.MapFingerprint}, seed={seed}); the {runs.Count} runs{(withSweep ? ", the sweep" : string.Empty)} and the report took {clock.Elapsed.TotalSeconds:0.0} s.");
+            return (json, md);
+        }
+
+        [MenuItem(WhatIfMenuPath, priority = 69)]
+        private static void MatchWhatIfFromMenu() => RunWhatIf();
+
+        /// <summary>
+        /// Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.MatchWhatIfBatch [-oracleWhatIf file] [-oracleSeed n] [-oracleThreads n]</c>. Reads the
+        /// named balance deltas of <c>Captures/oracle/whatif.json</c> (or the file given), plays the standard report designs for the shipped game and for each
+        /// delta with the same seeds, and writes <c>Captures/oracle/match-whatif-&lt;UTC&gt;.md</c> and <c>.json</c>. Read-only: nothing is applied or published.
+        /// </summary>
+        public static void MatchWhatIfBatch() => InBatch("The match what-if failed.", () => RunWhatIf());
+
+        public static (string json, string markdown) RunWhatIf()
+        {
+            var log = new UnityLogService(LogLevel.Info);
+            if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before the what-if: it reads the shipped assets.");
+            var (seed, threads) = MatchArguments();
+
+            string dir = OutputDirectory();
+            string path = Path.Combine(dir, WhatIfFileName);
+            var args = Environment.GetCommandLineArgs();
+            int at = Array.IndexOf(args, WhatIfArgument);
+            if (at >= 0 && at + 1 < args.Length) path = args[at + 1];
+            if (!File.Exists(path))
+            {
+                string missing = $"The what-if file is missing: {path}. Write one: {{\"replicateScale\":1,\"scenarios\":[{{\"name\":\"...\",\"delta\":{{\"schema\":1,\"assets\":{{...}}}}}}]}}.";
+                log.Error(Source, missing);
+                throw new FileNotFoundException(missing, path);
+            }
+            if (!WhatIfSpec.TryParse(File.ReadAllText(path), out var spec, out string error))
+            {
+                string bad = $"The what-if file is malformed: {path}: {error}.";
+                log.Error(Source, bad);
+                throw new InvalidOperationException(bad);
+            }
+
+            var inputs = Inputs();
+            WhatIfOutput output;
+            using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
+            {
+                inputs.Book = book;
+                output = MatchWhatIf.Run(inputs, OracleMapBaker.ArenaHalf(), BotArrivalRadius(), spec, seed, threads, LoadReference(), line => log.Info(Source, line));
+            }
+
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            string json = Path.Combine(dir, $"match-whatif-{stamp}.json");
+            string md = Path.Combine(dir, $"match-whatif-{stamp}.md");
+            File.WriteAllText(json, MatchWhatIf.Json(output));
+            File.WriteAllText(md, MatchWhatIf.Markdown(output));
+            log.Info(Source, $"Match what-if written: {md} and {json} ({output.Scenarios.Count} scenarios, {output.Scenarios.Count(s => s.Refused)} refused, {output.MatchesPlayed} matches in {output.ElapsedSeconds / 60.0:0.0} min).");
             return (json, md);
         }
 

@@ -224,22 +224,26 @@ namespace CluckWars.Balance
         /// <summary>
         /// The runs of the standard match report: the mixed, one-per-class and seat-check designs under each of the three populations, the forced
         /// kills once (P0), and with <paramref name="withSplits"/> the two head-to-head splits. <paramref name="progress"/> gets one line per run.
+        /// <paramref name="replicateScale"/> (default 1: the report's own replicates) scales every design's replicates, see <see cref="ScaledReplicates"/>.
         /// </summary>
-        public static List<MatchRunOutput> PlayStandard(MatchContext context, ulong seed, int threads, bool withSplits, Action<string> progress = null)
+        public static List<MatchRunOutput> PlayStandard(MatchContext context, ulong seed, int threads, bool withSplits, Action<string> progress = null, double replicateScale = 1.0)
         {
             if (context == null) throw new ArgumentNullException(nameof(context));
+            if (!(replicateScale > 0.0)) throw new ArgumentOutOfRangeException(nameof(replicateScale), "The replicate scale must be above zero.");
+            int mixedR = ScaledReplicates(MixedReplicates, replicateScale), onePerClassR = ScaledReplicates(OnePerClassReplicates, replicateScale);
+            int seatR = ScaledReplicates(SeatCheckReplicates, replicateScale), forcedR = ScaledReplicates(ForcedKillsReplicates, replicateScale);
             var plan = new List<(MatchDesignKind, int, PolicyPopulation)>();
             foreach (var population in new[] { PolicyPopulation.P0, PolicyPopulation.P1, PolicyPopulation.Mixed })
             {
-                plan.Add((MatchDesignKind.Mixed, MixedReplicates, population));
-                plan.Add((MatchDesignKind.OnePerClass, OnePerClassReplicates, population));
-                plan.Add((MatchDesignKind.SeatCheck, SeatCheckReplicates, population));
+                plan.Add((MatchDesignKind.Mixed, mixedR, population));
+                plan.Add((MatchDesignKind.OnePerClass, onePerClassR, population));
+                plan.Add((MatchDesignKind.SeatCheck, seatR, population));
             }
-            plan.Add((MatchDesignKind.ForcedKills, ForcedKillsReplicates, PolicyPopulation.P0));
+            plan.Add((MatchDesignKind.ForcedKills, forcedR, PolicyPopulation.P0));
             if (withSplits)
             {
-                plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.Split));
-                plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.SplitOdd));
+                plan.Add((MatchDesignKind.Mixed, mixedR, PolicyPopulation.Split));
+                plan.Add((MatchDesignKind.Mixed, mixedR, PolicyPopulation.SplitOdd));
             }
             var runs = new List<MatchRunOutput>(plan.Count);
             foreach (var (design, replicates, population) in plan)
@@ -250,6 +254,12 @@ namespace CluckWars.Balance
             }
             return runs;
         }
+
+        /// <summary>
+        /// <paramref name="replicates"/> times <paramref name="scale"/>, rounded to the nearest whole number and never below one. A scale of 1 gives the
+        /// report's own replicates; a what-if run uses a smaller one to fit more scenarios in the time (the margins grow by about the square root).
+        /// </summary>
+        public static int ScaledReplicates(int replicates, double scale) => Math.Max(1, (int)Math.Round(replicates * scale, MidpointRounding.AwayFromZero));
 
         private static readonly CutCause[] Causes = { CutCause.Stun, CutCause.Shove, CutCause.Execution, CutCause.EmptyPile, CutCause.OwnMove };
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;

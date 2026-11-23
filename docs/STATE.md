@@ -11,6 +11,13 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-23 - Match what-if report and the Spoiler / Thief lever map (BL-217, `develop`, not pushed)
+
+- **Tool:** menu `Cluck Wars/Balance/Oracle/Match what-if` (batch method and the `Captures/oracle/whatif.json` shape: `docs/TESTING.md`). It plays the standard report designs for the baseline and for each named schema-1 delta with the same seeds, and writes one markdown and JSON with the differences. A refused delta is reported and the rest still run. Nothing is applied.
+- **Suite:** 4330 passed, 0 failed (batch, with graphics).
+- **Lever map** (`Captures/oracle/match-whatif-20261123-111254.md`, 16 scenarios, 387600 matches, not committed): the Spoiler moves with `MatchConfig.ExecuteBounty` (about 1.5 points per bounty point under the strong policy); its passive bonus alone does little because few matches reach the clock; bounty 15 with `WindowSeconds` 5 (and `ArmSeconds` 2.5, or the passive at 30) puts it at 22 to 32 % under all three populations, at a cost of 5 to 7 points to the Speedy kits and about 4 to the Warrior kits. No Thief scenario passes about 11 %: numbers alone do not fix it.
+- **Not calibrated** against real matches; the real Spoiler bot wastes its stun (BL-215). Maestro decides (BL-217); no balance value was changed.
+
 ## 2026-11-23 - Match simulator S7: match records, the drift line and the solver's match term (BL-207, `develop`, not pushed)
 
 - **What exists:** match records on `OracleReference.asset` (`MatchRecords`, appended by the menu `Cluck Wars/Balance/Oracle/Accept match as balanced` or `OracleMenu.AcceptMatchBatch`; a record only, part 1's six entries, prices and drift guard untouched, targets stay 25 %), the report's drift section against the last record, `OracleReport.Match` (no output change when null), and the guarded match term of the solver (`MatchSolverTerm`: score in win-rate points squared over P0, P1 and mixed, common random numbers, gain over twice the paired noise, at most 3 values moved, a holdout on fresh seeds that reverts what does not hold, a seat check that aborts). The problem file gains a `"match"` block and `OracleProblem.DefaultMatchFree` lists the D8 (b) values; see `docs/TESTING.md` "Problem file, match block".
