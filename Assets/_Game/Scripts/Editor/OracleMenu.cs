@@ -27,16 +27,19 @@ namespace CluckWars.EditorTools
         public const string NoteArgument = "-oracleNote";
         public const string MatchMenuPath = "Cluck Wars/Balance/Oracle/Match report";
         public const string SensitivityMenuPath = "Cluck Wars/Balance/Oracle/Match sensitivity";
+        public const string AcceptMatchMenuPath = "Cluck Wars/Balance/Oracle/Accept match as balanced";
         public const string SeedArgument = "-oracleSeed";
         public const string ThreadsArgument = "-oracleThreads";
         public const ulong DefaultMatchSeed = 20261122UL;
         public const int DefaultMatchThreads = 12;
         /// <summary>Replicates of the four designs the match report plays (spec 5.3).</summary>
-        public const int MixedReplicates = 10, OnePerClassReplicates = 25, SeatCheckReplicates = 25, ForcedKillsReplicates = 5;
+        public const int MixedReplicates = MatchReports.MixedReplicates, OnePerClassReplicates = MatchReports.OnePerClassReplicates,
+            SeatCheckReplicates = MatchReports.SeatCheckReplicates, ForcedKillsReplicates = MatchReports.ForcedKillsReplicates;
         /// <summary>Matches written out event by event next to the report, so a number that looks wrong can be read in play.</summary>
         public const int SampleMatches = 6;
         private const string DefaultRecordNote = "baseline recorded from the menu";
         private const string DefaultAcceptNote = "accepted from the menu";
+        private const string DefaultAcceptMatchNote = "match record from the menu (a record to compare with, not a statement that the state is balanced)";
         private const string Source = "OracleReport";
 
         [MenuItem(MenuPath, priority = 61)]
@@ -153,40 +156,13 @@ namespace CluckWars.EditorTools
             var log = new UnityLogService(LogLevel.Info);
             if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before the match report: it reads the shipped assets.");
 
-            ulong seed = DefaultMatchSeed;
-            int threads = DefaultMatchThreads;
-            var args = Environment.GetCommandLineArgs();
-            int at = Array.IndexOf(args, SeedArgument);
-            if (at >= 0 && at + 1 < args.Length && !ulong.TryParse(args[at + 1], out seed))
-                throw new ArgumentException($"{SeedArgument} wants a whole number, got '{args[at + 1]}'.");
-            at = Array.IndexOf(args, ThreadsArgument);
-            if (at >= 0 && at + 1 < args.Length && !int.TryParse(args[at + 1], out threads))
-                throw new ArgumentException($"{ThreadsArgument} wants a whole number, got '{args[at + 1]}'.");
+            var (seed, threads) = MatchArguments();
 
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
-            var runs = new System.Collections.Generic.List<MatchRunOutput>();
             // The three populations play the mixed, one-per-class and seat-check designs; the forced kills (the other seats take P0's play) once;
             // the two splits (P1 on seats 0 and 2, then on 1 and 3) are the head-to-head line.
-            var plan = new System.Collections.Generic.List<(MatchDesignKind, int, PolicyPopulation)>();
-            foreach (var population in new[] { PolicyPopulation.P0, PolicyPopulation.P1, PolicyPopulation.Mixed })
-            {
-                plan.Add((MatchDesignKind.Mixed, MixedReplicates, population));
-                plan.Add((MatchDesignKind.OnePerClass, OnePerClassReplicates, population));
-                plan.Add((MatchDesignKind.SeatCheck, SeatCheckReplicates, population));
-            }
-            plan.Add((MatchDesignKind.ForcedKills, ForcedKillsReplicates, PolicyPopulation.P0));
-            plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.Split));
-            plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.SplitOdd));
-            foreach (var (design, replicates, population) in plan)
-            {
-                var run = MatchRunner.Run(context, new MatchRunSpec
-                {
-                    Design = design, Replicates = replicates, Population = population, RunSeed = seed, Threads = threads,
-                });
-                runs.Add(run);
-                log.Info(Source, $"Match run {design} {population} R={replicates}: {run.Results.Length} matches in {run.ElapsedMilliseconds / 1000.0:0.0} s on {threads} threads ({run.ElapsedMilliseconds / Math.Max(1, run.Results.Length):0.00} ms per match across threads).");
-            }
+            var runs = MatchReports.PlayStandard(context, seed, threads, true, line => log.Info(Source, line));
 
             MatchSweepOutput sweep = null;
             if (withSweep)
@@ -211,6 +187,52 @@ namespace CluckWars.EditorTools
             WriteSample(context, seed, Path.Combine(dir, $"match-sample-{stamp}.md"));
             log.Info(Source, $"Match report written: {md} and {json} (bal={section.BalanceHash}, map={section.MapFingerprint}, seed={seed}); the {runs.Count} runs{(withSweep ? ", the sweep" : string.Empty)} and the report took {clock.Elapsed.TotalSeconds:0.0} s.");
             return (json, md);
+        }
+
+        private static (ulong seed, int threads) MatchArguments()
+        {
+            ulong seed = DefaultMatchSeed;
+            int threads = DefaultMatchThreads;
+            var args = Environment.GetCommandLineArgs();
+            int at = Array.IndexOf(args, SeedArgument);
+            if (at >= 0 && at + 1 < args.Length && !ulong.TryParse(args[at + 1], out seed))
+                throw new ArgumentException($"{SeedArgument} wants a whole number, got '{args[at + 1]}'.");
+            at = Array.IndexOf(args, ThreadsArgument);
+            if (at >= 0 && at + 1 < args.Length && !int.TryParse(args[at + 1], out threads))
+                throw new ArgumentException($"{ThreadsArgument} wants a whole number, got '{args[at + 1]}'.");
+            return (seed, threads);
+        }
+
+        [MenuItem(AcceptMatchMenuPath, priority = 68)]
+        private static void AcceptMatchFromMenu()
+        {
+            if (Application.isBatchMode) { AcceptMatch(DefaultAcceptMatchNote); return; }
+            OracleNoteWizard.Open("Record the match report", "Record",
+                "A short note on why this match report is recorded. It is data to compare later reports with (the drift line); it changes no price and no target.", AcceptMatch);
+        }
+
+        /// <summary>
+        /// Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.AcceptMatchBatch -oracleNote "why" [-oracleSeed n] [-oracleThreads n]</c>. Plays the
+        /// standard match report on the shipped assets and appends a match record to the reference (spec 7, D5 (b)): part 1's entries and prices are not touched.
+        /// </summary>
+        public static void AcceptMatchBatch() => InBatch("Recording the match report failed.", () => AcceptMatch(NoteFromArguments(DefaultAcceptMatchNote)));
+
+        /// <summary>Plays the standard match report on the shipped assets (three populations, no splits) and appends it to the reference's match records.</summary>
+        public static void AcceptMatch(string note)
+        {
+            var log = new UnityLogService(LogLevel.Info);
+            if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before recording a match report: it reads the shipped assets.");
+            var (seed, threads) = MatchArguments();
+            var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
+            var reference = LoadReference();
+            var runs = MatchReports.PlayStandard(context, seed, threads, false, line => log.Info(Source, line));
+            var section = MatchReports.Build(context, runs, reference);
+            string date = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            OracleReferenceSO.AcceptMatch(reference, section, string.IsNullOrWhiteSpace(note) ? DefaultAcceptMatchNote : note.Trim(), date);
+            EditorUtility.SetDirty(reference);
+            AssetDatabase.SaveAssets();
+            var last = reference.MatchRecords[reference.MatchRecords.Count - 1];
+            log.Info(Source, $"Match record {reference.MatchRecords.Count} stored on {date}: {last.Lines.Count} lines, note \"{last.Note}\" (bal={last.BalanceHash}, seed={last.RunSeed}); part 1's {reference.Entries.Count} entries untouched.");
         }
 
         // A few mixed matches played again with their events recorded, written as plain lines.
@@ -268,6 +290,13 @@ namespace CluckWars.EditorTools
             }
 
             var inputs = Inputs();
+            if (problem.Match != null)
+            {
+                problem.Match.ArenaHalf = OracleMapBaker.ArenaHalf();
+                problem.Match.SightArrivalRadius = BotArrivalRadius();
+                problem.Match.Progress = line => log.Info(Source, line);
+                problem.Match.Reference = LoadReference();
+            }
             using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
             {
                 inputs.Book = book;

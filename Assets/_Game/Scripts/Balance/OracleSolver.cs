@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using CluckWars.Abilities;
 using CluckWars.Gameplay;
 
 namespace CluckWars.Balance
@@ -24,6 +25,37 @@ namespace CluckWars.Balance
         public string Key => Asset + "." + Field;
     }
 
+    /// <summary>
+    /// How the match term of the solver searches (spec 7.1): how many replicates each stage plays, how many screened moves are confirmed, the seed.
+    /// Read from the problem's <c>"match"</c> block; every key is optional. <see cref="ArenaHalf"/> and <see cref="SightArrivalRadius"/> come from the Editor
+    /// (the bake and the bot prefab), never from the file.
+    /// </summary>
+    public sealed class MatchProblemBlock
+    {
+        public const ulong DefaultSeed = 20261122UL;
+        /// <summary>Replicates of the Mixed design per candidate in the screen (three populations each).</summary>
+        public int ScreenReplicates = 3;
+        /// <summary>Replicates of the confirm and holdout runs; each replicate is one block of the paired noise estimate, so at least 2.</summary>
+        public int ConfirmReplicates = 10;
+        /// <summary>How many of the best screened moves go to the confirm run.</summary>
+        public int ConfirmBest = 3;
+        public ulong RunSeed = DefaultSeed;
+        /// <summary>Worker threads of a match run; zero or less means every core. The result does not depend on it.</summary>
+        public int Threads = 12;
+        /// <summary>Replicates of the seat check (full mirrors, three populations) that can abort the solve.</summary>
+        public int SeatCheckReplicates = 25;
+        /// <summary>Play the full match report (every design, the report's replicates) for the start and the proposal, for the proposal's plain-words half. About 100 s each on 12 threads; tests turn it off.</summary>
+        public bool FullReports = true;
+        /// <summary>The reference asset the Editor passes in: its Spoiler kill targets label the proposal's rows and its match records give the drift lines. Null for none.</summary>
+        public OracleReferenceSO Reference;
+        /// <summary>The arena half-size of the bake; the Editor sets it (the asset does not store it).</summary>
+        public float ArenaHalf;
+        /// <summary>The arrival radius of the game's bot, which the sight rule needs; the Editor sets it.</summary>
+        public float SightArrivalRadius;
+        /// <summary>Receives one line per stage of a long solve (the Editor logs them); null for none. Never part of the problem file.</summary>
+        public Action<string> Progress;
+    }
+
     /// <summary>What to search and what to aim at. Everything not listed in <see cref="Free"/> stays as it is.</summary>
     public sealed class OracleProblem
     {
@@ -37,6 +69,13 @@ namespace CluckWars.Balance
         /// value, so it can cross a flat stretch of the score. 1 turns that off.
         /// </summary>
         public int MaxFlatSteps = 4;
+
+        /// <summary>Weight of the match simulator's term in the score (<see cref="MatchSolverTerm.Score"/>, in win-rate points squared next to part 1's seconds squared). 0 leaves the solver exactly as part 1 built it and plays no match.</summary>
+        public float MatchWeight;
+        /// <summary>With a match term, at most this many distinct values change in one solve (spec 7.1, guard 3).</summary>
+        public int MaxMovedValues = 3;
+        /// <summary>The <c>"match"</c> block; null when the problem has none.</summary>
+        public MatchProblemBlock Match;
 
         /// <summary>
         /// Reads <c>{"bandLow":28,"bandHigh":36,"maxPasses":6,"maxFlatSteps":4,"free":[{"asset":"Fatty","field":"CargoCapacity","min":10,"max":60,"step":5}]}</c>.
@@ -63,6 +102,9 @@ namespace CluckWars.Balance
                         if (!Number(member.Value, "maxFlatSteps", out float flat, out error)) return false;
                         result.MaxFlatSteps = (int)flat;
                         break;
+                    case "match":
+                        if (!ParseMatch(member.Value, result, out error)) return false;
+                        break;
                     case "free":
                         if (member.Value.Kind != JsonKind.Array) { error = "\"free\" must be an array"; return false; }
                         for (int i = 0; i < member.Value.Items.Count; i++)
@@ -78,6 +120,118 @@ namespace CluckWars.Balance
             if (result.MaxFlatSteps < 1) { error = "maxFlatSteps must be 1 or more"; return false; }
             problem = result;
             error = null;
+            return true;
+        }
+
+        /// <summary>Step of the Death Mark's <c>LeaderPickWeight</c>, of a pile's food, of a class's <c>PeckCastSeconds</c>, of a cooldown and of an area radius in <see cref="DefaultMatchFree"/>.</summary>
+        public const float WeightStep = 0.25f, FoodStep = 1f, CastStep = 0.05f, CooldownStep = 0.25f, RadiusStep = 0.25f;
+
+        /// <summary>
+        /// The values spec 7.1 lets the match term move (D8 (b)): the Death Mark's <c>LeaderPickWeight</c>, the three pile amounts on the match config,
+        /// <c>PeckCastSeconds</c> of each class's stats, and for every non-Peck ability in the fixed kits each of its <see cref="AbilityBaseSO.CooldownFields"/>
+        /// and its <see cref="AbilityBaseSO.AimRadiusField"/> when it has one. A field with a [Range] takes it as its limits; with only a
+        /// [Min] (and a book to read the shipped value from) its upper limit is twice the shipped value, so every entry resolves. Steps are the constants above.
+        /// </summary>
+        public static List<FreeValue> DefaultMatchFree(OracleInputs inputs)
+        {
+            if (inputs == null) throw new ArgumentNullException(nameof(inputs));
+            if (inputs.Abilities == null || inputs.Classes == null || inputs.Match == null)
+                throw new ArgumentException("OracleInputs.Abilities, Classes and Match are required.", nameof(inputs));
+
+            var free = new List<FreeValue>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            void Add(string asset, string field, float step)
+            {
+                var value = new FreeValue { Asset = asset, Field = field, Step = step };
+                if (!seen.Add(value.Key)) return;
+                if (inputs.Book != null && inputs.Book.TryProbe(asset, field, out float shipped, out _, out float max, out _) && float.IsInfinity(max))
+                    value.Max = Math.Max(shipped * 2f, shipped + step * 8f);
+                free.Add(value);
+            }
+
+            var abilities = new List<AbilityBaseSO>();
+            var classes = new List<ChickenClass>();
+            foreach (var passive in inputs.Abilities.Passives)
+            {
+                if (passive == null) continue;
+                var cls = passive.Subclass.ClassOf();
+                if (!classes.Contains(cls)) classes.Add(cls);
+                foreach (var ability in OracleKits.ResolveKit(inputs, passive))
+                    if (ability != null && ability.Job != AbilityJob.Peck && !abilities.Contains(ability)) abilities.Add(ability);
+            }
+
+            foreach (var ability in abilities)
+                if (ability.Job == AbilityJob.DeathMark) Add(ability.name, "LeaderPickWeight", WeightStep);
+            Add(inputs.Match.name, nameof(MatchConfigSO.PersonalPileFood), FoodStep);
+            Add(inputs.Match.name, nameof(MatchConfigSO.ContestedPileFood), FoodStep);
+            Add(inputs.Match.name, nameof(MatchConfigSO.CentrePileFood), FoodStep);
+            foreach (var cls in classes)
+            {
+                if (!inputs.Classes.TryGet(cls, out var entry) || entry.Stats == null)
+                    throw new InvalidOperationException($"The class registry has no stats for {cls}.");
+                Add(entry.Stats.name, nameof(ChickenStatsSO.PeckCastSeconds), CastStep);
+            }
+            foreach (var ability in abilities)
+            {
+                foreach (string field in ability.CooldownFields) Add(ability.name, field, CooldownStep);
+                if (ability.AimRadiusField != null) Add(ability.name, ability.AimRadiusField, RadiusStep);
+            }
+            return free;
+        }
+
+        private static bool ParseMatch(JsonValue item, OracleProblem into, out string error)
+        {
+            error = null;
+            if (item.Kind != JsonKind.Object) { error = "\"match\" must be an object"; return false; }
+            var block = new MatchProblemBlock();
+            foreach (var m in item.Members)
+            {
+                string at = "match." + m.Key;
+                switch (m.Key)
+                {
+                    case "weight":
+                        if (!Number(m.Value, at, out into.MatchWeight, out error)) return false;
+                        if (!(into.MatchWeight >= 0f) || float.IsInfinity(into.MatchWeight)) { error = "match.weight must be 0 or more"; return false; }
+                        break;
+                    case "maxMovedValues": if (!WholeNumber(m.Value, at, 1, out into.MaxMovedValues, out error)) return false; break;
+                    case "screenReplicates": if (!WholeNumber(m.Value, at, 1, out block.ScreenReplicates, out error)) return false; break;
+                    case "confirmReplicates": if (!WholeNumber(m.Value, at, 2, out block.ConfirmReplicates, out error)) return false; break;
+                    case "confirmBest": if (!WholeNumber(m.Value, at, 1, out block.ConfirmBest, out error)) return false; break;
+                    case "threads": if (!WholeNumber(m.Value, at, 0, out block.Threads, out error)) return false; break;
+                    case "fullReports":
+                        if (m.Value.Kind != JsonKind.Bool) { error = "match.fullReports must be true or false"; return false; }
+                        block.FullReports = m.Value.Bool;
+                        break;
+                    case "seatCheckReplicates": if (!WholeNumber(m.Value, at, 1, out block.SeatCheckReplicates, out error)) return false; break;
+                    case "seed":
+                        if (m.Value.Kind == JsonKind.Number && m.Value.Number >= 0 && m.Value.Number == Math.Floor(m.Value.Number) && m.Value.Number < 9007199254740992.0)
+                            block.RunSeed = (ulong)m.Value.Number;
+                        else if (!(m.Value.Kind == JsonKind.String && TrySeed(m.Value.Text, out block.RunSeed)))
+                        {
+                            error = "match.seed must be a whole number or a hexadecimal string like \"0x1234\"";
+                            return false;
+                        }
+                        break;
+                    default: error = $"match: unknown key \"{m.Key}\""; return false;
+                }
+            }
+            into.Match = block;
+            return true;
+        }
+
+        private static bool TrySeed(string text, out ulong seed)
+        {
+            if (text != null && text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                return ulong.TryParse(text.Substring(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out seed);
+            return ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out seed);
+        }
+
+        private static bool WholeNumber(JsonValue v, string name, int min, out int value, out string error)
+        {
+            value = 0;
+            if (!Number(v, name, out float f, out error)) return false;
+            if (f != Math.Floor(f) || f < min || f > int.MaxValue) { error = $"\"{name}\" must be a whole number of {min} or more"; return false; }
+            value = (int)f;
             return true;
         }
 
@@ -122,6 +276,18 @@ namespace CluckWars.Balance
             sb.Append(",\"bandHigh\":").Append(BandHigh.ToString("R", inv));
             sb.Append(",\"maxPasses\":").Append(MaxPasses.ToString(inv));
             sb.Append(",\"maxFlatSteps\":").Append(MaxFlatSteps.ToString(inv));
+            if (Match != null)
+            {
+                sb.Append(",\"match\":{\"weight\":").Append(MatchWeight.ToString("R", inv));
+                sb.Append(",\"maxMovedValues\":").Append(MaxMovedValues.ToString(inv));
+                sb.Append(",\"screenReplicates\":").Append(Match.ScreenReplicates.ToString(inv));
+                sb.Append(",\"confirmReplicates\":").Append(Match.ConfirmReplicates.ToString(inv));
+                sb.Append(",\"confirmBest\":").Append(Match.ConfirmBest.ToString(inv));
+                sb.Append(",\"threads\":").Append(Match.Threads.ToString(inv));
+                sb.Append(",\"seatCheckReplicates\":").Append(Match.SeatCheckReplicates.ToString(inv));
+                sb.Append(",\"fullReports\":").Append(Match.FullReports ? "true" : "false");
+                sb.Append(",\"seed\":\"0x").Append(Match.RunSeed.ToString("x16", inv)).Append("\"}");
+            }
             sb.Append(",\"free\":[");
             for (int i = 0; i < Free.Count; i++)
             {
@@ -144,6 +310,10 @@ namespace CluckWars.Balance
         public float Old;
         public float New;
         public bool Changed;
+        /// <summary>The limits and step the search used (NaN when the solver did not report them).</summary>
+        public float Lo = float.NaN, Hi = float.NaN, Step = float.NaN;
+        /// <summary>The proposed value sits on one of its limits: the search wanted to go further (a sign the range, not the balance, decided it).</summary>
+        public bool AtLimit;
     }
 
     public sealed class OracleProposal
@@ -158,6 +328,12 @@ namespace CluckWars.Balance
         public List<ProposedValue> Values = new List<ProposedValue>();
         /// <summary>How many passes ran (a pass that finds no better move ends the search and is not counted).</summary>
         public int Passes;
+        /// <summary>Null unless the seat check aborted the solve (then no value changed and the proposal says why).</summary>
+        public string Aborted;
+        /// <summary>The moves of the match search that did not hold on fresh seeds, in plain words, last first; empty without a match term.</summary>
+        public List<string> Reverted = new List<string>();
+        /// <summary>What the guarded match search did; null when the problem had no match weight.</summary>
+        public MatchSearchResult Match;
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -175,7 +351,27 @@ namespace CluckWars.Balance
                 sb.Append("{\"asset\":").Append(BalanceJson.Quote(v.Asset)).Append(",\"field\":").Append(BalanceJson.Quote(v.Field));
                 sb.Append(",\"old\":").Append(N(v.Old)).Append(",\"new\":").Append(N(v.New)).Append('}');
             }
-            sb.Append("],\"before\":").Append(Before.ToJson()).Append(",\"after\":").Append(After.ToJson()).Append('}');
+            sb.Append(']');
+            if (Match != null)
+            {
+                sb.Append(",\"matchSearch\":{\"aborted\":").Append(Aborted == null ? "null" : BalanceJson.Quote(Aborted));
+                sb.Append(",\"matches\":").Append(Match.Matches.ToString(Inv)).Append(",\"seconds\":").Append(N((float)Match.ElapsedSeconds));
+                sb.Append(",\"holdoutScoreStart\":").Append(N(Match.HoldoutScoreStart)).Append(",\"holdoutScoreFinal\":").Append(N(Match.HoldoutScoreFinal));
+                sb.Append(",\"moves\":[");
+                for (int i = 0; i < Match.Moves.Count; i++)
+                {
+                    var m = Match.Moves[i];
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"pass\":").Append(m.Pass.ToString(Inv)).Append(",\"key\":").Append(BalanceJson.Quote(m.Key));
+                    sb.Append(",\"from\":").Append(N(m.From)).Append(",\"to\":").Append(N(m.To));
+                    sb.Append(",\"screenGain\":").Append(N(m.ScreenGain)).Append(",\"confirmGain\":").Append(N(m.ConfirmGain)).Append(",\"confirmNoise2\":").Append(N(m.ConfirmNoise2));
+                    sb.Append(",\"holdoutGain\":").Append(N(m.HoldoutGain)).Append(",\"holdoutCumulativeGain\":").Append(N(m.HoldoutCumulativeGain)).Append(",\"holdoutNoise2\":").Append(N(m.HoldoutNoise2));
+                    sb.Append(",\"reverted\":").Append(m.Reverted ? "true" : "false").Append('}');
+                }
+                sb.Append("],\"seatCheckBefore\":").Append(Match.SeatCheckBefore == null ? "null" : BalanceJson.Quote(Match.SeatCheckBefore));
+                sb.Append(",\"seatCheckAfter\":").Append(Match.SeatCheckAfter == null ? "null" : BalanceJson.Quote(Match.SeatCheckAfter)).Append('}');
+            }
+            sb.Append(",\"before\":").Append(Before.ToJson()).Append(",\"after\":").Append(After.ToJson()).Append('}');
             return sb.ToString();
         }
 
@@ -192,10 +388,11 @@ namespace CluckWars.Balance
             sb.AppendLine();
             sb.AppendLine("## Proposed values");
             sb.AppendLine();
-            sb.AppendLine("| Value | Now | Proposed |");
-            sb.AppendLine("|---|---|---|");
+            bool ranges = Values.Exists(v => !float.IsNaN(v.Step));
+            sb.AppendLine(ranges ? "| Value | Now | Proposed | Search range | Step |" : "| Value | Now | Proposed |");
+            sb.AppendLine(ranges ? "|---|---|---|---|---|" : "|---|---|---|");
             foreach (var v in Values)
-                sb.AppendLine($"| {v.Asset}.{v.Field} | {F2(v.Old)} | {F2(v.New)}{(v.Changed ? "" : " (unchanged)")} |");
+                sb.AppendLine($"| {v.Asset}.{v.Field} | {F2(v.Old)} | {F2(v.New)}{(v.Changed ? "" : " (unchanged)")}{(v.AtLimit ? " (ON THE LIMIT of its range)" : "")} |" + (ranges ? $" {F2(v.Lo)} to {F2(v.Hi)} | {F2(v.Step)} |" : ""));
             sb.AppendLine();
             sb.AppendLine("Balance delta (schema 1):");
             sb.AppendLine();
@@ -203,6 +400,7 @@ namespace CluckWars.Balance
             sb.AppendLine(DeltaJson);
             sb.AppendLine("```");
             sb.AppendLine();
+            if (Match != null) MatchProposalText.Append(sb, this);
             sb.AppendLine("## Four plain Warriors");
             sb.AppendLine();
             sb.AppendLine("| Seat | Before | After |");
@@ -253,6 +451,7 @@ namespace CluckWars.Balance
                 throw new ArgumentException("The solver starts from the shipped assets: OracleInputs.Verdict must be null or empty.", nameof(inputs));
 
             var specs = Resolve(inputs, problem);
+            if (problem.MatchWeight > 0f) return SolveWithMatch(inputs, problem, offsets, specs);
             var values = specs.Select(s => s.Start).ToArray();
 
             var current = Evaluate(inputs, problem, specs, values, offsets);
@@ -288,6 +487,116 @@ namespace CluckWars.Balance
                     Changed = values[i] != s.Start,
                 });
             }
+            return proposal;
+        }
+
+        // ------------------------------------------------------- the match term
+
+        /// <summary>
+        /// The search of spec 7.1 with the match term (<see cref="OracleProblem.MatchWeight"/> above 0): <see cref="MatchSolverTerm.Search"/> over this problem's
+        /// values, scored as part 1's score plus the weighted match term, then a full match report of the start and of the proposal for the plain-words half.
+        /// </summary>
+        private static OracleProposal SolveWithMatch(OracleInputs inputs, OracleProblem problem, IReadOnlyDictionary<string, float> offsets, List<Spec> specs)
+        {
+            var block = problem.Match ?? throw new ArgumentException("A match weight needs a \"match\" block in the problem.", nameof(problem));
+            if (!(block.ArenaHalf > 0f))
+                throw new ArgumentException("The match term needs MatchProblemBlock.ArenaHalf (the bake's arena half-size); the Editor menu sets it.", nameof(problem));
+            if (block.ConfirmReplicates < 2) throw new ArgumentException("The confirm run needs at least two replicates (its blocks give the noise).", nameof(problem));
+
+            var partOne = new Dictionary<string, Candidate>(StringComparer.Ordinal);
+            var contexts = new Dictionary<string, MatchContext>(StringComparer.Ordinal);
+            Candidate PartOne(float[] values)
+            {
+                string key = BuildDelta(specs, values) ?? string.Empty;
+                if (!partOne.TryGetValue(key, out var c)) partOne[key] = c = Evaluate(inputs, problem, specs, values, offsets);
+                return c;
+            }
+            MatchContext ContextOf(float[] values)
+            {
+                string key = BuildDelta(specs, values) ?? string.Empty;
+                if (!contexts.TryGetValue(key, out var c))
+                    contexts[key] = c = MatchContext.From(PartOne(values).Run, block.ArenaHalf, block.SightArrivalRadius);
+                return c;
+            }
+
+            MatchEval ScoreMatch(float[] values, int replicates, ulong seed, bool wantBlocks)
+            {
+                var c = PartOne(values);
+                if (!c.Usable) return new MatchEval { Usable = false, Score = float.PositiveInfinity };
+                var context = ContextOf(values);
+                var runs = MatchSolverTerm.PlayMixed(context, replicates, seed, block.Threads);
+                var section = MatchReports.Build(context, runs, null);
+                var e = new MatchEval { Section = section, Matches = runs.Sum(r => r.Results.Length) };
+                e.Score = c.Score + problem.MatchWeight * MatchSolverTerm.Score(section);
+                if (wantBlocks)
+                {
+                    e.Blocks = MatchSolverTerm.BlockScores(context, runs, section);
+                    for (int b = 0; b < e.Blocks.Length; b++) e.Blocks[b] = c.Score + problem.MatchWeight * e.Blocks[b];
+                }
+                return e;
+            }
+
+            var starts = specs.Select(s => s.Start).ToArray();
+            var search = MatchSolverTerm.Search(new MatchSearchSpec
+            {
+                Keys = specs.Select(s => s.Free.Key).ToArray(),
+                Start = starts,
+                Lo = specs.Select(s => s.Lo).ToArray(),
+                Hi = specs.Select(s => s.Hi).ToArray(),
+                Step = specs.Select(s => s.Free.Step).ToArray(),
+                MaxPasses = problem.MaxPasses,
+                MaxMovedValues = problem.MaxMovedValues,
+                ScreenReplicates = block.ScreenReplicates,
+                ConfirmReplicates = block.ConfirmReplicates,
+                ConfirmBest = block.ConfirmBest,
+                RunSeed = block.RunSeed,
+                Evaluate = ScoreMatch,
+                SeatCheck = values => MatchSolverTerm.SeatCheckText(ContextOf(values), block.SeatCheckReplicates, block.RunSeed, block.Threads),
+                Progress = block.Progress,
+            });
+
+            var finalValues = search.Values;
+            var start = PartOne(starts);
+            var final = PartOne(finalValues);
+            // The plain-words half: a full match report of the start and of the proposal (the report's designs and replicates, on the run seed).
+            MatchReportSection Full(float[] values)
+            {
+                var context = ContextOf(values);
+                block.Progress?.Invoke("Playing the full match report for " + (BuildDelta(specs, values) ?? "the shipped values") + ".");
+                return MatchReports.Build(context, MatchReports.PlayStandard(context, block.RunSeed, block.Threads, false), block.Reference);
+            }
+            var reportBefore = start.Report;
+            var reportAfter = final.Report;
+            if (search.Aborted == null && block.FullReports)
+            {
+                reportBefore.Match = Full(starts);
+                reportAfter.Match = finalValues.SequenceEqual(starts) ? reportBefore.Match : Full(finalValues);
+            }
+
+            float holdoutStart = search.HoldoutScoreStart;
+            if (float.IsNaN(holdoutStart) && search.Aborted == null)
+                holdoutStart = ScoreMatch(starts, block.ConfirmReplicates, MatchSolverTerm.PassSeed(block.RunSeed, problem.MaxPasses + 1), false).Score;
+            if (float.IsNaN(holdoutStart)) holdoutStart = start.Score;
+            var proposal = new OracleProposal
+            {
+                DeltaJson = final.DeltaJson,
+                Before = reportBefore,
+                After = reportAfter,
+                ScoreBefore = holdoutStart,
+                ScoreAfter = float.IsNaN(search.HoldoutScoreFinal) ? holdoutStart : search.HoldoutScoreFinal,
+                Passes = search.Passes,
+                Aborted = search.Aborted,
+                Match = search,
+            };
+            foreach (var m in search.Reverted.Reverse())
+                proposal.Reverted.Add($"{m.Key} {m.From:0.####} -> {m.To:0.####} (pass {m.Pass}) did not hold on fresh seeds");
+            for (int i = 0; i < specs.Count; i++)
+                proposal.Values.Add(new ProposedValue
+                {
+                    Asset = specs[i].Free.Asset, Field = specs[i].Free.Field, Old = specs[i].Start, New = finalValues[i], Changed = finalValues[i] != specs[i].Start,
+                    Lo = specs[i].Lo, Hi = specs[i].Hi, Step = specs[i].Free.Step,
+                    AtLimit = finalValues[i] != specs[i].Start && (finalValues[i] <= specs[i].Lo || finalValues[i] >= specs[i].Hi),
+                });
             return proposal;
         }
 
@@ -363,6 +672,8 @@ namespace CluckWars.Balance
             public OracleReport Report;
             public float Score;
             public string DeltaJson;
+            /// <summary>The inputs the candidate was measured on (the shipped assets with its verdict over them); the match term reads its kits from these.</summary>
+            public OracleInputs Run;
         }
 
         private static Candidate Evaluate(OracleInputs inputs, OracleProblem problem, List<Spec> specs, float[] values,
@@ -391,6 +702,7 @@ namespace CluckWars.Balance
                 Report = report,
                 Score = Score(report, problem),
                 DeltaJson = verdict != null && !verdict.IsEmpty ? verdict.Canonical : "{\"schema\":1}",
+                Run = run,
             };
         }
 

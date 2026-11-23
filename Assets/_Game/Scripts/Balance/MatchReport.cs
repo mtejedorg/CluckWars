@@ -180,6 +180,8 @@ namespace CluckWars.Balance
         public int SeatCheckCornerDecided;
         public int SeatCheckMatches;
         public List<DriftLine> Drift = new List<DriftLine>();
+        /// <summary>One line per match record in the reference, oldest first (date, note, balance hash, seed); empty when there is none.</summary>
+        public List<string> RecordHistory = new List<string>();
         /// <summary>Which population the tables of this section are for (P0 for the section Build returns; <see cref="Policies"/> holds one per population).</summary>
         public PolicyPopulation Population;
         /// <summary>One section per population that ran, in the order P0, P1, mixed; the first is this section's own tables.</summary>
@@ -215,6 +217,39 @@ namespace CluckWars.Balance
         public const float Target = 0.25f;
         public const float BandLow = 0.20f;
         public const float BandHigh = 0.30f;
+
+        /// <summary>Replicates of the four designs the match report plays (spec 5.3).</summary>
+        public const int MixedReplicates = 10, OnePerClassReplicates = 25, SeatCheckReplicates = 25, ForcedKillsReplicates = 5;
+
+        /// <summary>
+        /// The runs of the standard match report: the mixed, one-per-class and seat-check designs under each of the three populations, the forced
+        /// kills once (P0), and with <paramref name="withSplits"/> the two head-to-head splits. <paramref name="progress"/> gets one line per run.
+        /// </summary>
+        public static List<MatchRunOutput> PlayStandard(MatchContext context, ulong seed, int threads, bool withSplits, Action<string> progress = null)
+        {
+            if (context == null) throw new ArgumentNullException(nameof(context));
+            var plan = new List<(MatchDesignKind, int, PolicyPopulation)>();
+            foreach (var population in new[] { PolicyPopulation.P0, PolicyPopulation.P1, PolicyPopulation.Mixed })
+            {
+                plan.Add((MatchDesignKind.Mixed, MixedReplicates, population));
+                plan.Add((MatchDesignKind.OnePerClass, OnePerClassReplicates, population));
+                plan.Add((MatchDesignKind.SeatCheck, SeatCheckReplicates, population));
+            }
+            plan.Add((MatchDesignKind.ForcedKills, ForcedKillsReplicates, PolicyPopulation.P0));
+            if (withSplits)
+            {
+                plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.Split));
+                plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.SplitOdd));
+            }
+            var runs = new List<MatchRunOutput>(plan.Count);
+            foreach (var (design, replicates, population) in plan)
+            {
+                var run = MatchRunner.Run(context, new MatchRunSpec { Design = design, Replicates = replicates, Population = population, RunSeed = seed, Threads = threads });
+                runs.Add(run);
+                progress?.Invoke($"Match run {design} {population} R={replicates}: {run.Results.Length} matches in {run.ElapsedMilliseconds / 1000.0:0.0} s on {threads} threads ({run.ElapsedMilliseconds / Math.Max(1, run.Results.Length):0.00} ms per match across threads).");
+            }
+            return runs;
+        }
 
         private static readonly CutCause[] Causes = { CutCause.Stun, CutCause.Shove, CutCause.Execution, CutCause.EmptyPile, CutCause.OwnMove };
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -276,7 +311,68 @@ namespace CluckWars.Balance
 
             ApplyCalls(primary, sections);
             if (sweep != null) ApplySweep(primary, sweep);
+            if (reference != null && reference.MatchRecords != null && reference.MatchRecords.Count > 0)
+            {
+                primary.Drift = DriftAgainst(primary, reference.MatchRecords[reference.MatchRecords.Count - 1]);
+                primary.RecordHistory = reference.MatchRecords.Select(RecordSummary).ToList();
+            }
             return primary;
+        }
+
+        private static string RecordSummary(MatchRecord r) =>
+            $"{r.AcceptedOn}: \"{r.Note}\" (bal={r.BalanceHash}, seed {r.RunSeed}, {r.Design}; {r.Population}; {(r.Lines != null ? r.Lines.Count : 0)} lines)";
+
+        private static string PopulationName(PolicyPopulation p) => p == PolicyPopulation.Mixed ? "Mixed" : p.ToString();
+
+        /// <summary>
+        /// Every win rate a match record stores, from a report: each kit and each class (pooled, and the one-per-class headline when it ran)
+        /// under each population the report holds, with its interval.
+        /// </summary>
+        public static List<MatchRecordLine> RecordLines(MatchReportSection report)
+        {
+            if (report == null) throw new ArgumentNullException(nameof(report));
+            var lines = new List<MatchRecordLine>();
+            var sections = report.Policies.Count > 0 ? report.Policies : new List<MatchReportSection> { report };
+            foreach (var section in sections)
+            {
+                string pop = PopulationName(section.Population);
+                foreach (var k in section.Kits) Add(lines, k.Label, pop, false, k.Win);
+                foreach (var c in section.Classes)
+                {
+                    Add(lines, c.Class.ToString(), pop, true, c.Pooled);
+                    Add(lines, c.Class + " (one per class)", pop, true, c.Headline);
+                }
+            }
+            return lines;
+        }
+
+        private static void Add(List<MatchRecordLine> lines, string label, string population, bool isClass, WinInterval w)
+        {
+            if (w.Trials == 0) return;
+            lines.Add(new MatchRecordLine { Label = label, Population = population, IsClass = isClass, Rate = w.Rate, Low = w.Low, High = w.High, Trials = w.Trials });
+        }
+
+        /// <summary>
+        /// The change of every win rate in <paramref name="report"/> from <paramref name="record"/>, in points (positive: higher now), one line per kit
+        /// or class and population that both hold. The label carries both rates and both margins, so a change inside the noise reads as one.
+        /// A report line, never a test (D7).
+        /// </summary>
+        public static List<DriftLine> DriftAgainst(MatchReportSection report, MatchRecord record)
+        {
+            var drift = new List<DriftLine>();
+            if (record.Lines == null) return drift;
+            var then = new Dictionary<(string, string), MatchRecordLine>();
+            foreach (var l in record.Lines) then[(l.Label, l.Population)] = l;
+            foreach (var now in RecordLines(report))
+            {
+                if (!then.TryGetValue((now.Label, now.Population), out var old)) continue;
+                drift.Add(new DriftLine
+                {
+                    Label = $"{now.Label}, {now.Population}: {Pct(now.Rate)} (+/- {((now.High - now.Low) * 50f).ToString("0.0", Inv)}) now, {Pct(old.Rate)} (+/- {((old.High - old.Low) * 50f).ToString("0.0", Inv)}) on {record.AcceptedOn}",
+                    Points = (now.Rate - old.Rate) * 100f,
+                });
+            }
+            return drift;
         }
 
         private static PolicyMatchupLine Matchup(MatchRunOutput run)
@@ -976,11 +1072,19 @@ namespace CluckWars.Balance
             sb.AppendLine($"Corner tie-breaks in the mixed design: " + string.Join(", ", pops.Select(p => $"{Name(p.Population)} {p.CornerDecided} of {p.MixedMatches}")) + ".");
             sb.AppendLine();
 
-            sb.AppendLine("## Drift from the last accepted match record");
+            sb.AppendLine("## Drift from the last match record");
             sb.AppendLine();
-            if (r.Drift.Count == 0) sb.AppendLine("No accepted match record yet.");
+            if (r.RecordHistory.Count == 0) sb.AppendLine("No match record yet.");
             else
+            {
+                sb.AppendLine("Records, oldest first (a record is data to compare with, not a statement that the state is balanced):");
+                sb.AppendLine();
+                foreach (var h in r.RecordHistory) sb.AppendLine($"- {h}");
+                sb.AppendLine();
+                sb.AppendLine("Change from the last record, in win-rate points (both margins are in the line; a change inside them is noise):");
+                sb.AppendLine();
                 foreach (var d in r.Drift) sb.AppendLine($"- {d.Label}: {Num(d.Points, "+0.0;-0.0")} points");
+            }
             return sb.ToString();
         }
 
@@ -1139,6 +1243,7 @@ namespace CluckWars.Balance
                 $"{{\"kit\":{S(k.Kit)},\"matches\":{k.Matches},\"winsBySeat\":[{string.Join(",", k.WinsBySeat)}],\"cornerDecided\":{k.CornerDecided}}}")) + "]");
             sb.Append($",\"seatCheckMatches\":{r.SeatCheckMatches},\"seatCheckCornerDecided\":{r.SeatCheckCornerDecided}");
             sb.Append(",\"drift\":[" + string.Join(",", r.Drift.Select(d => $"{{\"label\":{S(d.Label)},\"points\":{N(d.Points)}}}")) + "]");
+            sb.Append(",\"records\":[" + string.Join(",", r.RecordHistory.Select(S)) + "]");
             sb.Append(",\"leftOut\":[" + string.Join(",", r.LeftOut.Select(S)) + "]");
             sb.Append(",\"matchups\":[" + string.Join(",", r.Matchups.Select(m => $"{{\"label\":{S(m.Label)},\"matches\":{m.Matches},\"p1Share\":{W(m.P1Share)}}}")) + "]");
             sb.Append(",\"policies\":[" + string.Join(",", r.Policies.Select(PolicyJson)) + "]");

@@ -103,6 +103,12 @@ namespace CluckWars.Balance
         public List<ThiefRow> Thief = new List<ThiefRow>();
         public List<string> NotModelled = new List<string>(DefaultNotModelled);
 
+        /// <summary>
+        /// The match simulator's section, when a run asked for it (the solver's match term fills it). Null by default: with null the JSON has no
+        /// <c>match</c> key and the Markdown no match heading, byte for byte part 1's output.
+        /// </summary>
+        public MatchReportSection Match;
+
         /// <summary>Spoiler inputs echoed so the page can say them in words.</summary>
         public float SpoilerBountyPerKill;
         public float SpoilerPassiveBonus;
@@ -187,7 +193,9 @@ namespace CluckWars.Balance
                 if (i > 0) sb.Append(',');
                 sb.Append(BalanceJson.Quote(NotModelled[i]));
             }
-            sb.Append("]}");
+            sb.Append(']');
+            if (Match != null) sb.Append(",\"match\":").Append(Match.ToJson());
+            sb.Append('}');
             return sb.ToString();
         }
 
@@ -289,6 +297,11 @@ namespace CluckWars.Balance
             sb.AppendLine("## What this report does not model");
             sb.AppendLine();
             foreach (var item in NotModelled) sb.AppendLine($"- {item}");
+            if (Match != null)
+            {
+                sb.AppendLine();
+                sb.Append(Match.ToMarkdown());
+            }
             return sb.ToString();
         }
 

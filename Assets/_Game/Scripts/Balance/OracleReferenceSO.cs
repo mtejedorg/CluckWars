@@ -29,6 +29,41 @@ namespace CluckWars.Balance
         public float MaxWinRate;
     }
 
+    /// <summary>One win rate of a match record: a kit or a class, under one policy population, with its 95 % interval.</summary>
+    [Serializable]
+    public struct MatchRecordLine
+    {
+        /// <summary>A kit label, a class name (the mixed design's pooled rate), or a class name followed by " (one per class)" for the headline.</summary>
+        public string Label;
+        /// <summary>"P0", "P1" or "Mixed".</summary>
+        public string Population;
+        public bool IsClass;
+        public float Rate;
+        public float Low;
+        public float High;
+        /// <summary>Seats (kits, pooled classes) or matches (headline classes) the rate rests on.</summary>
+        public int Trials;
+    }
+
+    /// <summary>
+    /// One recorded match report (spec 7, D5 (b)): the win rates of the shipped state at a date. A record is data to compare with, never a
+    /// statement that the state is balanced; targets stay at 25 % and nothing is learnt from it.
+    /// </summary>
+    [Serializable]
+    public struct MatchRecord
+    {
+        public string AcceptedOn;
+        public string Note;
+        public string BalanceHash;
+        /// <summary>The designs the lines come from, in words.</summary>
+        public string Design;
+        /// <summary>The populations the lines cover, in words.</summary>
+        public string Population;
+        /// <summary>The run seed as hexadecimal text (a whole 64-bit number does not fit a float field).</summary>
+        public string RunSeed;
+        public List<MatchRecordLine> Lines;
+    }
+
     /// <summary>
     /// The state of the game Maestro last recorded or accepted: the seconds every foraging kit needs to bank the win target in the oracle's
     /// economy run, with the offset in seconds each kit is worth beyond that (a credit when positive; spec 5.4, 5.6). The offsets feed
@@ -57,6 +92,8 @@ namespace CluckWars.Balance
         public List<Entry> Entries = new List<Entry>();
         /// <summary>The Spoiler's kills-to-win targets (match simulator report labels). Empty for an asset written before they existed.</summary>
         public List<SpoilerKillTarget> KillTargets = new List<SpoilerKillTarget>();
+        /// <summary>The match simulator's records, oldest first (<see cref="AcceptMatch"/> appends). Empty for an asset written before they existed; part 1 never reads them.</summary>
+        public List<MatchRecord> MatchRecords = new List<MatchRecord>();
 
         /// <summary>Offset in seconds per kit label, the shape <see cref="OracleRunner.Run"/> takes.</summary>
         public IReadOnlyDictionary<string, float> Offsets()
@@ -118,6 +155,36 @@ namespace CluckWars.Balance
             foreach (var line in applicable)
                 entries.Add(new Entry { Label = line.Label, BestSeconds = line.BestSeconds, OffsetSeconds = line.BestSeconds - mean });
             Store(target, report, note, date, entries, ReferenceOrigin.AcceptedAsBalanced);
+        }
+
+        /// <summary>
+        /// Appends a record of <paramref name="report"/>'s win rates (every kit and every class, under each population the report ran) with the
+        /// date and note. It never touches <see cref="Entries"/>, the prices or the origin: part 1 and its drift guard do not see it.
+        /// </summary>
+        public static void AcceptMatch(OracleReferenceSO target, MatchReportSection report, string note, string date)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            if (report == null) throw new ArgumentNullException(nameof(report));
+            if (string.IsNullOrWhiteSpace(date)) throw new ArgumentException("A date is required.", nameof(date));
+            if (report.Kits.Count == 0) throw new InvalidOperationException("The match report has no kit to record.");
+
+            var lines = MatchReports.RecordLines(report);
+            var populations = new List<string>();
+            foreach (var l in lines) if (!populations.Contains(l.Population)) populations.Add(l.Population);
+            var designs = new List<string> { "Mixed" };
+            if (report.Classes.Exists(c => c.Headline.Trials > 0)) designs.Add("OnePerClass");
+
+            if (target.MatchRecords == null) target.MatchRecords = new List<MatchRecord>();
+            target.MatchRecords.Add(new MatchRecord
+            {
+                AcceptedOn = date,
+                Note = note ?? string.Empty,
+                BalanceHash = report.BalanceHash,
+                Design = string.Join(", ", designs),
+                Population = string.Join(", ", populations),
+                RunSeed = "0x" + report.RunSeed.ToString("x16"),
+                Lines = lines,
+            });
         }
 
         private static List<KitLine> Validate(OracleReferenceSO target, OracleReport report, string date)

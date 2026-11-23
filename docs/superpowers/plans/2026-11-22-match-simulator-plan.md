@@ -113,6 +113,30 @@ Task 6 deviated from the text of Task 6 in these places; where Task 7 assumes th
 9. **Cost.** Per match, one thread (batch, a busier machine than S5): farm-only 12.7 ms, P0 19.2 ms, P1 43.9 ms. On 12 threads the default report (12 runs) takes 103 s, the sensitivity run 8.1 min (the sweep 94 500 matches in 370 s). The design's section 5.4 carries the figures.
 10. **`OracleMenu`**: `MatchReport(bool withSweep = false)`; `MatchReportBatch` plays the three populations, `MatchSensitivityBatch` (menu `Cluck Wars/Balance/Oracle/Match sensitivity`) adds the sweep and writes `match-sensitivity-<UTC>`. `MatchTimingBatch` times P1 too.
 
+## Deviations after Task 7
+
+Task 7 deviated from the text of Task 7 in these places. Where the plan left a choice, the simplest one that satisfies its tests was taken; the choice is named.
+
+1. **Records.** `MatchRecordLine` gains `Population` ("P0", "P1", "Mixed"), so a line says which population it is; the record's `Design` and `Population` are words ("Mixed, OnePerClass"; "P0, P1, Mixed"). Class lines are the mixed design's pooled rate under the class name, and the one-per-class headline under "<class> (one per class)". `MatchReports.RecordLines` makes them, `MatchReports.DriftAgainst(report, record)` compares with the last record (`MatchReports.Build` calls it when it is given a reference with records) and `MatchReportSection.RecordHistory` lists every record. The drift heading is now "Drift from the last match record". A line's drift label carries both rates and both margins; a line only one side holds has no drift.
+2. **The problem block.** `MatchProblemBlock` also holds `Threads` (12), `SeatCheckReplicates` (25), `FullReports` (true), the runtime-only `ArenaHalf`, `SightArrivalRadius` and `Progress` (the menu fills them; the Balance code cannot read the bake or the prefab). `weight` and `maxMovedValues` live on `OracleProblem` (`MatchWeight`, `MaxMovedValues`) and are read from the block. `seed` is a whole number or a hex string. `"match": {}` alone has weight 0 (the term is off).
+3. **The score** is in win-rate points squared (not fractions), so that weight 1 is comparable with part 1's seconds squared. Each kit counts the mean over P0, P1 and mixed of its squared excess beyond its interval half-width; a kit tagged policy-sensitive or no-call adds nothing, and so does a class whose three pooled rates do not agree on the band. Classes use the mixed design's pooled rates (the search plays only the Mixed design).
+4. **Blocks are the replicates**, not ten index blocks: each replicate is a full mixed design (every kit set and seating once), so a block is a small copy of the run. The block score uses the dead zones and the skipped kits of the whole run's report. At `ConfirmReplicates` 10 this is the plan's ten blocks.
+5. **The search** is `MatchSolverTerm.Search(MatchSearchSpec)`, generic over an evaluator (`MatchEvaluator`), so the guard is tested on synthetic scores; `OracleSolver` binds it to the book, part 1's score and the match runs. Single steps only: the flat-step search of part 1 is not used on the match path. `RevertCount` takes the cumulative holdout gains (the first j moves together against the start, fresh seeds) and the thresholds, and reverts last first until the moves left hold; the holdout plays the start and every prefix of the moves. A move's holdout gain and the cumulative one are in the proposal.
+6. **The seat check** is the SeatCheck design (every kit four times) at `SeatCheckReplicates` under P0, P1 and mixed; any flagged seat (the report's `SeatLine.Flagged`, corner-decided matches left out) aborts at the start. It is played again on the proposal and shown, never acted on. With 12 seat lines at 95 % a false flag is likely at R 25, which is why the replicates are a problem key.
+7. **`DefaultMatchFree`** takes a field's own [Range]; a field with only a [Min] gets a maximum of twice its shipped value (or the shipped value plus eight steps), read through the book. Steps: weight 0.25, food 1, cast 0.05 s, cooldown 0.25 s, radius 0.25 m.
+8. **Full reports.** After the search, `OracleSolver` plays the standard match report for the start and for the proposal (`MatchReports.PlayStandard`, extracted from the menu; the replicate constants moved to `MatchReports` and `OracleMenu` aliases them) and puts them in `Before.Match` and `After.Match`, so the proposal shows every kit and class under the three populations, the calls and the Spoiler table. `FullReports: false` skips them (tests). `OracleReport.Match` prints into the part 1 report's JSON (`"match"`) and Markdown only when set.
+9. **Cost.** One candidate at R 1 is 1 260 matches (420 cells, three populations), about 4 s on 12 threads on this PC; the Mixed design at R 10 under one population takes 10 s (P0), 19 s (P1), 14 s (mixed). The test `MatchSolve_OnTheShippedAssets_IsThreadIndependent_AndKeepsTheCap` plays two small solves (about 55 s each) and carries a 15-minute timeout.
+
+## Findings after Task 7
+
+First real solve (2026-11-23, seed 20261122, weight 1, shipped `bal=5465b825`), proposal only, kept in `Captures/oracle/proposal-20261123-011504.md` and `.json` (not committed; `problem-match-20261123.json` next to it is the problem). Twenty free values with ranges and steps in the proposal's table: `LeaderPickWeight` 1 to 4 step 0.25; `ExecuteBounty` 0 to 12 step 1; the three piles 6 to 14, 11 to 19 and 30 to 50, steps 1, 1 and 2; `PeckCastSeconds` of Fatty, Warrior and Speedy 0.2 to 1.2 step 0.05; Fatty `CargoCapacity` 20 to 50 step 2 and `PeckCooldown` 0.4 to 1.0 step 0.05; the cooldown and radius of Steal (`Snatch`), Stun (`WingSlam`), Shove (`CluckShock`), Slow and Slow Area (`FeatherAura`) in steps of 0.5 within about 40 % of the shipped value. Screen R 1, confirm and holdout R 6, three best confirmed, at most 3 passes, 3 values.
+
+- **Cost.** 92 scored candidates, 176 400 matches; the search took 657 s and the whole solve 779 s (first run, on a busier machine, 973 s) on 12 threads, including the two full match reports (about 90 s each). Same numbers on the second run (determinism). A candidate at R 1 is about 4 s.
+- **Result.** One move survived: `MatchConfig.ContestedPileFood` 15 to 16 (gain 161.5 at the confirm run against 127.1 to beat; 356.1 on fresh seeds against 225.1; held). The other 19 values never found a move above the guard. Pass 2 screened 40 moves, 4 improved at R 1, none held at R 6. Score on fresh seeds 2 738.6 to 2 382.6.
+- **What it says.** The score is dominated by gaps no single step of any value can close: the Spoiler and the Thief win 2 to 5 % of their seats under every population, the Slippery and Featherfoot kits 45 to 48 % in the mixed population. One pile more helps the Warrior classes (pooled P1 19.6 to 25.0 %) and the Speedy kits (down 1 to 6 points) and hurts the Bulwark (mixed 32.4 to 35.8 %, 3.4 points further from 25 % by more than the margin). The Hoarder's P1 rate went 17.2 to 9.8 % and the Bully's 23.4 to 32.6 %, both policy-sensitive kits the score does not count. No value ended on a range limit. No two populations moved opposite ways beyond their margins for one kit. Nothing was reverted. The Spoiler table: no row moved by more than 5 points (their margins are several points at 120 to 240 matches a row); the 3-kill loaded row crosses the edge of its without-passive target from 80.4 % to 78.8 %, which is noise-sized, and the empty-victim rows stay at 32 to 38 % even with 4 kills against a 90 % target (the shipped Spoiler cannot convert kills into a win when its victims carry nothing).
+- **Seat check.** Clean at the start; one of twelve lines flagged on the proposal (P1 seat 3, 17.5 %, interval 12.4 to 24.0 %). With twelve lines at 95 % a flag by chance is likely at 200 matches a line; it is printed, not acted on.
+- **The term is noisy.** A candidate that moves a kit across the policy-sensitive line adds or drops its whole squared distance, so the paired noise is large next to the gains (127 and 167 at R 6 against gains of 160 and 187), and 23 of 40 moves "improved" at R 1, the best 3 went to the confirm run and one held. A longer search needs R 10 or more in the screen, or a smoother term (the distance of every kit counted, with the disagreement shown beside it instead of dropping it).
+
 ## Global Constraints
 
 - Simulator code is pure, Fusion-free C# in `Assets/_Game/Scripts/Balance/`, namespace `CluckWars.Balance`, Gameplay assembly (the folder's `CluckWars.Gameplay.asmref`). No `using Fusion`, no MonoBehaviour, no `UnityEngine` beyond `Vector2`, `Mathf` and the ScriptableObject reads in the builders. No upward assembly reference.
@@ -619,7 +643,7 @@ git commit -m "feat(balance): utility policy P1, mixed population, sensitivity s
   - `static class MatchSolverTerm`: `static float Score(MatchReportSection match)` (squared distance from `MatchReports.Target` beyond one interval half-width, kits and classes, skipping `PolicySensitive` and `NoCall`); `static ulong PassSeed(ulong runSeed, int pass)`; `static bool Accepts(float gain, IReadOnlyList<float> blockDiffs, float minGain)`; `static int[] FreeIndices(IReadOnlyList<bool> moved, int maxMovedValues)`; `static int RevertCount(IReadOnlyList<float> holdoutGains, IReadOnlyList<float> thresholds)`.
   - `OracleProposal` gains `string Aborted` (null unless the seat check aborted the solve) and `List<string> Reverted`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 // MatchReferenceTests
@@ -644,11 +668,11 @@ git commit -m "feat(balance): utility policy P1, mixed population, sensitivity s
 [Test] public void SeatCheckFlagged_AbortsTheSolve()                     // synthetic flagged report: Aborted not null, no value changed
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 `-testFilter "CluckWars.Tests.MatchReferenceTests;CluckWars.Tests.MatchSolverTermTests"`. Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 With `MatchWeight == 0` the solver takes its existing path untouched and runs no match. With a weight, the search follows spec 7.1, in this order per pass:
 
@@ -666,11 +690,11 @@ revert RevertCount(...) moves, last first; list them in Reverted
 
 Score per candidate = part 1 `Score` + `MatchWeight x MatchSolverTerm.Score`. Mixed design, P0 and P1 together. A seat check flagged at the start sets `Aborted` and returns the start values.
 
-- [ ] **Step 4: Run the tests, the full suite and part 1's guards**
+- [x] **Step 4: Run the tests, the full suite and part 1's guards**
 
 New classes pass. `OracleReferenceTests`, `OracleSolverTests`, `OracleRunnerTests` pass unchanged. Full suite 0 failed. Then a batch solve with `Captures/oracle/problem.json` holding `DefaultMatchFree` and `"match": {"weight": 1}`; expected: a proposal file, its run time logged, at most 3 values changed. Put the measured time next to the 7.1 formula in the report (not in the spec; the orchestrator decides).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add <every file listed under Files, with .meta for new files>
