@@ -267,6 +267,14 @@ Swept per seat with a Latin hypercube (16 points by default):
 
 Populations: all P0, all P1, and mixed (policy drawn per seat), so a kit is never only measured against its mirror policy.
 
+**The reaction delay's default (2026-11-23, Maestro's brief for S6).** The game's bot has no reaction delay, so P0 "as the
+bot" runs at `d` = 0 plus the small jitter of 5.1 (0 to 0.1 s per intent, so replicates differ); the earlier default of 0.30 s
+(first reports, to 2026-11-22) halved the Spoiler's kills and is reproduced by parameter
+(`MatchRunSpec.WithJitter(PolicyParams.Default, MatchRunSpec.DefaultReactionJitter)`; `PolicyParams.Default.ReactionDelay`
+is still 0.3). `d` is the model of human slowness and a sweep axis for both policies: 0, 0.1 and 0.3 s as a one-factor
+table, and 0 to 0.6 s inside the hypercube. Every report prints the baseline in its header. Built in S6: P1 plays the kit
+(no class profile, no hidden state), P0 stays the bot (it keeps the Spoiler's early stun; P1 holds it for the kill).
+
 ### 4.4 When is a verdict a verdict
 
 A kit's call ("in band", "above", "below") is **policy-robust** when all three hold (thresholds are my proposal):
@@ -324,13 +332,22 @@ batch mode, one thread, 1 000 farm-only matches on the shipped inputs): 2.45 to 
 (2026-11-22, same method, with combat in the model): 4.5 to 9.4 ms per farm-only match (machine load varied) and **10.2 to 14.0 ms per mixed-design match under P0**
 (combat, casts, the comeback event), one thread. The 2 to 5 ms assumption was too low for a real match; the budget below
 is re-stated with 10 ms. Measured run times on 12 threads: Mixed R 10 (4 200 matches) 6.4 s, One per class R 25 (2 400) 4.0 s,
-Seat check R 25 (200) 0.4 s, Forced kills R 5 (2 400) 3.2 s: the whole default report, 20 s.
+Seat check R 25 (200) 0.4 s, Forced kills R 5 (2 400) 3.2 s: P0's report, 20 s.
+
+Re-measured in S6 (2026-11-23, same method, a busier machine than S5: farm-only 12.7 ms, **P0 19.2 ms**, **P1 43.9 ms** per mixed-design match, one thread; the
+P1 to P0 ratio, 2.3, is the figure to carry, the absolute numbers move with the machine's load). P1 costs more because every think scores every pile and every
+rival (the wall-aware walk is asked for the four nearest piles only, a further pile is taken at its straight line times 1.25). On 12 threads (seed 20261122):
+Mixed R 10 takes 7.4 s under P0, 19.6 s under P1, 12.7 s under the mixed population; One per class R 25 4.3 / 11.0 / 8.1 s; Seat check R 25 0.4 / 0.9 / 0.7 s; Forced
+kills R 5 (P0 only) 3.0 s; the two head-to-head splits (Mixed R 10 each) 12.3 and 14.1 s. **The whole default report (12 runs): 103 s.** The sensitivity run adds the
+sweep: 16 hypercube points, the one-factor delay run (3 delays) and the leader-weight run (5 weights), each at the three populations over the Mixed design at R 3,
+that is 25 parameter sets x 3 x 1 260 = **94 500 matches in 370 s** (the whole `MatchSensitivityBatch`: 8.1 min). Only the 16 hypercube points (60 480 matches) would
+take about 4 minutes.
 
 | Run | Matches | Budget |
 |---|---|---|
-| Default report (Mixed + One per class + Seat check + Forced kills) | about 9 200 | measured 20 s on 12 threads (10 ms a match, one thread) |
-| Sensitivity (16 points x 3 populations) | about 60 000 | under 5 min |
-| Solver (D8 (b), common random numbers, up to 6 passes; formula in 7.1) | about 900 000 | about 12 to 15 min on 12 threads at 10 ms a match, up to four times that with flat steps, batch mode |
+| Default report (Mixed + One per class + Seat check, three populations; Forced kills under P0; two splits) | about 28 000 | measured 103 s on 12 threads (P0 19 ms, P1 44 ms a match, one thread) |
+| Sensitivity (16 points x 3 populations) | about 60 000 | about 4 min measured; 8.1 min with the delay and leader-weight runs and the default report |
+| Solver (D8 (b), common random numbers, up to 6 passes; formula in 7.1) | about 900 000 | about 12 to 15 min on 12 threads at 10 ms a match, up to four times that with flat steps, batch mode; at P1's cost per match and with the P1 and mixed populations in the term, up to four times more again: Task 7 decides which populations the solver plays |
 
 Matches run in parallel (`Parallel.For` over the match index). Kits are resolved on the main thread first, because they
 read ScriptableObjects; the simulation then touches only plain structs. Results are summed in match-index order, so the

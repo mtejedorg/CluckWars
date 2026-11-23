@@ -11,8 +11,15 @@ namespace CluckWars.Balance
     /// <summary>Which set of matches a run plays (spec 5.2).</summary>
     public enum MatchDesignKind : byte { Mixed, OnePerClass, SeatCheck, ForcedKills }
 
-    /// <summary>Who decides for each seat. Task 6 adds the utility policy and the mix.</summary>
-    public enum PolicyPopulation : byte { P0 }
+    /// <summary>
+    /// Who decides for each seat: every seat P0 (the game's bot), every seat P1 (the utility chooser), a draw per seat between the two
+    /// (<see cref="MatchRunner.MixedDraw"/>), or two seats of each (the split).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Split"/> and <see cref="SplitOdd"/> are the head-to-head diagnostic: P1 on seats 0 and 2 (or 1 and 3), P0 on the other two. The
+    /// design turns the table one seat per cell, so over a run each kit plays each policy about as often.
+    /// </remarks>
+    public enum PolicyPopulation : byte { P0, P1, Mixed, Split, SplitOdd }
 
     /// <summary>One match to play: which kit sits in which seat, which replicate it is, and the scripted kills if the design has any.</summary>
     public sealed class MatchCell
@@ -223,7 +230,21 @@ namespace CluckWars.Balance
         public int Threads = 1;
         /// <summary>The shipped report's reaction jitter: each intent takes 0 to this many seconds longer than the delay (an arbitrary "small", not a measured value).</summary>
         public const float DefaultReactionJitter = 0.1f;
-        public PolicyParams Params = WithJitter(PolicyParams.Default, DefaultReactionJitter);
+        /// <summary>
+        /// The baseline reaction delay: none. The game's bot acts on its think itself, so "P0 as the bot" runs at 0 plus the jitter (replicates
+        /// differ). Human slowness is the sweep's axis (0, 0.1 and 0.3 s). The first reports (to 2026-11-22) ran P0 at 0.3 s plus the jitter:
+        /// <see cref="PolicyParams.Default"/> still carries that value, so <c>Params = WithJitter(PolicyParams.Default, DefaultReactionJitter)</c> reproduces them.
+        /// </summary>
+        public const float BaselineReactionDelay = 0f;
+        public PolicyParams Params = Baseline();
+
+        /// <summary>The default parameters of a report run: <see cref="PolicyParams.Default"/> at <see cref="BaselineReactionDelay"/> plus the jitter.</summary>
+        public static PolicyParams Baseline()
+        {
+            var p = WithJitter(PolicyParams.Default, DefaultReactionJitter);
+            p.ReactionDelay = BaselineReactionDelay;
+            return p;
+        }
 
         public static PolicyParams WithJitter(PolicyParams p, float seconds)
         {
@@ -251,14 +272,13 @@ namespace CluckWars.Balance
     /// </summary>
     public static class MatchRunner
     {
-        public static MatchRunOutput Run(MatchContext context, MatchRunSpec spec) => Run(context, spec, FactoryFor(spec.Population));
+        public static MatchRunOutput Run(MatchContext context, MatchRunSpec spec) => Run(context, spec, null);
 
-        /// <summary>Runs with an explicit policy factory for every seat (tests and later populations).</summary>
+        /// <summary>Runs with an explicit policy factory for every seat (tests); a null factory plays the spec's population.</summary>
         public static MatchRunOutput Run(MatchContext context, MatchRunSpec spec, PolicyFactory factory)
         {
             if (context == null) throw new ArgumentNullException(nameof(context));
             if (spec == null) throw new ArgumentNullException(nameof(spec));
-            if (factory == null) throw new ArgumentNullException(nameof(factory));
 
             var cells = MatchDesigns.Cells(spec.Design, context.Kits, spec.Replicates);
             if (spec.CellLimit > 0 && cells.Count > spec.CellLimit) cells = cells.GetRange(0, spec.CellLimit);
@@ -287,12 +307,13 @@ namespace CluckWars.Balance
             {
                 var seats = new MatchKit[OracleMapSO.SeatCount];
                 var policies = new PolicyFactory[OracleMapSO.SeatCount];
+                var mixed = spec.Population == PolicyPopulation.Mixed ? MixedDraw(seed) : new bool[OracleMapSO.SeatCount];
                 var parameters = new PolicyParams[OracleMapSO.SeatCount];
                 for (int s = 0; s < seats.Length; s++)
                 {
                     int kit = cell.KitOfSeat[s];
                     seats[s] = kit >= 0 ? context.Kits[kit] : null;
-                    policies[s] = kit >= 0 ? factory : null;
+                    policies[s] = kit >= 0 ? factory ?? FactoryOf(spec.Population, mixed[s], s) : null;
                     parameters[s] = spec.Params;
                 }
                 var setup = new MatchSetup
@@ -308,12 +329,37 @@ namespace CluckWars.Balance
             }
         }
 
+        /// <summary>
+        /// Which seats of a mixed match play P1: one draw per seat (all four, in seat order, whether the seat is filled or not) from the match's
+        /// setup stream, so the draw depends on the seed only.
+        /// </summary>
+        public static bool[] MixedDraw(ulong matchSeed)
+        {
+            var rng = MatchRng.Create(matchSeed, MatchRng.StreamSetup);
+            var p1 = new bool[OracleMapSO.SeatCount];
+            for (int s = 0; s < p1.Length; s++) p1[s] = rng.NextInt(2) == 1;
+            return p1;
+        }
+
         public static PolicyFactory FactoryFor(PolicyPopulation population)
         {
             switch (population)
             {
                 case PolicyPopulation.P0: return ScriptedPolicy.Factory;
-                default: throw new ArgumentOutOfRangeException(nameof(population));
+                case PolicyPopulation.P1: return UtilityPolicy.Factory;
+                default: throw new ArgumentOutOfRangeException(nameof(population), "A mixed population has one factory per seat: see MixedDraw.");
+            }
+        }
+
+        // The factory of one seat: its population's, or for a mix, the draw's.
+        private static PolicyFactory FactoryOf(PolicyPopulation population, bool drewP1, int seat)
+        {
+            switch (population)
+            {
+                case PolicyPopulation.Mixed: return drewP1 ? UtilityPolicy.Factory : ScriptedPolicy.Factory;
+                case PolicyPopulation.Split: return seat % 2 == 0 ? UtilityPolicy.Factory : ScriptedPolicy.Factory;
+                case PolicyPopulation.SplitOdd: return seat % 2 == 1 ? UtilityPolicy.Factory : ScriptedPolicy.Factory;
+                default: return FactoryFor(population);
             }
         }
     }

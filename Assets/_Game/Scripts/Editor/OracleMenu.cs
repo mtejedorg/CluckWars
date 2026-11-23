@@ -26,6 +26,7 @@ namespace CluckWars.EditorTools
         public const string ReferencePath = "Assets/_Game/Data/Balance/OracleReference.asset";
         public const string NoteArgument = "-oracleNote";
         public const string MatchMenuPath = "Cluck Wars/Balance/Oracle/Match report";
+        public const string SensitivityMenuPath = "Cluck Wars/Balance/Oracle/Match sensitivity";
         public const string SeedArgument = "-oracleSeed";
         public const string ThreadsArgument = "-oracleThreads";
         public const ulong DefaultMatchSeed = 20261122UL;
@@ -77,22 +78,23 @@ namespace CluckWars.EditorTools
         {
             MatchTiming(1000);
             MatchTimingCombat(1000);
+            MatchTimingCombat(1000, PolicyPopulation.P1);
         });
 
         /// <summary>
         /// Plays <paramref name="matches"/> real mixed-design matches under P0 on the shipped kits (combat, casts, the comeback event) on one
         /// thread after a short warm-up and returns the mean milliseconds per match: the cost the simulator's runtime budget rests on.
         /// </summary>
-        public static double MatchTimingCombat(int matches)
+        public static double MatchTimingCombat(int matches, PolicyPopulation population = PolicyPopulation.P0)
         {
             const int warmUp = 20;
             var log = new UnityLogService(LogLevel.Info);
             var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
             int replicates = Math.Max(1, (matches + 419) / 420);   // 420 cells per replicate of the mixed design
-            MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = 2UL, Threads = 1, CellLimit = warmUp });
-            var run = MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = 1UL, Threads = 1, CellLimit = matches });
+            MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = population, RunSeed = 2UL, Threads = 1, CellLimit = warmUp });
+            var run = MatchRunner.Run(context, new MatchRunSpec { Design = MatchDesignKind.Mixed, Replicates = replicates, Population = population, RunSeed = 1UL, Threads = 1, CellLimit = matches });
             double perMatch = run.ElapsedMilliseconds / run.Results.Length;
-            log.Info(Source, $"Match timing: {perMatch:0.000} ms per P0 mixed-design match with combat over {run.Results.Length} matches, one thread.");
+            log.Info(Source, $"Match timing: {perMatch:0.000} ms per {population} mixed-design match with combat over {run.Results.Length} matches, one thread.");
             return perMatch;
         }
 
@@ -136,7 +138,17 @@ namespace CluckWars.EditorTools
         /// </summary>
         public static void MatchReportBatch() => InBatch("The match report failed.", () => MatchReport());
 
-        public static (string json, string markdown) MatchReport()
+        [MenuItem(SensitivityMenuPath, priority = 67)]
+        private static void MatchSensitivityFromMenu() => MatchReport(true);
+
+        /// <summary>
+        /// Batch entry: <c>-executeMethod CluckWars.EditorTools.OracleMenu.MatchSensitivityBatch [-oracleSeed n] [-oracleThreads n]</c>. The match report
+        /// plus the hypercube sweep (16 points x 3 populations), the reaction-delay and leader-weight runs, with the sweep's tags on the kits' calls.
+        /// Writes <c>Captures/oracle/match-sensitivity-&lt;UTC&gt;.md</c> and <c>.json</c>.
+        /// </summary>
+        public static void MatchSensitivityBatch() => InBatch("The match sensitivity run failed.", () => MatchReport(true));
+
+        public static (string json, string markdown) MatchReport(bool withSweep = false)
         {
             var log = new UnityLogService(LogLevel.Info);
             if (Application.isPlaying) throw new InvalidOperationException("Leave Play mode before the match report: it reads the shipped assets.");
@@ -154,29 +166,50 @@ namespace CluckWars.EditorTools
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var context = MatchContext.From(Inputs(), OracleMapBaker.ArenaHalf(), BotArrivalRadius());
             var runs = new System.Collections.Generic.List<MatchRunOutput>();
-            foreach (var (design, replicates) in new[]
+            // The three populations play the mixed, one-per-class and seat-check designs; the forced kills (the other seats take P0's play) once;
+            // the two splits (P1 on seats 0 and 2, then on 1 and 3) are the head-to-head line.
+            var plan = new System.Collections.Generic.List<(MatchDesignKind, int, PolicyPopulation)>();
+            foreach (var population in new[] { PolicyPopulation.P0, PolicyPopulation.P1, PolicyPopulation.Mixed })
             {
-                (MatchDesignKind.Mixed, MixedReplicates), (MatchDesignKind.OnePerClass, OnePerClassReplicates),
-                (MatchDesignKind.SeatCheck, SeatCheckReplicates), (MatchDesignKind.ForcedKills, ForcedKillsReplicates),
-            })
+                plan.Add((MatchDesignKind.Mixed, MixedReplicates, population));
+                plan.Add((MatchDesignKind.OnePerClass, OnePerClassReplicates, population));
+                plan.Add((MatchDesignKind.SeatCheck, SeatCheckReplicates, population));
+            }
+            plan.Add((MatchDesignKind.ForcedKills, ForcedKillsReplicates, PolicyPopulation.P0));
+            plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.Split));
+            plan.Add((MatchDesignKind.Mixed, MixedReplicates, PolicyPopulation.SplitOdd));
+            foreach (var (design, replicates, population) in plan)
             {
                 var run = MatchRunner.Run(context, new MatchRunSpec
                 {
-                    Design = design, Replicates = replicates, Population = PolicyPopulation.P0, RunSeed = seed, Threads = threads,
+                    Design = design, Replicates = replicates, Population = population, RunSeed = seed, Threads = threads,
                 });
                 runs.Add(run);
-                log.Info(Source, $"Match run {design} R={replicates}: {run.Results.Length} matches in {run.ElapsedMilliseconds / 1000.0:0.0} s on {threads} threads ({run.ElapsedMilliseconds / Math.Max(1, run.Results.Length):0.00} ms per match across threads).");
+                log.Info(Source, $"Match run {design} {population} R={replicates}: {run.Results.Length} matches in {run.ElapsedMilliseconds / 1000.0:0.0} s on {threads} threads ({run.ElapsedMilliseconds / Math.Max(1, run.Results.Length):0.00} ms per match across threads).");
             }
 
-            var section = MatchReports.Build(context, runs, LoadReference());
+            MatchSweepOutput sweep = null;
+            if (withSweep)
+            {
+                var inputs = Inputs();
+                using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
+                {
+                    inputs.Book = book;
+                    sweep = MatchSweep.Run(inputs, OracleMapBaker.ArenaHalf(), BotArrivalRadius(), new MatchSweepSpec { RunSeed = seed, Threads = threads });
+                }
+                log.Info(Source, $"Match sweep: {sweep.Points.Length} points x 3 populations, {sweep.Matches} matches in {sweep.ElapsedSeconds:0.0} s on {threads} threads.");
+            }
+
+            var section = MatchReports.Build(context, runs, LoadReference(), sweep);
             string dir = OutputDirectory();
             string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-            string json = Path.Combine(dir, $"match-report-{stamp}.json");
-            string md = Path.Combine(dir, $"match-report-{stamp}.md");
+            string prefix = withSweep ? "match-sensitivity" : "match-report";
+            string json = Path.Combine(dir, $"{prefix}-{stamp}.json");
+            string md = Path.Combine(dir, $"{prefix}-{stamp}.md");
             File.WriteAllText(json, section.ToJson());
             File.WriteAllText(md, section.ToMarkdown());
             WriteSample(context, seed, Path.Combine(dir, $"match-sample-{stamp}.md"));
-            log.Info(Source, $"Match report written: {md} and {json} (bal={section.BalanceHash}, map={section.MapFingerprint}, seed={seed}); the four runs and the report took {clock.Elapsed.TotalSeconds:0.0} s.");
+            log.Info(Source, $"Match report written: {md} and {json} (bal={section.BalanceHash}, map={section.MapFingerprint}, seed={seed}); the {runs.Count} runs{(withSweep ? ", the sweep" : string.Empty)} and the report took {clock.Elapsed.TotalSeconds:0.0} s.");
             return (json, md);
         }
 
