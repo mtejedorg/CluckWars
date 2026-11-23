@@ -19,7 +19,7 @@ namespace CluckWars.Balance
     /// bank (carried food at risk, the clock, the win). On top it plays what the kit allows: Stun then Steal on a loaded rival; Egg Shell on
     /// an incoming stealer; Stun, Shove, Slow, Hide or Speed against a chaser when loaded; Shove (or Stun) on a rival in mid-Peck; Hide to
     /// walk up to a steal; and for a Death Mark it holds the stun for the kill window (it presses the mark only when the stun will be back by
-    /// the arm), chases the marked rival and stuns inside the last second.
+    /// the arm), chases the marked rival and stuns so it still runs at the arm (the kill window, the last 2 s today).
     /// Left out, on purpose: waiting out a fight between two others (the sim's rivals do not fight each other much; P1 does not model it),
     /// and any chase for a kit without a steal (a stun with nothing to take is no reason to leave a pile).
     /// </remarks>

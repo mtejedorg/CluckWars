@@ -200,7 +200,7 @@ namespace CluckWars.Diagnostics
             }
 
             // Hold still briefly first: the marker on the floor arrow of a target hidden from the clear viewport (nothing is pinned to the
-            // edge any more), if the target starts there (0.4 s: the mark lasts 4 s, and the Kill still has to be photographed and pressed).
+            // edge any more), if the target starts there (0.4 s: the mark lasts 5 s, and the Kill still has to be photographed and pressed).
             bool arrowOffscreen = MarkHudController.MarkerShownNow && MarkHudController.AnchorNow == MarkAnchor.OnArrow && HiddenFromView(target);
             if (!_shotOff && now - _markLockedAt < 0.4f)
             {

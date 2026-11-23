@@ -316,7 +316,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("MarkPickRules.Filter(_candidates", body);
         }
 
-        // ---- The shipped numbers keep their relations (Maestro 2026-11-04: 3 s arm in a 4 s window) ---------------
+        // ---- The shipped numbers keep their relations (Maestro 2026-11-04: 3 s arm in a 5 s window since 2026-11-23, was 4) ---------------
         // Rules, not values: every number here is read from the assets and is meant to be retuned within these rules.
 
         private static MarkKillAbilitySO ShippedMark => TestAssets.Load<MarkKillAbilitySO>(TestAssets.AbilitiesDir + "/MarkKill.asset");

@@ -28,11 +28,11 @@ namespace CluckWars.Gameplay
         [Tooltip("Flat food paid straight into the Assassin's bounty bag for a successful " +
                  "execute, ON TOP of the victim's transferred cargo. This is the Assassin's " +
                  "income FLOOR: without it, an execute on an empty-handed rival pays exactly " +
-                 "zero and the class can be starved in the opening seconds. 5 matches the " +
-                 "magnitude of the ground drops it replaced, so it routes food rather than " +
-                 "adding it. A starting value - solve it once the Predation axiom has real " +
+                 "zero and the class can be starved in the opening seconds. 15 since Maestro's " +
+                 "2026-11-23 ruling (was 5, the magnitude of the ground drops it replaced). " +
+                 "A starting value - solve it once the Predation axiom has real " +
                  "playtest numbers.")]
-        [Min(0)] public int ExecuteBounty = 5;
+        [Min(0)] public int ExecuteBounty = 15;
 
         [Min(0f)] public float DeathStunSeconds = 5f;
         [Min(0.5f)] public float DepositRatePerSecond = 9f;

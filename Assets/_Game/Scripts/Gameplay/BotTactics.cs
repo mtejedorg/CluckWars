@@ -576,7 +576,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The Spoiler bot's hunt. A mark lands anywhere on the map, and the CastPlan ladder knows none of that: left to it, a
         /// bot fires Ambush at whoever is near and walks where the FSM says, so the mark expires unpressed. The Kill needs the
-        /// stun live at the arm (3 s into a 4 s mark), so the stun goes out only once it will still run
+        /// stun live at the arm (3 s into a 5 s mark), so the stun goes out only once it will still run
         /// <see cref="StunLeadMargin"/> past the arm, and while the window has more than that margin left.
         /// </summary>
         /// <param name="armRemaining">Seconds until the mark arms (0 once armed).</param>

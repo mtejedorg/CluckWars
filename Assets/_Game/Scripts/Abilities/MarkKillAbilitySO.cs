@@ -32,7 +32,7 @@ namespace CluckWars.Abilities
         {
             DisplayName = "Hunt";   // UI name (spec D5b); internally still Death Mark
             ShortLabel = "HUNT";
-            Description = "Picks a rival to hunt for 4s. In the last 1s, if they are stunned and within 6.2m, press again to pounce and take all their food.";
+            Description = "Picks a rival to hunt for 5s. In the last 2s, if they are stunned and within 6.2m, press again to pounce and take all their food.";
             Category = AbilityCategory.Control;
             AllowedClasses = ChickenClassFlags.None; // pre-equip-only: obtainable solely as a subclass pre-equip (Spoiler Peck slot)
             Duration = 0.1f;

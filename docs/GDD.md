@@ -624,9 +624,9 @@ it at all, cannot hand-pick it, and cannot execute. The Assassin's stun now come
 | Stage | Condition | Counterplay |
 |---|---|---|
 | **Mark** | Press → a living rival anywhere on the map, picked at random but **likelier the farther it is from its own base**. The target sees it is marked. | Reach your base in time, where nothing reaches you |
-| **Hunt** | The Assassin has **4 s** to find it and close in; the Kill is only possible in the **last 1.0 s** (the 3 s arm is a gameplay beat) | Escape: stay out of his reach until the timer runs out, or walk home |
+| **Hunt** | The Assassin has **5 s** to find it and close in (4 s until 2026-11-23); the Kill is only possible in the **last 2.0 s** (the 3 s arm is a gameplay beat; 1.0 s until 2026-11-23) | Escape: stay out of his reach until the timer runs out, or walk home |
 | **Stun** | The target must be stunned **when the Kill lands** (his own Stun, or *any* stun; one that began before the arm and is still running counts) | Don't get stunned |
-| **Kill** | Press again in the last 1.0 s while it is stunned, within **6.2 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
+| **Kill** | Press again in the last 2.0 s while it is stunned, within **6.2 m**, with no base wall between, and the Assassin is not stunned (a stunned Assassin cannot cast anything) | — |
 
 No isolation: the mark ignores crowds. The only defences are not being stunned, escaping, and reaching your base in time.
 A steal-proof Egg Shell egg (§7.2; the walk is not steal-proof) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
@@ -645,13 +645,13 @@ the first mark is not wasted on targets still at home.
 **Spec v2 (Maestro, 2026-10-31).** The press marks a **living rival anywhere on the
 map**, chosen at random and weighted toward birds far from home (see below): no mark range, no isolation. Decoys are never picked, and the next mark can never be the last one unless that bird is the
 only rival (no time release; reset each round). The Assassin then finds it, stuns it and presses again. The Kill needs the target
-**stunned now**, not shelled, the Assassin free to cast, within **KillRange 6.2 m** (8 m until 2026-11-05), and no base wall between them. The mark lasts **4 s** (12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 1.0 s** of the mark. Only expiry, a kill or the target leaving play ends a mark: it survives
+**stunned now**, not shelled, the Assassin free to cast, within **KillRange 6.2 m** (8 m until 2026-11-05), and no base wall between them. The mark lasts **5 s** (4 s until 2026-11-23, 12 s until 2026-11-03, 7 s until 2026-11-04). A Kill cannot qualify before the **arm, 3.0 s** (`ArmSeconds`; 0.6 s until 2026-11-04, then only a replication floor), so the Kill happens in the **last 2.0 s** of the mark (1.0 s until 2026-11-23). Only expiry, a kill or the target leaving play ends a mark: it survives
 range, crowds and the target going home, where no ability reaches it, so the timer can run out. Expiry costs the fail cooldown (4 s);
 a kill 8 s (10 s until 2026-11-05, 15 s until 2026-11-04). All numbers are on `MarkKill.asset`. The bounty is paid on the victim's kill report, so a refused kill pays nothing.
 
 **Leader-weighted pick (Maestro, 2026-11-20, D7b).** The flat bounty gives no reason to hunt the leader, so the pick does: the rival with the most banked food (every rival tied for it) has its score multiplied by `LeaderPickWeight` (`MarkKill.asset`, range 1 to 4, 2 is a placeholder, BL-210); everyone else counts 1. It sits next to the two weights below and does not replace them: a leader at home still scores 0 (`MarkPickRules.LeaderWeight`, `Score`).
 
-**Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 4 s and
+**Weighted pick (Maestro, 2026-11-04).** A 7 s mark left the victim time to walk home, so the interaction died. The window is 5 s (4 s until 2026-11-23) and
 the pick favours birds far from home and, softly, far from the Assassin: each candidate rolls `roll * w * w * a`. `w` is its planar
 distance to its own base over the longest base-to-base distance (the diagonal, read from the live bases, 61.7 m), clamped to 0..1.
 `a = 0.25 + 0.75 * clamp01(distance to the Assassin / (span / 3))`, where span / 3 is about 20.6 m. A rival next to the Assassin keeps a
@@ -662,18 +662,17 @@ lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEng
 unless it is the only rival. **Stealing from an Assassin:** the bounty bag counts as carried food for every steal (Steal): a steal drains the beak first, then the bag (`StealRules.Stealable`, `SplitDrain`).
 
 **The 3 s arm and the stun at the kill (Maestro, 2026-11-04).** `ArmSeconds` is 3.0, so the Kill is possible only in the last
-1.0 s of the 4 s window. The stun must be active when the Kill lands; a stun that began before the arm and is still running counts.
+2.0 s of the 5 s window (1.0 s of 4 s until Maestro's 2026-11-23 ruling: "5 seconds, 3 of mark and 2 effective"). The stun must be active when the Kill lands; a stun that began before the arm and is still running counts.
 Stun lasts 1.3 s (Slippery too; 0.845 s on Bulwark, 0.975 s on Relentless), so the Assassin times Stun into roughly `[arm - stun, window)`.
 The victim's authority times the arm itself (verdict `NotArmed`, allowance 0.5 s) and checks its own stun (stunned on arrival or
 within one capped network latency, verdict `NotStunned`). **Cooldowns:** 4 s at GO, 4 s after a miss, 8 s after a kill (5 s / 10 s until 2026-11-05). That allows
 at most 4 kills in a 45 s round (press 4, kill 7.3, press 15.3, kill 18.6, press 26.6, kill 29.9, press 37.9, kill 41.2; a 5th press
-at 49.2 is past the end; it was 3 kills at 5 s / 10 s); any miss costs 8 s. **Stun** cooldown is 7 s, longer than the 4 s window: never a second stun in one hunt,
+at 49.2 is past the end; it was 3 kills at 5 s / 10 s); any miss costs 9 s (5 s window plus the 4 s fail cooldown; 8 s until 2026-11-23). **Stun** cooldown is 7 s, longer than the 5 s window: never a second stun in one hunt,
 and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 11.1 x 0.18 = 5.99 m (6.56 m at the old 12.15 speed; the reach figures below predate both changes). **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 8.39 m (9.19 m at 12.15), under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
 29-36% of marks. **D5 (changed twice on 2026-11-05):** Egg Shell is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
-plus the flat `ExecuteBounty` 5, the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
-code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so 3 banked kills are
-about 32 food, 8 short of 40; 2 kills plus the Spoiler bonus about 36.5; 2 kills alone about 21.5. No rule added; `ExecuteBounty` 8 would make 3 kills about 41.
+plus the flat `ExecuteBounty` 15 (5 until 2026-11-23), the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
+code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so with the 15 bounty one kill is nominally worth about 20.7 food and two kills about 41.4, past the 40 target (arithmetic before the time to bank it; the match simulator's kills-to-win table is the measure). At the old 5, 3 banked kills were about 32 food, 8 short of 40. No rule added.
 
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
 - **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the

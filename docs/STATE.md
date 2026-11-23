@@ -11,6 +11,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-23 - Spoiler values decided: Hunt lasts 5 s (3 s mark, 2 s kill window), execute bounty 15 (BL-217, `develop`, not pushed)
+
+- **Maestro's ruling** ("5 seconds, 3 of mark and 2 effective. And the reward at 15"): `MarkKill.asset` `WindowSeconds` 4 to 5 (`ArmSeconds` stays 3, so the kill window is 2 s, was 1 s); `MatchConfig.asset` `ExecuteBounty` 5 to 15. Nothing else moved (not `LeaderPickWeight`, cooldowns, the Spoiler passive).
+- **What followed by itself** (read from the assets): the ability text (`{window}` 5, `{live}` 2; the asset `Description` and the constructor default were pasted to match), the hunt clock, count and tenths (the count now reads 2, 1, then tenths in the last second of the window), screen edge, hex, brackets, the bots and the dev auto-play (`BotTactics.NextMarkStep` takes the remaining arm and window), the simulator, `MaxSpoilerKills`. Literals changed: `AssassinExecute.WindowDuration` 4 to 5 (the fallback with no asset registered, pinned equal to the asset by `MarkPickTests`) and the `MatchConfigSO.ExecuteBounty` default 5 to 15; comments in `BotTactics`, `UtilityPolicy`, `AutoTestDriver.Mark`.
+- **Hash:** `bal=5465b825` is the hash of the empty delta `{}` (`BalanceBook.BaselineHash`), not of the asset values, so it does not change; no doc or test needed an update.
+- **Oracle:** part 1 re-recorded (`OracleMenu.RecordBatch`; farm-only timings and prices unchanged, Warrior kits +5 s, the rest 0); match record 2 stored (`AcceptMatchBatch`, seed 20261122, a record, not an acceptance). Report `Captures/oracle/match-report-20261123-151552.md` (not committed): Spoiler 25.0 % P0 / 21.6 % P1 / 29.5 % mixed (was 3.1 / 2.8 / 5.3), 1.29 / 1.78 / 1.59 kills per match, played 3 kills win 42 / 52 / 58 % without the passive, forced 3 kills 95.8 % (empty victims) and 100 % (loaded). Thief 2.4 / 0.6 / 3.0 % (still below; its move to the passive is a separate task).
+- **Not seen in play:** the 2 s window and its HUD (clock pill LIVE 2s, count 2 / 1 / tenths, edge tint, POUNCE) were not watched in a match.
+- **Docs:** GDD 6.4 and 7 table notes, `docs/site/mechanics.html` (not republished; Maestro does it).
+
 ## 2026-11-23 - Match what-if report and the Spoiler / Thief lever map (BL-217, `develop`, not pushed)
 
 - **Tool:** menu `Cluck Wars/Balance/Oracle/Match what-if` (batch method and the `Captures/oracle/whatif.json` shape: `docs/TESTING.md`). It plays the standard report designs for the baseline and for each named schema-1 delta with the same seeds, and writes one markdown and JSON with the differences. A refused delta is reported and the rest still run. Nothing is applied.

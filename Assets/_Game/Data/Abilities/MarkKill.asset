@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.MarkKillAbilitySO
   DisplayName: Hunt
   ShortLabel: HUNT
-  Description: "Picks a rival to hunt for 4s. In the last 1s, if they are stunned and within 6.2m, press again to pounce and take all their food."
+  Description: "Picks a rival to hunt for 5s. In the last 2s, if they are stunned and within 6.2m, press again to pounce and take all their food."
   AccentKey: 10
   CustomAccentColor: {r: 0.9, g: 0.1, b: 0.2, a: 1}
   Category: 1
@@ -34,7 +34,7 @@ MonoBehaviour:
   Retired: 0
   KillRange: 6.2
   ArmSeconds: 3
-  WindowSeconds: 4
+  WindowSeconds: 5
   FailCooldownSeconds: 4
   SuccessCooldownSeconds: 8
   RemovalSeconds: 3
