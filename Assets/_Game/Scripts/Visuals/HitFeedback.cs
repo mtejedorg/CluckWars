@@ -383,6 +383,12 @@ namespace CluckWars.Visuals
         {
             if (_controller == null) return;
             float delta = e.Delta;
+            // A paid marked steal's gain is take plus bounty; the LOOT +n pop already named the bounty (design section 11), so this pop is the rest.
+            if (delta > 0f)
+            {
+                delta = LootPresentationRules.GrabAfterBounty(delta, LootFeedback.TakePendingBounty(_controller));
+                if (delta <= 0f) return;
+            }
 
             if (delta > 0f && StealGainPopHold.IsStealCredit(e.StealCreditFrame, Time.frameCount) &&
                 FloatingCombatText.IsSelfPopTarget(_controller))

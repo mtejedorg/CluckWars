@@ -664,3 +664,25 @@ was 1.7x) so it never reaches the YOU pill. Touch hold hint: one phrase per line
 130 px clear of the cancel strip ("Hold to see the reach", "Let go to use it", "Slide to the edge
 to cancel"); pad and keys keep the one-line mid-dot copy above the info strip. Pop words (STUN,
 STUCK, SLOW, IMMUNE, FULL!, SAFE) all come from UiText.
+
+## 13. Thief loot mark (2026-11-24, BL-219)
+
+The Thief's loot mark has one rule of sight: **only the Thief and the marked rival see it and its reward** (owner, 2026-11-24: "Sólo thief y víctima. No debería ser una corona, lo que es confuso si no le cae al líder. Debería ser como una bolsa de monedas."). A bystander's screen is unchanged. The identity is a **coin bag**, never a crown. The end-of-clock prize has **no feedback of its own** ("se queda, pero sin feedback propio por ahora"). Everything is local presentation read from replicated state (`ThiefLoot.State`, `MarkedTarget`) and `ChickenLocalEvents.LootTaken`; nothing is sent. The design is `docs/superpowers/specs/2026-11-23-thief-loot-mark-design.md` sections 11 and 22.
+
+**The gate.** `LootPresentationRules.Resolve` (pure) says whether the local player is the Thief (a live mark on a living rival) or the marked rival; `LootFeedback` (`Visuals/`, one scene-level object, created by the first `RivalIndicator` like `MarkFeedback`) publishes `LootFeedback.Current`; every presenter draws only from it. `LootFeedbackTests` pins the three roles and a source guard keeps the presenters from reading a chicken's loot state themselves.
+
+| Who | What | Drawn by | Reuses |
+|---|---|---|---|
+| Thief | Coin-bag marker over the marked rival, on its floor arrow outside the circle round his bird, pinned to the edge with no arrow; hops (0.2 s, not under Reduced Motion) when the mark moves to another bird | `MarkHudController.Loot.cs`, `MarkHud.uxml` (`LootMarker`) | the Hunt marker's anchor, placement and on-arrow scale (`ResolveAnchor`, `MarkerPlacement`, `HuntRules.MarkerScale`) |
+| Thief | The marked rival's floor arrow forced on, emphasised, in the bag's gold (grey while blocked) | `RivalIndicator`, `MarkFeedback.IsMarkedByLocal` / `MarkArrowTint` | the Hunt's emphasised target arrow |
+| Thief | Gold ground brackets while the rival is inside Steal's reach (`IndicatorRange` of the Steal ability); grey when blocked | `LootFeedback` over a second `HuntBrackets` | the Hunt's brackets mesh (`ApplyColour`; it never touches the Hunt's statics) |
+| Thief | Blocked state: the lock badge (a wall of its base) or the egg badge (a shell) on the marker | `MarkHudController.Loot.cs` | the Hunt's two corner badges |
+| Thief | Steal button dot: empty, growing with the cooldown while the mark is coming; solid gold from `LootLeadSeconds` before Steal is ready (the passive's number); pulses while the marked rival is in reach | `TouchControlsController.Hud.cs` `ApplyLootHex`, `LootHexRules` | the Hunt hex's dot (`HuntDot`, class `cw-hex--loot`) |
+| Thief | `LOOT +n` pop and a strong buzz when a marked steal pays; n is the event's bounty. The ordinary `+n` grab pop shows only the take | `LootFeedback.OnLootTaken`, `HitFeedback.OnCargoChanged` | self-pop path; `HapticKind.HuntPounce` |
+| Thief | `SAFE` over the victim when the victim's authority refuses the marked steal (a wall or a shell; a shell the Thief's own authority already knew is the existing SAFE) | `LootFeedback.OnMarkedStealRefused` | the Hunt's SAFE word |
+| Marked rival | Coin-bag badge with the word LOOT over its own nameplate; fades out in 0.3 s with no word when the mark leaves | `MarkHudController.Loot.cs` (`LootBadge`) | one screen-space badge; not a status-badge row (those wear prefab sprites) |
+| Marked rival | `MARKED!` pop and a short buzz when the mark lands | `LootFeedback.WarnLanded` | self-pop; `HapticKind.HuntLive` |
+| Marked rival | A bag on the Thief's arrow (where the arrow is drawn) | `MarkHudController.Loot.cs` (`LootArrowBag`) | the Hunt's hunter-skull badge placement |
+| Everyone else | Nothing | | |
+
+Hidden rival: Hide hides the bag from the Thief as it hides the bird (no marker, no brackets, no forced arrow). Words (`UiText.csv`, working words for the narrative designer): `hud.pop.marked` MARKED!, `hud.pop.lootTake` LOOT +{n}, `hud.badge.loot` LOOT; SAFE is the existing `hud.pop.safe`. Colours: `FeedbackPaletteSO.LootGoldColor`, `LootEmptyColor` (`FeedbackTuning`). **The bag is a placeholder**: `CoinBagGlyph` paints a sack, a tie and a coin with `Painter2D` in the palette's gold, ink and cream; the 2D artist replaces it with an icon. The hit-confirm sound the design lists already plays on any Steal that hits somebody (`HitFeedback`), so the marked steal has it.

@@ -148,3 +148,53 @@
     -unity-background-scale-mode: scale-to-fit;
     -unity-background-image-tint-color: rgb(254, 245, 224);
 }
+
+/* ============================================================================
+   Thief loot mark (MarkHudController.Loot). The marker reuses the hunt marker's boxes (.cw-mark-marker, -body, -pointer, -ring, -disc and the lock / egg
+   corner badges); the bag is painted by CoinBagGlyph (Painter2D, a placeholder for the 2D artist), so it needs no sprite. Colours come from the feedback
+   palette in code (LootGoldColor); the values below are the ink and cream of the shared look.
+   ============================================================================ */
+
+/* The bag on the disc: the disc's 102 px square. */
+.cw-loot-bag {
+    position: absolute; left: 21px; top: 21px;
+    width: 102px; height: 102px;
+}
+
+/* The marked rival's own badge: an ink pill with the bag and the word LOOT, centred on the anchor the controller writes (above its nameplate). The
+   label is 28 px, the HUD font floor (rule U4); the border colour is written inline from the palette. */
+.cw-loot-badge {
+    position: absolute; left: 0; top: 0;
+    height: 52px;
+    padding-left: 8px; padding-right: 16px;
+    flex-direction: row; align-items: center;
+    background-color: rgba(20, 10, 26, 0.9);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-top-left-radius: 26px; border-top-right-radius: 26px;
+    border-bottom-left-radius: 26px; border-bottom-right-radius: 26px;
+    display: none;
+}
+.cw-loot-badge-bag { width: 40px; height: 40px; }
+.cw-loot-badge-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    padding: 0; margin: 0; margin-left: 6px;
+}
+
+/* The bag on the Thief's arrow (the victim's view): the hunter skull's 44 px ink disc, a gold border written inline. */
+.cw-loot-arrowbag {
+    position: absolute; left: 0; top: 0;
+    width: 44px; height: 44px;
+    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px; border-bottom-right-radius: 22px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    background-color: rgb(20, 10, 26);
+    align-items: center; justify-content: center;
+    display: none;
+}
+.cw-loot-arrowbag-glyph { width: 32px; height: 32px; }

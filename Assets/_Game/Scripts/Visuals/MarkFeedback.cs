@@ -64,13 +64,15 @@ namespace CluckWars.Visuals
         /// <summary>Is <paramref name="chicken"/> the local Assassin's mark, with the hunt marker showing? Its floor arrow then
         /// carries the marker (K5r) while it is outside the circle round the hunter's bird, and is emphasised.</summary>
         public static bool IsMarkedByLocal(ChickenController chicken) =>
-            _instance != null && chicken != null && chicken == _instance._target &&
-            _instance._model.Current.Role == MarkRole.Assassin && _instance._model.Current.MarkerAlpha > 0f;
+            (_instance != null && chicken != null && chicken == _instance._target &&
+             _instance._model.Current.Role == MarkRole.Assassin && _instance._model.Current.MarkerAlpha > 0f)
+            || LootFeedback.IsMarkedByLocalThief(chicken);   // the Thief's coin-bag mark rides the same arrow and anchor machinery
 
         /// <summary>The marked target's arrow colour (K5r): the marker's own state colour, seat colour while arming, red or grey or
         /// cream by mode, yellow when the pounce is legal (<see cref="HuntRules.MarkerColour"/>).</summary>
         public static Color MarkArrowTint()
         {
+            if (LootFeedback.TryGetArrowTint(out Color loot)) return loot;   // a local Thief has no hunt; its marked rival's arrow wears the bag's gold
             if (_instance == null) return Color.white;
             var o = _instance._model.Current;
             return HuntRules.MarkerColour(o.MarkerMode, o.TargetCorner);

@@ -282,6 +282,10 @@ namespace CluckWars.Localization
         [UiArgs("n")] public const string HudPopGrabbed = "hud.pop.grabbed";
         /// <summary>The knockback victim's pop, on every peer like STUN (spec section 5).</summary>
         public const string HudPopPush = "hud.pop.push";
+        /// <summary>The marked rival's warning when the Thief's loot mark lands on it (a self-pop). Working word: the narrative designer owns the final one.</summary>
+        public const string HudPopMarked = "hud.pop.marked";
+        /// <summary>The Thief's reward pop when a marked steal pays: the bounty that fitted, from the event.</summary>
+        [UiArgs("n")] public const string HudPopLootTake = "hud.pop.lootTake";
         public const string HudStatusStun = "hud.status.stun";
         public const string HudStatusStuck = "hud.status.stuck";
         public const string HudStatusSlow = "hud.status.slow";
@@ -290,6 +294,8 @@ namespace CluckWars.Localization
         public const string HudBadgeEgg = "hud.badge.egg";
         public const string HudBadgeHidden = "hud.badge.hidden";
         public const string HudBadgeFast = "hud.badge.fast";
+        /// <summary>The coin-bag badge the marked rival wears on its own screen.</summary>
+        public const string HudBadgeLoot = "hud.badge.loot";
         public const string HudHintHoldTouch = "hud.hint.hold.touch";
         public const string HudHintHoldPad = "hud.hint.hold.pad";
         public const string HudHintHoldKeys = "hud.hint.hold.keys";

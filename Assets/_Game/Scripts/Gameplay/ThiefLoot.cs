@@ -229,11 +229,18 @@ namespace CluckWars.Gameplay
             _log?.Info(Source, $"{name}: marked steal on {victim.name}: +{take:0.#} stolen, +{bountyGained:0.#} bounty ({bountyLost:0.#} did not fit).");
         }
 
+        /// <summary>
+        /// Raised on the Thief's authority when the victim's authority refused a marked steal (a shell or a wall), with the victim. A plain local C# event,
+        /// not a replicated counter (so not ARCH-EVT-03's concern): the Thief's own screen reads it for the SAFE pop; no other peer ever hears it.
+        /// </summary>
+        public event System.Action<ChickenController> MarkedStealRefused;
+
         /// <summary>The victim's authority refused the marked steal (a shell or a wall): nothing was credited and the mark stays. Authority only.</summary>
         public void OnMarkedStealRefused(ChickenController victim)
         {
             if (!HasStateAuthority) return;
             _log?.Info(Source, $"{name}: the marked steal on {victim.name} was refused (shell or wall): the mark stays.");
+            MarkedStealRefused?.Invoke(victim);
         }
 
         /// <summary>Round reset (<c>ChickenController.RPC_ResetControlStates</c>, the match authority's PLAY AGAIN): the mark is cleared without effect and the last-marked memory with it.</summary>

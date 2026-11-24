@@ -38,3 +38,5 @@ MonoBehaviour:
   MarkVictimDimColor: {r: 0.03, g: 0.015, b: 0.05, a: 1}
   MarkVictimColdColor: {r: 0.13, g: 0.05, b: 0.28, a: 1}
   MarkVictimRedColor: {r: 0.9, g: 0.04, b: 0.04, a: 1}
+  LootGoldColor: {r: 0.91, g: 0.62, b: 0.1, a: 1}
+  LootEmptyColor: {r: 0.8, g: 0.74, b: 0.62, a: 0.85}

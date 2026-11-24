@@ -862,6 +862,8 @@
     display: none;
 }
 .cw-hex--hunt .cw-hex-huntdot { display: flex; }
+/* The Thief's loot dot (LootHexRules): the same top-centre dot on the Steal hex while a mark is coming or live. Gold or empty, scale and pulse are written inline from the palette. */
+.cw-hex--loot .cw-hex-huntdot { display: flex; }
 /* The count owns the lower centre, where the in-range pip sits. */
 .cw-hex--hunt .cw-hex-pip { visibility: hidden; }
 .cw-hex--hunt .cw-hex-huntglyph--star,

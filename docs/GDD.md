@@ -602,8 +602,13 @@ does not fit is lost, and an empty beak still pays the bounty. A full Thief gain
 reached the rival: a shell (Egg Shell) or a base wall refuses it, nothing is paid and the mark stays. The next mark appears `LootLeadSeconds` (1 s) before Steal is
 ready again; a mark older than `LootSeconds` (12 s) moves to another rival only while Steal is on cooldown (with Steal ready it stays, "overdue", and moves the moment
 Steal goes on cooldown, whatever caused it). Everything is authority-confirmed like every food transfer (`ThiefLoot`, `ChickenCargo.RPC_DrainStolenMarked`,
-`RPC_SettleMarkedSteal`, `MarkedStealBook`): the victim's authority drains and reports; the Thief's authority credits the take and then the bounty, once. Slice A has no
-visual for the mark: it is state, events (`ChickenLocalEvents.LootTaken`) and `Telemetry` lines (`lootdraw`, `loottake`, `lootmove`); slice B shows it.
+`RPC_SettleMarkedSteal`, `MarkedStealBook`): the victim's authority drains and reports; the Thief's authority credits the take and then the bounty, once. **What is seen (slice B, BL-219; owner 2026-11-24: only the Thief and the marked rival, a bag of coins, never a crown):**
+the Thief sees a coin-bag marker on the marked rival (on its floor arrow outside the circle round his bird, over its head inside it, pinned to the edge with no arrow),
+gold ground brackets while that rival is inside Steal's reach (grey when a wall of its base or an egg shell blocks the steal), a gold dot on the Steal button that
+fills with the cooldown and turns solid gold `LootLeadSeconds` before Steal is ready, and a `LOOT +n` pop with a strong buzz when a marked steal pays (n is the bounty
+that fitted); a hidden (Hide) rival hides the bag. The marked rival sees a coin-bag badge with the word LOOT over its own nameplate, a `MARKED!` pop with a short buzz
+when the mark lands, and a bag on the Thief's arrow. Nobody else sees any of it, and the end-of-clock prize has no feedback of its own. State, events
+(`ChickenLocalEvents.LootTaken`) and `Telemetry` lines (`lootdraw`, `loottake`, `lootmove`) are unchanged (design section 22).
 
 ### 6.3 Control ladder
 

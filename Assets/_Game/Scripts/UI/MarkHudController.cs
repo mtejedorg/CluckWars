@@ -22,7 +22,7 @@ namespace CluckWars.UI
     /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     [DefaultExecutionOrder(FloorRivalArrows.ExecutionOrder + 10)]
-    public sealed class MarkHudController : MonoBehaviour
+    public sealed partial class MarkHudController : MonoBehaviour
     {
         private const string Source = "MarkHud";
 
@@ -108,6 +108,7 @@ namespace CluckWars.UI
             LayoutClasses.Bind(root, _root);
             _ring.generateVisualContent += DrawRing;
             _pointer.generateVisualContent += DrawPointer;
+            BindLoot(root);   // the Thief's loot-mark elements; a fault there is reported once and leaves the Hunt untouched
             _bound = true;
             HideAll();
         }
@@ -131,6 +132,7 @@ namespace CluckWars.UI
 
             UpdateMarker(o, cam, panel);
             UpdateHunterSkull(o, cam, panel);
+            UpdateLoot(cam, panel);
             MarkerShownNow = _marker.style.display == DisplayStyle.Flex;
             MarkerOffScreenNow = MarkerShownNow && _markerOffScreen;
             AnchorNow = MarkerShownNow ? _anchor : MarkAnchor.OverHead;
@@ -420,6 +422,7 @@ namespace CluckWars.UI
             AnchorNow = MarkAnchor.OverHead;
             UiElements.SetShown(_marker, false);
             UiElements.SetShown(_hunterSkull, false);
+            HideLoot();
             _markerPlaced = false;
         }
 

@@ -736,6 +736,24 @@ namespace CluckWars.Visuals
         // ---- Death Mark feedback (MarkPresentationModel, MarkFeedback, MarkHudController, the top bar, the hexes) ---------
         // Maestro's 2026-11 redesign. Every timing below is the model's; the UI controllers only draw its outputs.
 
+        // ---- Thief loot mark feedback (LootFeedback, MarkHudController.Loot, the Steal hex; design 2026-11-23 sections 11 and 22) ----
+
+        /// <summary>The loot bag's gold: marker, brackets, hex dot and the victim's badge (palette: <c>LootGoldColor</c>).</summary>
+        public static Color LootGoldColor => FeedbackPalette.Current.LootGoldColor;
+        /// <summary>The Steal-hex dot while the next mark is still coming (palette: <c>LootEmptyColor</c>).</summary>
+        public static Color LootEmptyColor => FeedbackPalette.Current.LootEmptyColor;
+        /// <summary>The bag hops onto a new bird: it pops in from <see cref="MarkMarkerPopFrom"/> over this long (a mark that moved).</summary>
+        public const float LootHopSeconds = 0.2f;
+        /// <summary>The bag's size when it lands on a new bird, growing to 1 over <see cref="LootHopSeconds"/>.</summary>
+        public const float LootHopFrom = 0.5f;
+        /// <summary>The old victim's badge fades out over this long, with no word.</summary>
+        public const float LootBadgeFadeSeconds = 0.3f;
+        /// <summary>The Steal-hex dot pulses up to 1 + this while the marked bird is inside Steal's reach (not under Reduced Motion).</summary>
+        public const float LootDotPulse = 0.25f;
+        /// <summary>The marked rival's own badge floats this many panel px above its nameplate.</summary>
+        public const float LootBadgeGapPx = 12f;
+        public const float LootDotPulseHz = 3f;
+
         /// <summary>Kill-ready: the hunt marker and the Death Mark hex turn this colour (#FFEB1A).</summary>
         public static Color MarkKillColor => FeedbackPalette.Current.MarkPounceColor;
         /// <summary>The marker's disc and the skull's ink (#140A1A).</summary>

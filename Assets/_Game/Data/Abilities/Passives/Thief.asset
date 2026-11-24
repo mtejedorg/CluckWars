@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ThiefPassiveSO
   DisplayName: Thief
   ShortLabel: THEF
-  Description: A steal on your marked rival pays +10 food. +20 if time runs out. Carry 20 food.
+  Description: Rob the bird with your loot bag for 10 extra food. 20 extra food if time runs out. Carry 20 food.
   Icon: 
   AccentColor: {r: 0.45, g: 0.35, b: 0.7, a: 1}
   Category: 3

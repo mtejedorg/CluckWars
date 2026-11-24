@@ -235,6 +235,11 @@ namespace CluckWars.Input
         private readonly int[]   _appliedHuntMetres = new int[SlotCount];
         private const string MarkLitClass  = "cw-hex--lit";
 
+        // The Steal hex's loot dot (LootHexRules): the local Thief's own mark state on its Steal slot. _lootView is this frame's, per slot; the applied
+        // caches keep style writes to real changes. Only LootFeedback.Current is read, so no other player's mark ever reaches a hex.
+        private readonly LootHexView[] _lootView = new LootHexView[SlotCount];
+        private readonly LootDotState[] _appliedLootDot = new LootDotState[SlotCount];
+
         // Phase 6 chunk 6: layout mode (A10), haptics (A9) and the first-time hold hint (A1).
         private IInputProvider  _input;
         private IHapticsService _haptics;

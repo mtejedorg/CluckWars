@@ -35,5 +35,32 @@
         <ui:VisualElement name="HunterSkull" class="cw-hunter-skull" picking-mode="Ignore">
             <ui:VisualElement name="HunterSkullGlyph" class="cw-hunter-skull-glyph" picking-mode="Ignore" />
         </ui:VisualElement>
+
+        <!-- The Thief's loot-bag marker (MarkHudController.Loot): over the marked rival (pointer down), on its floor arrow outside the circle, or pinned
+             to the clear-viewport edge. Only the Thief ever sees it; the lock / egg corner badges are the blocked state (a wall, a shell). -->
+        <ui:VisualElement name="LootMarker" class="cw-mark-marker" picking-mode="Ignore">
+            <ui:VisualElement name="LootBody" class="cw-mark-body" picking-mode="Ignore">
+                <ui:VisualElement name="LootPointer" class="cw-mark-pointer" picking-mode="Ignore" />
+                <ui:VisualElement name="LootDisc" class="cw-mark-disc" picking-mode="Ignore" />
+                <ui:VisualElement name="LootRing" class="cw-mark-ring" picking-mode="Ignore" />
+                <ui:VisualElement name="LootBag" class="cw-loot-bag" picking-mode="Ignore" />
+                <ui:VisualElement name="LootLock" class="cw-mark-lock" picking-mode="Ignore">
+                    <ui:VisualElement name="LootLockGlyph" class="cw-mark-lock-glyph" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="LootShell" class="cw-mark-lock cw-mark-shell" picking-mode="Ignore">
+                    <ui:VisualElement name="LootShellGlyph" class="cw-mark-shell-glyph" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- The marked rival's own badge, over its own nameplate (a coin bag and the word LOOT), and the bag on the Thief's rival arrow (as the
+             Hunt shows the skull). Only the marked rival ever sees them. -->
+        <ui:VisualElement name="LootBadge" class="cw-loot-badge" picking-mode="Ignore">
+            <ui:VisualElement name="LootBadgeBag" class="cw-loot-badge-bag" picking-mode="Ignore" />
+            <ui:Label name="LootBadgeLabel" text="" class="cw-loot-badge-label" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="LootArrowBag" class="cw-loot-arrowbag" picking-mode="Ignore">
+            <ui:VisualElement name="LootArrowBagGlyph" class="cw-loot-arrowbag-glyph" picking-mode="Ignore" />
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

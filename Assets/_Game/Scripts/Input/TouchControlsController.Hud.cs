@@ -161,9 +161,11 @@ namespace CluckWars.Input
         {
             var mark = MarkFeedback.Current;
             _huntOut = mark;
+            var loot = LootFeedback.Current;
             for (int slot = 0; slot < SlotCount; slot++)
             {
                 var a = abilities != null ? SlotAbility(abilities, slot) : null;
+                _lootView[slot] = a.Is(AbilityJob.Steal) ? loot.Hex : default;
                 _huntOn[slot] = HuntHexRules.Applies(mark, a.Is(AbilityJob.DeathMark));
                 bool kill = mark.KillHex && a.Is(AbilityJob.DeathMark);
                 if (kill && !_markKill[slot]) _markKillSince[slot] = Time.unscaledTime;
@@ -237,6 +239,39 @@ namespace CluckWars.Input
                 hex.EnableInClassList(MarkLitClass, _markLit[slot]);
             }
             ApplyHuntHex(slot);
+            ApplyLootHex(slot);
+        }
+
+        /// <summary>
+        /// The Steal hex's loot dot (<see cref="LootHexRules"/>): the same top-centre dot the Hunt hex wears, empty and scaling up with the Steal cooldown while
+        /// the next mark is coming, solid gold once it is due or live, pulsing while the marked rival is inside Steal's reach. The colours are the palette's;
+        /// the class that shows the dot has its rule in TouchControls.uss. Each part is written only when its input changes (the pulse every frame, not under
+        /// Reduced Motion).
+        /// </summary>
+        private void ApplyLootHex(int slot)
+        {
+            var refs = _slots[slot];
+            var view = _lootView[slot];
+            if (view.Dot != _appliedLootDot[slot])
+            {
+                bool wasOff = _appliedLootDot[slot] == LootDotState.Off;
+                _appliedLootDot[slot] = view.Dot;
+                _log?.Debug(Source, $"Hex {slot + 1}: loot dot {view.Dot} (dot element {(refs.HuntDot != null ? "bound" : "MISSING")}).");
+                refs.Hex.EnableInClassList(LootHexRules.LootClass, view.Dot != LootDotState.Off);
+                if (view.Dot == LootDotState.Off && refs.HuntDot != null && !wasOff)
+                {
+                    refs.HuntDot.style.backgroundColor = StyleKeyword.Null;   // hand the dot back to the Hunt's own colouring
+                    refs.HuntDot.style.scale = StyleKeyword.Null;
+                    _appliedHuntCorner[slot] = int.MinValue;
+                }
+            }
+            if (view.Dot == LootDotState.Off || refs.HuntDot == null) return;
+
+            refs.HuntDot.style.backgroundColor = view.Dot == LootDotState.Live ? FeedbackTuning.LootGoldColor : FeedbackTuning.LootEmptyColor;
+            float scale = view.Dot == LootDotState.Live ? 1f : Mathf.Lerp(0.55f, 1f, view.Fill01);
+            if (view.Pulse && !PlayerPreferences.ReducedMotionEnabled)
+                scale *= 1f + FeedbackTuning.LootDotPulse * 0.5f * (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.LootDotPulseHz * 2f * Mathf.PI));
+            refs.HuntDot.style.scale = new Scale(new Vector3(scale, scale, 1f));
         }
 
         /// <summary>

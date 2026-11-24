@@ -63,6 +63,12 @@ namespace CluckWars.Visuals
         [Tooltip("The marked player's red tint at the screen edge.")]
         public Color MarkVictimRedColor = new Color(0.9f, 0.04f, 0.04f, 1f);
 
+        [Header("Thief loot mark")]
+        [Tooltip("The loot bag: the Thief's marker, brackets and Steal-hex dot while a mark is live, and the victim's badge (a warm gold, apart from the yolk and the stun yellow).")]
+        public Color LootGoldColor = new Color(0.91f, 0.62f, 0.10f, 1f);
+        [Tooltip("The Steal-hex dot while the next mark is still coming: a pale, empty bag (cream, dimmed).")]
+        public Color LootEmptyColor = new Color(0.80f, 0.74f, 0.62f, 0.85f);
+
         /// <summary>The accent for <paramref name="key"/>. <see cref="AccentKey.Custom"/> has no palette colour
         /// (the ability's own literal applies), so asking for it is a caller bug and throws.</summary>
         public Color Accent(AccentKey key) => key switch

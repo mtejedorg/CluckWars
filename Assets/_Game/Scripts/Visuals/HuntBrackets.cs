@@ -118,15 +118,26 @@ namespace CluckWars.Visuals
         /// <summary>The one renderer (tests count it).</summary>
         public MeshRenderer BracketRenderer => _renderer;
 
+        /// <summary>The hunt's own brackets report to the statics above; a second set (the Thief's loot brackets) must not overwrite them.</summary>
+        private bool _reportsToStatics = true;
+
         /// <summary>Builds the object under <paramref name="parent"/>: one mesh, one renderer, the shared material, hidden.</summary>
-        public static HuntBrackets Create(Transform parent, ILogService log)
+        public static HuntBrackets Create(Transform parent, ILogService log) => Create(parent, log, "HuntBrackets", true);
+
+        /// <summary>The same brackets for another owner (the Thief's loot brackets, <see cref="LootFeedback"/>): its own object name, and it leaves the hunt's
+        /// statics (<see cref="ShownNow"/> and friends) alone.</summary>
+        public static HuntBrackets Create(Transform parent, ILogService log, string objectName, bool reportsToStatics)
         {
-            var go = new GameObject("HuntBrackets");
+            var go = new GameObject(objectName);
             go.transform.SetParent(parent, worldPositionStays: false);
             var brackets = go.AddComponent<HuntBrackets>();
+            brackets._reportsToStatics = reportsToStatics;
             brackets.Build(log);
             return brackets;
         }
+
+        /// <summary>The brackets are drawn this frame (instance form: the loot brackets do not touch <see cref="ShownNow"/>).</summary>
+        public bool IsShown => _renderer != null && _renderer.enabled;
 
         private void Build(ILogService log)
         {
@@ -239,39 +250,50 @@ namespace CluckWars.Visuals
                 return;
             }
 
+            Color stroke = ColourFor(in o);
+            stroke.a = Mathf.Clamp01(o.MarkerAlpha);   // the marker's own fade (end hold included) rides in alpha
+            Draw(state, stroke, targetPosition, rivalRingWorldRadius, ScaleFor(in o, reducedMotion, unscaledTime));
+        }
+
+        /// <summary>Drives these brackets with a plain colour, for an owner that has no <see cref="MarkOutputs"/> (the Thief's loot brackets). The alpha is the colour's.</summary>
+        public void ApplyColour(Color stroke, Vector3 targetPosition, float rivalRingWorldRadius, float scale)
+        {
+            if (_renderer == null) return;
+            Draw(HuntBracketState.Pounce, stroke, targetPosition, rivalRingWorldRadius, scale);
+        }
+
+        private void Draw(HuntBracketState state, Color stroke, Vector3 targetPosition, float rivalRingWorldRadius, float scale)
+        {
             float radius = RadiusFor(rivalRingWorldRadius);
             if (!Mathf.Approximately(radius, _builtRadius)) WriteVertices(radius);
 
-            Color stroke = ColourFor(in o);
-            stroke.a = Mathf.Clamp01(o.MarkerAlpha);   // the marker's own fade (end hold included) rides in alpha
             if (stroke != _shownColour)
             {
                 WriteColours(stroke, stroke.a);
                 _shownColour = stroke;
             }
 
-            float s = ScaleFor(in o, reducedMotion, unscaledTime);
             transform.SetPositionAndRotation(new Vector3(targetPosition.x, TelegraphShapes.GroundY + FeedbackTuning.HuntBracketHeightOffset, targetPosition.z),
                 Quaternion.identity);
-            transform.localScale = new Vector3(s, 1f, s);
+            transform.localScale = new Vector3(scale, 1f, scale);
             _renderer.enabled = true;
             Color shown = stroke;
             shown.a = 1f;
-            SetShown(state, shown);
+            if (_reportsToStatics) SetShown(state, shown);
         }
 
         /// <summary>Not drawn (the next draw rewrites nothing unless the colour or radius changed).</summary>
         public void Hide()
         {
             if (_renderer != null && _renderer.enabled) _renderer.enabled = false;
-            SetShown(HuntBracketState.Hidden, default);
+            if (_reportsToStatics) SetShown(HuntBracketState.Hidden, default);
         }
 
         private void OnDisable() => Hide();
 
         private void OnDestroy()
         {
-            SetShown(HuntBracketState.Hidden, default);
+            if (_reportsToStatics) SetShown(HuntBracketState.Hidden, default);
             if (_mesh == null) return;
             if (Application.isPlaying) Destroy(_mesh);
             else DestroyImmediate(_mesh);

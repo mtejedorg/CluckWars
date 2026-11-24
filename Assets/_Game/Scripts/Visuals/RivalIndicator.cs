@@ -196,6 +196,7 @@ namespace CluckWars.Visuals
             // The painted floor ring (decision 2a): created by the first indicator of the first match, before any LateUpdate offers.
             FloorRivalArrows.EnsureForMatch();
             MarkFeedback.EnsureForMatch();
+            LootFeedback.EnsureForMatch();
             BuildGeometry();
         }
 

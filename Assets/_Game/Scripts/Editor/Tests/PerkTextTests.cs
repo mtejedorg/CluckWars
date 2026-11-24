@@ -35,9 +35,9 @@ namespace CluckWars.Tests
                             "Applies to every move except Peck.");
                 case ThiefPassiveSO t:
                     int tCap = (int)Math.Round(t.MinimumCapacity, MidpointRounding.AwayFromZero);
-                    return ($"A steal on your marked rival pays +{t.LootBounty} food. +{t.ClockPrize} if time runs out. Carry {tCap} food.",
-                            $"One rival at a time is your marked rival. A steal that reaches them takes their food and adds {t.LootBounty} new food to your beak, as far as it fits. " +
-                            $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {t.ClockPrize} bonus food first. You carry up to {tCap} food.");
+                    return ($"Rob the bird with your loot bag for {t.LootBounty} extra food. {t.ClockPrize} extra food if time runs out. Carry {tCap} food.",
+                            $"One rival carries your loot bag, and only you and that bird can see it. Rob that bird: you grab the food it holds, and {t.LootBounty} new food drops into your beak, as far as it fits. " +
+                            $"A new bag shows up just before your Steal is ready again. If time runs out before anyone reaches {cfg.FoodTargetToWin}, you get {t.ClockPrize} extra food at home. You carry up to {tCap} food.");
                 case SlipperyPassiveSO s:
                     return ($"Ability slows on you are {Pct(1.0 - s.Resist)}% weaker and end {Pct(1.0 - s.Resist)}% sooner.",
                             "Stuns still land in full. Pile and bump slows still apply.");
@@ -55,8 +55,8 @@ namespace CluckWars.Tests
                     // The pull is the Hunt's own number, read here from the Hunt asset the registry holds.
                     var hunt = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All.OfType<MarkKillAbilitySO>().Single();
                     string pull = hunt.LeaderPickWeight.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
-                    return ($"Your Hunt picks the leader {pull} times as often. Carry {spCap} food.",
-                            $"The bird with the most food at home is {pull} times as likely to be hunted. A kill fills your beak: you carry up to {spCap} food.");
+                    return ($"Your Hunt goes after the bird with the most food {pull} times more often. Carry {spCap} food.",
+                            $"The bird with the most food at home is {pull} times as likely to be hunted. A kill fills your beak with food: you carry up to {spCap} food.");
                 default:
                     Assert.Fail($"{p.name} ({p.GetType().Name}) has no perk-text expectation. A new passive needs " +
                                 "a perk.*.line template in UiText.csv, PerkLineKey/PerkArgs on the class, and a row here.");
@@ -263,8 +263,8 @@ namespace CluckWars.Tests
                         StringAssert.Contains("except Peck", b.Description);
                         break;
                     case ThiefPassiveSO t:
-                        StringAssert.Contains($"pays +{t.LootBounty} food", t.Description);
-                        StringAssert.Contains($"+{t.ClockPrize} if time runs out", t.Description);
+                        StringAssert.Contains($"for {t.LootBounty} extra food", t.Description);
+                        StringAssert.Contains($"{t.ClockPrize} extra food if time runs out", t.Description);
                         StringAssert.Contains($"Carry {(int)Math.Round(t.MinimumCapacity, MidpointRounding.AwayFromZero)} food", t.Description);
                         StringAssert.DoesNotContain("more", t.Description, "the 1.6x on every steal is gone: no text may still promise a bigger steal");
                         break;
