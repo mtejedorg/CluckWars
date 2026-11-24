@@ -48,11 +48,11 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
 | `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 28 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 197 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 198 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 145 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 32 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 315 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 316 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -99,8 +99,8 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Diagnostics` | `CluckWars.Diagnostics` | 27 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 9 |
 | `Editor` | `Assembly-CSharp-Editor` | 18 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 289 |
-| `Gameplay` | `CluckWars.Gameplay` | 89 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 290 |
+| `Gameplay` | `CluckWars.Gameplay` | 90 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
 | `Injection` | `CluckWars.Core` | 1 |
@@ -202,7 +202,7 @@ Non-script file counts by folder (depth 3):
 | Food, bases and transfers | `FoodPile`, `PlayerBase`, `FoodTransferRules` (holds `FoodRequests`), `PendingStealLedger`, `StealMath`, `StealRules`, `BaseDepositRules`, `BaseKeepOutRules`, `BaseWallRules`, `PileFootprintShape` |
 | RPC claims and control | `RpcClaim` (holds `RpcRejectionLimiter`), `ControlClaimRules`, `ControlReapplyRules` |
 | Map and terrain | `MapGenerator`, `PinwheelLayout`, `SectorScatter`, `TerrainObstacle`, `TerrainTraversal`, `ArenaDensityMetric` |
-| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
+| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotLootRules` (pure rules for the Thief bot's loot mark: pursue, hold Steal, bank now; the game's bot and the simulator's P0 call the same functions), `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
 | Shared config assets | `MatchConfigSO`, `PrefabRegistrySO`, `ColorSchemeSO` |
 
 **`Scripts/Abilities`** (45 files + 8 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
@@ -462,7 +462,7 @@ Every `.asset` under `Assets/_Game/Data`, with the class its `m_Script` GUID res
 Ability assets: 19 registered, 19 retired.
 <!-- END GENERATED: data -->
 
-`OracleReference.asset` holds the accepted route entries and `KillTargets`, and since match simulator slice 7 also `MatchRecords` (`MatchRecord` with `AcceptedOn`, `Note`, `BalanceHash`, `Design`, `Population`, `RunSeed` and `Lines` of `MatchRecordLine`): the accepted match reports the drift line compares with. It also holds the Thief's loot target rows. `Thief.asset` holds loot fields that only the match simulator reads today: the mechanic ships off (`LootBounty` 0).
+`OracleReference.asset` holds the accepted route entries and `KillTargets`, and since match simulator slice 7 also `MatchRecords` (`MatchRecord` with `AcceptedOn`, `Note`, `BalanceHash`, `Design`, `Population`, `RunSeed` and `Lines` of `MatchRecordLine`): the accepted match reports the drift line compares with. It also holds the Thief's loot target rows. `Thief.asset` holds loot fields that only the match simulator reads today: the mechanic ships off (`LootBounty` 0). `Spoiler.asset` and `Thief.asset` also hold a `MinimumCapacity` floor, read through `ModifyCargoCapacity` like the Hoarder's (Spoiler 25, Thief 0 today).
 
 ScriptableObject assets outside `Assets/_Game/Data`: the URP assets in `Assets/Settings` (section 3.7) and
 `Assets/Resources/PanelSettings.asset` (section 3.5).
@@ -493,7 +493,7 @@ Shared helpers (all in `Assets/_Game/Scripts/Editor/Tests/`):
 | `MatchTestKit.cs` | Shared inputs and map for the match simulator tests (releases them in `TearDown`) | 2 |
 | `IconStrokeMetrics.cs` | Pixel metrics on shipped icon PNGs (used by `AbilityIconArtTests`, `StateGlyphArtTests`) | - |
 
-Test classes for the bot sight rule and the match simulator: `BotSightTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
+Test classes for the bot sight rule and the match simulator: `BotSightTests`, `BotLootRulesTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
 
 Recording fakes are not shared: each test file declares its own private nested class (`RecordingLog` in 9 files, e.g.
 `SelfInjectTests.cs` and `MissingSfxTests.cs`; `FakeAudio`, `FakeInput`, `FakeDevice`, `FakeClock`, `FakePresenter`,
