@@ -211,6 +211,8 @@ namespace CluckWars.Balance
 
                 float capacity = Mathf.Max(1, v.Kits[r].Farm.CargoCapacity);
                 float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo, rival.Bag) / capacity);
+                // The Thief's loot mark (BL-217): the marked rival scores as a full load whatever it carries, and stays prey inside the hunt radius.
+                if (me.LootTarget == r) frac = 1f;
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);
                 if (priority <= 0f) continue;
@@ -289,7 +291,7 @@ namespace CluckWars.Balance
             var r = v.Seats[rival];
             if (!r.Present || r.Removed || !MatchCombat.InRange(me.Pos, r.Pos, ab.Radius)) return false;
             if (MatchCombat.KeepOutBlocks(me.Pos, r.Pos, BaseCentres(v), v.Rules.KeepOutRadius)) return false;
-            return ab.Job != AbilityJob.Steal || StealRules.Stealable(r.Cargo, r.Bag) > 0f;
+            return ab.Job != AbilityJob.Steal || StealRules.Stealable(r.Cargo, r.Bag) > 0f || me.LootTarget == rival;   // the Thief's mark needs no food to be taken
         }
 
         private bool AnyRivalInRange(MatchView v, in SeatView me, in MatchAbility ab)

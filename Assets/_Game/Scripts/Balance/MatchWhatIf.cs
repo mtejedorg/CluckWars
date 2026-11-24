@@ -182,7 +182,7 @@ namespace CluckWars.Balance
                 RunSeed = seed, ReplicateScale = spec.ReplicateScale, Threads = threads,
                 KitLabels = baseContext.Kits.Select(k => k.Label).ToArray(),
                 SpoilerKit = baseContext.Kits.FirstOrDefault(k => k.Passive.MatchEndBonusFood > 0f)?.Label,
-                ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.StealFactor > 1f)?.Label,
+                ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Loot.IsThief || k.Passive.StealFactor > 1f)?.Label,
             };
 
             WhatIfResult Play(string name, string delta, MatchContext context, string hash)
@@ -258,6 +258,29 @@ namespace CluckWars.Balance
                     Add("thief", "food stolen per match", pop, t.StolenPerMatch, trials: t.Matches);
                     Add("thief", "food foraged per match", pop, t.ForagedPerMatch, trials: t.Matches);
                     Add("thief", "food banked per match", pop, t.BankedPerMatch, trials: t.Matches);
+                    if (t.LootActive)
+                    {
+                        Add("thief", "marks drawn per match", pop, t.MarksDrawnPerMatch, trials: t.Matches);
+                        Add("thief", "marks consumed per match", pop, t.MarksTakenPerMatch, trials: t.Matches);
+                        Add("thief", "marks lost unpaid per match", pop, t.MarksLostPerMatch, trials: t.Matches);
+                        Add("thief", "marks refused per match", pop, t.MarksRefusedPerMatch, trials: t.Matches);
+                        Add("thief", "marked take per match", pop, t.LootTakeFoodPerMatch, trials: t.Matches);
+                        Add("thief", "bounty food per match", pop, t.LootBountyFoodPerMatch, trials: t.Matches);
+                        Add("thief", "bag food banked per match", pop, t.BagBankedPerMatch, trials: t.Matches);
+                        Add("thief", "bag food lost to steals per match", pop, t.BagLostPerMatch, trials: t.Matches);
+                        Add("thief", "won only on the prize (%)", pop, t.WonOnPrize * 100f, trials: t.Matches);
+                        Add("thief", "loot mark on a Hunt-marked bird (% of Thief matches)", pop, t.OverlapShare * 100f, trials: t.Matches);
+                        Add("thief", "loot mark on a Hunt-marked bird (% of Thief matches with a Spoiler)", pop, t.OverlapShareWithSpoiler * 100f, trials: t.MatchesWithSpoiler);
+                        Add("thief", "seconds on a Hunt-marked bird per match", pop, t.OverlapSecondsPerMatch, trials: t.Matches);
+                    }
+                    var mirror = s.SeatByKit.FirstOrDefault(m => m.Kit == t.Kit);
+                    if (mirror != null && mirror.Matches > 0)
+                        Add("match", "Thief mirror decided by the corner (%)", pop, mirror.CornerDecided * 100f / mirror.Matches, trials: mirror.Matches);
+                }
+                foreach (var row in s.LootSteals)
+                {
+                    AddRate("loot-steals", $"{row.Steals} marked steals, no prize", pop, row.Win, row.Label);
+                    AddRate("loot-steals", $"{row.Steals} marked steals, with prize", pop, row.WinWithPrize, row.Label);
                 }
                 var run = s.Runs.FirstOrDefault(r => r.Design == MatchDesignKind.Mixed);
                 if (run != null && run.Matches > 0)
@@ -378,6 +401,38 @@ namespace CluckWars.Balance
             }
             sb.AppendLine();
 
+            // Overview: the Thief's loot mark.
+            if (played.Any(s => all[s.Name].Any(l => l.Group == "loot-steals")))
+            {
+                sb.AppendLine("## Overview: the Thief's loot mark (per match, mixed population unless said)");
+                sb.AppendLine();
+                sb.AppendLine("| Scenario | marks drawn | consumed | lost unpaid | refused | marked take | bounty food | bag banked | bag lost to steals | won only on the prize (%) | on a Hunt-marked bird (% Thief matches) | Thief mirror on the corner (%) |");
+                sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|");
+                foreach (var s in played)
+                {
+                    string G(string label, string f = "0.00") { var l = Find(all[s.Name], "thief", label, "mixed") ?? Find(all[s.Name], "match", label, "mixed"); return l == null ? "n/a" : F(l.Scenario, f); }
+                    sb.AppendLine($"| {s.Name} | {G("marks drawn per match")} | {G("marks consumed per match")} | {G("marks lost unpaid per match")} | {G("marks refused per match")} | {G("marked take per match", "0.0")} | {G("bounty food per match", "0.0")} | {G("bag food banked per match", "0.0")} | {G("bag food lost to steals per match", "0.0")} | {G("won only on the prize (%)", "0.0")} | {G("loot mark on a Hunt-marked bird (% of Thief matches)", "0.0")} | {G("Thief mirror decided by the corner (%)", "0.0")} |");
+                }
+                sb.AppendLine();
+                sb.AppendLine("## Overview: the Thief's marked steals to win (win rate, matches in brackets; IN or OUT is the label against `ThiefLootTargets`)");
+                sb.AppendLine();
+                sb.AppendLine("| Scenario | 2, with prize P0 | P1 | mixed | 3, no prize P0 | P1 | mixed | 4, no prize P0 | P1 | mixed |");
+                sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|");
+                foreach (var s in played)
+                {
+                    string Row(int k, bool prize, string pop)
+                    {
+                        var l = Find(all[s.Name], "loot-steals", $"{k} marked steals, {(prize ? "with" : "no")} prize", pop);
+                        if (l == null || float.IsNaN(l.Scenario)) return l == null ? "n/a" : $"n/a (n {l.ScenarioTrials})";
+                        string note = l.ScenarioNote ?? string.Empty;
+                        string verdict = note.Contains(" OUT ") ? "OUT" : note.Contains(" IN ") ? "IN" : "-";
+                        return $"{F(l.Scenario)} (n {l.ScenarioTrials}) {verdict}";
+                    }
+                    sb.AppendLine($"| {s.Name} | {Row(2, true, "P0")} | {Row(2, true, "P1")} | {Row(2, true, "mixed")} | {Row(3, false, "P0")} | {Row(3, false, "P1")} | {Row(3, false, "mixed")} | {Row(4, false, "P0")} | {Row(4, false, "P1")} | {Row(4, false, "mixed")} |");
+                }
+                sb.AppendLine();
+            }
+
             // Overview: cost to every kit, per population.
             foreach (var pop in new[] { "P1", "mixed", "P0" })
             {
@@ -476,6 +531,25 @@ namespace CluckWars.Balance
                 sb.AppendLine($"| {who} | {Base(row)} | {Scn(row)} | {D(row)} | {Base(w)} | {Scn(w)} | {D(w)} | {(isBase ? row.BaseNote : row.ScenarioNote) ?? "-"} |");
             }
             sb.AppendLine();
+
+            var lootRows = ls.Where(l => l.Group == "loot-steals" && l.Population == "P1" && l.Label.EndsWith(", no prize")).ToList();
+            if (lootRows.Count > 0)
+            {
+                foreach (var pop in new[] { "P0", "P1", "mixed" })
+                {
+                    sb.AppendLine($"Thief's played marked steals to win, {pop} (survivor bias applies). Win rate without and with the clock prize, label against the `ThiefLootTargets`:");
+                    sb.AppendLine();
+                    sb.AppendLine("| Marked steals | Matches | no prize | with prize | label |");
+                    sb.AppendLine("|---|---|---|---|---|");
+                    foreach (var row in ls.Where(l => l.Group == "loot-steals" && l.Population == pop && l.Label.EndsWith(", no prize")))
+                    {
+                        string k = row.Label.Substring(0, row.Label.IndexOf(' '));
+                        var w = Find(ls, "loot-steals", $"{k} marked steals, with prize", pop);
+                        sb.AppendLine($"| {k} | {(isBase ? row.BaseTrials.ToString() : row.ScenarioTrials.ToString())} | {(isBase ? Base(row) : Scn(row))} | {(isBase ? Base(w) : Scn(w))} | {(isBase ? row.BaseNote : row.ScenarioNote) ?? "-"} |");
+                    }
+                    sb.AppendLine();
+                }
+            }
 
             sb.AppendLine("Other numbers (base -> scenario, difference):");
             sb.AppendLine();

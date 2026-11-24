@@ -7,8 +7,8 @@ namespace CluckWars.Balance
     /// </summary>
     public struct MatchRng
     {
-        /// <summary>Seat streams are 0 to 3; these three are the shared ones.</summary>
-        public const ulong StreamComeback = 100, StreamMark = 101, StreamSetup = 102;
+        /// <summary>Seat streams are 0 to 3; these four are the shared ones.</summary>
+        public const ulong StreamComeback = 100, StreamMark = 101, StreamSetup = 102, StreamLoot = 103;
 
         private const ulong Multiplier = 6364136223846793005UL;
         private const ulong Golden = 0x9E3779B97F4A7C15UL;

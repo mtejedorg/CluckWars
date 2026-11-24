@@ -29,6 +29,20 @@ namespace CluckWars.Balance
         public float MaxWinRate;
     }
 
+    /// <summary>
+    /// One Thief loot target (design 2026-11-23 section 7, BL-217): with exactly <see cref="Steals"/> marked steals taken, the Thief's win rate,
+    /// with or without the clock prize, should lie in [<see cref="MinWinRate"/>, <see cref="MaxWinRate"/>]. Report labels only, never a test.
+    /// A separate struct from <see cref="SpoilerKillTarget"/> so the Spoiler's serialized list stays as it was.
+    /// </summary>
+    [Serializable]
+    public struct ThiefLootTarget
+    {
+        public int Steals;
+        public bool WithPassive;
+        public float MinWinRate;
+        public float MaxWinRate;
+    }
+
     /// <summary>One win rate of a match record: a kit or a class, under one policy population, with its 95 % interval.</summary>
     [Serializable]
     public struct MatchRecordLine
@@ -92,6 +106,8 @@ namespace CluckWars.Balance
         public List<Entry> Entries = new List<Entry>();
         /// <summary>The Spoiler's kills-to-win targets (match simulator report labels). Empty for an asset written before they existed.</summary>
         public List<SpoilerKillTarget> KillTargets = new List<SpoilerKillTarget>();
+        /// <summary>The Thief's marked-steals-to-win targets (match simulator report labels). Empty for an asset written before they existed.</summary>
+        public List<ThiefLootTarget> ThiefLootTargets = new List<ThiefLootTarget>();
         /// <summary>The match simulator's records, oldest first (<see cref="AcceptMatch"/> appends). Empty for an asset written before they existed; part 1 never reads them.</summary>
         public List<MatchRecord> MatchRecords = new List<MatchRecord>();
 

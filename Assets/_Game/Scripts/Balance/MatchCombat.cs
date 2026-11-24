@@ -131,6 +131,24 @@ namespace CluckWars.Balance
         public float Stolen;
         public float LostToSteals;
         public float Bounty;
+        /// <summary>Loot marks drawn on a rival (the Thief's mark).</summary>
+        public int LootOffered;
+        /// <summary>Loot marks consumed by a marked steal: the Thief's marked steals.</summary>
+        public int LootTaken;
+        /// <summary>Marks that moved on without a take (the timeout) or ended without pay (the marked bird was removed).</summary>
+        public int LootTimeouts;
+        /// <summary>Steal casts that covered the marked rival in range but were refused by a base wall or a shell.</summary>
+        public int LootRefused;
+        /// <summary>Food the marked steals took from the marked rivals.</summary>
+        public float LootTakeFood;
+        /// <summary>New food the marked steals added to the bounty bag.</summary>
+        public float LootBountyFood;
+        /// <summary>Bounty bag food this seat banked.</summary>
+        public float BagBanked;
+        /// <summary>Bounty bag food rivals' steals took from this seat.</summary>
+        public float BagLostToSteals;
+        /// <summary>Seconds a Thief's loot mark sat on the same bird as a Spoiler's Hunt mark (counted on the Thief's seat).</summary>
+        public float LootHuntOverlapSeconds;
         public int Casts;
         public int Steals;
         public float FirstContact;

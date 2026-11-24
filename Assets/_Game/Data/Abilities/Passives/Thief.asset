@@ -30,6 +30,16 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   StealMultiplier: 1.6
+  LootBounty: 0
+  LootSeconds: 12
+  LootLeadSeconds: 1
+  LootTakeToBag: 1
+  LootBaseWeight: 4
+  LootBankedWeight: 1
+  LootCarriedWeight: 0.5
+  LootOverFraction: 0.625
+  LootOverBonus: 10
+  ClockPrize: 0
   Subclass: 8
   Kit:
   - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}

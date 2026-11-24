@@ -388,17 +388,23 @@ namespace CluckWars.Balance
                 _score[r] = float.NegativeInfinity;
                 _value[r] = 0f;
                 if (!_ok[r] || v.Seats[r].Shelled || _dist[r] > chase) continue;
-                float take = MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag);
-                if (take < 1f) continue;
+                // The loot mark (BL-217): the marked rival is worth its take plus the bounty, the take < 1 skip does not apply to it (the bounty
+                // pays on an empty bird) and the take goes to the bag, so the free room does not limit it.
+                bool marked = _me.LootTarget == r;
+                var loot = _kit.Passive.Loot;
+                float take = marked && loot.TakeToBag
+                    ? LootRules.MarkedTake(a.StealAmount, _kit.Passive.StealFactor, v.Seats[r].Cargo, v.Seats[r].Bag)
+                    : MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag);
+                if (take < 1f && !marked) continue;
 
                 float wait = Mathf.Max(_me.CooldownLeft[1 + steal], Mathf.Max(0f, _dist[r] - a.Radius * BotTactics.CommitReachFraction) / _speed);
                 float homeAfter = Mathf.Max(0f, Vector2.Distance(v.Seats[r].Pos, _home) - v.Map.BaseRadius) / _speed;
-                float carried = _all + take;
+                float carried = _all + take + (marked ? loot.Bounty : 0f);
                 float seconds = wait + homeAfter + carried / _dep;
                 if (seconds > v.TimeLeft) continue;     // no time to bank it
                 float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);
                 float value = carried / Mathf.Max(Eps, seconds) * (1f + DenyWeight * lead);
-                if (r == _lastVictim) value *= Stickiness;
+                if (r == _lastVictim && !marked) value *= Stickiness;   // it is the bag that pulls a Thief to the marked bird, not the habit
                 _value[r] = value;
                 switch (_p.Target)
                 {

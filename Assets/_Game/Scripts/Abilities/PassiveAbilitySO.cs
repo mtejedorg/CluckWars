@@ -209,6 +209,12 @@ namespace CluckWars.Abilities
         public virtual int MatchEndBonusFood(ChickenController self) => 0;
 
         /// <summary>
+        /// The Thief's loot mark as numbers (BL-217); <see cref="LootMarkFacts.None"/> for every other passive. Read by the match simulator
+        /// as a property, not called from the game: nothing in the game reads it yet.
+        /// </summary>
+        public virtual LootMarkFacts LootMark => LootMarkFacts.None;
+
+        /// <summary>
         /// Called on the state authority each tick while a traversal window is open (not while
         /// unsticking). Lets a passive react to <i>how</i> its owner is moving through terrain.
         /// Chokepoint: <c>ChickenController</c>'s traversal tick.

@@ -82,6 +82,8 @@ namespace CluckWars.Balance
         public float StealFactor;
         public float MaxStealMultiplier;
         public float MatchEndBonusFood;
+        /// <summary>The Thief's loot mark (<see cref="LootMarkFacts.Active"/> false for every other passive and for the shipped Thief).</summary>
+        public LootMarkFacts Loot;
         /// <summary>Every slow factor the shipped kits emit, and what this passive turns each into when it is the victim (parallel arrays).</summary>
         public float[] SlowFactorsEmitted;
         public float[] SlowFactorsReceived;

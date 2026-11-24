@@ -459,3 +459,34 @@ the clock prize beat shown to everyone.
 - Whether the steal chunks draw for every client is assumed (ux-designer); the cargo bar does not show the bag (verified
   by the ux-designer: no UI or Visuals file reads `BountyBag`).
 - The simulator does not model a placed Slow Area zone or body collision (its own list); neither changes the mark.
+
+## 17. Simulator results (2026-11-24, BL-217)
+
+Built as section 13 says; reports `Captures/oracle/match-whatif-20261124-124228.md` (Stage A, 15 scenarios) and
+`match-whatif-20261124-125852.md` (Stage B, 15 scenarios), 22800 matches per scenario at the report's own replicates, common
+random numbers, seed `0x1352902`, every scenario with `Spoiler.BonusFood` 0 and `StealMultiplier` 1.0 unless swept. Not committed.
+
+**Verdict: no scenario passes.** Thief win rate P0 / P1 / mixed, marked steals consumed per match (P0 / P1), the Spoiler (shipped 25.0 / 21.6 / 29.5):
+
+| Scenario | Thief | Consumed | Spoiler | Worst other kit (P1) |
+|---|---|---|---|---|
+| bounty 10, prize 20 (anchor) | 12.3 / 27.1 / 21.9 | 1.52 / 3.07 | 19.2 / 18.3 / 24.4 | Featherfoot -9.6 |
+| bounty 11, prize 20 | 13.5 / 33.2 / 24.9 | 1.52 / 3.03 | 19.5 / 17.4 / 24.4 | Featherfoot -12.7 |
+| bounty 10, steal x1.6 | 20.9 / 35.3 / 28.7 | 1.46 / 2.87 | 18.1 / 17.3 / 24.4 | Featherfoot -10.1 |
+| bounty 12, prize 20 | 15.6 / 42.7 / 31.7 | 1.51 / 2.97 | 19.1 / 17.0 / 23.8 | Featherfoot -14.0 |
+| bounty 14, prize 20 | 20.7 / 54.8 / 39.2 | 1.50 / 2.89 | 19.2 / 15.5 / 22.8 | Featherfoot -17.9 |
+
+- The Thief's rate moves with the bounty (6: 5 %, 8: 11 %, 10: 22 %, 12: 32 %, 14: 39 % mixed) and **the two policies never agree**:
+  P1 plays the rule as designed (about 3 marked steals, bag banked), P0 consumes half as many (1.5 of 3.6 drawn). Where P0 reaches 20 %
+  (bounty 14) P1 is at 55 %, above the no-go bar of 35 %. No bounty puts P0, P1 and mixed in 20 to 30 together.
+- The clock prize does nothing measurable (15, 20, 25, 30: 0 to 2 points); 1 to 5 % of matches are won only through it. Stall probe 30: no stall.
+- Timeout (8 / 16 s), lead (0 / 2 s), weights (W0, W2), taking into the beak, cargo 14: each within 1 point of the anchor for mixed. Steal x1.3 / x1.6: +2.5 / +6.8 mixed.
+- "Three marked steals win" does not hold: with 3 marked steals the Thief wins 29 to 35 % (anchor, no prize) against the 75 % row, 62 to 70 % at bounty 14. A marked steal is worth about 12 to 13 food at bounty 10, so three bags bank about 37, short of 40.
+- The Spoiler falls out of its band in every scenario (17 to 20 % P0 / P1), because the Thief now takes the food it would have taken. Featherfoot (P1) loses 9.6 to 18 points: more than the 8-point no-go bar from bounty 10 up.
+- Clock share stays 2 to 5 % (go bar 12 %), mean length 1 to 2 s shorter, the Thief mirror is corner-decided 0 to 8 % under P1 and mixed (24 to 60 % under P0, 25 matches per kit) against 100 % before.
+- The loot mark and a Hunt mark sit on the same bird in 19 to 28 % of the Thief's matches (P1 19, P0 27, mixed 23 at the anchor).
+- Marks per match at the anchor: 3.65 drawn, 2.33 consumed (mixed), 0.5 timed out or lost with their bird, 4.0 bag food lost to rivals' steals of 22.7 banked.
+
+Which rule, not number, would have to change: (1) the P0 / P1 gap (a bot that reaches the marked bird twice as often is not a number in this design: either the game bot gets a real chase for the marked bird or the target is read from P1 only); (2) the win threshold against the bag (three bags are about 37, so "three steals win" needs the bag to be worth 13.3 each, which is the 14 bounty that already sends P1 to 55 %); (3) the Spoiler's loss, which comes from sharing victims, not from its own numbers.
+
+**Deviations from this design.** The target rows are a separate `ThiefLootTarget` list (not a generalised `WinTarget`), so `KillTargets` stays byte for byte; "mechanic off" is `LootBounty` 0 (no extra switch); the loot stream is one shared stream `StreamLoot` 103 drawn in a rotating seat order, not per seat; P1's flee option is not built (the `SeatView.LootMarkedBy` field exists, no policy reads it); `BotTactics` and `BotController` are untouched: P0 passes the marked rival's load as 1.0 from its own perception code; a mark ended by its bird's removal is counted with the timeouts.

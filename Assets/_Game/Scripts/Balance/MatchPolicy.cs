@@ -83,6 +83,10 @@ namespace CluckWars.Balance
         public float ArmLeft;
         /// <summary>Seconds until this seat's live mark runs out (0 with no mark).</summary>
         public float WindowLeft;
+        /// <summary>The rival this seat's loot mark (the Thief's) is on, -1 for none. Only the Thief and the marked rival see it in the game; a policy reads its own.</summary>
+        public int LootTarget;
+        /// <summary>The seat (a Thief) whose loot mark is on this one, -1 for none. For a policy's own seat only; P0 and P1 do not read it for a rival.</summary>
+        public int LootMarkedBy;
         /// <summary>Seconds until each slot is ready. Index 0 is the Peck, index 1 + i is <c>MatchKit.Abilities[i]</c>.</summary>
         public float[] CooldownLeft;
     }

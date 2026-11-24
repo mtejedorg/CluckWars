@@ -147,6 +147,29 @@ namespace CluckWars.Balance
         public float StolenPerMatch;
         public float ForagedPerMatch;
         public float BankedPerMatch;
+        /// <summary>The loot mark is on for this Thief (the shipped Thief has none); the fields below are 0 when it is not.</summary>
+        public bool LootActive;
+        public float MarksDrawnPerMatch;
+        /// <summary>Marks consumed by a marked steal, per match.</summary>
+        public float MarksTakenPerMatch;
+        /// <summary>Marks that moved on unpaid (timeout) or lost their bird, per match.</summary>
+        public float MarksLostPerMatch;
+        /// <summary>Steal casts that met the marked bird behind a wall or a shell, per match.</summary>
+        public float MarksRefusedPerMatch;
+        public float LootTakeFoodPerMatch;
+        public float LootBountyFoodPerMatch;
+        /// <summary>Bounty bag food the Thief banked, per match.</summary>
+        public float BagBankedPerMatch;
+        /// <summary>Bounty bag food rivals' steals took from the Thief, per match.</summary>
+        public float BagLostPerMatch;
+        /// <summary>Share of the Thief's matches that it won only through the clock prize.</summary>
+        public float WonOnPrize;
+        /// <summary>Share of the Thief's matches in which its loot mark shared a bird with a Spoiler's Hunt mark for any time.</summary>
+        public float OverlapShare;
+        public float OverlapSecondsPerMatch;
+        /// <summary>Of the Thief's matches that held a Spoiler, the share with an overlap (NaN with none).</summary>
+        public float OverlapShareWithSpoiler;
+        public int MatchesWithSpoiler;
     }
 
     /// <summary>The match simulator's section of the oracle report (spec 6). Plain data; <see cref="ToMarkdown"/> and <see cref="ToJson"/> print it.</summary>
@@ -165,6 +188,8 @@ namespace CluckWars.Balance
         public List<SpoilerKillRow> KillsPlayed = new List<SpoilerKillRow>();
         public List<ThiefLine> Thief = new List<ThiefLine>();
         public ThiefSummary ThiefIncome;
+        /// <summary>The Thief's win rate by the marked steals it really took (mixed design; survivor bias included). Empty with the loot mark off.</summary>
+        public List<LootStealRow> LootSteals = new List<LootStealRow>();
         public List<PeckCutLine> PeckCuts = new List<PeckCutLine>();
         public ContactLine FirstContact;
         /// <summary>The same, over the matches that held no Assassin (whose Search walk makes the contact in the first seconds).</summary>
@@ -407,6 +432,7 @@ namespace CluckWars.Balance
                 LeftOut = new List<string>(LeftOut),
             };
             var targets = reference != null ? reference.KillTargets : null;
+            var lootTargets = reference != null ? reference.ThiefLootTargets : null;
 
             MatchRunOutput mixed = null, onePerClass = null, seat = null, forced = null;
             foreach (var run in runs)
@@ -423,7 +449,7 @@ namespace CluckWars.Balance
             }
 
             Dictionary<ChickenClass, WinInterval> pooled = null;
-            if (mixed != null) pooled = BuildMixed(section, context, mixed, targets);
+            if (mixed != null) pooled = BuildMixed(section, context, mixed, targets, lootTargets);
             if (onePerClass != null || pooled != null) BuildClasses(section, context, onePerClass, pooled);
             if (seat != null) BuildSeatCheck(section, context, seat);
             if (forced != null) BuildForced(section, forced, targets);
@@ -558,7 +584,8 @@ namespace CluckWars.Balance
             return (where == "inside" ? "inside the band" : where + " the band") + (straddles ? " (the margin reaches a band edge)" : string.Empty);
         }
 
-        private static Dictionary<ChickenClass, WinInterval> BuildMixed(MatchReportSection section, MatchContext context, MatchRunOutput run, IReadOnlyList<SpoilerKillTarget> targets)
+        private static Dictionary<ChickenClass, WinInterval> BuildMixed(MatchReportSection section, MatchContext context, MatchRunOutput run, IReadOnlyList<SpoilerKillTarget> targets,
+            IReadOnlyList<ThiefLootTarget> lootTargets)
         {
             int kits = context.Kits.Length;
             var appear = new int[kits];
@@ -625,7 +652,7 @@ namespace CluckWars.Balance
             section.FirstContact = Contact(contacts);
             section.FirstContactNoAssassin = Contact(contactsNoAssassin);
             BuildHeadToHead(section, context, run);
-            BuildThief(section, context, run);
+            BuildThief(section, context, run, lootTargets);
             BuildPeckCuts(section, context, cutExposed, cutWhile, cuts, classAppear);
             BuildPlayedKills(section, context, run, targets);
             var pooled = new Dictionary<ChickenClass, WinInterval>();
@@ -682,19 +709,24 @@ namespace CluckWars.Balance
             }
         }
 
-        private static void BuildThief(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        private static void BuildThief(MatchReportSection section, MatchContext context, MatchRunOutput run, IReadOnlyList<ThiefLootTarget> lootTargets)
         {
-            // The Thief is the kit whose passive makes a steal bigger (its steal factor is above 1).
+            // The Thief is the kit of the Thief's passive (its loot facts say so, whatever the numbers), or one whose steal factor is above 1.
             int thief = -1;
             for (int k = 0; k < context.Kits.Length; k++)
-                if (context.Kits[k].Passive.StealFactor > 1f) { thief = k; break; }
+                if (context.Kits[k].Passive.Loot.IsThief || context.Kits[k].Passive.StealFactor > 1f) { thief = k; break; }
             if (thief < 0) return;
+            bool lootOn = context.Kits[thief].Passive.Loot.Active;
 
             int kits = context.Kits.Length;
             var from = new double[kits];
             var meetings = new int[kits];
             int matches = 0, steals = 0;
             double stolen = 0, foraged = 0, banked = 0;
+            double drawn = 0, taken = 0, lost = 0, refused = 0, takeFood = 0, bountyFood = 0, bagBanked = 0, bagLost = 0, overlapSeconds = 0;
+            int wonOnPrize = 0, overlapMatches = 0, withSpoiler = 0, withSpoilerOverlap = 0;
+            var byTaken = new SortedDictionary<int, List<(MatchResult, int)>>();
+            int mostTaken = 0;
             for (int i = 0; i < run.Results.Length; i++)
             {
                 var seats = run.Cells[i].KitOfSeat;
@@ -706,6 +738,22 @@ namespace CluckWars.Balance
                 stolen += c.Stolen;
                 foraged += c.Foraged;
                 banked += run.Results[i].Banked[t];
+                drawn += c.LootOffered; taken += c.LootTaken; lost += c.LootTimeouts; refused += c.LootRefused;
+                takeFood += c.LootTakeFood; bountyFood += c.LootBountyFood; bagBanked += c.BagBanked; bagLost += c.BagLostToSteals;
+                overlapSeconds += c.LootHuntOverlapSeconds;
+                if (c.LootHuntOverlapSeconds > 0f) overlapMatches++;
+                bool spoilerPlays = false;
+                for (int o = 0; o < seats.Length; o++)
+                    if (o != t && seats[o] >= 0 && MatchDesigns.HoldsDeathMark(context.Kits[seats[o]])) spoilerPlays = true;
+                if (spoilerPlays) { withSpoiler++; if (c.LootHuntOverlapSeconds > 0f) withSpoilerOverlap++; }
+                var res = run.Results[i];
+                if (res.Winner == t && res.WinnerWithoutSpoilerBonus != t) wonOnPrize++;
+                if (lootOn)
+                {
+                    mostTaken = Math.Max(mostTaken, c.LootTaken);
+                    if (!byTaken.TryGetValue(c.LootTaken, out var list)) byTaken[c.LootTaken] = list = new List<(MatchResult, int)>();
+                    list.Add((res, t));
+                }
                 for (int v = 0; v < seats.Length; v++)
                 {
                     if (v == t || seats[v] < 0) continue;
@@ -718,7 +766,24 @@ namespace CluckWars.Balance
             {
                 Kit = context.Kits[thief].Label, Matches = matches, StealsPerMatch = steals / (float)matches, StolenPerMatch = (float)(stolen / matches),
                 ForagedPerMatch = (float)(foraged / matches), BankedPerMatch = (float)(banked / matches),
+                LootActive = lootOn,
+                MarksDrawnPerMatch = (float)(drawn / matches), MarksTakenPerMatch = (float)(taken / matches), MarksLostPerMatch = (float)(lost / matches),
+                MarksRefusedPerMatch = (float)(refused / matches), LootTakeFoodPerMatch = (float)(takeFood / matches),
+                LootBountyFoodPerMatch = (float)(bountyFood / matches), BagBankedPerMatch = (float)(bagBanked / matches), BagLostPerMatch = (float)(bagLost / matches),
+                WonOnPrize = wonOnPrize / (float)matches, OverlapShare = overlapMatches / (float)matches,
+                OverlapSecondsPerMatch = (float)(overlapSeconds / matches),
+                OverlapShareWithSpoiler = withSpoiler > 0 ? withSpoilerOverlap / (float)withSpoiler : float.NaN, MatchesWithSpoiler = withSpoiler,
             };
+            if (lootOn)
+            {
+                // Every row up to the largest target, so a row with no matches still says "no data" against its target.
+                int last = Math.Max(mostTaken, lootTargets != null && lootTargets.Count > 0 ? lootTargets.Max(x => x.Steals) : 0);
+                for (int k = 0; k <= last; k++)
+                {
+                    byTaken.TryGetValue(k, out var list);
+                    section.LootSteals.Add(MatchStats.LootStealsToWin(list ?? new List<(MatchResult, int)>(), k, lootTargets));
+                }
+            }
             for (int k = 0; k < kits; k++)
             {
                 if (k == thief || meetings[k] == 0) continue;
@@ -1019,6 +1084,26 @@ namespace CluckWars.Balance
             if (!anyThief) sb.AppendLine("No Thief kit in these matches.");
             else
             {
+                foreach (var p in pops)
+                {
+                    var t = p.ThiefIncome;
+                    if (t == null || !t.LootActive) continue;
+                    sb.AppendLine($"- Loot mark, {Name(p.Population)}: {Num(t.MarksDrawnPerMatch)} marks drawn, {Num(t.MarksTakenPerMatch)} consumed, {Num(t.MarksLostPerMatch)} moved on or lost unpaid, {Num(t.MarksRefusedPerMatch)} refused (wall or shell) per match; marked take {Num(t.LootTakeFoodPerMatch, "0.0")} + bounty {Num(t.LootBountyFoodPerMatch, "0.0")} food into the bag, {Num(t.BagBankedPerMatch, "0.0")} of the bag banked and {Num(t.BagLostPerMatch, "0.0")} lost to rivals' steals; won only through the clock prize in {Pct(t.WonOnPrize)} of matches; loot mark and a Hunt mark on one bird in {Pct(t.OverlapShare)} of the Thief's matches ({Pct(t.OverlapShareWithSpoiler)} of those with a Spoiler), {Num(t.OverlapSecondsPerMatch)} s per match.");
+                }
+                foreach (var p in pops)
+                {
+                    if (p.LootSteals.Count == 0) continue;
+                    sb.AppendLine();
+                    sb.AppendLine($"Thief marked steals to win, {Name(p.Population)} (steals taken in the match, mixed design; survivor bias applies; the label compares the row with the `ThiefLootTargets` data):");
+                    sb.AppendLine();
+                    sb.AppendLine("| Marked steals | Matches | Win, no prize | Win, with prize | Final banked | Bag share banked | Reached 40 | Label |");
+                    sb.AppendLine("|---|---|---|---|---|---|---|---|");
+                    foreach (var row in p.LootSteals)
+                    {
+                        string reached = float.IsNaN(row.NobodyReachedTarget) ? "n/a" : Pct(1f - row.NobodyReachedTarget);
+                        sb.AppendLine($"| {row.Steals} | {row.Win.Trials} | {Pct(row.Win.Rate)} ({Pm(row.Win)}) | {Pct(row.WinWithPrize.Rate)} ({Pm(row.WinWithPrize)}) | {Num(row.MeanFinal, "0.0")} | {Pct(row.BankedShare)} | {reached} | {row.Label ?? "no target"} |");
+                    }
+                }
                 sb.AppendLine();
                 sb.AppendLine("Food taken per meeting, by victim kit:");
                 sb.AppendLine();
@@ -1230,6 +1315,7 @@ namespace CluckWars.Balance
                 $"{{\"class\":{S(h.Class.ToString())},\"kitA\":{S(h.KitA)},\"kitB\":{S(h.KitB)},\"aAhead\":{N(h.AAhead)},\"matches\":{h.Matches}}}")) + "]");
             sb.Append(",\"killsPlayed\":[" + string.Join(",", r.KillsPlayed.Select(KillJson)) + "]");
             sb.Append(",\"killsToWin\":[" + string.Join(",", r.KillsToWin.Select(KillJson)) + "]");
+            sb.Append(",\"lootSteals\":[" + string.Join(",", r.LootSteals.Select(LootJson)) + "]");
             sb.Append(",\"thief\":[" + string.Join(",", r.Thief.Select(t =>
                 $"{{\"victim\":{S(t.Victim)},\"stolenPerMatch\":{N(t.StolenPerMatch)},\"share\":{N(t.Share)}}}")) + "]");
             if (r.ThiefIncome != null)
@@ -1274,6 +1360,7 @@ namespace CluckWars.Balance
             sb.Append(",\"mixedSeats\":[" + string.Join(",", p.MixedSeats.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)}}}")) + "]");
             sb.Append(",\"seatCheck\":[" + string.Join(",", p.SeatCheck.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)},\"winExCorner\":{W(x.WinExCorner)},\"flagged\":{(x.Flagged ? "true" : "false")}}}")) + "]");
             sb.Append(",\"killsPlayed\":[" + string.Join(",", p.KillsPlayed.Select(KillJson)) + "]");
+            sb.Append(",\"lootSteals\":[" + string.Join(",", p.LootSteals.Select(LootJson)) + "]");
             if (p.ThiefIncome != null)
             {
                 var t = p.ThiefIncome;
@@ -1303,6 +1390,9 @@ namespace CluckWars.Balance
             sb.Append('}');
             return sb.ToString();
         }
+
+        private static string LootJson(LootStealRow k) =>
+            $"{{\"steals\":{k.Steals},\"win\":{W(k.Win)},\"winWithPrize\":{W(k.WinWithPrize)},\"meanFinal\":{N(k.MeanFinal)},\"bankedShare\":{N(k.BankedShare)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";
 
         private static string KillJson(SpoilerKillRow k) =>
             $"{{\"kills\":{k.Kills},\"victims\":{S(k.Victims.ToString())},\"win\":{W(k.Win)},\"winWithPassive\":{W(k.WinWithPassive)},\"meanFinal\":{N(k.MeanFinal)},\"meanBestRival\":{N(k.MeanBestRival)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";

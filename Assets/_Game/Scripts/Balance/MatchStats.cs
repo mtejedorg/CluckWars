@@ -54,6 +54,25 @@ namespace CluckWars.Balance
         public string Label;
     }
 
+    /// <summary>
+    /// One row of the Thief's marked-steals-to-win table, from Thief seats that took exactly <see cref="Steals"/> marked steals.
+    /// <see cref="Win"/> is the win rate without the clock prize, <see cref="WinWithPrize"/> with it.
+    /// </summary>
+    public sealed class LootStealRow
+    {
+        public int Steals;
+        public WinInterval Win;
+        public WinInterval WinWithPrize;
+        /// <summary>The Thief's final banked food (the clock prize included when the clock ended), averaged.</summary>
+        public float MeanFinal;
+        /// <summary>Share of the loot bag food (take plus bounty) that reached the base; NaN when no bag food was made.</summary>
+        public float BankedShare;
+        /// <summary>Share of matches that went to the clock.</summary>
+        public float NobodyReachedTarget;
+        /// <summary>How the row stands against the reference's Thief loot targets; null when it holds none for this many steals.</summary>
+        public string Label;
+    }
+
     /// <summary>Statistics of the match report: pure functions over plain numbers.</summary>
     public static class MatchStats
     {
@@ -134,18 +153,64 @@ namespace CluckWars.Balance
             return row;
         }
 
+        /// <summary>
+        /// The marked-steals-to-win row of Thief seats that took exactly <paramref name="steals"/> marked steals: each entry names the match and
+        /// the seat the Thief held. The rate without the prize counts <see cref="MatchResult.WinnerWithoutSpoilerBonus"/> (the pick over banked
+        /// food before any end-of-clock bonus, whoever's), the rate with it counts <see cref="MatchResult.Winner"/>.
+        /// </summary>
+        public static LootStealRow LootStealsToWin(IReadOnlyList<(MatchResult Result, int Seat)> played, int steals, IReadOnlyList<ThiefLootTarget> targets)
+        {
+            if (played == null) throw new ArgumentNullException(nameof(played));
+            int wins = 0, winsWith = 0, clock = 0;
+            double final = 0.0, bagMade = 0.0, bagBanked = 0.0;
+            foreach (var (r, seat) in played)
+            {
+                if (r.WinnerWithoutSpoilerBonus == seat) wins++;
+                if (r.Winner == seat) winsWith++;
+                if (r.NobodyReachedTarget) clock++;
+                final += r.Banked[seat];
+                var c = r.Counters[seat];
+                bagMade += c.LootTakeFood + c.LootBountyFood;
+                bagBanked += Math.Min(c.BagBanked, c.LootTakeFood + c.LootBountyFood);
+            }
+            int n = played.Count;
+            var row = new LootStealRow
+            {
+                Steals = steals,
+                Win = WinInterval.Wilson(wins, n),
+                WinWithPrize = WinInterval.Wilson(winsWith, n),
+                MeanFinal = n > 0 ? (float)(final / n) : float.NaN,
+                BankedShare = bagMade > 0.0 ? (float)(bagBanked / bagMade) : float.NaN,
+                NobodyReachedTarget = n > 0 ? clock / (float)n : float.NaN,
+            };
+            if (targets != null)
+            {
+                var list = new List<(int, bool, float, float)>();
+                foreach (var t in targets) list.Add((t.Steals, t.WithPassive, t.MinWinRate, t.MaxWinRate));
+                row.Label = Label(steals, row.Win.Rate, row.WinWithPrize.Rate, list, "prize");
+            }
+            return row;
+        }
+
         private static string Label(SpoilerKillRow row, IReadOnlyList<SpoilerKillTarget> targets)
         {
             if (targets == null) return null;
+            var list = new List<(int, bool, float, float)>();
+            foreach (var t in targets) list.Add((t.Kills, t.WithPassive, t.MinWinRate, t.MaxWinRate));
+            return Label(row.Kills, row.Win.Rate, row.WinWithPassive.Rate, list, "passive");
+        }
+
+        private static string Label(int count, float rateWithout, float rateWith, List<(int Count, bool With, float Min, float Max)> targets, string noun)
+        {
             StringBuilder sb = null;
             foreach (var t in targets)
             {
-                if (t.Kills != row.Kills) continue;
-                float rate = t.WithPassive ? row.WinWithPassive.Rate : row.Win.Rate;
-                string verdict = float.IsNaN(rate) ? "NO DATA" : rate >= t.MinWinRate - 1e-6f && rate <= t.MaxWinRate + 1e-6f ? "IN" : "OUT";
+                if (t.Count != count) continue;
+                float rate = t.With ? rateWith : rateWithout;
+                string verdict = float.IsNaN(rate) ? "NO DATA" : rate >= t.Min - 1e-6f && rate <= t.Max + 1e-6f ? "IN" : "OUT";
                 if (sb == null) sb = new StringBuilder(); else sb.Append("; ");
-                sb.Append(string.Format(CultureInfo.InvariantCulture, "{0} passive {1} [{2:0.00}, {3:0.00}]",
-                    t.WithPassive ? "with" : "without", verdict, t.MinWinRate, t.MaxWinRate));
+                sb.Append(string.Format(CultureInfo.InvariantCulture, "{0} {1} {2} [{3:0.00}, {4:0.00}]",
+                    t.With ? "with" : "without", noun, verdict, t.Min, t.Max));
             }
             return sb?.ToString();
         }

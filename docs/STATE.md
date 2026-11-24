@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-24 - Thief loot mark and clock prize in the match simulator (BL-217, `develop`, not pushed)
+
+- **Built** from the loot-mark design (section 13): pure `LootPickRules` / `LootRules` / `LootMarkFacts` in `Gameplay/LootMark.cs`, the mark's state machine, the marked steal, the bounty into the bag and the Thief-only clock prize in `MatchSim`; P0 and P1 play the mark; new `ThiefPassiveSO` fields (`LootBounty`, `LootSeconds`, `LootLeadSeconds`, `LootTakeToBag`, `LootBaseWeight`, `LootBankedWeight`, `LootCarriedWeight`, `LootOverFraction`, `LootOverBonus`, `ClockPrize`), readable and sweepable through `BalanceBook`; `ThiefLootTargets` on `OracleReference.asset`; report and what-if rows (marked steals to win, marks, bag food, overlap with the Hunt mark).
+- **Game unchanged:** the mechanic is off as shipped (`LootBounty` 0, `ClockPrize` 0); nothing in the game reads the new fields. As-shipped what-if baseline 2.4 / 0.6 / 3.0 % Thief, 25.0 / 21.6 / 29.5 % Spoiler, and the match report's drift against the last record is +0.0 on all 48 lines.
+- **Result:** no scenario passes the design's go measures; see the design section 17. Maestro decides; no shipped balance value changed.
+- **Suite:** 4357 passed, 0 failed (batch, with graphics; 27 new tests in `MatchLootTests`).
+- **No prefab or scene steps for Maestro.**
+
 ## 2026-11-23 - Spoiler values decided: Hunt lasts 5 s (3 s mark, 2 s kill window), execute bounty 15 (BL-217, `develop`, not pushed)
 
 - **Maestro's ruling** ("5 seconds, 3 of mark and 2 effective. And the reward at 15"): `MarkKill.asset` `WindowSeconds` 4 to 5 (`ArmSeconds` stays 3, so the kill window is 2 s, was 1 s); `MatchConfig.asset` `ExecuteBounty` 5 to 15. Nothing else moved (not `LeaderPickWeight`, cooldowns, the Spoiler passive).

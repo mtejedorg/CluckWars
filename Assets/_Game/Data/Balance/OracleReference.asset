@@ -49,6 +49,19 @@ MonoBehaviour:
     WithPassive: 1
     MinWinRate: 0
     MaxWinRate: 0.2
+  ThiefLootTargets:
+  - Steals: 4
+    WithPassive: 0
+    MinWinRate: 0.9
+    MaxWinRate: 1
+  - Steals: 3
+    WithPassive: 0
+    MinWinRate: 0.75
+    MaxWinRate: 1
+  - Steals: 2
+    WithPassive: 1
+    MinWinRate: 0
+    MaxWinRate: 0.2
   MatchRecords:
   - AcceptedOn: 2026-11-23
     Note: 'first part 2 baseline: the shipped state (bal=5465b825) played as a record,

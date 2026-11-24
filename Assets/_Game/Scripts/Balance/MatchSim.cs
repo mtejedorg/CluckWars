@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace CluckWars.Balance
 {
-    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank }
+    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot }
 
     /// <summary>Why a running Peck was cut. <see cref="OwnMove"/> is the chicken's own doing (it cast another ability).</summary>
     public enum CutCause : byte { None, Stun, Shove, Execution, EmptyPile, OwnMove }
@@ -232,6 +232,13 @@ namespace CluckWars.Balance
                 if (f.Times[i] < f.Times[i - 1]) throw new ArgumentException("MatchSetup.Forced.Times must ascend.", nameof(s));
         }
 
+        private static int StealSlot(MatchAbility[] abilities)
+        {
+            if (abilities == null) return -1;
+            for (int a = 0; a < abilities.Length; a++) if (abilities[a].Job == AbilityJob.Steal) return a;
+            return -1;
+        }
+
         private static int DeathMarkSlot(MatchAbility[] abilities)
         {
             if (abilities == null) return -1;
@@ -336,6 +343,15 @@ namespace CluckWars.Balance
             public float WindowEnd;
             public bool HasLastMark;
             public int LastMark;
+
+            // loot mark (the Thief's, BL-217)
+            public int LootSlot = -1;
+            public LootState LootState;
+            public int LootTarget = -1;
+            public float LootSince;
+            public float LootDrawAt;
+            public bool HasLastLoot;
+            public int LastLoot;
         }
 
         private sealed class Core
@@ -355,6 +371,9 @@ namespace CluckWars.Balance
             private readonly MatchRng[] _rng = new MatchRng[Seats];
             private MatchRng _comebackRng;
             private MatchRng _markRng;
+            private MatchRng _lootRng;
+            private readonly List<int> _lootCandidates = new List<int>(Seats);
+            private readonly List<float> _lootWeights = new List<float>(Seats);
             private readonly float _baseSpan;
             private int _forcedNext;
             private readonly List<int> _markCandidates = new List<int>(Seats);
@@ -439,12 +458,19 @@ namespace CluckWars.Balance
 
                     ch.Abilities = abilities;
                     ch.MarkSlot = DeathMarkSlot(abilities);
+                    ch.LootSlot = kit.Passive.Loot.Active ? StealSlot(abilities) : -1;
                     ch.AbReady = new float[abilities.Length];
                     ch.AuraUntil = new float[abilities.Length];
                     for (int a = 0; a < abilities.Length; a++)
                     {
                         ch.AbReady[a] = abilities[a].RoundStartCooldown;
                         contact = Math.Min(contact, OffensiveRange(abilities[a]));
+                    }
+                    if (ch.LootSlot >= 0)
+                    {
+                        // GO: the Thief's first mark is drawn at once when Steal is ready (design section 4).
+                        ch.LootState = LootState.Waiting;
+                        ch.LootDrawAt = LootRules.DrawAt(0f, ch.AbReady[ch.LootSlot], kit.Passive.Loot.LeadSeconds);
                     }
                     centres.Add(s.Map.Places[OracleMapSO.BaseIndex(seat)].Pos);
                     ch.Pos = Spawn(s.Map, seat);
@@ -461,6 +487,7 @@ namespace CluckWars.Balance
                 _contactRadius = float.IsPositiveInfinity(contact) ? 0f : contact;
                 _comebackRng = MatchRng.Create(matchSeed, MatchRng.StreamComeback);
                 _markRng = MatchRng.Create(matchSeed, MatchRng.StreamMark);
+                _lootRng = MatchRng.Create(matchSeed, MatchRng.StreamLoot);
                 // The game weighs the mark by the longest distance between two live bases (PlayerBase.BaseSpan); 0 with fewer than two.
                 float span = 0f;
                 for (int a = 0; a < centres.Count; a++)
@@ -495,6 +522,7 @@ namespace CluckWars.Balance
                     NoteContact();
                     ForceKills();
                     MarkUpkeep();
+                    LootUpkeep();
 
                     for (int k = 0; k < Seats; k++) Complete((_i + k) % Seats);
                     if (_winner >= 0) break;
@@ -670,6 +698,7 @@ namespace CluckWars.Balance
                 float dep = Math.Min(ch.Cargo + ch.Bag, kit.DepositRate * _tick);
                 float before = ch.Banked;
                 float fromBag = Math.Min(ch.Bag, dep);
+                _result.Counters[s].BagBanked += fromBag;
                 ch.Bag -= fromBag;
                 ch.Cargo -= dep - fromBag;
                 ch.Banked += dep;
@@ -731,6 +760,10 @@ namespace CluckWars.Balance
                     v.Removed = ch.Removed;
                     v.Shelled = EggPhase(ch);
                     v.MarkTarget = ch.MarkTarget;
+                    v.LootTarget = ch.LootTarget;
+                    v.LootMarkedBy = -1;
+                    for (int m = 0; m < Seats; m++)
+                        if (m != s && _c[m].LootTarget == s) { v.LootMarkedBy = m; break; }
                     v.ArmLeft = ch.MarkTarget >= 0 ? Math.Max(0f, ch.ArmEnd - _time) : 0f;
                     v.WindowLeft = ch.MarkTarget >= 0 ? Math.Max(0f, ch.WindowEnd - _time) : 0f;
                     v.MarkedBy = -1;
@@ -917,16 +950,36 @@ namespace CluckWars.Balance
                 switch (ab.Job)
                 {
                     case AbilityJob.Steal:
+                    {
+                        // The Thief's marked rival is a valid target even with nothing to take (Snatch's filter: a carrier or the caster's mark).
+                        int marked = LootLive(ch) && req.Slot == ch.LootSlot ? ch.LootTarget : -1;
                         for (int v = 0; v < Seats; v++)
                         {
-                            if (!RivalCanBeHit(s, v, ab.Radius)) continue;
-                            var victim = _c[v];
-                            if (StealRules.Stealable(victim.Cargo, victim.Bag) <= 0f) continue;     // Snatch only targets a carrier
-                            if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
-                            DoSteal(s, v, ab);
+                            if (v == marked)
+                            {
+                                var mv = _c[v];
+                                bool inRange = mv.Present && !mv.Removed && !ch.Removed && MatchCombat.InRange(ch.Pos, mv.Pos, ab.Radius);
+                                bool walled = MatchCombat.KeepOutBlocks(ch.Pos, mv.Pos, _baseCentres, _rules.KeepOutRadius);
+                                bool proof = MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v]);
+                                if (!LootRules.CanTake(inRange, walled, proof))
+                                {
+                                    if (inRange) _result.Counters[s].LootRefused++;
+                                    continue;
+                                }
+                                TakeLoot(s, v, ab);
+                            }
+                            else
+                            {
+                                if (!RivalCanBeHit(s, v, ab.Radius)) continue;
+                                var victim = _c[v];
+                                if (StealRules.Stealable(victim.Cargo, victim.Bag) <= 0f) continue;     // Snatch only targets a carrier
+                                if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
+                                DoSteal(s, v, ab);
+                            }
                             if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback);
                         }
                         break;
+                    }
                     case AbilityJob.Stun:
                     case AbilityJob.Slow:
                         for (int v = 0; v < Seats; v++)
@@ -989,7 +1042,116 @@ namespace CluckWars.Balance
                 tn.Steals++;
                 tn.StolenFromSeat[victim] += take;
                 _result.Counters[victim].LostToSteals += take;
+                _result.Counters[victim].BagLostToSteals += fromBag;
                 Record(MatchEventKind.Steal, thief, victim, take, CutCause.None);
+            }
+
+            // ---- the Thief's loot mark (BL-217; design 2026-11-23 section 4) ----
+
+            private static bool LootLive(Chick ch) => ch.LootState == LootState.Live || ch.LootState == LootState.Overdue;
+
+            // A marked steal: the take (the free room does not limit it when it goes to the bag) and the new bounty food land in the bag,
+            // the mark is spent and the next one is scheduled from the Steal cooldown the cast has just started.
+            private void TakeLoot(int thief, int victim, in MatchAbility ab)
+            {
+                var t = _c[thief];
+                var v = _c[victim];
+                var loot = PassiveOf(thief).Loot;
+                float factor = PassiveOf(thief).StealFactor;
+                float take = loot.TakeToBag
+                    ? LootRules.MarkedTake(ab.StealAmount, factor, v.Cargo, v.Bag)
+                    : MatchCombat.StealTake(ab.StealAmount, factor, _s.Seats[thief].Farm.CargoCapacity - t.Cargo, v.Cargo, v.Bag);
+                ref SeatCounters tn = ref _result.Counters[thief];
+                if (take > 0f)
+                {
+                    StealRules.SplitDrain(take, v.Cargo, v.Bag, out float fromCargo, out float fromBag);
+                    v.Cargo -= fromCargo;
+                    v.Bag -= fromBag;
+                    if (loot.TakeToBag) t.Bag += take; else t.Cargo += take;
+                    tn.Stolen += take;
+                    tn.Steals++;
+                    tn.StolenFromSeat[victim] += take;
+                    _result.Counters[victim].LostToSteals += take;
+                    _result.Counters[victim].BagLostToSteals += fromBag;
+                }
+                t.Bag += loot.Bounty;
+                tn.LootTaken++;
+                tn.LootTakeFood += take;
+                tn.LootBountyFood += loot.Bounty;
+                v.ThinkNow = t.ThinkNow = true;
+                Record(MatchEventKind.Loot, thief, victim, take + loot.Bounty, CutCause.None);
+                EndLoot(thief);
+            }
+
+            // The mark ends (paid, timed out or its bird removed): the bird is the last marked, the next draw is due ahead of Steal's return.
+            private void EndLoot(int thief)
+            {
+                var ch = _c[thief];
+                ch.HasLastLoot = true;
+                ch.LastLoot = ch.LootTarget;
+                ch.LootTarget = -1;
+                ch.LootState = LootState.Waiting;
+                ch.LootDrawAt = LootRules.DrawAt(_time, ch.AbReady[ch.LootSlot], PassiveOf(thief).Loot.LeadSeconds);
+                ch.ThinkNow = true;
+            }
+
+            // The state machine, once a tick in a rotating seat order so a draw never favours a low seat.
+            private void LootUpkeep()
+            {
+                for (int k = 0; k < Seats; k++)
+                {
+                    int s = (_i + k) % Seats;
+                    var ch = _c[s];
+                    if (!ch.Present || ch.LootSlot < 0) continue;
+                    var loot = PassiveOf(s).Loot;
+                    if (ch.LootState == LootState.Waiting)
+                    {
+                        if (_time + Eps >= ch.LootDrawAt) DrawLoot(s, loot);
+                    }
+                    else if (LootLive(ch))
+                    {
+                        bool ready = _time + Eps >= ch.AbReady[ch.LootSlot];
+                        float age = _time - ch.LootSince;
+                        for (int m = 0; m < Seats; m++)
+                            if (m != s && _c[m].Present && _c[m].MarkTarget == ch.LootTarget) { _result.Counters[s].LootHuntOverlapSeconds += _tick; break; }
+                        if (LootRules.TimedOut(age, loot.Seconds, ready))
+                        {
+                            _result.Counters[s].LootTimeouts++;
+                            EndLoot(s);
+                        }
+                        else if (ch.LootState == LootState.Live && age >= loot.Seconds) ch.LootState = LootState.Overdue;
+                    }
+                }
+            }
+
+            // The draw: living rivals, the last marked out, a weight each, one proportional pick from the loot stream. No candidate: stay waiting.
+            private void DrawLoot(int s, in LootMarkFacts loot)
+            {
+                var ch = _c[s];
+                _lootCandidates.Clear();
+                int rivals = 0;
+                for (int t = 0; t < Seats; t++)
+                {
+                    if (t == s || !_c[t].Present) continue;
+                    rivals++;
+                    if (!_c[t].Removed) _lootCandidates.Add(t);
+                }
+                LootPickRules.Filter(_lootCandidates, ch.HasLastLoot, ch.LastLoot, rivals);
+                if (_lootCandidates.Count == 0) return;
+
+                var table = loot.Weights;
+                table.OverThreshold = loot.OverFraction * _farm.WinTarget;
+                _lootWeights.Clear();
+                foreach (int t in _lootCandidates)
+                    _lootWeights.Add(LootPickRules.Weight(_c[t].Banked, _c[t].Cargo + _c[t].Bag, table));
+                int pick = LootPickRules.Pick(_lootWeights, _lootRng.NextFloat());
+                if (pick < 0) return;
+
+                ch.LootTarget = _lootCandidates[pick];
+                ch.LootSince = _time;
+                ch.LootState = LootState.Live;
+                ch.ThinkNow = true;
+                _result.Counters[s].LootOffered++;
             }
 
             private void Control(int caster, int victim, ControlEmission e)
@@ -1175,6 +1337,8 @@ namespace CluckWars.Balance
                 v.WaypointValid = false;
                 v.ThinkNow = true;
                 if (v.MarkTarget >= 0) EndMark(v, v.MarkTarget);        // a mark ends with its holder; no cooldown change
+                for (int m = 0; m < Seats; m++)                         // a loot mark ends with its bird, unpaid
+                    if (_c[m].Present && _c[m].LootTarget == victim) { _result.Counters[m].LootTimeouts++; EndLoot(m); }
             }
 
             // A mark ended, paid or failed: its target is the one the next press cannot pick.
