@@ -17,15 +17,13 @@ namespace CluckWars.Abilities
         [Min(1f)] public float StealMultiplier = 1.6f;
 
         [Header("Loot mark (BL-217: simulator only, nothing in the game reads these yet)")]
-        [Tooltip("New food a marked steal adds to the Thief's bounty bag on top of what it takes. 0 switches the loot mark off " +
-                 "(the shipped value: the game does not have the mechanic yet).")]
+        [Tooltip("New food a marked steal adds to the Thief's cargo on top of what it takes, as far as it fits (the stolen food comes first). " +
+                 "0 switches the loot mark off (the shipped value: the game does not have the mechanic yet).")]
         [Min(0)] public int LootBounty = 0;
         [Tooltip("Seconds after which a mark moves to another rival. Checked only while Steal is on cooldown: with Steal ready the mark stays.")]
         [Min(1f)] public float LootSeconds = 12f;
         [Tooltip("The next mark appears this many seconds before Steal comes off cooldown (at once when that has already passed).")]
         [Range(0f, 6f)] public float LootLeadSeconds = 1f;
-        [Tooltip("True: the marked take goes to the bounty bag (ignores the beak's room). False (a probe): it goes to the beak, held to its free room.")]
-        public bool LootTakeToBag = true;
         [Tooltip("Lottery weight every rival has, however little it holds.")]
         [Min(0.01f)] public float LootBaseWeight = 4f;
         [Tooltip("Lottery weight per food banked at the rival's base (Maestro: it weighs a lot).")]
@@ -36,6 +34,11 @@ namespace CluckWars.Abilities
         [Range(0f, 2f)] public float LootOverFraction = 0.625f;
         [Tooltip("Extra lottery weight for a rival above the over threshold.")]
         [Min(0f)] public float LootOverBonus = 10f;
+
+        [Header("Carrying")]
+        [Tooltip("Capacity floor of the Thief's beak, like the Hoarder's: the Sneaky class stat is shared with the Spoiler and does not move. " +
+                 "0 is the shipped value (no floor, the class capacity). It sets how many marked steals one trip holds.")]
+        [Min(0f)] public float MinimumCapacity = 0f;
 
         [Header("End of the clock")]
         [Tooltip("Food banked at the base when the timer expires with no winner, before the winner is picked. The Thief's alone; 0 is the shipped value.")]
@@ -53,6 +56,9 @@ namespace CluckWars.Abilities
 
         public override float MaxStealMultiplier => StealMultiplier;
 
+        public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
+            Mathf.Max(capacity, MinimumCapacity);
+
         public override int MatchEndBonusFood(ChickenController self) => ClockPrize;
 
         public override LootMarkFacts LootMark => new LootMarkFacts
@@ -61,7 +67,6 @@ namespace CluckWars.Abilities
             Bounty = LootBounty,
             Seconds = LootSeconds,
             LeadSeconds = LootLeadSeconds,
-            TakeToBag = LootTakeToBag,
             OverFraction = LootOverFraction,
             Weights = new LootWeightTable
             {

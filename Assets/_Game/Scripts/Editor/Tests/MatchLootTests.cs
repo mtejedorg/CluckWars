@@ -132,22 +132,61 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void MarkedTake_IgnoresTheThiefsRoom_AndIsHeldToWhatTheBirdCarries()
+        public void Advance_EveryStateOfTheLifeCycle_FollowsMaestrosRule()
         {
-            Assert.AreEqual(8f, LootRules.MarkedTake(5f, 1.6f, 20f, 0f), 1e-5f, "nominal times factor");
-            Assert.AreEqual(3f, LootRules.MarkedTake(5f, 1f, 2f, 1f), 1e-5f, "held to beak plus bag");
-            Assert.AreEqual(0f, LootRules.MarkedTake(5f, 1f, 0f, 0f), "an empty bird gives nothing; the bounty still pays");
+            const float limit = 12f;
+            // Young: nothing moves it, whatever Steal does.
+            Assert.AreEqual(LootStep.Stay, LootRules.Advance(LootState.Live, 5f, limit, true));
+            Assert.AreEqual(LootStep.Stay, LootRules.Advance(LootState.Live, 5f, limit, false), "a young mark does not move when Steal is spent on someone else");
+            // Old with Steal ready: it stays, as Overdue.
+            Assert.AreEqual(LootStep.GoOverdue, LootRules.Advance(LootState.Live, limit, limit, true));
+            Assert.AreEqual(LootStep.Stay, LootRules.Advance(LootState.Overdue, 40f, limit, true), "Overdue stays for as long as Steal is ready");
+            // Old with Steal on cooldown: it moves, from Live or from Overdue (the 2026-11-24 correction).
+            Assert.AreEqual(LootStep.Move, LootRules.Advance(LootState.Live, limit, limit, false));
+            Assert.AreEqual(LootStep.Move, LootRules.Advance(LootState.Overdue, 13f, limit, false), "an overdue mark ends the moment Steal goes on cooldown");
+            // A mark that is not live never steps.
+            Assert.AreEqual(LootStep.Stay, LootRules.Advance(LootState.Waiting, 99f, limit, false));
+            Assert.AreEqual(LootStep.Stay, LootRules.Advance(LootState.Off, 99f, limit, false));
+        }
+
+        [Test]
+        public void MarkedGain_StolenFoodFirst_ThenTheBounty_BothHeldToTheFreeRoom()
+        {
+            LootRules.MarkedGain(5f, 1f, 20f, 6f, 0f, 10f, out float stolen, out float bounty, out float wanted);
+            Assert.AreEqual(5f, stolen, 1e-5f, "an ordinary steal's take");
+            Assert.AreEqual(10f, bounty, 1e-5f, "everything fits");
+            Assert.AreEqual(15f, wanted, 1e-5f);
+
+            LootRules.MarkedGain(5f, 1f, 12f, 6f, 0f, 10f, out stolen, out bounty, out wanted);
+            Assert.AreEqual(5f, stolen, 1e-5f, "the stolen food comes first");
+            Assert.AreEqual(7f, bounty, 1e-5f, "the bounty fills what room is left; the rest is lost");
+            Assert.AreEqual(15f, wanted, 1e-5f);
+
+            LootRules.MarkedGain(5f, 1f, 3f, 6f, 0f, 10f, out stolen, out bounty, out wanted);
+            Assert.AreEqual(3f, stolen, 1e-5f, "held to the Thief's free room: the bird loses only what the Thief gains");
+            Assert.AreEqual(0f, bounty, 1e-5f);
+
+            LootRules.MarkedGain(5f, 1f, 0f, 6f, 0f, 10f, out stolen, out bounty, out _);
+            Assert.AreEqual(0f, stolen + bounty, "a full Thief gains nothing from a marked steal");
+
+            LootRules.MarkedGain(5f, 1.6f, 20f, 2f, 1f, 4f, out stolen, out bounty, out wanted);
+            Assert.AreEqual(3f, stolen, 1e-5f, "held to what the bird carries (beak plus bag)");
+            Assert.AreEqual(4f, bounty, 1e-5f, "an empty or poor bird still pays the bounty");
+            Assert.AreEqual(7f, wanted, 1e-5f);
+
+            LootRules.MarkedGain(5f, 1.6f, 20f, 20f, 0f, 0f, out stolen, out bounty, out _);
+            Assert.AreEqual(8f, stolen, 1e-5f, "nominal times the Thief's factor");
         }
 
         // ---------------------------------------------------------------- the simulator
 
-        private static MatchPassive LootPassive(float bounty = 10f, float seconds = 12f, float lead = 1f, bool toBag = true, int prize = 0)
+        private static MatchPassive LootPassive(float bounty = 10f, float seconds = 12f, float lead = 1f, int prize = 0)
         {
             var p = MatchPassive.Identity();
             p.MatchEndBonusFood = prize;
             p.Loot = new LootMarkFacts
             {
-                IsThief = true, Bounty = bounty, Seconds = seconds, LeadSeconds = lead, TakeToBag = toBag, OverFraction = 0.5f,
+                IsThief = true, Bounty = bounty, Seconds = seconds, LeadSeconds = lead, OverFraction = 0.5f,
                 Weights = new LootWeightTable { Base = 1f },
             };
             return p;
@@ -186,15 +225,15 @@ namespace CluckWars.Tests
         private static List<MatchEvent> Loots(MatchResult r) => r.Events.Where(e => e.Kind == MatchEventKind.Loot).ToList();
 
         [Test]
-        public void MarkedSteal_PaysTheBounty_IntoTheBag_NotTheBeak_EvenOffAnEmptyBird()
+        public void MarkedSteal_PaysTheBounty_IntoTheCargo_EvenOffAnEmptyBird()
         {
             const float bounty = 7f;
             var setup = Arena(Thief(LootPassive(bounty)), 3, 6f);
-            float cargo = 0f;
+            float maxCargo = 0f;
             int markedBy = -2;
             setup.Policies[0] = Caster(t => true, (v, s) =>
             {
-                cargo = v.Seats[s].Cargo;
+                maxCargo = Mathf.Max(maxCargo, v.Seats[s].Cargo);
                 int target = v.Seats[s].LootTarget;
                 if (target >= 0) markedBy = v.Seats[target].LootMarkedBy;
             });
@@ -203,12 +242,92 @@ namespace CluckWars.Tests
             Assert.GreaterOrEqual(c.LootTaken, 1, "a steal that reaches the marked rival consumes the mark");
             Assert.AreEqual(c.LootTaken * bounty, c.LootBountyFood, 1e-4f);
             Assert.AreEqual(0f, c.LootTakeFood, "the rivals carry nothing: nothing to take, the bounty paid anyway");
-            Assert.AreEqual(c.LootTaken * bounty, c.BagBanked, 1e-3f, "the bounty went through the bag (the Thief stands in its base zone, so it banks at once)");
+            Assert.AreEqual(0f, c.LootLostToRoom, 1e-4f, "the beak had room");
+            Assert.AreEqual(bounty, maxCargo, 0.5f, "the bounty sat in the ordinary beak (banking at the deposit rate) before it banked");
+            Assert.AreEqual(0f, c.BagBanked, "no bag: the Spoiler's bag is the only one");
+            Assert.AreEqual(c.LootTaken * bounty, c.LootBankedFood, 1e-3f, "the Thief stands in its base zone, so the loot banks at once");
             Assert.AreEqual(c.LootTaken * bounty, r.Banked[0], 1e-3f);
-            Assert.AreEqual(0f, cargo, "the beak is untouched");
             Assert.AreEqual(0, markedBy, "the marked rival's view says whose mark it is");
             Assert.AreEqual(c.LootTaken, Loots(r).Count);
             Assert.AreEqual(0, r.RejectedIntents);
+        }
+
+        // A Thief that walks away from its base and casts Steal whenever it is ready from `startAt` on, so what it gains stays in its beak.
+        private static PolicyFactory Wanderer(Watch watch = null, float startAt = 1f) =>
+            MatchTestKit.Policy((v, s) =>
+            {
+                watch?.Invoke(v, s);
+                var intent = MatchIntent.Idle(Vector2.zero);
+                if (v.Time >= startAt && v.Seats[s].CooldownLeft[1] <= 1e-4f) intent.CastSlot = 0;
+                return intent;
+            });
+
+        [Test]
+        public void AMarkedSteal_FillsTheBeakUpToCapacity_AndNoFurther()
+        {
+            // Capacity 12, a rival that carries 6, a bounty of 10: 5 stolen (an ordinary take), then 7 of the 10 fit, 3 are lost.
+            const int capacity = 12;
+            var map = MatchTestKit.OpenMap(Half);
+            var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(Big, 5f, StealCooldown) }, LootPassive(10f), capacity: capacity);
+            var rival = MatchTestKit.Fighter("rival", 100f, new MatchAbility[0], capacity: 100, peckAmount: 6f, peckCooldown: 50f, castSeconds: 0.1f);
+            var setup = MatchTestKit.Duel(map, thief, rival, null, MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1)), Half, 3f);
+            float maxCargo = 0f;
+            setup.Policies[0] = Wanderer((v, s) => maxCargo = Mathf.Max(maxCargo, v.Seats[s].Cargo));
+            var r = MatchSim.Run(setup, 2);
+            var c = r.Counters[0];
+            Assert.AreEqual(1, c.LootTaken);
+            Assert.AreEqual(5f, c.LootTakeFood, 1e-4f, "the stolen food first");
+            Assert.AreEqual(7f, c.LootBountyFood, 1e-4f, "then the bounty into what room is left");
+            Assert.AreEqual(3f, c.LootLostToRoom, 1e-4f, "what did not fit is lost, never held back");
+            Assert.AreEqual(capacity, Loots(r)[0].Amount, 1e-4f);
+            Assert.LessOrEqual(maxCargo, capacity + 1e-4f, "the beak never holds more than its capacity");
+            Assert.AreEqual(capacity, maxCargo, 1e-3f);
+            Assert.AreEqual(0, r.RejectedIntents);
+        }
+
+        [Test]
+        public void AFullThief_GainsNothingFromAMarkedSteal_AndTheBirdLosesNothing()
+        {
+            const int capacity = 10;
+            var map = MatchTestKit.OpenMap(Half);
+            var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(Big, 5f, StealCooldown) }, LootPassive(10f, lead: 0f), capacity: capacity);
+            var kits = new[] { thief, Carrier("a"), Carrier("b"), Carrier("c") };
+            var setup = MatchTestKit.Setup(map, kits, MatchTestKit.Stand, Half);
+            setup.Rules.Farm.ClockSeconds = 11f;
+            setup.RecordEvents = true;
+            for (int i = 1; i <= 3; i++) setup.Policies[i] = MatchTestKit.Stand;
+            setup.Policies[0] = Wanderer();
+            var r = MatchSim.Run(setup, 6);
+            var loots = Loots(r);
+            Assert.GreaterOrEqual(loots.Count, 2, "a second mark was consumed with the beak already full");
+            Assert.AreEqual(capacity, loots[0].Amount, 1e-4f, "the first filled the beak with its bounty");
+            Assert.AreEqual(0f, loots[1].Amount, 1e-4f, "a full Thief gains nothing from the next one");
+            Assert.AreEqual(0f, r.Counters[0].LootTakeFood, "and took nothing from the bird");
+            Assert.AreEqual(capacity, r.Counters[0].LootBountyFood, 1e-4f);
+            Assert.Greater(r.Counters[0].LootLostToRoom, capacity, "the whole second bounty was lost to the full beak");
+        }
+
+        [Test]
+        public void ARivalsSteal_TakesTheLootLikeAnyCargo()
+        {
+            var map = MatchTestKit.OpenMap(Half);
+            var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(Big, 5f, StealCooldown) }, LootPassive(10f), capacity: 40);
+            var rival = MatchTestKit.Fighter("rival", 100f, new[] { MatchTestKit.Steal(Big, 5f, StealCooldown) }, capacity: 100);
+            var setup = MatchTestKit.Duel(map, thief, rival, null, MatchTestKit.CastAt(2f, 0), Half, 4f);
+            bool cast = false;
+            setup.Policies[0] = MatchTestKit.Policy((v, s) =>
+            {
+                var intent = MatchIntent.Idle(Vector2.zero);
+                if (!cast && v.Time >= 0.5f) { cast = true; intent.CastSlot = 0; }
+                return intent;
+            });
+            var r = MatchSim.Run(setup, 3);
+            Assert.AreEqual(1, r.Counters[0].LootTaken);
+            Assert.AreEqual(10f, r.Counters[0].LootBountyFood, 1e-4f);
+            Assert.AreEqual(5f, r.Counters[1].Stolen, 1e-4f, "the rival's Steal took the usual 5 from the Thief's beak");
+            Assert.AreEqual(5f, r.Counters[0].LostToSteals, 1e-4f);
+            Assert.AreEqual(5f, r.Counters[0].LootLostToSteals, 1e-4f, "all of the Thief's cargo is loot, so the theft took loot");
+            Assert.AreEqual(0f, r.Counters[0].BagLostToSteals, "there is no bag to drain");
         }
 
         [Test]
@@ -299,6 +418,96 @@ namespace CluckWars.Tests
             int second = TargetAt(seen, readyAt + 0.5f);
             Assert.GreaterOrEqual(second, 1, "the next mark lands a second before Steal is ready");
             Assert.AreNotEqual(first, second, "and not on the bird it just left");
+        }
+
+        // ---- an overdue mark and the Steal cooldown (Maestro 2026-11-24) ----
+        // The synthetic map puts seat 0 at (32, 0), seat 1 at (0, 32), seat 2 at (-32, 0), seat 3 at (0, -32): a reach of 50 m covers seats 1 and 3, not seat 2.
+        private const float ReachesTheNeighboursOnly = 50f;
+
+        private static MatchKit Carrier(string label) =>
+            MatchTestKit.Fighter(label, 100f, new MatchAbility[0], capacity: 100, peckAmount: 6f, peckCooldown: 50f, castSeconds: 0.1f);
+
+        // A Thief that does not cast before `castAt` and then casts once; its mark is read back each tick. Without `shelled`, rivals 1 and 3 carry
+        // food and rival 2 does not; with it, every rival is that kit and shells up at 6 s (its egg is up from 6.2 s to 14.2 s).
+        private static (MatchResult result, List<(float time, int target)> seen) PlayOverdue(ulong seed, float castAt, float clock, MatchKit shelled = null)
+        {
+            var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(ReachesTheNeighboursOnly, 5f, StealCooldown) }, LootPassive(seconds: 12f, lead: 1f));
+            var map = MatchTestKit.OpenMap(Half);
+            var kits = new[] { thief, shelled ?? Carrier("carrier1"), shelled ?? Idle("idle2"), shelled ?? Carrier("carrier3") };
+            var setup = MatchTestKit.Setup(map, kits, MatchTestKit.Stand, Half);
+            setup.Rules.Farm.ClockSeconds = clock;
+            setup.RecordEvents = true;
+            if (shelled == null)
+            {
+                setup.Policies[1] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1));
+                setup.Policies[3] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(3));
+            }
+            else
+            {
+                for (int i = 1; i <= 3; i++) setup.Policies[i] = MatchTestKit.CastAt(6f, 0);
+            }
+            var seen = new List<(float, int)>();
+            bool cast = false;
+            setup.Policies[0] = Caster(t => !cast && (cast = t >= castAt), (v, s) => seen.Add((v.Time, v.Seats[s].LootTarget)));
+            return (MatchSim.Run(setup, seed), seen);
+        }
+
+        [Test]
+        public void AnOverdueMark_EndsWhenStealIsSpentOnAnotherRival_AndTheNextMarkIsNotTheBirdJustLeft()
+        {
+            int checkedRuns = 0;
+            for (ulong seed = 1; seed <= 80 && checkedRuns < 3; seed++)
+            {
+                // The first cast at 13 s: the mark (drawn at GO, 13 s old) is overdue with Steal ready. The cast reaches the carriers on seats 1 and 3.
+                var (r, seen) = PlayOverdue(seed, 13f, 30f);
+                int first = TargetAt(seen, 1f);
+                if (first != 2) continue;   // the mark must sit on the rival the cast cannot reach
+                checkedRuns++;
+                Assert.AreEqual(2, TargetAt(seen, 12.9f), $"seed {seed}: overdue with Steal ready, the mark stays");
+                Assert.Greater(r.Counters[0].Steals, 0, $"seed {seed}: the cast robbed a carrier that was not the marked bird");
+                Assert.AreEqual(0, r.Counters[0].LootTaken, $"seed {seed}: the marked bird was out of reach: no pay");
+                Assert.AreEqual(1, r.Counters[0].LootTimeouts, $"seed {seed}: Steal went on cooldown with the mark overdue: it ends");
+                float readyAt = 13f + StealCooldown;
+                Assert.AreEqual(-1, TargetAt(seen, readyAt - 1.5f), $"seed {seed}: no mark between the end and the next draw");
+                int second = TargetAt(seen, readyAt + 0.5f);
+                Assert.GreaterOrEqual(second, 1, $"seed {seed}: the next mark appears a second before Steal is ready");
+                Assert.AreNotEqual(2, second, $"seed {seed}: and never on the bird it just left");
+                Assert.AreEqual(0, r.RejectedIntents);
+            }
+            Assert.GreaterOrEqual(checkedRuns, 1, "no seed marked the far rival: the test would be vacuous");
+        }
+
+        [Test]
+        public void AnOverdueMark_ConsumedOnItsBird_IsTheNormalPaidPath()
+        {
+            int checkedRuns = 0;
+            for (ulong seed = 1; seed <= 80 && checkedRuns < 3; seed++)
+            {
+                var (r, seen) = PlayOverdue(seed, 13f, 30f);
+                int first = TargetAt(seen, 1f);
+                if (first != 1 && first != 3) continue;   // the mark sits on a rival the cast reaches
+                checkedRuns++;
+                Assert.AreEqual(first, TargetAt(seen, 12.9f), $"seed {seed}: overdue, Steal ready: it stays");
+                Assert.AreEqual(1, r.Counters[0].LootTaken, $"seed {seed}: the cast covers the marked bird: the mark is consumed");
+                Assert.AreEqual(0, r.Counters[0].LootTimeouts, $"seed {seed}: and it did not move");
+                Assert.AreNotEqual(first, TargetAt(seen, 13f + StealCooldown + 0.5f), $"seed {seed}: the next mark is on another bird");
+            }
+            Assert.GreaterOrEqual(checkedRuns, 1, "no seed marked a reachable rival: the test would be vacuous");
+        }
+
+        [Test]
+        public void AnOverdueMark_OnAShelledBird_IsRefused_ButTheCooldownIsSpent_SoItMoves()
+        {
+            var shell = MatchTestKit.Fighter("shell", 100f, new[] { MatchTestKit.Shield(0.2f, 1f, 8f, 30f) });
+            var (r, seen) = PlayOverdue(7, 13f, 30f, shell);
+            int first = TargetAt(seen, 1f);
+            Assert.GreaterOrEqual(first, 1);
+            Assert.AreEqual(first, TargetAt(seen, 12.9f), "Steal ready: the overdue mark stays");
+            Assert.AreEqual(1, r.Counters[0].LootRefused, "the shell refuses the cast on the marked bird");
+            Assert.AreEqual(0, r.Counters[0].LootTaken);
+            Assert.AreEqual(1, r.Counters[0].LootTimeouts, "the refused cast spent Steal: the overdue mark ends");
+            Assert.AreNotEqual(first, TargetAt(seen, 13f + StealCooldown + 0.5f), "and the next one is another bird");
+            Assert.AreEqual(0, r.RejectedIntents);
         }
 
         [Test]
@@ -404,25 +613,25 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ATakeToTheBeak_IsHeldToTheFreeRoom_ATakeToTheBag_IsNot()
+        public void TheThiefsCapacity_ComesFromThePassive_AndTheSpoilersIsUnchanged()
         {
-            // A Thief with room for 2, a rival that carries 6: the bag takes the whole 5, the beak only 2.
-            float Taken(bool toBag)
+            var inputs = ShippedInputs();
+            using (var book = new BalanceBook(new QuietLog(), inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
             {
-                var map = MatchTestKit.OpenMap(Half);
-                var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(Big, 5f, StealCooldown) }, LootPassive(bounty: 1f, toBag: toBag), capacity: 2);
-                var rival = MatchTestKit.Fighter("rival", 100f, new MatchAbility[0], capacity: 100, peckAmount: 6f, peckCooldown: 50f, castSeconds: 0.1f);
-                var setup = MatchTestKit.Duel(map, thief, rival, null, MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1)), Half, 5f);
-                float first = -1f;
-                setup.Policies[0] = Caster(t => t >= 1.5f, (v, s) => { });
-                var r = MatchSim.Run(setup, 2);
-                var loot = Loots(r);
-                Assert.GreaterOrEqual(loot.Count, 1);
-                first = loot[0].Amount - 1f;   // take plus the 1 food bounty
-                return first;
+                inputs.Book = book;
+                var shipped = MatchContext.From(inputs, OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius());
+                var moved = MatchWhatIf.ContextFor(inputs, Delta(("Thief", "MinimumCapacity", "16")), OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius(), out _, out string reason);
+                Assert.IsNotNull(moved, reason);
+                int thief = Array.FindIndex(shipped.Kits, k => k.Passive.Loot.IsThief);
+                int spoiler = Array.FindIndex(shipped.Kits, MatchDesigns.HoldsDeathMark);
+                Assert.GreaterOrEqual(thief, 0);
+                Assert.GreaterOrEqual(spoiler, 0);
+                float classCapacity = shipped.Kits[thief].Farm.CargoCapacity;
+                Assert.AreEqual(classCapacity, shipped.Kits[spoiler].Farm.CargoCapacity, "shipped, the Thief carries the class's capacity, the same as the Spoiler");
+                Assert.Less(classCapacity, 16f, "the test's floor is above the class capacity");
+                Assert.AreEqual(16f, moved.Kits[thief].Farm.CargoCapacity, "the floor on the Thief's passive raises his capacity");
+                Assert.AreEqual(classCapacity, moved.Kits[spoiler].Farm.CargoCapacity, "the Sneaky class stat is shared with the Spoiler and does not move");
             }
-            Assert.AreEqual(5f, Taken(true), 1e-4f);
-            Assert.AreEqual(2f, Taken(false), 1e-4f);
         }
 
         // ---------------------------------------------------------------- the shipped data
@@ -475,10 +684,10 @@ namespace CluckWars.Tests
             using (var book = new BalanceBook(new QuietLog(), inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
             {
                 inputs.Book = book;
-                foreach (var field in new[] { "LootBounty", "LootSeconds", "LootLeadSeconds", "LootBaseWeight", "LootBankedWeight", "LootCarriedWeight", "LootOverFraction", "LootOverBonus", "ClockPrize" })
+                foreach (var field in new[] { "LootBounty", "LootSeconds", "LootLeadSeconds", "LootBaseWeight", "LootBankedWeight", "LootCarriedWeight", "LootOverFraction", "LootOverBonus", "ClockPrize", "MinimumCapacity" })
                     Assert.IsTrue(book.TryProbe("Thief", field, out _, out _, out _, out string problem), $"{field}: {problem}");
 
-                string delta = Delta(("Thief", "LootBounty", "9"), ("Thief", "ClockPrize", "13"), ("Thief", "LootTakeToBag", "false"), ("Thief", "LootSeconds", "8"),
+                string delta = Delta(("Thief", "LootBounty", "9"), ("Thief", "ClockPrize", "13"), ("Thief", "MinimumCapacity", "15"), ("Thief", "LootSeconds", "8"),
                     ("Thief", "StealMultiplier", "1"), ("Spoiler", "BonusFood", "0"));
                 var context = MatchWhatIf.ContextFor(inputs, delta, OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius(), out _, out string reason);
                 Assert.IsNotNull(context, reason);
@@ -486,7 +695,7 @@ namespace CluckWars.Tests
                 Assert.IsTrue(thief.Passive.Loot.Active);
                 Assert.AreEqual(9f, thief.Passive.Loot.Bounty);
                 Assert.AreEqual(8f, thief.Passive.Loot.Seconds);
-                Assert.IsFalse(thief.Passive.Loot.TakeToBag);
+                Assert.AreEqual(15f, thief.Farm.CargoCapacity);
                 Assert.AreEqual(13f, thief.Passive.MatchEndBonusFood);
                 Assert.AreEqual(1f, thief.Passive.StealFactor);
                 Assert.AreEqual(1, context.Kits.Count(k => k.Passive.MatchEndBonusFood > 0f), "the Spoiler's prize is gone, the Thief's is paid");
@@ -536,7 +745,7 @@ namespace CluckWars.Tests
             for (int i = 0; i < 4; i++) counters[i] = new SeatCounters { StolenFromSeat = new float[4] };
             counters[seat].LootTakeFood = taken;
             counters[seat].LootBountyFood = bounty;
-            counters[seat].BagBanked = bagBanked;
+            counters[seat].LootBankedFood = bagBanked;
             var b = new float[4];
             b[seat] = banked;
             return new MatchResult { Winner = winner, WinnerWithoutSpoilerBonus = winnerWithout, NobodyReachedTarget = clock, Banked = b, Counters = counters };

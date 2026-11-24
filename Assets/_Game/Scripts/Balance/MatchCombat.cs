@@ -139,13 +139,23 @@ namespace CluckWars.Balance
         public int LootTimeouts;
         /// <summary>Steal casts that covered the marked rival in range but were refused by a base wall or a shell.</summary>
         public int LootRefused;
-        /// <summary>Food the marked steals took from the marked rivals.</summary>
+        /// <summary>Food the marked steals took from the marked rivals (into the Thief's cargo).</summary>
         public float LootTakeFood;
-        /// <summary>New food the marked steals added to the bounty bag.</summary>
+        /// <summary>New bounty food the marked steals put into the Thief's cargo.</summary>
         public float LootBountyFood;
-        /// <summary>Bounty bag food this seat banked.</summary>
+        /// <summary>What marked steals would have gained with an unlimited beak, minus what they did: stolen food and bounty that did not fit.</summary>
+        public float LootLostToRoom;
+        /// <summary>Loot food (marked take plus bounty) this seat banked; a Thief's cargo mixes it with plain stolen food, so a deposit or a theft takes the loot share pro rata.</summary>
+        public float LootBankedFood;
+        /// <summary>Loot food rivals' steals took from this seat (pro rata of the cargo they drained).</summary>
+        public float LootLostToSteals;
+        /// <summary>Deposit visits that emptied this seat's cargo and bag (trips home).</summary>
+        public int Trips;
+        /// <summary>Most marked steals this seat made between two of its trips home (the load before the first, and the one carried when the clock ended, count too).</summary>
+        public int MaxMarksPerTrip;
+        /// <summary>Spoiler bounty bag food this seat banked.</summary>
         public float BagBanked;
-        /// <summary>Bounty bag food rivals' steals took from this seat.</summary>
+        /// <summary>Spoiler bounty bag food rivals' steals took from this seat.</summary>
         public float BagLostToSteals;
         /// <summary>Seconds a Thief's loot mark sat on the same bird as a Spoiler's Hunt mark (counted on the Thief's seat).</summary>
         public float LootHuntOverlapSeconds;

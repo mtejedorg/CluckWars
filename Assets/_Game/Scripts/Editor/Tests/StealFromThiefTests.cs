@@ -27,13 +27,15 @@ namespace CluckWars.Tests
             { "ChickenClass", ".Class", "Subclass", "Passive", "IsStealth", "Invisib", "Alpha", "IsDecoy", "Thief" };
 
         [Test]
-        public void TheThiefPassive_ChangesNeitherCapacityNorStealability()
+        public void TheShippedThiefPassive_ChangesNeitherCapacityNorStealability()
         {
+            // Shipped, the capacity floor is 0 (BL-217: it is raised by a what-if delta only; the loot mark's design gives the Thief a floor like the
+            // Hoarder's, through the passive and never through the class stat). No steal-proof hook, ever.
             var thief = TestAssets.Load<ThiefPassiveSO>(TestAssets.AbilitiesDir + "/Passives/Thief.asset");
-            Assert.AreEqual(10f, thief.ModifyCargoCapacity(10f, null), "no capacity bonus or malus");
+            Assert.AreEqual(10f, thief.ModifyCargoCapacity(10f, null), "no capacity bonus or malus as shipped");
+            Assert.AreEqual(0f, thief.MinimumCapacity);
             var src = Src("Abilities/Passives/ThiefPassiveSO.cs");
             StringAssert.DoesNotContain("StealProof", src);
-            StringAssert.DoesNotContain("ModifyCargoCapacity", src);
         }
 
         [Test]

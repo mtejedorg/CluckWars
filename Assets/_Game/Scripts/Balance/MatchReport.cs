@@ -156,12 +156,27 @@ namespace CluckWars.Balance
         public float MarksLostPerMatch;
         /// <summary>Steal casts that met the marked bird behind a wall or a shell, per match.</summary>
         public float MarksRefusedPerMatch;
+        /// <summary>Food marked steals took from the marked rivals into the Thief's cargo, per match.</summary>
         public float LootTakeFoodPerMatch;
+        /// <summary>New bounty food marked steals put into the Thief's cargo, per match.</summary>
         public float LootBountyFoodPerMatch;
-        /// <summary>Bounty bag food the Thief banked, per match.</summary>
-        public float BagBankedPerMatch;
-        /// <summary>Bounty bag food rivals' steals took from the Thief, per match.</summary>
-        public float BagLostPerMatch;
+        /// <summary>Loot food (take plus bounty) that did not fit the Thief's beak, per match.</summary>
+        public float LootLostToRoomPerMatch;
+        /// <summary>Loot food the Thief banked, per match.</summary>
+        public float LootBankedPerMatch;
+        /// <summary>Loot food rivals' steals took from the Thief, per match.</summary>
+        public float LootLostPerMatch;
+        /// <summary>Trips home (deposit visits that emptied the cargo) per match.</summary>
+        public float TripsPerMatch;
+        /// <summary>Share of the Thief's matches in which it made two or more marked steals between two trips home.</summary>
+        public float StackedMarksShare;
+        /// <summary>Of the matches the Thief won on the win target, the share in which it had stacked two or more marked steals in one load (NaN with no win).</summary>
+        public float WinsWithStackedMarks;
+        public int WinsOnTarget;
+        /// <summary>Share of the Thief's matches in which it made three or more marked steals in one load: what Maestro's third note rules out.</summary>
+        public float ThreeInOneLoadShare;
+        /// <summary>Of its wins on the target, the share with three or more marked steals in one load (NaN with no win).</summary>
+        public float WinsWithThreeInOneLoad;
         /// <summary>Share of the Thief's matches that it won only through the clock prize.</summary>
         public float WonOnPrize;
         /// <summary>Share of the Thief's matches in which its loot mark shared a bird with a Spoiler's Hunt mark for any time.</summary>
@@ -723,7 +738,8 @@ namespace CluckWars.Balance
             var meetings = new int[kits];
             int matches = 0, steals = 0;
             double stolen = 0, foraged = 0, banked = 0;
-            double drawn = 0, taken = 0, lost = 0, refused = 0, takeFood = 0, bountyFood = 0, bagBanked = 0, bagLost = 0, overlapSeconds = 0;
+            double drawn = 0, taken = 0, lost = 0, refused = 0, takeFood = 0, bountyFood = 0, roomLost = 0, lootBanked = 0, lootLost = 0, trips = 0, overlapSeconds = 0;
+            int stacked = 0, targetWins = 0, targetWinsStacked = 0, three = 0, targetWinsThree = 0;
             int wonOnPrize = 0, overlapMatches = 0, withSpoiler = 0, withSpoilerOverlap = 0;
             var byTaken = new SortedDictionary<int, List<(MatchResult, int)>>();
             int mostTaken = 0;
@@ -739,7 +755,11 @@ namespace CluckWars.Balance
                 foraged += c.Foraged;
                 banked += run.Results[i].Banked[t];
                 drawn += c.LootOffered; taken += c.LootTaken; lost += c.LootTimeouts; refused += c.LootRefused;
-                takeFood += c.LootTakeFood; bountyFood += c.LootBountyFood; bagBanked += c.BagBanked; bagLost += c.BagLostToSteals;
+                takeFood += c.LootTakeFood; bountyFood += c.LootBountyFood; roomLost += c.LootLostToRoom; lootBanked += c.LootBankedFood; lootLost += c.LootLostToSteals;
+                trips += c.Trips;
+                if (c.MaxMarksPerTrip >= 2) stacked++;
+                if (c.MaxMarksPerTrip >= 3) three++;
+                if (run.Results[i].Winner == t && run.Results[i].ReachedTarget) { targetWins++; if (c.MaxMarksPerTrip >= 2) targetWinsStacked++; if (c.MaxMarksPerTrip >= 3) targetWinsThree++; }
                 overlapSeconds += c.LootHuntOverlapSeconds;
                 if (c.LootHuntOverlapSeconds > 0f) overlapMatches++;
                 bool spoilerPlays = false;
@@ -769,7 +789,11 @@ namespace CluckWars.Balance
                 LootActive = lootOn,
                 MarksDrawnPerMatch = (float)(drawn / matches), MarksTakenPerMatch = (float)(taken / matches), MarksLostPerMatch = (float)(lost / matches),
                 MarksRefusedPerMatch = (float)(refused / matches), LootTakeFoodPerMatch = (float)(takeFood / matches),
-                LootBountyFoodPerMatch = (float)(bountyFood / matches), BagBankedPerMatch = (float)(bagBanked / matches), BagLostPerMatch = (float)(bagLost / matches),
+                LootBountyFoodPerMatch = (float)(bountyFood / matches), LootLostToRoomPerMatch = (float)(roomLost / matches),
+                LootBankedPerMatch = (float)(lootBanked / matches), LootLostPerMatch = (float)(lootLost / matches), TripsPerMatch = (float)(trips / matches),
+                StackedMarksShare = stacked / (float)matches, WinsOnTarget = targetWins,
+                WinsWithStackedMarks = targetWins > 0 ? targetWinsStacked / (float)targetWins : float.NaN,
+                ThreeInOneLoadShare = three / (float)matches, WinsWithThreeInOneLoad = targetWins > 0 ? targetWinsThree / (float)targetWins : float.NaN,
                 WonOnPrize = wonOnPrize / (float)matches, OverlapShare = overlapMatches / (float)matches,
                 OverlapSecondsPerMatch = (float)(overlapSeconds / matches),
                 OverlapShareWithSpoiler = withSpoiler > 0 ? withSpoilerOverlap / (float)withSpoiler : float.NaN, MatchesWithSpoiler = withSpoiler,
@@ -1088,7 +1112,7 @@ namespace CluckWars.Balance
                 {
                     var t = p.ThiefIncome;
                     if (t == null || !t.LootActive) continue;
-                    sb.AppendLine($"- Loot mark, {Name(p.Population)}: {Num(t.MarksDrawnPerMatch)} marks drawn, {Num(t.MarksTakenPerMatch)} consumed, {Num(t.MarksLostPerMatch)} moved on or lost unpaid, {Num(t.MarksRefusedPerMatch)} refused (wall or shell) per match; marked take {Num(t.LootTakeFoodPerMatch, "0.0")} + bounty {Num(t.LootBountyFoodPerMatch, "0.0")} food into the bag, {Num(t.BagBankedPerMatch, "0.0")} of the bag banked and {Num(t.BagLostPerMatch, "0.0")} lost to rivals' steals; won only through the clock prize in {Pct(t.WonOnPrize)} of matches; loot mark and a Hunt mark on one bird in {Pct(t.OverlapShare)} of the Thief's matches ({Pct(t.OverlapShareWithSpoiler)} of those with a Spoiler), {Num(t.OverlapSecondsPerMatch)} s per match.");
+                    sb.AppendLine($"- Loot mark, {Name(p.Population)}: {Num(t.MarksDrawnPerMatch)} marks drawn, {Num(t.MarksTakenPerMatch)} consumed, {Num(t.MarksLostPerMatch)} moved on or lost unpaid, {Num(t.MarksRefusedPerMatch)} refused (wall or shell) per match; marked take {Num(t.LootTakeFoodPerMatch, "0.0")} + bounty {Num(t.LootBountyFoodPerMatch, "0.0")} food into the beak ({Num(t.LootLostToRoomPerMatch, "0.0")} did not fit), {Num(t.LootBankedPerMatch, "0.0")} of it banked and {Num(t.LootLostPerMatch, "0.0")} lost to rivals' steals (pro rata of the cargo); {Num(t.TripsPerMatch)} trips home per match, two or more marked steals in one load in {Pct(t.StackedMarksShare)} of matches and in {Pct(t.WinsWithStackedMarks)} of its {t.WinsOnTarget} wins on the target; three or more in one load in {Pct(t.ThreeInOneLoadShare)} of matches and {Pct(t.WinsWithThreeInOneLoad)} of those wins; won only through the clock prize in {Pct(t.WonOnPrize)} of matches; loot mark and a Hunt mark on one bird in {Pct(t.OverlapShare)} of the Thief's matches ({Pct(t.OverlapShareWithSpoiler)} of those with a Spoiler), {Num(t.OverlapSecondsPerMatch)} s per match.");
                 }
                 foreach (var p in pops)
                 {
@@ -1096,7 +1120,7 @@ namespace CluckWars.Balance
                     sb.AppendLine();
                     sb.AppendLine($"Thief marked steals to win, {Name(p.Population)} (steals taken in the match, mixed design; survivor bias applies; the label compares the row with the `ThiefLootTargets` data):");
                     sb.AppendLine();
-                    sb.AppendLine("| Marked steals | Matches | Win, no prize | Win, with prize | Final banked | Bag share banked | Reached 40 | Label |");
+                    sb.AppendLine("| Marked steals | Matches | Win, no prize | Win, with prize | Final banked | Loot share banked | Reached 40 | Label |");
                     sb.AppendLine("|---|---|---|---|---|---|---|---|");
                     foreach (var row in p.LootSteals)
                     {

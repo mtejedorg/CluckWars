@@ -11,7 +11,8 @@ namespace CluckWars.Balance
     /// <see cref="BotTactics.ResolvePhase"/>, <see cref="BotTactics.NextMarkStep"/>, <see cref="BotTactics.CastPlan"/>,
     /// <see cref="BotTactics.PileCost"/>, <see cref="BotTactics.TargetPriority"/>, <see cref="BotTactics.ShouldStealGuard"/> and
     /// <see cref="BotTactics.ScoreCastCandidate"/>. It reads a rival only from the <see cref="MatchView"/>, so Hide counts through
-    /// <see cref="MatchSight"/>.
+    /// <see cref="MatchSight"/>. A Thief with the loot mark on also plays <see cref="BotLootRules"/> (BL-217, round 2): chase the marked rival, keep
+    /// Steal for it, bank when the next marked steal would not fit.
     /// </summary>
     /// <remarks>
     /// Mirrored, not called (each pinned by a test against the prefab or the source): the hysteresis factor of the state exits and the
@@ -52,6 +53,7 @@ namespace CluckWars.Balance
         private float _preyCargo;
         private MatchPhase _phase;
         private bool _leading;
+        private bool _holdSteal;
 
         public ScriptedPolicy(int seat, PolicyParams p)
         {
@@ -80,9 +82,16 @@ namespace CluckWars.Balance
             float cargoFraction = Mathf.Clamp01(cargo / capacity);
             float distHome = Vector2.Distance(me.Pos, home);
 
-            // Priority 0: BANK OR LOSE IT.
+            // Priority 0: BANK OR LOSE IT. A Thief with the loot mark banks by its own rule (the clock, the win, a full beak for the next mark).
             float depositRate = Mathf.Max(0.5f, kit.Farm.DepositRate);
-            if (BotTactics.MustBankNow(cargo, distHome, kit.Farm.MoveSpeed, v.TimeLeft, cargo / depositRate))
+            bool lootThief = kit.Passive.Loot.Active;
+            if (lootThief)
+            {
+                if (BotLootRules.BankNow(cargo, capacity, kit.Passive.Loot.Bounty, me.Banked, Mathf.Max(1f, v.Rules.Farm.WinTarget), distHome,
+                        kit.Farm.MoveSpeed, depositRate, v.TimeLeft))
+                    return GoHome(v, home);
+            }
+            else if (BotTactics.MustBankNow(cargo, distHome, kit.Farm.MoveSpeed, v.TimeLeft, cargo / depositRate))
                 return GoHome(v, home);
 
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof shell.
@@ -114,8 +123,11 @@ namespace CluckWars.Balance
                 return Finish(v, home, -1);
             }
 
-            // Priority 2: DEPOSIT.
-            if (cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading)) return GoHome(v, home);
+            // Priority 2: DEPOSIT (a loot Thief decided at priority 0).
+            if (!lootThief && cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading)) return GoHome(v, home);
+
+            // Priority 2b: THE LOOT MARK. Walk to the marked rival at any distance and keep Steal for it.
+            if (lootThief && ChaseMarked(v, me, abilities, arrival, out var lootIntent)) return lootIntent;
 
             // Priority 3: HUNT / STALK.
             if (_prey >= 0 && Engage(v, me, abilities, arrival, out var engageIntent)) return engageIntent;
@@ -211,8 +223,6 @@ namespace CluckWars.Balance
 
                 float capacity = Mathf.Max(1, v.Kits[r].Farm.CargoCapacity);
                 float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo, rival.Bag) / capacity);
-                // The Thief's loot mark (BL-217): the marked rival scores as a full load whatever it carries, and stays prey inside the hunt radius.
-                if (me.LootTarget == r) frac = 1f;
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);
                 if (priority <= 0f) continue;
@@ -231,6 +241,7 @@ namespace CluckWars.Balance
 
             _phase = BotTactics.ResolvePhase(v.TimeLeft, v.Rules.Farm.ClockSeconds);
             _leading = IsLeading(v, me);
+            _holdSteal = false;
         }
 
         private bool IsLeading(MatchView v, in SeatView me)
@@ -260,6 +271,7 @@ namespace CluckWars.Balance
             {
                 var ab = abilities[slot];
                 if (ab.Job == AbilityJob.Peck || !Ready(me, slot)) continue;
+                if (_holdSteal && ab.Job == AbilityJob.Steal) continue;   // kept for the marked rival
                 int priority = Array.IndexOf(plan, ab.Role);
                 if (priority < 0) continue;
                 if (ab.NeedsEnemyInRange && !AnyRivalInRange(v, me, ab)) continue;
@@ -405,6 +417,39 @@ namespace CluckWars.Balance
             else if (step == BotMarkStep.Kill && _cast < 0) _cast = markSlot;
 
             intent = Finish(v, Reach(me.Pos, target, arrival), -1);
+            return true;
+        }
+
+        // ---- the loot mark ----
+
+        // True and an intent when the bot goes for the marked rival this think: walk to it (the last seen spot when it is hidden, the simulator's
+        // path goes round walls) and cast Steal once it is in reach. False leaves the ordinary rules, including the marked rival being abandoned
+        // (home behind its wall, shelled, given up), which lets Steal go elsewhere and the mark move.
+        private bool ChaseMarked(MatchView v, in SeatView me, MatchAbility[] abilities, float arrival, out MatchIntent intent)
+        {
+            intent = default;
+            int mark = me.LootTarget;
+            if (mark < 0) return false;
+            var m = v.Seats[mark];
+            bool behind = BotLootRules.BehindWall(m.Pos, v.Map.Places[OracleMapSO.BaseIndex(mark)].Pos, v.Rules.KeepOutRadius);
+            if (!BotLootRules.Pursue(m.Present && !m.Removed, m.Known, m.Shelled, behind)) return false;
+
+            int slot = -1;
+            for (int a = 0; a < abilities.Length; a++) if (abilities[a].Job == AbilityJob.Steal) { slot = a; break; }
+            float dist = Vector2.Distance(me.Pos, m.Pos);
+            if (slot >= 0)
+            {
+                var steal = abilities[slot];
+                float speed = Mathf.Max(0.1f, v.Kits[_seat].Farm.MoveSpeed);
+                _holdSteal = BotLootRules.HoldSteal(true, dist, speed, steal.Cooldown);
+                if (!me.Stunned && _cast < 0 && Ready(me, slot))
+                {
+                    bool onMarked = dist <= steal.Reach * BotTactics.CommitReachFraction && WouldAffect(v, me, steal, mark);
+                    if (onMarked || (!_holdSteal && AnyRivalInRange(v, me, steal))) _cast = slot;
+                }
+            }
+            _state = State.Hunt;
+            intent = Finish(v, Reach(me.Pos, m.Pos, arrival), -1);
             return true;
         }
 

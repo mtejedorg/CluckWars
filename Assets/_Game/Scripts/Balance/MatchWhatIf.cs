@@ -266,8 +266,14 @@ namespace CluckWars.Balance
                         Add("thief", "marks refused per match", pop, t.MarksRefusedPerMatch, trials: t.Matches);
                         Add("thief", "marked take per match", pop, t.LootTakeFoodPerMatch, trials: t.Matches);
                         Add("thief", "bounty food per match", pop, t.LootBountyFoodPerMatch, trials: t.Matches);
-                        Add("thief", "bag food banked per match", pop, t.BagBankedPerMatch, trials: t.Matches);
-                        Add("thief", "bag food lost to steals per match", pop, t.BagLostPerMatch, trials: t.Matches);
+                        Add("thief", "loot food lost to the beak's room per match", pop, t.LootLostToRoomPerMatch, trials: t.Matches);
+                        Add("thief", "loot food banked per match", pop, t.LootBankedPerMatch, trials: t.Matches);
+                        Add("thief", "loot food lost to steals per match", pop, t.LootLostPerMatch, trials: t.Matches);
+                        Add("thief", "trips home per match", pop, t.TripsPerMatch, trials: t.Matches);
+                        Add("thief", "two or more marked steals in one load (% of Thief matches)", pop, t.StackedMarksShare * 100f, trials: t.Matches);
+                        Add("thief", "Thief wins on the target with marks stacked in one load (%)", pop, t.WinsWithStackedMarks * 100f, trials: t.WinsOnTarget);
+                        Add("thief", "three or more marked steals in one load (% of Thief matches)", pop, t.ThreeInOneLoadShare * 100f, trials: t.Matches);
+                        Add("thief", "Thief wins on the target with three marks in one load (%)", pop, t.WinsWithThreeInOneLoad * 100f, trials: t.WinsOnTarget);
                         Add("thief", "won only on the prize (%)", pop, t.WonOnPrize * 100f, trials: t.Matches);
                         Add("thief", "loot mark on a Hunt-marked bird (% of Thief matches)", pop, t.OverlapShare * 100f, trials: t.Matches);
                         Add("thief", "loot mark on a Hunt-marked bird (% of Thief matches with a Spoiler)", pop, t.OverlapShareWithSpoiler * 100f, trials: t.MatchesWithSpoiler);
@@ -406,12 +412,12 @@ namespace CluckWars.Balance
             {
                 sb.AppendLine("## Overview: the Thief's loot mark (per match, mixed population unless said)");
                 sb.AppendLine();
-                sb.AppendLine("| Scenario | marks drawn | consumed | lost unpaid | refused | marked take | bounty food | bag banked | bag lost to steals | won only on the prize (%) | on a Hunt-marked bird (% Thief matches) | Thief mirror on the corner (%) |");
-                sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|");
+                sb.AppendLine("| Scenario | marks drawn | consumed | lost unpaid | refused | marked take | bounty food | did not fit | loot banked | loot lost to steals | trips home | stacked marks in one load (% matches) | stacked, of wins (%) | three in one load (% matches) | three in one load, of wins (%) | won only on the prize (%) | on a Hunt-marked bird (% Thief matches) | Thief mirror on the corner (%) |");
+                sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
                 foreach (var s in played)
                 {
                     string G(string label, string f = "0.00") { var l = Find(all[s.Name], "thief", label, "mixed") ?? Find(all[s.Name], "match", label, "mixed"); return l == null ? "n/a" : F(l.Scenario, f); }
-                    sb.AppendLine($"| {s.Name} | {G("marks drawn per match")} | {G("marks consumed per match")} | {G("marks lost unpaid per match")} | {G("marks refused per match")} | {G("marked take per match", "0.0")} | {G("bounty food per match", "0.0")} | {G("bag food banked per match", "0.0")} | {G("bag food lost to steals per match", "0.0")} | {G("won only on the prize (%)", "0.0")} | {G("loot mark on a Hunt-marked bird (% of Thief matches)", "0.0")} | {G("Thief mirror decided by the corner (%)", "0.0")} |");
+                    sb.AppendLine($"| {s.Name} | {G("marks drawn per match")} | {G("marks consumed per match")} | {G("marks lost unpaid per match")} | {G("marks refused per match")} | {G("marked take per match", "0.0")} | {G("bounty food per match", "0.0")} | {G("loot food lost to the beak's room per match", "0.0")} | {G("loot food banked per match", "0.0")} | {G("loot food lost to steals per match", "0.0")} | {G("trips home per match")} | {G("two or more marked steals in one load (% of Thief matches)", "0.0")} | {G("Thief wins on the target with marks stacked in one load (%)", "0.0")} | {G("three or more marked steals in one load (% of Thief matches)", "0.0")} | {G("Thief wins on the target with three marks in one load (%)", "0.0")} | {G("won only on the prize (%)", "0.0")} | {G("loot mark on a Hunt-marked bird (% of Thief matches)", "0.0")} | {G("Thief mirror decided by the corner (%)", "0.0")} |");
                 }
                 sb.AppendLine();
                 sb.AppendLine("## Overview: the Thief's marked steals to win (win rate, matches in brackets; IN or OUT is the label against `ThiefLootTargets`)");

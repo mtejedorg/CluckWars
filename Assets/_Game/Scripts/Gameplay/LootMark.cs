@@ -4,21 +4,19 @@ using System.Collections.Generic;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The Thief's loot mark as numbers (design 2026-11-23, BL-217), read once from the Thief's passive so the match simulator and,
+    /// The Thief's loot mark as numbers (design 2026-11-23, BL-217; ordinary cargo since Maestro's third note of 2026-11-24), read once from the Thief's passive so the match simulator and,
     /// later, the game use the same values. A <see cref="Bounty"/> of 0 switches the mark off: the shipped Thief has none.
     /// </summary>
     public struct LootMarkFacts
     {
         /// <summary>The passive is the Thief's. True even with the mark off, so a report can find the kit whatever its numbers.</summary>
         public bool IsThief;
-        /// <summary>New food a marked steal adds to the Thief's bounty bag on top of what it takes. 0 = no loot mark at all.</summary>
+        /// <summary>New food a marked steal adds to the Thief's cargo on top of what it takes, as far as it fits. 0 = no loot mark at all.</summary>
         public float Bounty;
         /// <summary>Seconds after which a mark moves, checked only while Steal is on cooldown.</summary>
         public float Seconds;
         /// <summary>How many seconds before Steal comes off cooldown the next mark appears.</summary>
         public float LeadSeconds;
-        /// <summary>The marked take goes to the bounty bag (true) or, as a probe, to the beak under its free room (false).</summary>
-        public bool TakeToBag;
         public LootWeightTable Weights;
         /// <summary>The Thief's own number: <see cref="LootWeightTable.OverThreshold"/> is this fraction of the win target.</summary>
         public float OverFraction;
@@ -41,6 +39,17 @@ namespace CluckWars.Gameplay
 
     /// <summary>Where the Thief's mark stands in its life cycle (design section 4).</summary>
     public enum LootState : byte { Off, Waiting, Live, Overdue }
+
+    /// <summary>What a live mark does on a tick (<see cref="LootRules.Advance"/>).</summary>
+    public enum LootStep : byte
+    {
+        /// <summary>Nothing changes.</summary>
+        Stay,
+        /// <summary>The mark is old and Steal is ready: it stays on its bird, now <see cref="LootState.Overdue"/>.</summary>
+        GoOverdue,
+        /// <summary>The mark is old and Steal is on cooldown, for whatever reason: it ends unpaid and the next one is scheduled.</summary>
+        Move,
+    }
 
     /// <summary>
     /// Who the Thief's loot mark lands on, pure, every roll injected, so the game and the simulator call the same rule. The caller lists
@@ -107,10 +116,34 @@ namespace CluckWars.Gameplay
         public static bool TimedOut(float age, float seconds, bool stealReady) => age >= seconds && !stealReady;
 
         /// <summary>
-        /// What the marked bird loses: the nominal steal times the Thief's factor, held to what the bird carries (beak plus bag). The Thief's
-        /// free room does not limit it: the take goes to the bag. 0 for an empty bird (the bounty still pays).
+        /// One tick of a live mark (design section 4, with Maestro's correction of 2026-11-24). Young (below <paramref name="seconds"/>): it stays,
+        /// whatever Steal does. Old with Steal ready: it stays on its bird as <see cref="LootState.Overdue"/>. Old with Steal on cooldown, an
+        /// Overdue mark included and whatever spent the cooldown (a steal that hit someone else, a cast on the marked bird that was refused):
+        /// it moves, unpaid. A mark that is not <see cref="LootState.Live"/> or <see cref="LootState.Overdue"/> never steps.
         /// </summary>
-        public static float MarkedTake(float nominal, float factor, float victimCargo, float victimBag) =>
-            StealMath.Clamp(nominal * factor, float.MaxValue, StealRules.Stealable(victimCargo, victimBag));
+        public static LootStep Advance(LootState state, float age, float seconds, bool stealReady)
+        {
+            if (state != LootState.Live && state != LootState.Overdue) return LootStep.Stay;
+            if (TimedOut(age, seconds, stealReady)) return LootStep.Move;
+            return state == LootState.Live && age >= seconds ? LootStep.GoOverdue : LootStep.Stay;
+        }
+
+        /// <summary>
+        /// What a marked steal puts into the Thief's cargo (Maestro, 2026-11-24, third note: no capacity-free bag, everything is ordinary cargo).
+        /// The stolen food comes first and is an ordinary steal's take: the nominal steal times the Thief's factor, held to the Thief's free room and
+        /// to what the bird carries. The new-food bounty fills whatever room is left; what does not fit is lost, never held back. The bird loses
+        /// only what the Thief gains from it. <paramref name="wanted"/> is what the same cast would have gained with no room limit, so
+        /// <c>wanted - stolen - bountyKept</c> is what the Thief's full beak cost him.
+        /// </summary>
+        public static void MarkedGain(float nominal, float factor, float freeRoom, float victimCargo, float victimBag, float bounty,
+            out float stolen, out float bountyKept, out float wanted)
+        {
+            float room = freeRoom > 0f ? freeRoom : 0f;
+            float available = StealRules.Stealable(victimCargo, victimBag);
+            stolen = StealMath.Clamp(nominal * factor, room, available);
+            float bonus = bounty > 0f ? bounty : 0f;
+            bountyKept = Math.Min(bonus, Math.Max(0f, room - stolen));
+            wanted = StealMath.Clamp(nominal * factor, float.MaxValue, available) + bonus;
+        }
     }
 }

@@ -65,7 +65,7 @@ namespace CluckWars.Balance
         public WinInterval WinWithPrize;
         /// <summary>The Thief's final banked food (the clock prize included when the clock ended), averaged.</summary>
         public float MeanFinal;
-        /// <summary>Share of the loot bag food (take plus bounty) that reached the base; NaN when no bag food was made.</summary>
+        /// <summary>Share of the loot food (take plus bounty) that reached the base; NaN when no loot food was made.</summary>
         public float BankedShare;
         /// <summary>Share of matches that went to the clock.</summary>
         public float NobodyReachedTarget;
@@ -171,7 +171,7 @@ namespace CluckWars.Balance
                 final += r.Banked[seat];
                 var c = r.Counters[seat];
                 bagMade += c.LootTakeFood + c.LootBountyFood;
-                bagBanked += Math.Min(c.BagBanked, c.LootTakeFood + c.LootBountyFood);
+                bagBanked += Math.Min(c.LootBankedFood, c.LootTakeFood + c.LootBountyFood);
             }
             int n = played.Count;
             var row = new LootStealRow

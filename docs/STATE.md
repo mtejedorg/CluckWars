@@ -11,6 +11,15 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-24 - Loot mark round 2: ordinary cargo, overdue mark, bot rule, Spoiler bounty sweep (BL-217, `develop`, not pushed)
+
+- **Maestro's third note:** no capacity-free bag. A marked steal's food and bounty go into the Thief's ordinary cargo (stolen food first, then the bounty into the room left, the rest lost). The Thief's capacity comes from his passive: new `ThiefPassiveSO.MinimumCapacity` (floor like the Hoarder's, 0 shipped); the Sneaky class stat is untouched. The `LootTakeToBag` probe is gone.
+- **Life cycle:** an overdue mark ends the moment Steal goes on cooldown, whatever caused it (`LootRules.Advance`; tests for a cast on another rival, a refused cast, the consumed path).
+- **Bot:** `Gameplay/BotLootRules.cs` (`Pursue`, `HoldSteal`, `BankNow`), called by `ScriptedPolicy`; `BotController` not edited. P0 marks consumed per match 1.47 to 3.1 (P1 3.1).
+- **Sweep (simulator only):** capacity 20, bounty 10, prize 20, multiplier 1.0 puts the Thief at 22 / 25 / 24 %; the Spoiler needs no raise (execute bounty 15; 16 pushes mixed to 32.6). Misses Maestro's measures by 0.5 to 1.2 points (Bulwark P0 -5.8, Bully P1 -5.5). Design section 20.
+- **Game unchanged:** mechanic off as shipped (`LootBounty` 0, `MinimumCapacity` 0, `ClockPrize` 0); no shipped value changed.
+- **No prefab or scene steps for Maestro.**
+
 ## 2026-11-24 - Thief loot mark and clock prize in the match simulator (BL-217, `develop`, not pushed)
 
 - **Built** from the loot-mark design (section 13): pure `LootPickRules` / `LootRules` / `LootMarkFacts` in `Gameplay/LootMark.cs`, the mark's state machine, the marked steal, the bounty into the bag and the Thief-only clock prize in `MatchSim`; P0 and P1 play the mark; new `ThiefPassiveSO` fields (`LootBounty`, `LootSeconds`, `LootLeadSeconds`, `LootTakeToBag`, `LootBaseWeight`, `LootBankedWeight`, `LootCarriedWeight`, `LootOverFraction`, `LootOverBonus`, `ClockPrize`), readable and sweepable through `BalanceBook`; `ThiefLootTargets` on `OracleReference.asset`; report and what-if rows (marked steals to win, marks, bag food, overlap with the Hunt mark).

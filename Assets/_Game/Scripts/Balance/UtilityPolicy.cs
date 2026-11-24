@@ -120,6 +120,11 @@ namespace CluckWars.Balance
             // A bounty bag goes home before anything else.
             if (_me.Bag > Eps) _banking = true;
 
+            // A Thief whose beak cannot take another marked steal's bounty banks first (Maestro, 2026-11-24: the loot is ordinary cargo and
+            // what does not fit is lost). Only while there is something to bank.
+            var lootFacts = _kit.Passive.Loot;
+            if (lootFacts.Active && _all > Eps && BotLootRules.NextMarkedStealWouldNotFit(_all, _capacity, lootFacts.Bounty)) _banking = true;
+
             // Threats and the answer to them (shell, stun, shove, slow, hide, speed); a loaded chicken under threat heads home.
             Defend(v);
             if (_banking) return Finish(_home, -1);
@@ -388,18 +393,25 @@ namespace CluckWars.Balance
                 _score[r] = float.NegativeInfinity;
                 _value[r] = 0f;
                 if (!_ok[r] || v.Seats[r].Shelled || _dist[r] > chase) continue;
-                // The loot mark (BL-217): the marked rival is worth its take plus the bounty, the take < 1 skip does not apply to it (the bounty
-                // pays on an empty bird) and the take goes to the bag, so the free room does not limit it.
+                // The loot mark (BL-217): the marked rival is worth what the cast really gains, the stolen food and then the bounty, both held to
+                // the free room (ordinary cargo). The take < 1 skip does not apply to it: the bounty pays on an empty bird. A full beak gains nothing.
                 bool marked = _me.LootTarget == r;
                 var loot = _kit.Passive.Loot;
-                float take = marked && loot.TakeToBag
-                    ? LootRules.MarkedTake(a.StealAmount, _kit.Passive.StealFactor, v.Seats[r].Cargo, v.Seats[r].Bag)
-                    : MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag);
-                if (take < 1f && !marked) continue;
+                float take, bounty = 0f;
+                if (marked)
+                {
+                    LootRules.MarkedGain(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag, loot.Bounty, out take, out bounty, out _);
+                    if (take + bounty < 1f) continue;
+                }
+                else
+                {
+                    take = MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag);
+                    if (take < 1f) continue;
+                }
 
                 float wait = Mathf.Max(_me.CooldownLeft[1 + steal], Mathf.Max(0f, _dist[r] - a.Radius * BotTactics.CommitReachFraction) / _speed);
                 float homeAfter = Mathf.Max(0f, Vector2.Distance(v.Seats[r].Pos, _home) - v.Map.BaseRadius) / _speed;
-                float carried = _all + take + (marked ? loot.Bounty : 0f);
+                float carried = _all + take + bounty;
                 float seconds = wait + homeAfter + carried / _dep;
                 if (seconds > v.TimeLeft) continue;     // no time to bank it
                 float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);

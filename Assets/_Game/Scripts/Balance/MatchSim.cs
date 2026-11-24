@@ -352,6 +352,9 @@ namespace CluckWars.Balance
             public float LootDrawAt;
             public bool HasLastLoot;
             public int LastLoot;
+            /// <summary>Loot food (marked take plus bounty) still in the cargo; a share of it leaves with every deposit or theft.</summary>
+            public float LootHeld;
+            public int MarksThisTrip;
         }
 
         private sealed class Core
@@ -700,6 +703,7 @@ namespace CluckWars.Balance
                 float fromBag = Math.Min(ch.Bag, dep);
                 _result.Counters[s].BagBanked += fromBag;
                 ch.Bag -= fromBag;
+                _result.Counters[s].LootBankedFood += TakeLootShare(ch, dep - fromBag);
                 ch.Cargo -= dep - fromBag;
                 ch.Banked += dep;
                 ch.Visit += dep;
@@ -715,6 +719,9 @@ namespace CluckWars.Balance
 
                 ch.Cargo = 0f;
                 ch.Bag = 0f;
+                ch.LootHeld = 0f;
+                ch.MarksThisTrip = 0;
+                _result.Counters[s].Trips++;
                 ch.ThinkNow = true;
                 Record(MatchEventKind.Bank, s, -1, ch.Visit, CutCause.None);
                 ch.Visit = 0f;
@@ -1033,6 +1040,7 @@ namespace CluckWars.Balance
                 float take = MatchCombat.StealTake(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, v.Bag);
                 if (take <= 0f) return;
                 StealRules.SplitDrain(take, v.Cargo, v.Bag, out float fromCargo, out float fromBag);
+                _result.Counters[victim].LootLostToSteals += TakeLootShare(v, fromCargo);
                 v.Cargo -= fromCargo;
                 v.Bag -= fromBag;
                 t.Cargo += take;
@@ -1050,37 +1058,50 @@ namespace CluckWars.Balance
 
             private static bool LootLive(Chick ch) => ch.LootState == LootState.Live || ch.LootState == LootState.Overdue;
 
-            // A marked steal: the take (the free room does not limit it when it goes to the bag) and the new bounty food land in the bag,
-            // the mark is spent and the next one is scheduled from the Steal cooldown the cast has just started.
+            // A marked steal (Maestro, 2026-11-24, third note: ordinary cargo, no bag): the stolen food first, held to the Thief's free room and to what
+            // the bird carries, then the new-food bounty into what room is left. What does not fit is lost. The mark is spent either way, and the next
+            // one is scheduled from the Steal cooldown the cast has just started.
             private void TakeLoot(int thief, int victim, in MatchAbility ab)
             {
                 var t = _c[thief];
                 var v = _c[victim];
                 var loot = PassiveOf(thief).Loot;
-                float factor = PassiveOf(thief).StealFactor;
-                float take = loot.TakeToBag
-                    ? LootRules.MarkedTake(ab.StealAmount, factor, v.Cargo, v.Bag)
-                    : MatchCombat.StealTake(ab.StealAmount, factor, _s.Seats[thief].Farm.CargoCapacity - t.Cargo, v.Cargo, v.Bag);
+                float room = _s.Seats[thief].Farm.CargoCapacity - t.Cargo;
+                LootRules.MarkedGain(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, v.Bag, loot.Bounty,
+                    out float take, out float bounty, out float wanted);
                 ref SeatCounters tn = ref _result.Counters[thief];
                 if (take > 0f)
                 {
                     StealRules.SplitDrain(take, v.Cargo, v.Bag, out float fromCargo, out float fromBag);
+                    _result.Counters[victim].LootLostToSteals += TakeLootShare(v, fromCargo);
                     v.Cargo -= fromCargo;
                     v.Bag -= fromBag;
-                    if (loot.TakeToBag) t.Bag += take; else t.Cargo += take;
                     tn.Stolen += take;
                     tn.Steals++;
                     tn.StolenFromSeat[victim] += take;
                     _result.Counters[victim].LostToSteals += take;
                     _result.Counters[victim].BagLostToSteals += fromBag;
                 }
-                t.Bag += loot.Bounty;
+                t.Cargo += take + bounty;
+                t.LootHeld += take + bounty;
                 tn.LootTaken++;
                 tn.LootTakeFood += take;
-                tn.LootBountyFood += loot.Bounty;
+                tn.LootBountyFood += bounty;
+                tn.LootLostToRoom += wanted - take - bounty;
+                if (++t.MarksThisTrip > tn.MaxMarksPerTrip) tn.MaxMarksPerTrip = t.MarksThisTrip;
                 v.ThinkNow = t.ThinkNow = true;
-                Record(MatchEventKind.Loot, thief, victim, take + loot.Bounty, CutCause.None);
+                Record(MatchEventKind.Loot, thief, victim, take + bounty, CutCause.None);
                 EndLoot(thief);
+            }
+
+            // The loot share of `amount` leaving a cargo (a deposit or a theft): pro rata of what the cargo holds. Returns the loot food that left.
+            private static float TakeLootShare(Chick ch, float amount)
+            {
+                if (ch.LootHeld <= 0f || ch.Cargo <= 1e-6f || amount <= 0f) return 0f;
+                float share = Math.Min(1f, ch.LootHeld / ch.Cargo);
+                float lootOut = Math.Min(ch.LootHeld, amount * share);
+                ch.LootHeld -= lootOut;
+                return lootOut;
             }
 
             // The mark ends (paid, timed out or its bird removed): the bird is the last marked, the next draw is due ahead of Steal's return.
@@ -1114,12 +1135,16 @@ namespace CluckWars.Balance
                         float age = _time - ch.LootSince;
                         for (int m = 0; m < Seats; m++)
                             if (m != s && _c[m].Present && _c[m].MarkTarget == ch.LootTarget) { _result.Counters[s].LootHuntOverlapSeconds += _tick; break; }
-                        if (LootRules.TimedOut(age, loot.Seconds, ready))
+                        switch (LootRules.Advance(ch.LootState, age, loot.Seconds, ready))
                         {
-                            _result.Counters[s].LootTimeouts++;
-                            EndLoot(s);
+                            case LootStep.Move:
+                                _result.Counters[s].LootTimeouts++;
+                                EndLoot(s);
+                                break;
+                            case LootStep.GoOverdue:
+                                ch.LootState = LootState.Overdue;
+                                break;
                         }
-                        else if (ch.LootState == LootState.Live && age >= loot.Seconds) ch.LootState = LootState.Overdue;
                     }
                 }
             }
@@ -1305,6 +1330,7 @@ namespace CluckWars.Balance
                 float loot = EggPhase(v) ? 0f : v.Cargo;
                 float pay = loot + _rules.ExecuteBounty;
                 v.Cargo -= loot;
+                if (v.LootHeld > v.Cargo) v.LootHeld = v.Cargo;
                 sp.Bag += pay;
                 sp.ThinkNow = true;
                 _result.Kills[s]++;
@@ -1360,6 +1386,7 @@ namespace CluckWars.Balance
                     ch.Removed = false;
                     ch.Pos = Spawn(_map, s);
                     ch.Cargo = 0f;
+                    ch.LootHeld = 0f;
                     ch.Visit = 0f;
                     ch.Push = Vector2.zero;
                     ch.ThinkNow = true;

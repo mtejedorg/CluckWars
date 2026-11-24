@@ -33,12 +33,12 @@ MonoBehaviour:
   LootBounty: 0
   LootSeconds: 12
   LootLeadSeconds: 1
-  LootTakeToBag: 1
   LootBaseWeight: 4
   LootBankedWeight: 1
   LootCarriedWeight: 0.5
   LootOverFraction: 0.625
   LootOverBonus: 10
+  MinimumCapacity: 0
   ClockPrize: 0
   Subclass: 8
   Kit:
