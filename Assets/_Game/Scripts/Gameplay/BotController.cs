@@ -281,8 +281,8 @@ namespace CluckWars.Gameplay
                                                     : _profile.DangerRadius;
 
             // Priority 1: RETREAT — loaded, and something is close enough to take it.
-            if (cargoFraction >= _profile.ProtectCargoThreshold &&
-                _nearestRival != null && _nearestRivalDist <= dangerR)
+            if (BotLootRules.Retreat(cargoFraction >= _profile.ProtectCargoThreshold && _nearestRival != null && _nearestRivalDist <= dangerR,
+                                     lootThief && TryGetPursuedMark(out _, out _)))
             {
                 _state      = BotState.Flee;
                 _moveTarget = homePos;
@@ -614,21 +614,29 @@ namespace CluckWars.Gameplay
                 distHome, EstimateMoveSpeed(), depositRate, MatchTimeRemaining());
         }
 
+        /// <summary>The marked rival this Thief walks to now (<see cref="BotLootRules.Pursue"/>) with what the bot believes of its position.</summary>
+        private bool TryGetPursuedMark(out ChickenController mark, out RivalSighting sight)
+        {
+            mark = null;
+            sight = default;
+            if (_loot == null || !_loot.MarkLive) return false;
+            if (!Runner.TryFindBehaviour(_loot.MarkedTarget, out mark) || mark == null ||
+                (mark.Combat != null && mark.Combat.IsRemoved)) return false;
+
+            sight = Sight(mark);
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            bool behindWall = config != null && PlayerBase.TryGetBaseCentre(mark.HomeCornerIndex, out Vector2 centre) &&
+                              BotLootRules.BehindWall(new Vector2(sight.Position.x, sight.Position.z), centre, config.BaseKeepOutRadius);
+            return BotLootRules.Pursue(true, !sight.GivenUp, mark.IsStealProof, behindWall);
+        }
+
         /// <summary>
         /// Walks to the marked rival and casts Steal once it is in reach (BotLootRules.Pursue / HoldSteal). Returns false, leaving the ordinary rules, when there is
         /// no live mark or the rival is abandoned (shelled, behind its base wall, given up while hidden): Steal then goes elsewhere and the mark moves.
         /// </summary>
         private bool TryChaseMarked()
         {
-            if (_loot == null || _abilities == null || !_loot.MarkLive) return false;
-            if (!Runner.TryFindBehaviour(_loot.MarkedTarget, out ChickenController mark) || mark == null ||
-                (mark.Combat != null && mark.Combat.IsRemoved)) return false;
-
-            var sight = Sight(mark);
-            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
-            bool behindWall = config != null && PlayerBase.TryGetBaseCentre(mark.HomeCornerIndex, out Vector2 centre) &&
-                              BotLootRules.BehindWall(new Vector2(sight.Position.x, sight.Position.z), centre, config.BaseKeepOutRadius);
-            if (!BotLootRules.Pursue(true, !sight.GivenUp, mark.IsStealProof, behindWall)) return false;
+            if (_abilities == null || !TryGetPursuedMark(out ChickenController mark, out RivalSighting sight)) return false;
 
             int slot = AbilityController.InvalidSlot;
             for (int i = 0; i < _abilities.EquippedSlotCount; i++)

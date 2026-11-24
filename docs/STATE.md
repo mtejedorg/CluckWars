@@ -11,6 +11,11 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-25 - Maestro's values: execute bounty 15, Spoiler 30, Thief 15; the Thief bot no longer retreats from its marked rival (BL-217, BL-220, `develop`, not pushed)
+
+- **Values** (Maestro 2026-11-25): `MatchConfig.asset` `ExecuteBounty` 17 to 15; `Spoiler.asset` `MinimumCapacity` 25 to 30 (and the `SpoilerPassiveSO` default); `Thief.asset` `MinimumCapacity` 20 to 15. The stored descriptions of both passives carry the new numbers. Older entries below that quote 17, 25 or 20 are history.
+- **Bot defect (BL-220):** at Thief capacity 20 the P0 win rate fell to 22.4 % (35.9 % at 19). A Thief at capacity 20 holds a full-bounty load without banking (room 10 still fits the next bounty), and the retreat rule (loaded, rival within the danger radius) took 37 015 thinks with a live mark against 909 at capacity 19: the marked rival closing in sent the Thief home. `BotLootRules.Retreat` skips the retreat while the Thief pursues a live mark, in `BotController` and `ScriptedPolicy`. After: capacity 20 P0 35.4 %, capacities 14 to 19 unchanged within noise. Unverified: the game's bot in a real match (BL-220 test step).
+
 ## 2026-11-24 - Thief loot mark in the game, slice B: what the Thief and the marked rival see (BL-219, `develop`, not pushed)
 
 - **Owner's rulings** (Maestro, 2026-11-24): only the Thief and the marked rival see the mark and the reward; the identity is a **bag of coins**, never a crown; the clock prize stays but has no feedback of its own. Everyone else sees nothing.

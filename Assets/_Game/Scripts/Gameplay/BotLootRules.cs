@@ -23,6 +23,14 @@ namespace CluckWars.Gameplay
         public static bool Pursue(bool markLive, bool known, bool shelled, bool behindWall) => markLive && known && !shelled && !behindWall;
 
         /// <summary>
+        /// Does the retreat rule (a loaded bot with a rival inside its danger radius runs home) fire? Not while the Thief pursues a live mark:
+        /// whenever it carries something it banks by <see cref="BankNow"/>, so a beak that is not banked is one the Thief chose to hold, and the
+        /// rival it walks to is the marked one, always inside the danger radius when the cast is due. Measured in the match simulator (Thief
+        /// capacity 20, P0): the retreat took 37 015 thinks with a live mark against 909 at capacity 19, and the win rate fell from 36 % to 22 %.
+        /// </summary>
+        public static bool Retreat(bool retreatTriggered, bool pursuing) => retreatTriggered && !pursuing;
+
+        /// <summary>
         /// Is a rival "behind its wall" for a bot standing outside: inside the keep-out circle of its own base
         /// (<see cref="BaseWallRules.IsInside"/>, the game's own test).
         /// </summary>

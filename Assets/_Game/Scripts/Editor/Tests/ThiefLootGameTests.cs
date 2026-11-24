@@ -468,7 +468,7 @@ namespace CluckWars.Tests
         {
             string bot = RuntimeSourceGuardTests.Code(BotPath);
             string p0 = RuntimeSourceGuardTests.Code(Scripts + "Balance/ScriptedPolicy.cs");
-            foreach (var call in new[] { "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(" })
+            foreach (var call in new[] { "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(" })
             {
                 StringAssert.Contains(call, bot, "the game's bot plays the loot mark by the shared rule");
                 StringAssert.Contains(call, p0, "P0 plays it by the same rule");

@@ -35,6 +35,15 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Retreat_FiresWhenTriggered_ExceptWhileThePursuitOfAMarkIsOn()
+        {
+            Assert.IsTrue(BotLootRules.Retreat(true, false), "loaded, rival close, no mark to walk to: run home");
+            Assert.IsFalse(BotLootRules.Retreat(true, true), "the rival in reach is the marked one the Thief walks to: no retreat");
+            Assert.IsFalse(BotLootRules.Retreat(false, false), "not triggered stays not triggered");
+            Assert.IsFalse(BotLootRules.Retreat(false, true));
+        }
+
+        [Test]
         public void BankNow_ForTheClock_TheWin_OrANextMarkThatWouldNotFit()
         {
             // capacity 14, bounty 10: room below 10 means the next marked steal would lose part of its bounty.
