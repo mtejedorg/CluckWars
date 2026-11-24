@@ -176,6 +176,7 @@ Generated from commit `b7c2616e` (branch `simplify-abilities`), 2026-11-13. Comm
 | CODE-DESIGN-16 | Hold 60 fps on Windows and a stable 30 fps on mid-range Android | NONE | CURRENT |
 | CODE-DESIGN-17 | Ship the dev tools in builds behind Developer Mode, off by default | TEST | CURRENT |
 | CODE-DESIGN-18 | Keep the retired ability classes until alpha feedback | REVIEW | CURRENT |
+| CODE-DESIGN-19 | Show the Thief's loot mark only to the Thief and the marked rival | TEST | CURRENT |
 | CODE-FOOT-01 | When "the chicken doesn't move", check the camera and the stats first | REVIEW | CURRENT |
 | CODE-FOOT-02 | Write C#, Python and paths with the Write tool, not shell heredocs | REVIEW | CURRENT |
 | CODE-FOOT-03 | Give every PC client its own `-cw_profile`; restart Android with `am start -S` | REVIEW | CURRENT |
@@ -406,10 +407,10 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 ### CODE-UI-06 — Give every USS class the code emits a rule
 - Rule: A USS class name that C# adds to an element must have a rule in the stylesheet that element uses.
 - Why: a class with no rule silently renders unstyled.
-- Enforced by: TEST `HudFeedbackStyleTests.EveryGlyphClassHudFeedbackStyleUses_HasARuleInTouchControlsUss`, and since 2026-11-17 `HuntHexRulesTests.EveryEmittedHuntClass_HasARuleInTheStylesheet_AndEverySpriteExists` (the Hunt hex classes); rest CONVENTION
+- Enforced by: TEST `HudFeedbackStyleTests.EveryGlyphClassHudFeedbackStyleUses_HasARuleInTouchControlsUss`, and since 2026-11-17 `HuntHexRulesTests.EveryEmittedHuntClass_HasARuleInTheStylesheet_AndEverySpriteExists` (the Hunt hex classes), and since 2026-11-24 `LootFeedbackTests.EveryElementTheLootHudBinds_IsInTheUxml_AndEveryClassItEmitsHasARule` (the loot HUD classes in `MarkHud.uss`, and `cw-hex--loot`, emitted by `LootHexRules`, which needs its rule in `TouchControls.uss`); rest CONVENTION
 - Audit check: for each `EnableInClassList("x"` / `AddToClassList("x"` in a touched file, `git grep -n "\.x" HEAD -- 'Assets/UI/**/*.uss'` finds a rule.
 - Source: Assets/_Game/Scripts/Editor/Tests/HudFeedbackStyleTests.cs:327
-- Status: PARTIAL (two emitters covered: the HUD feedback glyphs and the Hunt hex)
+- Status: PARTIAL (three emitters covered: the HUD feedback glyphs, the Hunt hex and the loot mark)
 
 ### CODE-UI-07 — Drive menu motion only through `MenuJuice`, gated by Reduced Motion read live
 - Rule: Menu animation goes through `MenuJuice`, and every entry point checks the Reduced Motion gate; effects read the preference at runtime, never latch it in `Awake`/`Start`.
@@ -1268,6 +1269,13 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 - Enforced by: CONVENTION (review only)
 - Audit check: a diff deleting a `*AbilitySO.cs` cites an owner request.
 - Source: M:arch-audit-decisions-2026-11-12.md; audit thread 2026-11-12 (owner); same rule as ARCH-DATA-13
+- Status: CURRENT
+
+### CODE-DESIGN-19 — Show the Thief's loot mark only to the Thief and the marked rival
+- Rule: The loot mark is private. Three roles exist: the Thief sees its own mark and nothing else; the marked rival sees that it is marked and by whom; a bystander sees nothing, not even a mark on a third bird. No local seat is no role. Every loot presenter draws only from the gated outputs of `LootPresentationRules.Resolve`.
+- Why: owner decision D6 in the design (2026-11-23): "Sólo thief y víctima"; bystanders see nothing.
+- Enforced by: TEST `LootFeedbackTests.TheThief_SeesItsOwnMark_AndOnlyThat`, `LootFeedbackTests.TheMarkedRival_SeesItself_MarkedBy_TheThief`, `LootFeedbackTests.ABystander_SeesNothing_NotEvenAMarkOnAThirdBird`, `LootFeedbackTests.NoLocalSeat_IsNoRole`, `LootFeedbackTests.EveryPresenter_DrawsOnlyFromTheGatedOutputs_SourceGuard`
+- Source: docs/superpowers/specs/2026-11-23-thief-loot-mark-design.md ("Game slice B"), commit `3d9afe41`
 - Status: CURRENT
 
 ## 3.10 FOOT: footguns (real bugs hit, with the avoidance)
