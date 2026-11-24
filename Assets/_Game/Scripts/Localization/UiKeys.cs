@@ -125,8 +125,8 @@ namespace CluckWars.Localization
         [UiArgs("cap")] public const string PerkHoarderDetail = "perk.hoarder.detail";
         [UiArgs("pct")] public const string PerkFeatherfootLine = "perk.featherfoot.line";
         [UiArgs("pct")] public const string PerkFeatherfootDetail = "perk.featherfoot.detail";
-        [UiArgs("food")] public const string PerkSpoilerLine = "perk.spoiler.line";
-        [UiArgs("goal", "food")] public const string PerkSpoilerDetail = "perk.spoiler.detail";
+        [UiArgs("food", "cap")] public const string PerkSpoilerLine = "perk.spoiler.line";
+        [UiArgs("goal", "food", "cap")] public const string PerkSpoilerDetail = "perk.spoiler.detail";
 
         // ---- Loadout ----
         public const string LoadoutRowShared = "loadout.row.shared";

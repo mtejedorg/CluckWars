@@ -19,8 +19,9 @@ namespace CluckWars.Gameplay
     /// The HUD floors it for display.
     /// <para>
     /// Nothing drops food on the ground any more. The only "death" in the game is the
-    /// Assassin's execute, which transfers the victim's cargo straight into the killer's
-    /// bounty bag and pays a flat execute bounty on top — see <c>AssassinExecute</c>. The
+    /// Assassin's execute, which transfers the victim's cargo into the killer's ordinary
+    /// cargo and pays a flat execute bounty on top, both held to the killer's free room
+    /// (the capacity-free bounty bag went on 2026-11-24) — see <c>AssassinExecute</c>. The
     /// old <c>FoodPickup</c> subsystem that this class used to spawn and collect from was
     /// deleted along with that change.
     /// </para>
@@ -71,7 +72,6 @@ namespace CluckWars.Gameplay
         [SerializeField] private LayerMask _searchMask = ~0;
 
         [Networked] public float Cargo { get; set; }
-        [Networked] public float BountyBag { get; set; }
 
         /// <summary>
         /// The chicken that last successfully robbed this one, and a one-shot event id bumped
@@ -146,8 +146,8 @@ namespace CluckWars.Gameplay
         }
         public float Fraction => Capacity > 0f ? Mathf.Clamp01(Cargo / Capacity) : 0f;
 
-        /// <summary>What a thief can take from this chicken right now: its cargo plus its bounty bag (<see cref="StealRules.Stealable"/>).</summary>
-        public float Stealable => StealRules.Stealable(Cargo, BountyBag);
+        /// <summary>What a thief can take from this chicken right now: its cargo (<see cref="StealRules.Stealable"/>).</summary>
+        public float Stealable => StealRules.Stealable(Cargo);
 
         /// <summary><see cref="Stealable"/> as a share of <see cref="Capacity"/>, 0 to 1: how loaded this chicken looks to a thief.</summary>
         public float StealableFraction => Capacity > 0f ? Mathf.Clamp01(Stealable / Capacity) : 0f;
@@ -181,7 +181,7 @@ namespace CluckWars.Gameplay
         {
             get
             {
-                if (Cargo <= 0f && BountyBag <= 0f) return false;
+                if (Cargo <= 0f) return false;
                 if (_combat != null && _combat.IsRemoved) return false;
                 return FindNearestBaseInRange() != null;
             }
@@ -223,17 +223,24 @@ namespace CluckWars.Gameplay
         // from the steal requests so a loot report can never close a steal request or vice versa,
         // and with its own longer window (StealRules.ExecuteLootWindowSeconds): the report makes
         // two relayed trips in Shared Mode, not the refund's one round trip.
-        // Telemetry only (MatchTelemetry "kill" line): the loot the last execute credited, read once by AssassinExecute.PayExecuteBounty.
-        private float _executeLootSeen;
+        // Telemetry only (MatchTelemetry "kill" line): what the last execute's loot report said the victim carried and how much of it
+        // fitted, read once by AssassinExecute.PayExecuteBounty.
+        private float _executeLootDrained;
+        private float _executeLootGained;
         private NetworkBehaviourId _executeLootVictim;
 
-        /// <summary>The loot credited for the execute on <paramref name="victimId"/> (0 if none was), then forgotten. Telemetry only.</summary>
-        internal float TakeExecuteLootForTelemetry(NetworkBehaviourId victimId)
+        /// <summary>
+        /// What the execute on <paramref name="victimId"/> drained from the victim and how much of it fitted into this chicken's
+        /// cargo (both 0 if no loot report came), then forgotten. Telemetry only.
+        /// </summary>
+        internal void TakeExecuteLootForTelemetry(NetworkBehaviourId victimId, out float drained, out float gained)
         {
-            float loot = _executeLootVictim == victimId ? _executeLootSeen : 0f;
-            _executeLootSeen = 0f;
+            bool mine = _executeLootVictim == victimId;
+            drained = mine ? _executeLootDrained : 0f;
+            gained = mine ? _executeLootGained : 0f;
+            _executeLootDrained = 0f;
+            _executeLootGained = 0f;
             _executeLootVictim = default;
-            return loot;
         }
 
         private readonly PendingStealLedger<NetworkBehaviourId> _pendingExecutes = StealRules.NewExecuteLootLedger<NetworkBehaviourId>();
@@ -452,7 +459,7 @@ namespace CluckWars.Gameplay
                 _activeBaseTarget = playerBase;
             }
 
-            if (Cargo <= 0f && BountyBag <= 0f)
+            if (Cargo <= 0f)
             {
                 FlushBaseDeposit();
                 return;
@@ -465,14 +472,8 @@ namespace CluckWars.Gameplay
 
             float desiredTransfer = ResolveDepositRate() * Runner.DeltaTime;
 
-            float transferFromBounty = Mathf.Min(BountyBag, desiredTransfer);
-            BountyBag -= transferFromBounty;
-            float remainingDesired = desiredTransfer - transferFromBounty;
-
-            float transferFromCargo = Mathf.Min(Cargo, remainingDesired);
-            Cargo -= transferFromCargo;
-
-            float transfer = transferFromBounty + transferFromCargo;
+            float transfer = Mathf.Min(Cargo, desiredTransfer);
+            Cargo -= transfer;
             if (transfer <= 0f)
             {
                 FlushBaseDeposit();
@@ -485,7 +486,7 @@ namespace CluckWars.Gameplay
             // The batch window is shared with PlayerBase's receiver-side bound — see
             // BaseDepositRules.FlushSeconds for why the two must not drift apart.
             int ticksToFlush = Mathf.RoundToInt(BaseDepositRules.FlushSeconds * Runner.TickRate);
-            if (_baseDepositTicks >= ticksToFlush || (Cargo <= 0f && BountyBag <= 0f))
+            if (_baseDepositTicks >= ticksToFlush || Cargo <= 0f)
             {
                 // Nothing is zeroed and nothing is played here: both were already drained to exactly 0 above, a base
                 // this peer owns may bounce the flush back inside FlushBaseDeposit, and "deposit complete" is only
@@ -584,12 +585,19 @@ namespace CluckWars.Gameplay
                 "ability is listed in its All array.");
         }
 
-        /// <summary>Puts arriving food into the hold: the cargo up to its free room, the rest into the bounty bag.</summary>
+        /// <summary>Puts arriving food into the hold, up to its free room. What does not fit is not held (and is said so).</summary>
         private void AddToHold(float amount)
         {
-            FoodTransferRules.Place(amount, FreeSpace, out float toCargo, out float toBag);
+            float toCargo = FoodTransferRules.Fit(amount, FreeSpace);
             if (toCargo > 0f) Cargo += toCargo;
-            if (toBag > 0f) BountyBag += toBag;
+            WarnOverflow("returned food", amount - toCargo);
+        }
+
+        /// <summary>Food that had no room on arrival is gone (there is no store beyond the capacity): never silently.</summary>
+        private void WarnOverflow(string what, float overflow)
+        {
+            if (overflow > 1e-3f)
+                _log?.Warn(Source, $"{name}: {overflow:0.00} of {what} did not fit (capacity {Capacity:0.0}, cargo {Cargo:0.0}) and is not held.");
         }
 
         /// <summary>One bite of this chicken's class: the most a single peck can be worth (<c>PeckAbilitySO</c>).</summary>
@@ -637,10 +645,10 @@ namespace CluckWars.Gameplay
             }
 
             var settled = _requests.SettlePeck(pileId, requestId, amount, MaxPeck, Capacity, Cargo, Time.unscaledTime);
-            if (settled.Credited <= 0f) return;   // the pile was emptied first, or it refused: a legal no-op
+            if (settled.Credited <= 0f && settled.Overflow <= 0f) return;   // the pile was emptied first, or it refused: a legal no-op
 
             if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
-            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
+            WarnOverflow("a peck", settled.Overflow);
             if (settled.Outcome == SettleOutcome.Late) WarnLateSettle(nameof(RPC_SettlePeck), info, pile.name, requestId, settled.Credited);
             else if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))
                 _log.Verbose(Source, $"Pecked +{settled.Credited:0.00} from {pile.name} (asked {settled.Requested:0.00}) → Cargo={Cargo:0.0}.");
@@ -714,7 +722,7 @@ namespace CluckWars.Gameplay
         /// could not tell one bot thief from another — or from no one. Naming the thief turns
         /// the question into one the receiver can answer: is the caller entitled to act for that
         /// chicken, and was that chicken close enough to reach this one. Same
-        /// <c>Runner.TryFindBehaviour</c> mechanism <see cref="RPC_TransferAllToBountyBag"/>
+        /// <c>Runner.TryFindBehaviour</c> mechanism <see cref="RPC_TransferAllToExecutor"/>
         /// already uses; it resolves to the <c>ChickenController</c> rather than the thief's
         /// <c>ChickenCargo</c> because every fact the rules need — authority, decoy status,
         /// position, move speed — is on the controller.
@@ -761,11 +769,9 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            // The beak first, then the bounty bag (an Assassin's execute pays into the bag): see StealRules.SplitDrain.
-            StealRules.SplitDrain(amount, Cargo, BountyBag, out float fromCargo, out float fromBag);
-            Cargo = Mathf.Max(0f, Cargo - fromCargo);
-            BountyBag = Mathf.Max(0f, BountyBag - fromBag);
-            float actual = fromCargo + fromBag;
+            // Never more than the victim holds (an execute's loot is ordinary cargo, so it is taken like any other food).
+            float actual = StealRules.DrainAmount(amount, Cargo);
+            Cargo = Mathf.Max(0f, Cargo - actual);
 
             // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
             // HitFeedback.OnStolen for the observation half. Written only HERE, after the drain has
@@ -776,8 +782,8 @@ namespace CluckWars.Gameplay
             LastThiefId = thiefId;
             StealEventId++;
 
-            _log?.Info(Source, $"Stolen: -{actual:0.00} (beak {fromCargo:0.00}, bag {fromBag:0.00}) from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
-                               $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
+            _log?.Info(Source, $"Stolen: -{actual:0.00} from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
+                               $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}.");
 
             _log?.Info(MatchTelemetry.Source, MatchTelemetry.Steal(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(thief), MatchTelemetry.Seat(_controller), actual));
             ReportSteal(thief, actual, requestId);
@@ -840,10 +846,11 @@ namespace CluckWars.Gameplay
                     "(unsolicited, already settled or expired).");
                 return;
             }
-            if (settled.Credited <= 0f) return;   // refused, or the load was gone: a legal no-op
+            if (settled.Credited <= 0f && settled.Overflow <= 0f) return;   // refused, or the load was gone: a legal no-op
 
             if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
-            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
+            WarnOverflow("a steal", settled.Overflow);
+            if (settled.ToCargo <= 0f) return;
             _stealCreditFrame = Time.frameCount;   // I5: Render holds this gain own +n until the kernels land
             _log?.Debug(Source, $"Steal settled: +{settled.Credited:0.00} from {victim.name} (asked {settled.Requested:0.00}) → Cargo={Cargo:0.0}.");
         }
@@ -855,8 +862,8 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// The cargo was debited when the flush was built, so a refusal used to destroy the food (the host seeing the
-        /// chicken a step outside the radius was enough). A bounce returns it to the cargo, or to the bounty bag for
-        /// whatever no longer fits. The deposit stat is counted here, on "banked" only, and so is the deposit moment
+        /// chicken a step outside the radius was enough). A bounce returns it to the cargo, as far as it fits (the cargo
+        /// has been debited and nothing else may have filled it, so in practice all of it). The deposit stat is counted here, on "banked" only, and so is the deposit moment
         /// (<see cref="DepositEventId"/>, which presentation turns into the deposit sound).
         /// Honoured only from the base's own authority; with that verified, an answer whose flush is no longer on
         /// record is still honoured, up to one flush.
@@ -883,7 +890,7 @@ namespace CluckWars.Gameplay
                 else _log?.Warn(Source, $"{name}: no ChickenMatchStats - {settled.Banked:0.00} banked food not counted in MATCH SUMMARY.");
 
                 // The whole load is in the base: nothing left to carry, nothing still unanswered.
-                if (Cargo <= 0f && BountyBag <= 0f && _pendingBaseFood <= 0f && _requests.DepositsInFlight(now) <= 0f)
+                if (Cargo <= 0f && _pendingBaseFood <= 0f && _requests.DepositsInFlight(now) <= 0f)
                 {
                     DepositEventId++;   // wraps at 255 by design: a one-shot signal, the sound is the listeners' (A04)
                     _log?.Debug(Source, $"Deposit complete at {playerBase.name}.");
@@ -891,11 +898,11 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            if (settled.Credited <= 0f) return;
+            if (settled.Credited <= 0f && settled.Overflow <= 0f) return;
             if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
-            if (settled.ToBag > 0f) BountyBag += settled.ToBag;
-            _log?.Info(Source, $"Deposit of {settled.Credited:0.00} bounced by {playerBase.name}: back in the hold " +
-                               $"(cargo +{settled.ToCargo:0.00}, bag +{settled.ToBag:0.00}) → Cargo={Cargo:0.0}, BountyBag={BountyBag:0.0}.");
+            WarnOverflow("a bounced deposit", settled.Overflow);
+            _log?.Info(Source, $"Deposit of {settled.Credited + settled.Overflow:0.00} bounced by {playerBase.name}: back in the hold " +
+                               $"(cargo +{settled.ToCargo:0.00}) → Cargo={Cargo:0.0}.");
         }
 
         /// <summary>Magnitude check, with the reason so the caller can log it.</summary>
@@ -1015,7 +1022,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Assassin-side half of an execute, called by <c>AssassinExecute.Press</c> on this
         /// (the assassin's) state authority just before it sends
-        /// <see cref="RPC_TransferAllToBountyBag"/>: records that a loot report from
+        /// <see cref="RPC_TransferAllToExecutor"/>: records that a loot report from
         /// <paramref name="victim"/> is expected, and the most it may be worth.
         /// </summary>
         /// <remarks>
@@ -1046,9 +1053,30 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
+        /// The flat execute bounty, into the ordinary cargo as far as the free room goes (what does not fit is not gained). Called by
+        /// <c>AssassinExecute.PayExecuteBounty</c> on this chicken's own state authority after the victim's authority reported the kill, so the
+        /// victim's cargo (<see cref="RPC_CreditExecuteLoot"/>, sent first) has normally taken its room already. Returns what was gained.
+        /// </summary>
+        public float CreditExecuteBounty(float bounty)
+        {
+            if (!HasStateAuthority) return 0f;
+            float gained = FoodTransferRules.Fit(bounty, FreeSpace);
+            if (gained > 0f) Cargo += gained;
+            return gained;
+        }
+
+        /// <summary>An executed chicken stands up at its base with no cargo (the execute took the load). State authority only;
+        /// there is nothing else to clear.</summary>
+        public void ClearForRespawn()
+        {
+            if (!HasStateAuthority) return;
+            Cargo = 0f;
+        }
+
+        /// <summary>
         /// Assassin execute cargo transfer, victim side: drains ALL of this chicken's cargo and
         /// reports the amount actually drained back to the assassin's authority, which credits
-        /// its own bounty bag (<see cref="RPC_CreditExecuteLoot"/>).
+        /// its own cargo, as far as it fits (<see cref="RPC_CreditExecuteLoot"/>).
         /// </summary>
         /// <remarks>
         /// <c>RpcSources.All</c>, so the call is a claim: it is honoured only when the caller is
@@ -1059,26 +1087,18 @@ namespace CluckWars.Gameplay
         /// <para>
         /// <b>Nothing is written to the assassin's cargo from here.</b> This runs on the
         /// VICTIM's authority, where the assassin's cargo is a proxy; a <c>[Networked]</c> write
-        /// through a proxy never replicates, so the bag credit used to vanish in Shared-mode PvP
+        /// through a proxy never replicates, so the credit used to vanish in Shared-mode PvP
         /// while appearing to work solo. The amount reported is the one zeroed HERE, at the
         /// moment of the drain, so food the victim banked while stunned in its own base before
         /// this landed is never paid to the assassin as well (CW-050).
         /// </para>
         /// </remarks>
-        /// <summary>An executed chicken stands up at its base with no cargo (the execute took the load). State authority only;
-        /// the bounty bag is its own food and stays.</summary>
-        public void ClearForRespawn()
-        {
-            if (!HasStateAuthority) return;
-            Cargo = 0f;
-        }
-
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        public void RPC_TransferAllToBountyBag(NetworkBehaviourId assassinId, RpcInfo info = default)
+        public void RPC_TransferAllToExecutor(NetworkBehaviourId assassinId, RpcInfo info = default)
         {
             if (!TryResolveExecutor(assassinId, info, out var assassinCargo, out bool walled, out string rejection))
             {
-                _log?.Warn(Source, $"{name}: rejected RPC_TransferAllToBountyBag from {info.Source} - {rejection}");
+                _log?.Warn(Source, $"{name}: rejected RPC_TransferAllToExecutor from {info.Source} - {rejection}");
                 return;
             }
 
@@ -1116,7 +1136,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Assassin side of an execute's loot: the victim's authority reports how much cargo
         /// it actually drained, and this (the assassin's) authority banks it into its own
-        /// <see cref="BountyBag"/>.
+        /// ordinary <see cref="Cargo"/>, held to its free room (what does not fit is not gained, and is not left on the victim).
         /// </summary>
         /// <remarks>
         /// <c>RpcSources.All</c>, so every report is a claim. Same receiver-validated shape as
@@ -1155,14 +1175,18 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            BountyBag += allowed;
-            _executeLootSeen = allowed;
+            // Held to the free room on THIS authority (capacity less cargo less open requests): the victim already drained all it
+            // had, so what does not fit is simply not gained. Nothing was credited before this report: no double credit.
+            float gained = FoodTransferRules.Fit(allowed, FreeSpace);
+            if (gained > 0f) Cargo += gained;
+            _executeLootDrained = allowed;
+            _executeLootGained = gained;
             _executeLootVictim = victimId;
             if (allowed + 1e-4f < amount)
             {
                 _log?.Warn(Source, $"{name}: execute loot from {victim.name} clamped {amount:0.00} -> {allowed:0.00} (above the victim's carry cap).");
             }
-            _log?.Info(Source, $"Execute loot: +{allowed:0.0} from {victim.name} into the bounty bag (BountyBag={BountyBag:0.0}).");
+            _log?.Info(Source, $"Execute loot: +{gained:0.0} of {allowed:0.0} from {victim.name} into the cargo ({allowed - gained:0.0} did not fit) → Cargo={Cargo:0.0}/{Capacity:0.0}.");
         }
 
         /// <summary>
@@ -1253,8 +1277,8 @@ namespace CluckWars.Gameplay
         /// from the master client; routes to each chicken's StateAuthority.
         /// </summary>
         /// <remarks>
-        /// Sender-restricted like <c>ChickenController.RPC_ResetControlStates</c> (A19): it zeroes the hold and the
-        /// bounty bag, so any peer could otherwise empty a rival. Its two callers are the match authority's round
+        /// Sender-restricted like <c>ChickenController.RPC_ResetControlStates</c> (A19): it zeroes the hold,
+        /// so any peer could otherwise empty a rival. Its two callers are the match authority's round
         /// reset and the Ability Lab's dummy reset, which is a local invoke (solo).
         /// </remarks>
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -1276,8 +1300,7 @@ namespace CluckWars.Gameplay
             _pendingExecutes.Clear();
 
             Cargo = 0f;
-            BountyBag = 0f;
-            _log?.Debug(Source, "Reset for new match: Cargo=0, BountyBag=0.");
+            _log?.Debug(Source, "Reset for new match: Cargo=0.");
         }
     }
 }

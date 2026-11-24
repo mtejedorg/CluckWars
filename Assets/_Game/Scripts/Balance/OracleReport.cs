@@ -83,7 +83,7 @@ namespace CluckWars.Balance
             "Pursuit: nobody chases anybody, so escape speed and Egg Shell show no value.",
             "Scatter cover: the walls are the only obstacles.",
             "Bots' decisions: routes are fixed rules, not what a bot would choose.",
-            "The Spoiler's walk home to bank its bag is not timed.",
+            "The Spoiler's walk home to bank its loot is not timed. The kill table below banks every kill's whole payout: the carry limit (the Spoiler's 25) belongs to the match simulator.",
             "A kill or a steal is assumed to always land.",
             "The Peck cast, until it ships in the game: the cast is an oracle-only value per class (0 today); the chicken is rooted from the start of a peck until the food lands, then for the Peck ability's lock.",
             "Straight-line jump legs: a jumping kit crosses arms in a straight line, which is an approximation.",

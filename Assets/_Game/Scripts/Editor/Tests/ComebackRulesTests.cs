@@ -110,8 +110,8 @@ namespace CluckWars.Tests
         [TestCase("ChickenCombat.cs", typeof(ChickenCombat), "IsRemoved = false;")]
         public void TheRoundResets_OfCargoAndCombat_AreSenderCheckedToo(string file, System.Type type, string firstWrite)
         {
-            // A19: source guard (the branch needs a live runner). Unvalidated, any peer could empty a rival's hold and
-            // bounty bag, or stand an executed chicken back up.
+            // A19: source guard (the branch needs a live runner). Unvalidated, any peer could empty a rival's hold,
+            // or stand an executed chicken back up.
             var rpc = type.GetMethod("RPC_ResetForNewMatch", BindingFlags.Public | BindingFlags.Instance);
             Assert.IsNotNull(rpc);
             Assert.IsTrue(System.Array.Exists(rpc.GetParameters(), p => p.ParameterType == typeof(Fusion.RpcInfo)));
@@ -121,7 +121,7 @@ namespace CluckWars.Tests
             int ret = body.IndexOf("return;", gate, System.StringComparison.Ordinal);
             Assert.Greater(ret, gate, "a rejected call must return");
             Assert.Greater(body.IndexOf(firstWrite, System.StringComparison.Ordinal), ret, "nothing is reset before the gate");
-            foreach (string write in new[] { "_requests.Clear()", "_pendingExecutes.Clear()", "BountyBag = 0f", "StunTimer = default", "_markSeenAt.Clear()" })
+            foreach (string write in new[] { "_requests.Clear()", "_pendingExecutes.Clear()", "StunTimer = default", "_markSeenAt.Clear()" })
             {
                 int at = body.IndexOf(write, System.StringComparison.Ordinal);
                 if (at >= 0) Assert.Greater(at, ret, $"{write} runs before the gate");

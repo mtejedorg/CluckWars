@@ -25,8 +25,8 @@ namespace CluckWars.Gameplay
         [Min(1)] public int FoodTargetToWin = 40;
         [Min(0)] public int SpoilerBounty = 15;
 
-        [Tooltip("Flat food paid straight into the Assassin's bounty bag for a successful " +
-                 "execute, ON TOP of the victim's transferred cargo. This is the Assassin's " +
+        [Tooltip("Flat food paid into the Assassin's ordinary cargo for a successful " +
+                 "execute, ON TOP of the victim's transferred cargo and held to his free room (the victim's cargo comes first; what does not fit is not gained). This is the Assassin's " +
                  "income FLOOR: without it, an execute on an empty-handed rival pays exactly " +
                  "zero and the class can be starved in the opening seconds. 15 since Maestro's " +
                  "2026-11-23 ruling (was 5, the magnitude of the ground drops it replaced). " +

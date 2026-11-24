@@ -95,14 +95,11 @@ namespace CluckWars.Balance
                 return GoHome(v, home);
 
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof shell.
-            float bag = me.Bag;
-            StealGuard(v, me, abilities, cargo + bag);
+            StealGuard(v, me, abilities, cargo);
 
-            // A Death Mark in progress owns the bot until it pays or fizzles.
-            if (FollowThroughMark(v, me, kit, abilities, cargo + bag, arrival, out var markIntent)) return markIntent;
-
-            // An execute pays into the bounty bag, so a bot holding only a bag still has to walk it home.
-            if (bag > 0f) return GoHome(v, home);
+            // A Death Mark in progress owns the bot until it pays or fizzles. An execute's loot is ordinary cargo (no bag since 2026-11-24): a Spoiler
+            // that just killed holds at least the bounty, which is above the return threshold of a 25 beak (0.30 of 25 is 7.5), so the deposit rule goes home.
+            if (FollowThroughMark(v, me, kit, abilities, cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading), arrival, out var markIntent)) return markIntent;
 
             // Latch ReturnToBase until all cargo is deposited.
             if (_state == State.ReturnToBase && cargo > 0f)
@@ -222,7 +219,7 @@ namespace CluckWars.Balance
                 if (preyRadius <= 0f) continue;
 
                 float capacity = Mathf.Max(1, v.Kits[r].Farm.CargoCapacity);
-                float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo, rival.Bag) / capacity);
+                float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo) / capacity);
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);
                 if (priority <= 0f) continue;
@@ -303,7 +300,7 @@ namespace CluckWars.Balance
             var r = v.Seats[rival];
             if (!r.Present || r.Removed || !MatchCombat.InRange(me.Pos, r.Pos, ab.Radius)) return false;
             if (MatchCombat.KeepOutBlocks(me.Pos, r.Pos, BaseCentres(v), v.Rules.KeepOutRadius)) return false;
-            return ab.Job != AbilityJob.Steal || StealRules.Stealable(r.Cargo, r.Bag) > 0f || me.LootTarget == rival;   // the Thief's mark needs no food to be taken
+            return ab.Job != AbilityJob.Steal || StealRules.Stealable(r.Cargo) > 0f || me.LootTarget == rival;   // the Thief's mark needs no food to be taken
         }
 
         private bool AnyRivalInRange(MatchView v, in SeatView me, in MatchAbility ab)
@@ -370,7 +367,7 @@ namespace CluckWars.Balance
 
         // ---- the Spoiler's mark ----
 
-        private bool FollowThroughMark(MatchView v, in SeatView me, MatchKit kit, MatchAbility[] abilities, float cargoAndBag, float arrival,
+        private bool FollowThroughMark(MatchView v, in SeatView me, MatchKit kit, MatchAbility[] abilities, bool loadedToBank, float arrival,
             out MatchIntent intent)
         {
             intent = default;
@@ -380,8 +377,8 @@ namespace CluckWars.Balance
 
             if (me.MarkTarget < 0)
             {
-                // A loaded bot banks first: a bounty bag is worth more than a new mark.
-                if (cargoAndBag > 0f || me.Stunned || _cast >= 0) return false;
+                // A bot loaded to its return threshold banks first: the loot of a kill is worth more than a new mark.
+                if (loadedToBank || me.Stunned || _cast >= 0) return false;
                 for (int slot = 0; slot < abilities.Length; slot++)
                     if (abilities[slot].Job == AbilityJob.DeathMark && Ready(me, slot)) { _cast = slot; break; }
                 return false;   // the mark shows up next tick; this think goes on as usual

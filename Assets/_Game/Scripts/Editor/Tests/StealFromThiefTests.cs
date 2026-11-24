@@ -42,14 +42,12 @@ namespace CluckWars.Tests
         public void ALoadedThief_IsStealable_AndTheClampIsTheThiefsFreeSpace_NotTheVictims()
         {
             // The Assassin's capacity is 10; a Thief holding a full beak of stolen food.
-            Assert.AreEqual(10f, StealRules.Stealable(10f, 0f));
-            Assert.AreEqual(3f, StealMath.Clamp(4.2f, 3f, StealRules.Stealable(10f, 0f)), 1e-5f, "the thief's own free space limits it");
-            Assert.AreEqual(4.2f, StealMath.Clamp(4.2f, 10f, StealRules.Stealable(10f, 0f)), 1e-5f);
-            Assert.AreEqual(1.5f, StealMath.Clamp(4.2f, 10f, StealRules.Stealable(1.5f, 0f)), 1e-5f, "never more than he holds");
-            Assert.AreEqual(0f, StealMath.Clamp(4.2f, 0f, StealRules.Stealable(10f, 0f)), "a full thief steals nothing");
-            StealRules.SplitDrain(4.2f, 10f, 0f, out float beak, out float bag);
-            Assert.AreEqual(4.2f, beak, 1e-5f);
-            Assert.AreEqual(0f, bag);
+            Assert.AreEqual(10f, StealRules.Stealable(10f));
+            Assert.AreEqual(3f, StealMath.Clamp(4.2f, 3f, StealRules.Stealable(10f)), 1e-5f, "the thief's own free space limits it");
+            Assert.AreEqual(4.2f, StealMath.Clamp(4.2f, 10f, StealRules.Stealable(10f)), 1e-5f);
+            Assert.AreEqual(1.5f, StealMath.Clamp(4.2f, 10f, StealRules.Stealable(1.5f)), 1e-5f, "never more than he holds");
+            Assert.AreEqual(0f, StealMath.Clamp(4.2f, 0f, StealRules.Stealable(10f)), "a full thief steals nothing");
+            Assert.AreEqual(4.2f, StealRules.DrainAmount(4.2f, 10f), 1e-5f);
         }
 
         [TestCase("Abilities/SnatchAbilitySO.cs")]

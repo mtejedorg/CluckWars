@@ -97,7 +97,7 @@ namespace CluckWars.Tests
             string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
             int proof  = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
             int report = body.IndexOf("ReportSteal(thief, 0f, requestId)", StringComparison.Ordinal);
-            int drain  = body.IndexOf("StealRules.SplitDrain(", StringComparison.Ordinal);
+            int drain  = body.IndexOf("float actual = StealRules.DrainAmount(", StringComparison.Ordinal);
             int stamp  = body.IndexOf("StealEventId++", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
             Assert.Greater(report, proof, "the zero report is sent from the refusal branch");
@@ -124,9 +124,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void RpcTransferAllToBountyBag_RefusesAStealProofVictim_BeforeTouchingCargo()
+        public void RpcTransferAllToExecutor_RefusesAStealProofVictim_BeforeTouchingCargo()
         {
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_TransferAllToBountyBag(", 1400);
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_TransferAllToExecutor(", 1400);
             int proof = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
             int zero  = body.IndexOf("Cargo = 0f", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
@@ -217,7 +217,7 @@ namespace CluckWars.Tests
             string press = AssassinExecuteCreditTests.MethodBody(Dir + "Gameplay/AssassinExecute.cs", "public bool Press(");
             string body = Body(press, "TryFindBehaviour(MarkedTarget", press.Length); // to the end of Press
             int gate = body.IndexOf("StealRules.CanStealFrom(target)", StringComparison.Ordinal);
-            int rpc  = body.IndexOf("RPC_TransferAllToBountyBag", StringComparison.Ordinal);
+            int rpc  = body.IndexOf("RPC_TransferAllToExecutor", StringComparison.Ordinal);
             Assert.Greater(gate, -1);
             Assert.Less(gate, rpc);
             StringAssert.Contains("RPC_ExecuteRemoval", body);
@@ -232,7 +232,7 @@ namespace CluckWars.Tests
                 string norm = path.Replace('\\', '/');
                 if (norm.Contains("/Editor/") || Path.GetFileName(path) == "ChickenCargo.cs") continue;
                 string src = Src(norm.Substring(Dir.Length));
-                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".RequestSteal(") && !src.Contains(".RPC_TransferAllToBountyBag(")) continue;
+                if (!src.Contains(".RPC_DrainStolen(") && !src.Contains(".RequestSteal(") && !src.Contains(".RPC_TransferAllToExecutor(")) continue;
                 StringAssert.Contains("StealRules.CanStealFrom(", src, $"{Path.GetFileName(path)} steals without the steal-proof gate.");
             }
         }

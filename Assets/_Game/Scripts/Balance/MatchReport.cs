@@ -187,6 +187,20 @@ namespace CluckWars.Balance
         public int MatchesWithSpoiler;
     }
 
+    /// <summary>What the executions of one kit paid on victims of one class (mixed design): the victim's whole beak, and how much of it and the bounty fitted the killer's cargo.</summary>
+    public sealed class KillLootLine
+    {
+        public string Killer;
+        public ChickenClass Victim;
+        public int Kills;
+        /// <summary>Cargo the victims carried and the executions drained, per kill.</summary>
+        public float CargoPerKill;
+        /// <summary>Food really gained per kill (victim cargo first, then the bounty, held to the killer's free room).</summary>
+        public float GainedPerKill;
+        /// <summary>Food that did not fit per kill (victim cargo plus bounty, less the gain).</summary>
+        public float UnfitPerKill;
+    }
+
     /// <summary>The match simulator's section of the oracle report (spec 6). Plain data; <see cref="ToMarkdown"/> and <see cref="ToJson"/> print it.</summary>
     public sealed class MatchReportSection
     {
@@ -201,6 +215,8 @@ namespace CluckWars.Balance
         public List<SpoilerKillRow> KillsToWin = new List<SpoilerKillRow>();
         /// <summary>The Spoiler's win rate by the kills a policy really made in the mixed design (survivor bias included).</summary>
         public List<SpoilerKillRow> KillsPlayed = new List<SpoilerKillRow>();
+        /// <summary>Executions by killer kit and victim class: the food a kill gained and the food that did not fit (mixed design).</summary>
+        public List<KillLootLine> KillLoot = new List<KillLootLine>();
         public List<ThiefLine> Thief = new List<ThiefLine>();
         public ThiefSummary ThiefIncome;
         /// <summary>The Thief's win rate by the marked steals it really took (mixed design; survivor bias included). Empty with the loot mark off.</summary>
@@ -670,6 +686,7 @@ namespace CluckWars.Balance
             BuildThief(section, context, run, lootTargets);
             BuildPeckCuts(section, context, cutExposed, cutWhile, cuts, classAppear);
             BuildPlayedKills(section, context, run, targets);
+            BuildKillLoot(section, context, run);
             var pooled = new Dictionary<ChickenClass, WinInterval>();
             foreach (var cls in classAppear.Keys)
                 pooled[cls] = WinInterval.Wilson(classWins.TryGetValue(cls, out int w) ? w : 0, classAppear[cls]);
@@ -866,6 +883,37 @@ namespace CluckWars.Balance
             {
                 byKills.TryGetValue(k, out var list);
                 section.KillsPlayed.Add(MatchStats.KillsToWin(list ?? new List<(MatchResult, int)>(), k, ForcedVictims.Empty, targets));
+            }
+        }
+
+        private static void BuildKillLoot(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        {
+            var kills = new Dictionary<(int Kit, ChickenClass Victim), (int Kills, double Cargo, double Gained, double Unfit)>();
+            for (int i = 0; i < run.Results.Length; i++)
+            {
+                var seats = run.Cells[i].KitOfSeat;
+                for (int s = 0; s < seats.Length; s++)
+                {
+                    if (seats[s] < 0) continue;
+                    var c = run.Results[i].Counters[s];
+                    if (c.KillsOnSeat == null) continue;
+                    for (int v = 0; v < seats.Length; v++)
+                    {
+                        if (v == s || seats[v] < 0 || c.KillsOnSeat[v] == 0) continue;
+                        var key = (seats[s], context.Kits[seats[v]].Class);
+                        kills.TryGetValue(key, out var sum);
+                        kills[key] = (sum.Kills + c.KillsOnSeat[v], sum.Cargo + c.KillCargoFromSeat[v], sum.Gained + c.KillGainedFromSeat[v], sum.Unfit + c.KillUnfitFromSeat[v]);
+                    }
+                }
+            }
+            foreach (var pair in kills.OrderBy(p => p.Key.Kit).ThenBy(p => p.Key.Victim))
+            {
+                var v = pair.Value;
+                section.KillLoot.Add(new KillLootLine
+                {
+                    Killer = context.Kits[pair.Key.Kit].Label, Victim = pair.Key.Victim, Kills = v.Kills,
+                    CargoPerKill = (float)(v.Cargo / v.Kills), GainedPerKill = (float)(v.Gained / v.Kills), UnfitPerKill = (float)(v.Unfit / v.Kills),
+                });
             }
         }
 
@@ -1090,6 +1138,16 @@ namespace CluckWars.Balance
                 sb.AppendLine("Survivor bias applies: a Spoiler who kills often is usually already doing well, so these rates are not the worth of a kit's kill. The label compares the row with the `KillTargets` data.");
                 sb.AppendLine();
                 KillTable(sb, p.KillsPlayed, false);
+                if (p.KillLoot.Count > 0)
+                {
+                    sb.AppendLine($"Food per kill by victim class, {Name(p.Population)} (the kill loot is ordinary cargo: the victim's beak first, then the bounty, held to the killer's free room):");
+                    sb.AppendLine();
+                    sb.AppendLine("| Killer | Victim class | Kills | Victim's beak | Gained | Did not fit |");
+                    sb.AppendLine("|---|---|---|---|---|---|");
+                    foreach (var l in p.KillLoot)
+                        sb.AppendLine($"| {l.Killer} | {l.Victim} | {l.Kills} | {Num(l.CargoPerKill, "0.0")} | {Num(l.GainedPerKill, "0.0")} | {Num(l.UnfitPerKill, "0.0")} |");
+                    sb.AppendLine();
+                }
             }
             sb.AppendLine("### From the forced design (exactly k kills on schedule, same victims every time)");
             sb.AppendLine();
@@ -1338,6 +1396,7 @@ namespace CluckWars.Balance
             sb.Append(",\"headToHead\":[" + string.Join(",", r.HeadToHead.Select(h =>
                 $"{{\"class\":{S(h.Class.ToString())},\"kitA\":{S(h.KitA)},\"kitB\":{S(h.KitB)},\"aAhead\":{N(h.AAhead)},\"matches\":{h.Matches}}}")) + "]");
             sb.Append(",\"killsPlayed\":[" + string.Join(",", r.KillsPlayed.Select(KillJson)) + "]");
+            sb.Append(",\"killLoot\":[" + string.Join(",", r.KillLoot.Select(KillLootJson)) + "]");
             sb.Append(",\"killsToWin\":[" + string.Join(",", r.KillsToWin.Select(KillJson)) + "]");
             sb.Append(",\"lootSteals\":[" + string.Join(",", r.LootSteals.Select(LootJson)) + "]");
             sb.Append(",\"thief\":[" + string.Join(",", r.Thief.Select(t =>
@@ -1384,6 +1443,7 @@ namespace CluckWars.Balance
             sb.Append(",\"mixedSeats\":[" + string.Join(",", p.MixedSeats.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)}}}")) + "]");
             sb.Append(",\"seatCheck\":[" + string.Join(",", p.SeatCheck.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)},\"winExCorner\":{W(x.WinExCorner)},\"flagged\":{(x.Flagged ? "true" : "false")}}}")) + "]");
             sb.Append(",\"killsPlayed\":[" + string.Join(",", p.KillsPlayed.Select(KillJson)) + "]");
+            sb.Append(",\"killLoot\":[" + string.Join(",", p.KillLoot.Select(KillLootJson)) + "]");
             sb.Append(",\"lootSteals\":[" + string.Join(",", p.LootSteals.Select(LootJson)) + "]");
             if (p.ThiefIncome != null)
             {
@@ -1417,6 +1477,9 @@ namespace CluckWars.Balance
 
         private static string LootJson(LootStealRow k) =>
             $"{{\"steals\":{k.Steals},\"win\":{W(k.Win)},\"winWithPrize\":{W(k.WinWithPrize)},\"meanFinal\":{N(k.MeanFinal)},\"bankedShare\":{N(k.BankedShare)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";
+
+        private static string KillLootJson(KillLootLine l) =>
+            $"{{\"killer\":{S(l.Killer)},\"victim\":{S(l.Victim.ToString())},\"kills\":{l.Kills},\"cargoPerKill\":{N(l.CargoPerKill)},\"gainedPerKill\":{N(l.GainedPerKill)},\"unfitPerKill\":{N(l.UnfitPerKill)}}}";
 
         private static string KillJson(SpoilerKillRow k) =>
             $"{{\"kills\":{k.Kills},\"victims\":{S(k.Victims.ToString())},\"win\":{W(k.Win)},\"winWithPassive\":{W(k.WinWithPassive)},\"meanFinal\":{N(k.MeanFinal)},\"meanBestRival\":{N(k.MeanBestRival)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";

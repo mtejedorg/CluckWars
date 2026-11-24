@@ -246,18 +246,12 @@ namespace CluckWars.Gameplay
 
             // Overlay (never returns): a loaded bot with a stealer in reach pulls up a steal-proof
             // shell if it has one ready.
-            float bag = _cargo != null ? _cargo.BountyBag : 0f;
-            TryStealGuard(cargo + bag);
+            TryStealGuard(cargo);
 
-            // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep.
-            if (TryFollowThroughMark(cargo + bag)) return;
-
-            // An execute pays into the bounty bag, not the beak, so a bot holding only a bag still has to walk it home.
-            if (bag > 0f)
-            {
-                EnterReturnToBase(homePos, $"bag={bag:0}");
-                return;
-            }
+            // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep. An execute's loot is ordinary
+            // cargo (no bag since 2026-11-24), so a Spoiler that just killed is a chicken above its return threshold and the deposit
+            // rule below sends it home; a bot at or above that threshold banks before it marks again.
+            if (TryFollowThroughMark(cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))) return;
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
@@ -594,14 +588,14 @@ namespace CluckWars.Gameplay
         /// The Spoiler's loop: mark whenever it can, then hunt the mark across the map (a target at home is approached up to its
         /// wall, RefreshRivalWalls), stun it, and press Kill. Returns true while a mark owns the bot.
         /// </summary>
-        private bool TryFollowThroughMark(float cargoAndBag)
+        private bool TryFollowThroughMark(bool loadedToBank)
         {
             if (_execute == null || _abilities == null) return false;
 
             if (_execute.MarkedTarget == NetworkBehaviourId.None)
             {
-                // A loaded bot banks first: a bounty bag is worth more than a new mark.
-                if (cargoAndBag > 0f) return false;
+                // A bot loaded to the return threshold banks first: the loot of a kill is worth more than a new mark.
+                if (loadedToBank) return false;
                 for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
                 {
                     var ability = _abilities.GetSlot(slot);

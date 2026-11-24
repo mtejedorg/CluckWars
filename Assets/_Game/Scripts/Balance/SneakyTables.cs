@@ -114,8 +114,7 @@ namespace CluckWars.Balance
 
         /// <summary>
         /// Rows for steals 1..N (as many as the clock allows at the steal cooldown) at each cargo level, level by level.
-        /// The game caps a steal request at the thief's free cargo room (<c>FoodTransferRules.Request</c>); the bounty bag
-        /// takes only overflow that arrives unasked and is not counted against capacity. So a steal takes
+        /// The game caps a steal request at the thief's free cargo room (<c>FoodTransferRules.Request</c>); a steal takes
         /// min(amount, victim cargo, free room), and the thief goes home to bank when it cannot take a full steal. Every trip
         /// is a round trip between a contested pile and its base; the load still held at the end is banked on one last trip.
         /// </summary>

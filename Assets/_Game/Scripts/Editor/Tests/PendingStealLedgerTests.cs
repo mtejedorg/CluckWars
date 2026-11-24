@@ -10,7 +10,7 @@ namespace CluckWars.Tests
 {
     /// <summary>
     /// Security hardening of the steal settlement (<c>RPC_SettleSteal</c>) and the
-    /// Death Mark transfer (<c>RPC_TransferAllToBountyBag</c>): neither may be driven by a peer
+    /// Death Mark transfer (<c>RPC_TransferAllToExecutor</c>): neither may be driven by a peer
     /// without a real steal / mark behind it. The ledger is pure and asserted for real; the
     /// Fusion-side wiring is pinned from comment-stripped source.
     /// </summary>
@@ -213,10 +213,10 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TransferAllToBountyBag_RequiresTheAssassinsAuthority_AndAMarkOnThisChicken()
+        public void TransferAllToExecutor_RequiresTheAssassinsAuthority_AndAMarkOnThisChicken()
         {
             string cargo = Src("Gameplay/ChickenCargo.cs");
-            string rpc = Body(cargo, "public void RPC_TransferAllToBountyBag(", 1400);
+            string rpc = Body(cargo, "public void RPC_TransferAllToExecutor(", 1400);
             StringAssert.Contains("RpcInfo info = default", rpc);
             int resolve = rpc.IndexOf("TryResolveExecutor(", StringComparison.Ordinal);
             int zero = rpc.IndexOf("Cargo = 0f", StringComparison.Ordinal);

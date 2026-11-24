@@ -9,15 +9,15 @@ namespace CluckWars.Gameplay
     /// </summary>
     /// <remarks>
     /// <b>The owner of the food debits first and reports the ACTUAL amount; the receiver credits only what was
-    /// reported.</b> The same shape the Assassin's execute loot already had (<c>RPC_TransferAllToBountyBag</c> ->
+    /// reported.</b> The same shape the Assassin's execute loot already had (<c>RPC_TransferAllToExecutor</c> ->
     /// <c>RPC_CreditExecuteLoot</c>). Before this (audit A02, decision D3a) the receiver credited itself from a stale
     /// local estimate and the owner clamped silently: two peckers on a nearly empty pile both got a full bite, two
     /// thieves on one victim both got its whole load, and a deposit the base refused was simply destroyed.
     /// <list type="bullet">
     /// <item><b>Request.</b> The receiver asks for <see cref="Request"/>, records it and gets a request id. Nothing
     /// is credited yet.</item>
-    /// <item><b>Debit.</b> The owner's authority removes what it really has (<see cref="ServePeck"/>,
-    /// <see cref="StealRules.SplitDrain"/>) and reports that amount with the same id. A refusal reports 0, so the
+    /// <item><b>Debit.</b> The owner's authority removes what it really has (<see cref="ServePeck"/> for a pile,
+    /// <see cref="StealRules.DrainAmount"/> for a steal) and reports that amount with the same id. A refusal reports 0, so the
     /// request is closed at once instead of holding its room until it expires.</item>
     /// <item><b>Settle.</b> The receiver closes the request with that id and credits <see cref="Credit"/>: never more
     /// than it asked for. The id is what ties a report to its request; two requests open with one owner (a refused
@@ -36,8 +36,8 @@ namespace CluckWars.Gameplay
     /// <para>
     /// <b>Capacity.</b> Open requests reserve their room: <see cref="FreeSpace"/> subtracts them, so a second
     /// request made before the first settles cannot overbook the hold. Whatever still does not fit on arrival
-    /// (a late report, a bounce) goes to the bounty bag, which has no cap (<see cref="Place"/>). A settlement
-    /// never creates or destroys food.
+    /// (a late report, a bounce, an execute's loot) is not gained (<see cref="Fit"/>): there is no store beyond the
+    /// capacity since 2026-11-24, so the hold never exceeds it. A settlement never creates food.
     /// </para>
     /// </remarks>
     public static class FoodTransferRules
@@ -75,15 +75,11 @@ namespace CluckWars.Gameplay
             reported > 0f ? Mathf.Min(Mathf.Max(0f, requested), reported) : 0f;
 
         /// <summary>
-        /// Where arriving food goes: the cargo up to its free room, the rest to the bounty bag, which has no cap and
-        /// is banked first on the next deposit. The two parts always add up to <paramref name="amount"/>.
+        /// How much of arriving food the hold can take: all of it up to its free room, never negative. The rest is not gained
+        /// (nothing is held beyond the capacity).
         /// </summary>
-        public static void Place(float amount, float freeSpace, out float toCargo, out float toBag)
-        {
-            float food = Mathf.Max(0f, amount);
-            toCargo = Mathf.Min(food, Mathf.Max(0f, freeSpace));
-            toBag = food - toCargo;
-        }
+        public static float Fit(float amount, float freeSpace) =>
+            Mathf.Min(Mathf.Max(0f, amount), Mathf.Max(0f, freeSpace));
 
         /// <summary>
         /// Pile side of a peck: what the pile really hands over and what it holds afterwards. The request is clamped to
@@ -128,14 +124,14 @@ namespace CluckWars.Gameplay
         public SettleOutcome Outcome;
         /// <summary>Added to the cargo.</summary>
         public float ToCargo;
-        /// <summary>Added to the bounty bag (what the cargo had no room for).</summary>
-        public float ToBag;
+        /// <summary>What the cargo had no room for: reported, not gained.</summary>
+        public float Overflow;
         /// <summary>Deposits only: food the base banked, to count in the deposit stat.</summary>
         public float Banked;
         /// <summary>The amount the request was opened for (0 when none was open).</summary>
         public float Requested;
 
-        public float Credited => ToCargo + ToBag;
+        public float Credited => ToCargo;
     }
 
     /// <summary>
@@ -219,8 +215,8 @@ namespace CluckWars.Gameplay
 
         private FoodSettlement Credit(SettleOutcome outcome, float requested, float credit, float capacity, float cargo, float now)
         {
-            FoodTransferRules.Place(credit, FreeSpace(capacity, cargo, now), out float toCargo, out float toBag);
-            return new FoodSettlement { Outcome = outcome, Requested = requested, ToCargo = toCargo, ToBag = toBag };
+            float toCargo = FoodTransferRules.Fit(credit, FreeSpace(capacity, cargo, now));
+            return new FoodSettlement { Outcome = outcome, Requested = requested, ToCargo = toCargo, Overflow = credit - toCargo };
         }
 
         /// <summary>Drops every open request and flush (new round).</summary>

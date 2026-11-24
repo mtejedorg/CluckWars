@@ -289,13 +289,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void KillLine_PayoutIsTheFlatBountyPlusTheVictimCargo()
+        public void KillLine_PayoutIsTheFlatBountyPlusTheVictimCargo_AndSaysWhatFittedAndWhatDidNot()
         {
-            const float bounty = 4f, cargo = 2.5f;
-            string line = MatchTelemetry.Kill(9, "P2", "B1", bounty, cargo, victimPecking: true);
+            const float bounty = 4f, cargo = 2.5f, gained = 5f;
+            string line = MatchTelemetry.Kill(9, "P2", "B1", bounty, cargo, gained, victimPecking: true);
             StringAssert.Contains("killer=P2 victim=B1", line);
-            StringAssert.Contains("payout=6.50 bounty=4.00 victim_cargo=2.50 victim_pecking=1", line);
-            StringAssert.Contains("payout=4.00 bounty=4.00 victim_cargo=0.00 victim_pecking=0", MatchTelemetry.Kill(9, "P2", "B1", bounty, 0f, false));
+            StringAssert.Contains("payout=6.50 bounty=4.00 victim_cargo=2.50 gained=5.00 unfit=1.50 victim_pecking=1", line);
+            StringAssert.Contains("payout=4.00 bounty=4.00 victim_cargo=0.00 gained=4.00 unfit=0.00 victim_pecking=0", MatchTelemetry.Kill(9, "P2", "B1", bounty, 0f, bounty, false));
+            StringAssert.Contains("unfit=0.00", MatchTelemetry.Kill(9, "P2", "B1", bounty, cargo, bounty + cargo + 1f, false), "a gain above the payout is never a negative unfit");
         }
 
         [Test]

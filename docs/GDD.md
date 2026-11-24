@@ -516,7 +516,7 @@ current, shipped state.
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Egg Shell**, **Shove** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Slow Area**, **Egg Shell**, **Steal** |
-| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner | **Hunt**, **Jump**, **Hide**, **Stun** |
+| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner; carries at least 25 food (`MinimumCapacity`, a kill's loot is ordinary cargo held to it) | **Hunt**, **Jump**, **Hide**, **Stun** |
 | | The Thief | Every steal takes 1.6x more | **Steal**, **Jump**, **Hide**, **Slow Area** |
 
 **Slot roles (Maestro, 2026-11-20).** The kits above are listed in slot order, and the order is a rule: slot 1 is the **income** move (Peck; Hunt for the Spoiler, Steal for the Thief), slot 2 **movement** (the Fatty's second attack instead), slot 3 the **flex** move (defence or self utility, or a second attack; the least used), slot 4 the **main attack**, the combo partner of slot 1. The touch hexes are tilted to match (ART.md section 6.7). `FixedKitTests.ShippedKits_HaveTheExactSlotOrder` pins the eight orders and `EveryKit_FollowsTheSlotRoles` the roles (BL-156).
@@ -632,8 +632,12 @@ No isolation: the mark ignores crowds. The only defences are not being stunned, 
 A steal-proof Egg Shell egg (§7.2; the walk is not steal-proof) also makes you unkillable while it lasts: a steal-proof chicken cannot be executed
 (`ExecuteRules.CanBeExecuted`). The egg is stun-immune as well, so an egged bird cannot be stunned at all; the mark stays alive and its timer keeps running. A stun can still land on the one-second walk.
 
-On success the victim's **entire cargo transfers to the Assassin as a capacity-exempt
-"bounty bag"** (he becomes a courier of a stolen win). The victim is **out for 3 s** (`MarkKill.asset`
+On success the victim's **entire cargo is drained and goes into the Assassin's ordinary cargo**, as far as it fits,
+and then the flat bounty goes into the room left; whatever does not fit is not gained and is not left on the victim either
+(Maestro, 2026-11-24: "como hacer trampas": a capacity-free store let a chicken win without going home and took the Fatty's identity,
+a big beak). The Spoiler's capacity is **25** (`Spoiler.asset` `MinimumCapacity`, a floor read through `ModifyCargoCapacity` like the Hoarder's;
+the Sneaky class stat stays 10, shared with the Thief), so a Fatty's whole beak does not fit and a kill is a courier's trip, not a deposit in the field.
+Until 2026-11-24 the loot went into a capacity-exempt "bounty bag" (`ChickenCargo.BountyBag`), banked before the beak and stolen after it; it no longer exists. The victim is **out for 3 s** (`MarkKill.asset`
 `RemovalSeconds`): invisible, no collisions, untargetable, cannot act or pick up, not counted by any base wall. Every
 running ability, control state and effect window ends at the removal (stun, root, slow, invisibility, steal-proof, any
 mark it holds); its **cooldowns keep running**. It then **respawns at its own base** (its corner's spawn point, through
@@ -659,7 +663,7 @@ quarter weight, so nobody is unmarkable; marks that start inside the old 10.2 m 
 centre, and from 15% to 10% roaming (Monte Carlo, mechanics-designer). The highest score wins. A bird at home
 scores 0 and is never picked while another candidate is away from home; if every score is 0 the pick is uniform, so a mark always
 lands when a rival exists (`MarkPickRules`, authority side, rolls from `UnityEngine.Random`). The last mark is still excluded
-unless it is the only rival. **Stealing from an Assassin:** the bounty bag counts as carried food for every steal (Steal): a steal drains the beak first, then the bag (`StealRules.Stealable`, `SplitDrain`).
+unless it is the only rival. **Stealing from an Assassin:** his kill loot is ordinary cargo, so every steal takes it like any food (`StealRules.Stealable`, `StealRules.DrainAmount`); the "beak first, then the bag" split went with the bag on 2026-11-24.
 
 **The 3 s arm and the stun at the kill (Maestro, 2026-11-04).** `ArmSeconds` is 3.0, so the Kill is possible only in the last
 2.0 s of the 5 s window (1.0 s of 4 s until Maestro's 2026-11-23 ruling: "5 seconds, 3 of mark and 2 effective"). The stun must be active when the Kill lands; a stun that began before the arm and is still running counts.
@@ -672,7 +676,7 @@ and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
 29-36% of marks. **D5 (changed twice on 2026-11-05):** Egg Shell is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
 plus the flat `ExecuteBounty` 15 (5 until 2026-11-23), the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
-code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so with the 15 bounty one kill is nominally worth about 20.7 food and two kills about 41.4, past the 40 target (arithmetic before the time to bank it; the match simulator's kills-to-win table is the measure). At the old 5, 3 banked kills were about 32 food, 8 short of 40. No rule added.
+code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so with the 15 bounty one kill is nominally worth about 20.7 food and two kills about 41.4, past the 40 target (arithmetic before the time to bank it and, since 2026-11-24, before the carry limit: the loot is ordinary cargo held to the Spoiler's 25, so two kills in one load never exceed 25 and the second trip home is part of the price; the match simulator's kills-to-win table is the measure). At the old 5, 3 banked kills were about 32 food, 8 short of 40. No rule added.
 
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
 - **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
@@ -1144,7 +1148,7 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
 - **Map & walls** — shipped. Tiered 80-food budget, pinwheel walls on `ObstacleClass`,
   centre pile no longer permanent/regenerating (fixed supply).
 - **Combat** — shipped. HP/damage pipeline deleted; `ControlState`/`ControlRules` ladder;
-  `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Death Mark, bounty bag);
+  `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Death Mark, kill loot into ordinary cargo);
   `MatchConfig` W=40 / 45 s / Spoiler +15 / DepositRate 9; class stats Oracle-solved.
 - **Ability pool** — shipped. Steal/Control/Defense/Utility categories; ex-damage abilities
   converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill (now Death Mark); roster masks;

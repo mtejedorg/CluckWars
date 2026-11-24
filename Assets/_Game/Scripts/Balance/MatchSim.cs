@@ -173,9 +173,9 @@ namespace CluckWars.Balance
     /// Death Mark (slice S4): a press with no live mark picks a rival through the game's <see cref="MarkPickRules"/> (rolls from the mark
     /// stream), arms for <c>MarkArmSeconds</c> and lives <c>MarkWindowSeconds</c>; a press with a live mark is the Kill, legal only when
     /// <see cref="ExecuteRules.KillQualifies"/> (armed, the target stunned now, not shelled), the target is within <c>MarkKillRange</c>, no
-    /// base wall lies between and the Spoiler can cast. A kill empties the victim's beak into the Spoiler's bounty bag plus
-    /// <see cref="MatchRules.ExecuteBounty"/>, takes the victim out for <c>MarkRemovalSeconds</c> and sends it back to its base with no beak
-    /// food. The bag ignores capacity, banks first at the base and can be stolen. The Spoiler passive's bonus is paid on the clock before
+    /// base wall lies between and the Spoiler can cast. A kill empties the victim's beak into the killer's ordinary cargo and then pays
+    /// <see cref="MatchRules.ExecuteBounty"/> into the room left (Maestro, 2026-11-24: no capacity-free bag; the Spoiler's capacity comes from his passive), takes the
+    /// victim out for <c>MarkRemovalSeconds</c> and sends it back to its base with no beak food, whatever did not fit. The Spoiler passive's bonus is paid on the clock before
     /// the winner is picked. Not modelled: body collision, a chicken's own base keep-out as a movement limit (the walk graph ignores rival bases).
     /// </remarks>
     public static class MatchSim
@@ -281,7 +281,6 @@ namespace CluckWars.Balance
             public bool Present;
             public Vector2 Pos;
             public float Cargo;
-            public float Bag;
             public float Banked;
             public float Visit;
             public bool Pecking;
@@ -451,6 +450,10 @@ namespace CluckWars.Balance
                     {
                         FirstContact = -1f,
                         StolenFromSeat = new float[Seats],
+                        KillsOnSeat = new int[Seats],
+                        KillCargoFromSeat = new float[Seats],
+                        KillGainedFromSeat = new float[Seats],
+                        KillUnfitFromSeat = new float[Seats],
                         CutsByCause = new int[causes],
                         ExposedByCause = new int[causes],
                         CutWhileExposedByCause = new int[causes],
@@ -657,7 +660,7 @@ namespace CluckWars.Balance
                     else if (_time + Eps >= ch.PeckDoneAt) Land(s);
                 }
 
-                if (ch.Cargo + ch.Bag > Eps && kit.DepositRate > 0f && MatchGeometry.InReach(_map, OracleMapSO.BaseIndex(s), ch.Pos)) Deposit(s, kit);
+                if (ch.Cargo > Eps && kit.DepositRate > 0f && MatchGeometry.InReach(_map, OracleMapSO.BaseIndex(s), ch.Pos)) Deposit(s, kit);
 
                 if (!ch.HasIntent || ch.Intent.PeckPile < 0) return;
                 int pile = ch.Intent.PeckPile;
@@ -697,14 +700,10 @@ namespace CluckWars.Balance
             private void Deposit(int s, OracleKit kit)
             {
                 var ch = _c[s];
-                // The bounty bag banks first, then the beak (ChickenCargo.TryDeposit).
-                float dep = Math.Min(ch.Cargo + ch.Bag, kit.DepositRate * _tick);
+                float dep = Math.Min(ch.Cargo, kit.DepositRate * _tick);
                 float before = ch.Banked;
-                float fromBag = Math.Min(ch.Bag, dep);
-                _result.Counters[s].BagBanked += fromBag;
-                ch.Bag -= fromBag;
-                _result.Counters[s].LootBankedFood += TakeLootShare(ch, dep - fromBag);
-                ch.Cargo -= dep - fromBag;
+                _result.Counters[s].LootBankedFood += TakeLootShare(ch, dep);
+                ch.Cargo -= dep;
                 ch.Banked += dep;
                 ch.Visit += dep;
 
@@ -715,10 +714,9 @@ namespace CluckWars.Balance
                     float at = _time + (target - before) / kit.DepositRate;
                     if (_winner < 0 || at < _winTime - 1e-6f) { _winner = s; _winTime = at; }
                 }
-                if (ch.Cargo + ch.Bag > Eps) return;
+                if (ch.Cargo > Eps) return;
 
                 ch.Cargo = 0f;
-                ch.Bag = 0f;
                 ch.LootHeld = 0f;
                 ch.MarksThisTrip = 0;
                 _result.Counters[s].Trips++;
@@ -760,7 +758,6 @@ namespace CluckWars.Balance
                     ref SeatView v = ref _view.Seats[s];
                     v.Present = ch.Present;
                     v.Cargo = ch.Cargo;
-                    v.Bag = ch.Bag;
                     v.Banked = ch.Banked;
                     v.Pecking = ch.Pecking;
                     v.Stunned = Stunned(ch);
@@ -979,7 +976,7 @@ namespace CluckWars.Balance
                             {
                                 if (!RivalCanBeHit(s, v, ab.Radius)) continue;
                                 var victim = _c[v];
-                                if (StealRules.Stealable(victim.Cargo, victim.Bag) <= 0f) continue;     // Snatch only targets a carrier
+                                if (StealRules.Stealable(victim.Cargo) <= 0f) continue;     // Snatch only targets a carrier
                                 if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
                                 DoSteal(s, v, ab);
                             }
@@ -1037,12 +1034,10 @@ namespace CluckWars.Balance
                 var t = _c[thief];
                 var v = _c[victim];
                 float room = _s.Seats[thief].Farm.CargoCapacity - t.Cargo;
-                float take = MatchCombat.StealTake(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, v.Bag);
+                float take = MatchCombat.StealTake(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo);
                 if (take <= 0f) return;
-                StealRules.SplitDrain(take, v.Cargo, v.Bag, out float fromCargo, out float fromBag);
-                _result.Counters[victim].LootLostToSteals += TakeLootShare(v, fromCargo);
-                v.Cargo -= fromCargo;
-                v.Bag -= fromBag;
+                _result.Counters[victim].LootLostToSteals += TakeLootShare(v, take);
+                v.Cargo -= take;
                 t.Cargo += take;
                 v.ThinkNow = t.ThinkNow = true;
                 ref SeatCounters tn = ref _result.Counters[thief];
@@ -1050,7 +1045,6 @@ namespace CluckWars.Balance
                 tn.Steals++;
                 tn.StolenFromSeat[victim] += take;
                 _result.Counters[victim].LostToSteals += take;
-                _result.Counters[victim].BagLostToSteals += fromBag;
                 Record(MatchEventKind.Steal, thief, victim, take, CutCause.None);
             }
 
@@ -1067,20 +1061,17 @@ namespace CluckWars.Balance
                 var v = _c[victim];
                 var loot = PassiveOf(thief).Loot;
                 float room = _s.Seats[thief].Farm.CargoCapacity - t.Cargo;
-                LootRules.MarkedGain(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, v.Bag, loot.Bounty,
+                LootRules.MarkedGain(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, loot.Bounty,
                     out float take, out float bounty, out float wanted);
                 ref SeatCounters tn = ref _result.Counters[thief];
                 if (take > 0f)
                 {
-                    StealRules.SplitDrain(take, v.Cargo, v.Bag, out float fromCargo, out float fromBag);
-                    _result.Counters[victim].LootLostToSteals += TakeLootShare(v, fromCargo);
-                    v.Cargo -= fromCargo;
-                    v.Bag -= fromBag;
+                    _result.Counters[victim].LootLostToSteals += TakeLootShare(v, take);
+                    v.Cargo -= take;
                     tn.Stolen += take;
                     tn.Steals++;
                     tn.StolenFromSeat[victim] += take;
                     _result.Counters[victim].LostToSteals += take;
-                    _result.Counters[victim].BagLostToSteals += fromBag;
                 }
                 t.Cargo += take + bounty;
                 t.LootHeld += take + bounty;
@@ -1168,7 +1159,7 @@ namespace CluckWars.Balance
                 table.OverThreshold = loot.OverFraction * _farm.WinTarget;
                 _lootWeights.Clear();
                 foreach (int t in _lootCandidates)
-                    _lootWeights.Add(LootPickRules.Weight(_c[t].Banked, _c[t].Cargo + _c[t].Bag, table));
+                    _lootWeights.Add(LootPickRules.Weight(_c[t].Banked, _c[t].Cargo, table));
                 int pick = LootPickRules.Pick(_lootWeights, _lootRng.NextFloat());
                 if (pick < 0) return;
 
@@ -1321,21 +1312,32 @@ namespace CluckWars.Balance
                     && !MatchCombat.KeepOutBlocks(sp.Pos, t.Pos, _baseCentres, _rules.KeepOutRadius);
             }
 
-            // One execution: the victim's beak and the flat bounty go into the Spoiler's bag (capacity does not apply), the kill is scored,
-            // the victim is taken out. A shelled victim keeps its beak (AssassinExecute: StealRules.CanStealFrom), a forced kill can hit one.
+            // One execution (Maestro, 2026-11-24: ordinary cargo, no capacity-free bag): the victim's beak goes into the killer's cargo first, then the flat
+            // bounty into the room left; what does not fit is not gained, and the victim loses its whole beak either way (as in the game: the victim's
+            // authority drains it all). The kill is scored and the victim taken out. A shelled victim keeps its beak (AssassinExecute:
+            // StealRules.CanStealFrom), a forced kill can hit one.
             private void Execute(int s, int victim, float removalSeconds)
             {
                 var sp = _c[s];
                 var v = _c[victim];
                 float loot = EggPhase(v) ? 0f : v.Cargo;
+                float room = Math.Max(0f, _s.Seats[s].Farm.CargoCapacity - sp.Cargo);
+                float lootGained = FoodTransferRules.Fit(loot, room);
+                float bountyGained = FoodTransferRules.Fit(_rules.ExecuteBounty, room - lootGained);
                 float pay = loot + _rules.ExecuteBounty;
+                float gained = lootGained + bountyGained;
                 v.Cargo -= loot;
                 if (v.LootHeld > v.Cargo) v.LootHeld = v.Cargo;
-                sp.Bag += pay;
+                sp.Cargo += gained;
                 sp.ThinkNow = true;
                 _result.Kills[s]++;
-                _result.Counters[s].Bounty += pay;
-                Record(MatchEventKind.Kill, s, victim, pay, CutCause.None);
+                ref SeatCounters n = ref _result.Counters[s];
+                n.Bounty += gained;
+                n.KillsOnSeat[victim]++;
+                n.KillCargoFromSeat[victim] += loot;
+                n.KillGainedFromSeat[victim] += gained;
+                n.KillUnfitFromSeat[victim] += pay - gained;
+                Record(MatchEventKind.Kill, s, victim, gained, CutCause.None);
                 Remove(victim, removalSeconds);
             }
 
@@ -1375,7 +1377,7 @@ namespace CluckWars.Balance
                 ch.MarkTarget = -1;
             }
 
-            // Phase 0: a removed chicken whose time is up stands at its base spawn with an empty beak (its bag stays: it is its own food).
+            // Phase 0: a removed chicken whose time is up stands at its base spawn with an empty beak.
             // Done before the look, so every observer sees it at its base this very tick.
             private void Respawn()
             {

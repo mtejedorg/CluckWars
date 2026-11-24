@@ -261,7 +261,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 512
   _Cargo: 0
-  _BountyBag: 0
   _LastThiefId:
     Object:
       Raw: 0

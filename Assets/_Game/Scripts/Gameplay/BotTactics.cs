@@ -603,7 +603,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Does <paramref name="ability"/> take cargo off a rival? Snatch, Sneaky Steal, Scrap, Dive Bomb
         /// and Spine Coat declare a nominal steal amount; Death Mark's execute moves the whole load
-        /// (<c>RPC_TransferAllToBountyBag</c>), which has no nominal amount.
+        /// (<c>RPC_TransferAllToExecutor</c>), which has no nominal amount.
         /// </summary>
         public static bool IsStealer(AbilityBaseSO ability) =>
             ability != null && (ability.NominalStealAmount > 0f || ability.Is(AbilityJob.DeathMark));

@@ -148,16 +148,24 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void FullBag_GoesHome()
+        public void ALoadedSpoiler_IsJustAChickenWithCargo_TheOrdinaryReturnRuleDecides_AndASmallLoadKeepsMarking()
         {
-            var view = View(Four(Kit("me"), Kit("rival")));
+            // A kill's loot is ordinary cargo (no bag since 2026-11-24): above the return threshold the chicken banks first and marks nobody,
+            // below it the Spoiler goes on hunting.
+            var mark = Make(MatchTestKit.DeathMark(3f, 6f, 4f, 20f, 8f, 4f), BotRole.Offense, float.PositiveInfinity, false);
+            var view = View(Four(Kit("spoiler", mark), Kit("rival")));
             view.Seats[0].Pos = Vector2.zero;
-            view.Seats[0].Bag = 5f;
+            view.Seats[1].Pos = new Vector2(30f, 0f);
+            float capacity = view.Kits[0].Farm.CargoCapacity;
 
-            var intent = Think(view);
+            view.Seats[0].Cargo = capacity * (Profile.ReturnThreshold + 0.05f);
+            var loaded = Think(view);
+            Assert.AreEqual(Home(0), loaded.Goal, "loaded past the return threshold: home, like any chicken");
+            Assert.AreEqual(-1, loaded.CastSlot, "a loaded Spoiler banks before it marks again");
 
-            Assert.AreEqual(Home(0), intent.Goal);
-            Assert.AreEqual(-1, intent.PeckPile);
+            view.Seats[0].Cargo = capacity * (Profile.ReturnThreshold - 0.05f);
+            var light = Think(view);
+            Assert.AreEqual(0, light.CastSlot, "a small load is no reason to stop marking");
         }
 
         [Test]

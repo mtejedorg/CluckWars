@@ -28,6 +28,12 @@ namespace CluckWars.Abilities
                  "big enough to win from zero.")]
         [Min(0)] public int BonusFood = 15;
 
+        [Header("Carrying")]
+        [Tooltip("Capacity floor of the Spoiler's beak, like the Hoarder's: the Sneaky class stat is shared with the Thief and does not move. " +
+                 "A kill's loot (the victim's cargo, then the execute bounty) is ordinary cargo held to this room (Maestro, 2026-11-24: " +
+                 "no capacity-free bag, 25 or so). 0 would leave the class capacity.")]
+        [Min(0f)] public float MinimumCapacity = 25f;
+
         public SpoilerPassiveSO()
         {
             DisplayName = "Assassin";
@@ -39,13 +45,16 @@ namespace CluckWars.Abilities
 
         public override int MatchEndBonusFood(ChickenController self) => BonusFood;
 
+        public override float ModifyCargoCapacity(float capacity, ChickenController self) =>
+            Mathf.Max(capacity, MinimumCapacity);
+
         public override string PerkLineKey => UiKeys.PerkSpoilerLine;
         public override string PerkDetailKey => UiKeys.PerkSpoilerDetail;
         // {goal} is the one number this passive does not own: the match's win target.
         // A null MatchConfig leaves {goal} unsupplied, which UiText renders as #goal# and logs.
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
             match != null
-                ? new (string, object)[] { ("food", BonusFood), ("goal", match.FoodTargetToWin) }
-                : new (string, object)[] { ("food", BonusFood) };
+                ? new (string, object)[] { ("food", BonusFood), ("cap", Mathf.RoundToInt(MinimumCapacity)), ("goal", match.FoodTargetToWin) }
+                : new (string, object)[] { ("food", BonusFood), ("cap", Mathf.RoundToInt(MinimumCapacity)) };
     }
 }

@@ -30,10 +30,16 @@ namespace CluckWars.Gameplay
 
         /// <param name="bounty">The flat execute bounty (<c>MatchConfig.ExecuteBounty</c>).</param>
         /// <param name="victimCargo">What the victim carried and the execute drained (0 for a steal-proof victim).</param>
+        /// <param name="gained">What the killer's cargo really took of the two: held to its free room, so <c>unfit</c> is what the execute paid in
+        /// name only (the victim is removed with no cargo either way).</param>
         /// <param name="victimPecking">The victim had a Peck cast running when the Kill landed.</param>
-        public static string Kill(int tick, string killer, string victim, float bounty, float victimCargo, bool victimPecking) =>
-            string.Format(CultureInfo.InvariantCulture, "kill tick={0} killer={1} victim={2} payout={3:0.00} bounty={4:0.00} victim_cargo={5:0.00} victim_pecking={6}",
-                tick, killer, victim, bounty + victimCargo, bounty, victimCargo, victimPecking ? 1 : 0);
+        public static string Kill(int tick, string killer, string victim, float bounty, float victimCargo, float gained, bool victimPecking)
+        {
+            float payout = bounty + victimCargo;
+            return string.Format(CultureInfo.InvariantCulture,
+                "kill tick={0} killer={1} victim={2} payout={3:0.00} bounty={4:0.00} victim_cargo={5:0.00} gained={6:0.00} unfit={7:0.00} victim_pecking={8}",
+                tick, killer, victim, payout, bounty, victimCargo, gained, payout > gained ? payout - gained : 0f, victimPecking ? 1 : 0);
+        }
 
         /// <param name="seconds">Playable seconds since the round's GET READY ended.</param>
         public static string Contact(int tick, string seat, string rival, int round, float seconds, float distance) =>

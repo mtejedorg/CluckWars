@@ -10,8 +10,8 @@ namespace CluckWars.Tests
     /// A02 (architecture audit 2026-11-12, decision D3a, review fixes R-1..R-6): the owner of the food debits and reports
     /// the actual amount; the receiver credits only that. Every behavioural test here drives the code production runs:
     /// <see cref="FoodRequests{TKey}"/> is the object <c>ChickenCargo</c> holds, <see cref="FoodTransferRules.ServePeck"/>
-    /// is what <c>FoodPile.RPC_Drain</c> calls, <see cref="StealRules.SplitDrain"/> what <c>RPC_DrainStolen</c> calls.
-    /// The Chicken below only does what the RPC bodies do with the results: add ToCargo / ToBag / Banked.
+    /// is what <c>FoodPile.RPC_Drain</c> calls, <see cref="StealRules.DrainAmount"/> what <c>RPC_DrainStolen</c> calls.
+    /// The Chicken below only does what the RPC bodies do with the results: add ToCargo / Banked (and count what did not fit).
     /// </summary>
     /// <remarks>
     /// Source-text guards are kept only for what EditMode cannot execute (a live runner is needed): that the RPCs
@@ -32,12 +32,12 @@ namespace CluckWars.Tests
         /// <summary>A chicken's hold, applying settlements exactly as the RPC bodies in ChickenCargo do.</summary>
         private sealed class Chicken
         {
-            public float Capacity = 10f, Cargo, Bag, Stat;
+            public float Capacity = 10f, Cargo, Lost, Stat;
             public readonly FoodRequests<int> Requests = new FoodRequests<int>();
 
-            public float Carried => Cargo + Bag;
+            public float Carried => Cargo;
 
-            private void Apply(FoodSettlement s) { Cargo += s.ToCargo; Bag += s.ToBag; Stat += s.Banked; }
+            private void Apply(FoodSettlement s) { Cargo += s.ToCargo; Lost += s.Overflow; Stat += s.Banked; }
 
             public FoodSettlement Peck(int pile, ushort id, float reported, float now)
             {
@@ -94,23 +94,23 @@ namespace CluckWars.Tests
         [Test]
         public void TwoThieves_OnOneVictim_GetWhatWasReallyDrained_NotTheirEstimates()
         {
-            float victimCargo = 4f, victimBag = 1f;
+            float victimCargo = 5f;
             var first = new Chicken();
             var second = new Chicken();
             first.Requests.AskSteal(Victim, 4f, first.Capacity, first.Cargo, 0f, out float ask1, out ushort id1);
             second.Requests.AskSteal(Victim, 4f, second.Capacity, second.Cargo, 0f, out float ask2, out ushort id2);
 
-            StealRules.SplitDrain(ask1, victimCargo, victimBag, out float c1, out float b1);
-            victimCargo -= c1; victimBag -= b1;
-            StealRules.SplitDrain(ask2, victimCargo, victimBag, out float c2, out float b2);
-            victimCargo -= c2; victimBag -= b2;
+            float d1 = StealRules.DrainAmount(ask1, victimCargo);
+            victimCargo -= d1;
+            float d2 = StealRules.DrainAmount(ask2, victimCargo);
+            victimCargo -= d2;
 
-            first.Steal(Victim, id1, c1 + b1, 0.1f);
-            second.Steal(Victim, id2, c2 + b2, 0.1f);
+            first.Steal(Victim, id1, d1, 0.1f);
+            second.Steal(Victim, id2, d2, 0.1f);
 
             Assert.AreEqual(4f, first.Cargo, 1e-5f);
             Assert.AreEqual(1f, second.Cargo, 1e-5f, "the second thief gets the one unit that was left");
-            Assert.AreEqual(5f, first.Cargo + second.Cargo + victimCargo + victimBag, 1e-5f, "5 food before, 5 after");
+            Assert.AreEqual(5f, first.Cargo + second.Cargo + victimCargo, 1e-5f, "5 food before, 5 after");
         }
 
         [Test]
@@ -188,7 +188,7 @@ namespace CluckWars.Tests
         [Test]
         public void ADepositTheBaseRejects_ComesBackWhole_AndIsNotCounted()
         {
-            var chicken = new Chicken { Cargo = 6f, Bag = 3f };
+            var chicken = new Chicken { Cargo = 6f };
             float carried = chicken.Carried;
             ushort id = chicken.Flush(Base, 1.5f, 0f);
 
@@ -368,17 +368,25 @@ namespace CluckWars.Tests
             c.Peck(Pile, p, 3f, 0.1f);
             c.Steal(Victim, s, 1f, 0.1f);
             Assert.AreEqual(c.Capacity, c.Cargo, 1e-5f, "everything that arrived fits");
-            Assert.AreEqual(0f, c.Bag);
+            Assert.AreEqual(0f, c.Lost, "nothing overflowed: the requests reserved their room");
         }
 
         [Test]
-        public void WhatDoesNotFitOnArrival_GoesToTheBag_NeverLost()
+        public void WhatDoesNotFitOnArrival_IsNotHeld_TheHoldNeverExceedsItsCapacity_AndTheOverflowIsReported()
         {
+            // No store beyond the capacity since 2026-11-24 (the bounty bag is gone): the cargo takes what fits, the rest is reported, not kept.
             var c = new Chicken { Capacity = 4f, Cargo = 4f };
             var late = c.Peck(Pile, 5, 3f, 0f);   // a late report: no room was reserved for it
             Assert.AreEqual(0f, late.ToCargo);
-            Assert.AreEqual(3f, late.ToBag, 1e-5f);
-            Assert.AreEqual(7f, c.Carried, 1e-5f);
+            Assert.AreEqual(3f, late.Overflow, 1e-5f, "the caller can say so (ChickenCargo.WarnOverflow)");
+            Assert.AreEqual(4f, c.Carried, 1e-5f, "the hold is still at its capacity");
+            Assert.AreEqual(3f, c.Lost, 1e-5f);
+
+            var half = new Chicken { Capacity = 4f, Cargo = 3f };
+            var partly = half.Peck(Pile, 5, 3f, 0f);
+            Assert.AreEqual(1f, partly.ToCargo, 1e-5f);
+            Assert.AreEqual(2f, partly.Overflow, 1e-5f);
+            Assert.AreEqual(partly.Credited + partly.Overflow, 3f, 1e-5f, "what fitted plus what did not is what was reported");
         }
 
         [TestCase(3f, 3f, 3f)]
@@ -392,18 +400,13 @@ namespace CluckWars.Tests
         public void Credit_IsTheReport_NeverMoreThanTheRequest_NeverNegative(float requested, float reported, float expected) =>
             Assert.AreEqual(expected, FoodTransferRules.Credit(requested, reported), 1e-5f);
 
-        [TestCase(4f, 10f, 4f, 0f)]
-        [TestCase(4f, 1.5f, 1.5f, 2.5f)]
-        [TestCase(4f, 0f, 0f, 4f)]
-        [TestCase(4f, -3f, 0f, 4f)]
-        [TestCase(-1f, 5f, 0f, 0f)]
-        public void Place_FillsTheCargoFirst_ThenTheBag_AndLosesNothing(float amount, float freeSpace, float toCargo, float toBag)
-        {
-            FoodTransferRules.Place(amount, freeSpace, out float c, out float b);
-            Assert.AreEqual(toCargo, c, 1e-5f);
-            Assert.AreEqual(toBag, b, 1e-5f);
-            Assert.AreEqual(System.Math.Max(0f, amount), c + b, 1e-5f);
-        }
+        [TestCase(4f, 10f, 4f)]
+        [TestCase(4f, 1.5f, 1.5f)]
+        [TestCase(4f, 0f, 0f)]
+        [TestCase(4f, -3f, 0f)]
+        [TestCase(-1f, 5f, 0f)]
+        public void Fit_IsAsMuchAsTheFreeRoomTakes_NeverNegative_NeverMore(float amount, float freeSpace, float expected) =>
+            Assert.AreEqual(expected, FoodTransferRules.Fit(amount, freeSpace), 1e-5f);
 
         // ---- The ledger additions --------------------------------------------------
 
@@ -539,9 +542,12 @@ namespace CluckWars.Tests
                 {
                     "public void RPC_SettlePeck(", "public void RPC_SettleSteal(", "public void RPC_SettleDeposit(",
                     "private void AddToHold(",
+                    // The execute's two payments (the capacity-free bag is gone, so they credit the cargo): the loot report, which the
+                    // assassin's pending-execute ledger gates, and the flat bounty, paid on the kill report. Both are held to the free room.
+                    "public void RPC_CreditExecuteLoot(", "public float CreditExecuteBounty(",
                 }
                 .Sum(sig => Regex.Matches(Body(CargoPath, sig), @"(?<![\w.])Cargo\s*\+=").Count);
-            Assert.AreEqual(4, allowed);
+            Assert.AreEqual(6, allowed);
             Assert.AreEqual(allowed, credits, "ChickenCargo credits cargo outside a settlement: that is an optimistic credit again.");
         }
     }

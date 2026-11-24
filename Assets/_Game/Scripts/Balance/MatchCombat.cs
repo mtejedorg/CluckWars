@@ -82,8 +82,8 @@ namespace CluckWars.Balance
         /// Food a steal takes from one victim: the nominal amount times the thief's factor, clamped to the thief's free room and to what the
         /// victim holds (<c>ChickenCargo.StealFrom</c>, through <see cref="StealMath.Clamp"/> and <see cref="StealRules.Stealable"/>).
         /// </summary>
-        public static float StealTake(float nominal, float thiefFactor, float thiefFreeRoom, float victimCargo, float victimBag) =>
-            StealMath.Clamp(nominal * thiefFactor, thiefFreeRoom, StealRules.Stealable(victimCargo, victimBag));
+        public static float StealTake(float nominal, float thiefFactor, float thiefFreeRoom, float victimCargo) =>
+            StealMath.Clamp(nominal * thiefFactor, thiefFreeRoom, StealRules.Stealable(victimCargo));
 
         /// <summary>
         /// The timer's winner: most banked, then most kills, then the lowest corner, over the seats in <paramref name="present"/>. Mirrors
@@ -149,14 +149,10 @@ namespace CluckWars.Balance
         public float LootBankedFood;
         /// <summary>Loot food rivals' steals took from this seat (pro rata of the cargo they drained).</summary>
         public float LootLostToSteals;
-        /// <summary>Deposit visits that emptied this seat's cargo and bag (trips home).</summary>
+        /// <summary>Deposit visits that emptied this seat's cargo (trips home).</summary>
         public int Trips;
         /// <summary>Most marked steals this seat made between two of its trips home (the load before the first, and the one carried when the clock ended, count too).</summary>
         public int MaxMarksPerTrip;
-        /// <summary>Spoiler bounty bag food this seat banked.</summary>
-        public float BagBanked;
-        /// <summary>Spoiler bounty bag food rivals' steals took from this seat.</summary>
-        public float BagLostToSteals;
         /// <summary>Seconds a Thief's loot mark sat on the same bird as a Spoiler's Hunt mark (counted on the Thief's seat).</summary>
         public float LootHuntOverlapSeconds;
         public int Casts;
@@ -164,6 +160,14 @@ namespace CluckWars.Balance
         public float FirstContact;
         /// <summary>Food this seat took from each seat (index = victim).</summary>
         public float[] StolenFromSeat;
+        /// <summary>Executions this seat made on each seat (index = victim).</summary>
+        public int[] KillsOnSeat;
+        /// <summary>Cargo the executions drained from each seat (the victim's whole beak; 0 for a shelled victim).</summary>
+        public float[] KillCargoFromSeat;
+        /// <summary>Food the executions on each seat really put into this seat's cargo (victim cargo first, then the bounty, held to the free room).</summary>
+        public float[] KillGainedFromSeat;
+        /// <summary>Food the executions on each seat paid in name only: victim cargo plus bounty, less what fitted.</summary>
+        public float[] KillUnfitFromSeat;
         /// <summary>Pecks of this seat that were cut, by <see cref="CutCause"/>.</summary>
         public int[] CutsByCause;
         /// <summary>Peck casts of this seat that began with a rival holding a ready cutter of that cause in range.</summary>

@@ -63,7 +63,7 @@ namespace CluckWars.Gameplay
             MarkPickRules.Filter(candidates, hasLast, last, rivalsInMatch);
 
         /// <summary>
-        /// A candidate's weight: the base, plus banked food times its weight, plus carried food (beak and bounty bag) times its weight, plus
+        /// A candidate's weight: the base, plus banked food times its weight, plus carried food times its weight, plus
         /// the over bonus when banked plus carried is above the threshold.
         /// </summary>
         public static float Weight(float banked, float carried, in LootWeightTable t)
@@ -135,11 +135,11 @@ namespace CluckWars.Gameplay
         /// only what the Thief gains from it. <paramref name="wanted"/> is what the same cast would have gained with no room limit, so
         /// <c>wanted - stolen - bountyKept</c> is what the Thief's full beak cost him.
         /// </summary>
-        public static void MarkedGain(float nominal, float factor, float freeRoom, float victimCargo, float victimBag, float bounty,
+        public static void MarkedGain(float nominal, float factor, float freeRoom, float victimCargo, float bounty,
             out float stolen, out float bountyKept, out float wanted)
         {
             float room = freeRoom > 0f ? freeRoom : 0f;
-            float available = StealRules.Stealable(victimCargo, victimBag);
+            float available = StealRules.Stealable(victimCargo);
             stolen = StealMath.Clamp(nominal * factor, room, available);
             float bonus = bounty > 0f ? bounty : 0f;
             bountyKept = Math.Min(bonus, Math.Max(0f, room - stolen));

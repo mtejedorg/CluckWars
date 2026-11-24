@@ -101,7 +101,7 @@ namespace CluckWars.Balance
             _speed = Mathf.Max(0.1f, _kit.Farm.MoveSpeed);
             _dep = Mathf.Max(0.5f, _kit.Farm.DepositRate);
             _capacity = Mathf.Max(1f, _kit.Farm.CargoCapacity);
-            _all = _me.Cargo + _me.Bag;
+            _all = _me.Cargo;
             _baseCentres = null;
             float distHome = WalkMetres(v, _me.Pos, _home);
             _tHome = Mathf.Max(0f, distHome - v.Map.BaseRadius) / _speed;
@@ -116,9 +116,6 @@ namespace CluckWars.Balance
 
             // A Death Mark in play owns the think until it pays or fizzles.
             if (MarkLoop(v, arrival, out var markIntent)) return markIntent;
-
-            // A bounty bag goes home before anything else.
-            if (_me.Bag > Eps) _banking = true;
 
             // A Thief whose beak cannot take another marked steal's bounty banks first (Maestro, 2026-11-24: the loot is ordinary cargo and
             // what does not fit is lost). Only while there is something to bank.
@@ -400,12 +397,12 @@ namespace CluckWars.Balance
                 float take, bounty = 0f;
                 if (marked)
                 {
-                    LootRules.MarkedGain(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag, loot.Bounty, out take, out bounty, out _);
+                    LootRules.MarkedGain(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, loot.Bounty, out take, out bounty, out _);
                     if (take + bounty < 1f) continue;
                 }
                 else
                 {
-                    take = MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo, v.Seats[r].Bag);
+                    take = MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo);
                     if (take < 1f) continue;
                 }
 
@@ -416,7 +413,7 @@ namespace CluckWars.Balance
                 if (seconds > v.TimeLeft) continue;     // no time to bank it
                 float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);
                 float value = carried / Mathf.Max(Eps, seconds) * (1f + DenyWeight * lead);
-                if (r == _lastVictim && !marked) value *= Stickiness;   // it is the bag that pulls a Thief to the marked bird, not the habit
+                if (r == _lastVictim && !marked) value *= Stickiness;   // it is the loot that pulls a Thief to the marked bird, not the habit
                 _value[r] = value;
                 switch (_p.Target)
                 {
@@ -483,10 +480,13 @@ namespace CluckWars.Balance
 
             if (_me.MarkTarget < 0)
             {
-                // Press the mark only when the stun will be back by the arm, and not while carrying (bank first).
+                // Press the mark only when the stun will be back by the arm, and not while loaded to the return threshold (bank first: a kill's
+                // loot is ordinary cargo, so a Spoiler holding some food is no reason to stop marking, a full one is).
                 int stun = Slot(AbilityJob.Stun, false);
                 bool stunBack = stun >= 0 && _me.CooldownLeft[1 + stun] <= mk.MarkArmSeconds;
-                if (_all <= Eps && !_me.Stunned && Ready(markSlot) && stunBack) _cast = markSlot;
+                float returnAt = float.IsNaN(_p.ReturnThreshold) ? FullShare : _p.ReturnThreshold;
+                bool loadedToBank = _all > Eps && _me.Cargo / _capacity >= returnAt;
+                if (!loadedToBank && !_me.Stunned && Ready(markSlot) && stunBack) _cast = markSlot;
                 return false;
             }
 

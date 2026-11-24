@@ -68,29 +68,18 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// The ONE thief-side gate for the steal-proof state: every caller of
-        /// <c>RPC_DrainStolen</c> / <c>RPC_TransferAllToBountyBag</c> (Snatch, Sneaky Steal, Scrap,
+        /// <c>RPC_DrainStolen</c> / <c>RPC_TransferAllToExecutor</c> (Snatch, Sneaky Steal, Scrap,
         /// Dive Bomb, Spine Coat, Death Mark) asks this BEFORE sending its request. No thief credits
         /// anything ahead of the victim's report (<see cref="FoodTransferRules"/>), so the gate
         /// creates no food either way; it is there so a shelled victim is not even asked to drain.
         /// </summary>
         public static bool CanStealFrom(ChickenController victim) => victim != null && !victim.IsStealProof;
 
-        /// <summary>
-        /// What a thief can take from a chicken: the food it carries in its beak plus its bounty bag. An Assassin's execute pays
-        /// into the bag, never the beak, so reading the beak alone made a loaded Assassin look empty-handed to every steal.
-        /// </summary>
-        public static float Stealable(float cargo, float bountyBag) => Mathf.Max(0f, cargo) + Mathf.Max(0f, bountyBag);
+        /// <summary>What a thief can take from a chicken: the food it carries (there is no other store since 2026-11-24).</summary>
+        public static float Stealable(float cargo) => Mathf.Max(0f, cargo);
 
-        /// <summary>
-        /// Splits a steal of <paramref name="amount"/> between a victim's cargo and bounty bag: the beak first, then the bag,
-        /// never more than <see cref="Stealable"/> in all.
-        /// </summary>
-        public static void SplitDrain(float amount, float cargo, float bountyBag, out float fromCargo, out float fromBag)
-        {
-            float want = Mathf.Max(0f, amount);
-            fromCargo = Mathf.Min(want, Mathf.Max(0f, cargo));
-            fromBag = Mathf.Min(want - fromCargo, Mathf.Max(0f, bountyBag));
-        }
+        /// <summary>What the victim's authority really drains for a steal of <paramref name="amount"/>: never more than it holds, never negative.</summary>
+        public static float DrainAmount(float amount, float cargo) => Mathf.Min(Mathf.Max(0f, amount), Stealable(cargo));
 
         /// <summary>
         /// The most an Assassin execute may bank as looted cargo: the victim's carry capacity, or

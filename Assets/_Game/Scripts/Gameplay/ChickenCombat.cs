@@ -205,7 +205,7 @@ namespace CluckWars.Gameplay
         /// own StateAuthority, which is the only peer that may write <see cref="IsRemoved"/>.
         /// </summary>
         /// <remarks>
-        /// Mirrors the <c>RPC_TransferAllToBountyBag</c> / <c>RPC_DrainStolen</c> pattern that
+        /// Mirrors the <c>RPC_TransferAllToExecutor</c> / <c>RPC_DrainStolen</c> pattern that
         /// every other cross-authority write in this codebase already uses. Both halves of an
         /// execute now travel the same way — previously the cargo transfer was an RPC and the
         /// removal was a plain call, so they disagreed about who could apply them and the

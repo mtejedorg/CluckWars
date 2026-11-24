@@ -152,29 +152,29 @@ namespace CluckWars.Tests
         [Test]
         public void MarkedGain_StolenFoodFirst_ThenTheBounty_BothHeldToTheFreeRoom()
         {
-            LootRules.MarkedGain(5f, 1f, 20f, 6f, 0f, 10f, out float stolen, out float bounty, out float wanted);
+            LootRules.MarkedGain(5f, 1f, 20f, 6f, 10f, out float stolen, out float bounty, out float wanted);
             Assert.AreEqual(5f, stolen, 1e-5f, "an ordinary steal's take");
             Assert.AreEqual(10f, bounty, 1e-5f, "everything fits");
             Assert.AreEqual(15f, wanted, 1e-5f);
 
-            LootRules.MarkedGain(5f, 1f, 12f, 6f, 0f, 10f, out stolen, out bounty, out wanted);
+            LootRules.MarkedGain(5f, 1f, 12f, 6f, 10f, out stolen, out bounty, out wanted);
             Assert.AreEqual(5f, stolen, 1e-5f, "the stolen food comes first");
             Assert.AreEqual(7f, bounty, 1e-5f, "the bounty fills what room is left; the rest is lost");
             Assert.AreEqual(15f, wanted, 1e-5f);
 
-            LootRules.MarkedGain(5f, 1f, 3f, 6f, 0f, 10f, out stolen, out bounty, out wanted);
+            LootRules.MarkedGain(5f, 1f, 3f, 6f, 10f, out stolen, out bounty, out wanted);
             Assert.AreEqual(3f, stolen, 1e-5f, "held to the Thief's free room: the bird loses only what the Thief gains");
             Assert.AreEqual(0f, bounty, 1e-5f);
 
-            LootRules.MarkedGain(5f, 1f, 0f, 6f, 0f, 10f, out stolen, out bounty, out _);
+            LootRules.MarkedGain(5f, 1f, 0f, 6f, 10f, out stolen, out bounty, out _);
             Assert.AreEqual(0f, stolen + bounty, "a full Thief gains nothing from a marked steal");
 
-            LootRules.MarkedGain(5f, 1.6f, 20f, 2f, 1f, 4f, out stolen, out bounty, out wanted);
-            Assert.AreEqual(3f, stolen, 1e-5f, "held to what the bird carries (beak plus bag)");
+            LootRules.MarkedGain(5f, 1.6f, 20f, 3f, 4f, out stolen, out bounty, out wanted);
+            Assert.AreEqual(3f, stolen, 1e-5f, "held to what the bird carries");
             Assert.AreEqual(4f, bounty, 1e-5f, "an empty or poor bird still pays the bounty");
             Assert.AreEqual(7f, wanted, 1e-5f);
 
-            LootRules.MarkedGain(5f, 1.6f, 20f, 20f, 0f, 0f, out stolen, out bounty, out _);
+            LootRules.MarkedGain(5f, 1.6f, 20f, 20f, 0f, out stolen, out bounty, out _);
             Assert.AreEqual(8f, stolen, 1e-5f, "nominal times the Thief's factor");
         }
 
@@ -244,7 +244,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, c.LootTakeFood, "the rivals carry nothing: nothing to take, the bounty paid anyway");
             Assert.AreEqual(0f, c.LootLostToRoom, 1e-4f, "the beak had room");
             Assert.AreEqual(bounty, maxCargo, 0.5f, "the bounty sat in the ordinary beak (banking at the deposit rate) before it banked");
-            Assert.AreEqual(0f, c.BagBanked, "no bag: the Spoiler's bag is the only one");
             Assert.AreEqual(c.LootTaken * bounty, c.LootBankedFood, 1e-3f, "the Thief stands in its base zone, so the loot banks at once");
             Assert.AreEqual(c.LootTaken * bounty, r.Banked[0], 1e-3f);
             Assert.AreEqual(0, markedBy, "the marked rival's view says whose mark it is");
@@ -327,7 +326,6 @@ namespace CluckWars.Tests
             Assert.AreEqual(5f, r.Counters[1].Stolen, 1e-4f, "the rival's Steal took the usual 5 from the Thief's beak");
             Assert.AreEqual(5f, r.Counters[0].LostToSteals, 1e-4f);
             Assert.AreEqual(5f, r.Counters[0].LootLostToSteals, 1e-4f, "all of the Thief's cargo is loot, so the theft took loot");
-            Assert.AreEqual(0f, r.Counters[0].BagLostToSteals, "there is no bag to drain");
         }
 
         [Test]
@@ -613,7 +611,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheThiefsCapacity_ComesFromThePassive_AndTheSpoilersIsUnchanged()
+        public void TheThiefsCapacity_ComesFromThePassive_AndTheSpoilersIsHisOwnFloor_NeitherMovesTheOther()
         {
             var inputs = ShippedInputs();
             using (var book = new BalanceBook(new QuietLog(), inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
@@ -627,10 +625,11 @@ namespace CluckWars.Tests
                 Assert.GreaterOrEqual(thief, 0);
                 Assert.GreaterOrEqual(spoiler, 0);
                 float classCapacity = shipped.Kits[thief].Farm.CargoCapacity;
-                Assert.AreEqual(classCapacity, shipped.Kits[spoiler].Farm.CargoCapacity, "shipped, the Thief carries the class's capacity, the same as the Spoiler");
+                float spoilerCapacity = shipped.Kits[spoiler].Farm.CargoCapacity;
+                Assert.Greater(spoilerCapacity, classCapacity, "shipped, the Thief carries the shared class capacity and the Spoiler his own larger floor (2026-11-24: kill loot is ordinary cargo)");
                 Assert.Less(classCapacity, 16f, "the test's floor is above the class capacity");
                 Assert.AreEqual(16f, moved.Kits[thief].Farm.CargoCapacity, "the floor on the Thief's passive raises his capacity");
-                Assert.AreEqual(classCapacity, moved.Kits[spoiler].Farm.CargoCapacity, "the Sneaky class stat is shared with the Spoiler and does not move");
+                Assert.AreEqual(spoilerCapacity, moved.Kits[spoiler].Farm.CargoCapacity, "the Thief's floor does not move the Spoiler's: each is on its own passive, the shared class stat is untouched");
             }
         }
 

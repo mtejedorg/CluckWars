@@ -126,7 +126,7 @@ namespace CluckWars.Balance
         public float ThinkSeconds;
         /// <summary>Radius of the circle round each base that keeps rivals out (<c>MatchConfig.BaseKeepOutRadius</c>).</summary>
         public float KeepOutRadius;
-        /// <summary>Food an execute adds to the Spoiler's bag on top of the victim's cargo (<c>MatchConfig.ExecuteBounty</c>).</summary>
+        /// <summary>Food an execute adds to the killer's cargo, as far as it fits, after the victim's cargo (<c>MatchConfig.ExecuteBounty</c>).</summary>
         public float ExecuteBounty;
         /// <summary>Per second decay of a shove (<c>ChickenMovement.KnockbackDecayRate</c>).</summary>
         public float KnockbackDecayRate;

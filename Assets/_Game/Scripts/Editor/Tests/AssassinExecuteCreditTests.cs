@@ -22,7 +22,7 @@ namespace CluckWars.Tests
     /// instance of the type the receiver asks for. The ledger maths that bounds the loot is pure
     /// and is exercised for real.
     /// <para>
-    /// The two ids are deliberately DIFFERENT types. <c>RPC_TransferAllToBountyBag</c> resolves an
+    /// The two ids are deliberately DIFFERENT types. <c>RPC_TransferAllToExecutor</c> resolves an
     /// <c>AssassinExecute</c> (it checks the mark, <c>TryResolveExecutor</c>, 7cb18c6), so Press
     /// passes its own <c>Id</c> there; <c>CreditKillToAttacker</c> resolves a
     /// <c>ChickenCombat</c>, so Press passes <c>_combat.Id</c>. The unmerged
@@ -36,11 +36,14 @@ namespace CluckWars.Tests
         private const string ChickenCargoPath    = "Assets/_Game/Scripts/Gameplay/ChickenCargo.cs";
         private const string ChickenCombatPath   = "Assets/_Game/Scripts/Gameplay/ChickenCombat.cs";
 
-        private const string TransferCall = "RPC_TransferAllToBountyBag(";
+        private const string TransferCall = "RPC_TransferAllToExecutor(";
         private const string RemovalCall  = "RPC_ExecuteRemoval(";
 
-        // A write to the bag (=, +=, -=), not a mention: the transfer RPC's own name contains it.
-        private const string BountyBagWrite = @"\bBountyBag\s*[+\-]?=(?!=)";
+        // A write to the ASSASSIN's cargo (=, +=, -=) from the victim's side: the proxy write that never replicates.
+        private const string AssassinCargoWrite = @"\bassassinCargo\.Cargo\s*[+\-]?=(?!=)";
+        // Any write to a Cargo property through a receiver, not the chicken's own (`Cargo += x`): Press and PayExecuteBounty must pay through
+        // ChickenCargo.CreditExecuteBounty only.
+        private const string CargoWriteThroughReceiver = @"\b_?cargo\.Cargo\s*[+\-]?=(?!=)";
 
         // ---- 1. The ids Press hands out, against what the receivers resolve -------------
 
@@ -75,7 +78,7 @@ namespace CluckWars.Tests
         public void TransferRpc_IsHandedThisAssassinExecutesOwnId_WhichIsWhatTheExecutorCheckResolves()
         {
             Assert.AreEqual("Id", FirstArgumentOfSoleCallTo(AssassinExecutePath, TransferCall),
-                "RPC_TransferAllToBountyBag validates its caller through TryResolveExecutor, which " +
+                "RPC_TransferAllToExecutor validates its caller through TryResolveExecutor, which " +
                 "resolves an AssassinExecute and checks its MarkedTarget. Any other behaviour's id " +
                 "(e.g. '_cargo.Id', as the pre-7cb18c6 fix branch passed) is rejected on every execute.");
 
@@ -88,12 +91,12 @@ namespace CluckWars.Tests
         // ---- 2. Which side of the wire the loot is banked on ----------------------------
 
         [Test]
-        public void TransferRpc_NeverWritesBountyBag_AndReportsTheDrainBackAfterZeroing()
+        public void TransferRpc_NeverWritesTheAssassinsCargo_AndReportsTheDrainBackAfterZeroing()
         {
-            string body = MethodBody(ChickenCargoPath, "public void RPC_TransferAllToBountyBag(");
+            string body = MethodBody(ChickenCargoPath, "public void RPC_TransferAllToExecutor(");
 
-            Assert.IsFalse(Regex.IsMatch(body, BountyBagWrite),
-                "RPC_TransferAllToBountyBag writes BountyBag again. It runs on the VICTIM's authority, " +
+            Assert.IsFalse(Regex.IsMatch(body, AssassinCargoWrite),
+                "RPC_TransferAllToExecutor writes the assassin's Cargo. It runs on the VICTIM's authority, " +
                 "where the assassin's cargo is a proxy: a [Networked] write there never replicates and " +
                 "the loot vanishes in Shared-mode PvP. Report the drain via RPC_CreditExecuteLoot.");
 
@@ -120,27 +123,61 @@ namespace CluckWars.Tests
             int sender  = body.IndexOf("RpcClaim.SenderSpeaksFor(victim, info)", StringComparison.Ordinal);
             int local   = sender;
             int consume = body.IndexOf("StealRules.TryResolveExecuteLoot(_pendingExecutes, victimId", StringComparison.Ordinal);
-            int bank    = body.IndexOf("BountyBag += allowed", StringComparison.Ordinal);
+            int fit     = body.IndexOf("FoodTransferRules.Fit(allowed, FreeSpace)", StringComparison.Ordinal);
+            int bank    = body.IndexOf("Cargo += gained", StringComparison.Ordinal);
 
             Assert.Greater(sender, 0, "the wire sender must be the victim's state authority");
             Assert.Greater(local, 0, "a local invoke must have the victim simulated here");
             Assert.Greater(consume, Math.Max(sender, local), "the pending record is consumed only after attribution");
-            Assert.Greater(bank, consume, "bank only what the ledger allowed, never the raw report");
-            StringAssert.DoesNotContain("BountyBag += amount", body, "the raw report must never be banked");
+            Assert.Greater(fit, consume, "the loot is held to this authority's free room, from what the ledger allowed, never the raw report");
+            Assert.Greater(bank, fit, "credit only what fitted: capped by the free room on the crediting side, no optimistic double credit");
+            StringAssert.DoesNotContain("Cargo += amount", body, "the raw report must never be banked");
+            StringAssert.DoesNotContain("Cargo += allowed", body, "what the ledger allowed is held to the free room before it is credited");
         }
 
         [Test]
         public void Press_PaysOnlyTheFlatBountyItself_TheLootArrivesByReport()
         {
-            Assert.IsFalse(Regex.IsMatch(MethodBody(AssassinExecutePath, "public bool Press("), BountyBagWrite),
+            Assert.IsFalse(Regex.IsMatch(MethodBody(AssassinExecutePath, "public bool Press("), CargoWriteThroughReceiver),
                 "the bounty follows the kill report, so a refused removal pays nothing");
             string pay = MethodBody(AssassinExecutePath, "public void PayExecuteBounty(");
-            var credits = Regex.Matches(pay, @"BountyBag\s*\+=\s*([^;]+);").Cast<Match>().ToArray();
+            Assert.IsFalse(Regex.IsMatch(pay, CargoWriteThroughReceiver),
+                "PayExecuteBounty never writes the cargo itself: the free-room limit lives in ChickenCargo.CreditExecuteBounty");
+            var credits = Regex.Matches(pay, @"\.CreditExecuteBounty\(([^)]*)\)").Cast<Match>().ToArray();
             Assert.AreEqual(1, credits.Length,
-                "The bounty bag is written exactly once - the flat execute bounty. Crediting the " +
+                "The cargo is credited exactly once from the kill report - the flat execute bounty. Crediting the " +
                 "victim's cargo here reads a lagging proxy and double-pays food the victim banked " +
                 "while stunned in its own base (CW-050).");
             Assert.AreEqual("bounty", credits[0].Groups[1].Value.Trim());
+        }
+
+        [Test]
+        public void CreditExecuteBounty_IsHeldToTheFreeRoom_OnTheKillersOwnAuthority()
+        {
+            string body = MethodBody(ChickenCargoPath, "public float CreditExecuteBounty(");
+            int authority = body.IndexOf("if (!HasStateAuthority) return 0f;", StringComparison.Ordinal);
+            int fit = body.IndexOf("FoodTransferRules.Fit(bounty, FreeSpace)", StringComparison.Ordinal);
+            int credit = body.IndexOf("Cargo += gained", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(authority, 0, "the bounty is written only on the killer's state authority");
+            Assert.Greater(fit, authority, "the bounty is held to the free room (capacity less cargo less open requests)");
+            Assert.Greater(credit, fit, "credit what fitted, never the raw bounty");
+        }
+
+        [TestCase(25f, 12f, 15f, 12f, 13f, 2f)]    // the victim's beak first, then the bounty into the room left
+        [TestCase(25f, 25f, 15f, 25f, 0f, 15f)]    // a full Fatty beak fills the Spoiler: the bounty is not gained
+        [TestCase(25f, 40f, 15f, 25f, 0f, 30f)]    // a beak above the room: the rest is neither gained nor left on the victim
+        [TestCase(25f, 0f, 15f, 0f, 15f, 0f)]      // an empty-handed victim: the bounty alone
+        [TestCase(10f, 9f, 15f, 9f, 1f, 14f)]      // the shared Sneaky class capacity, a Thief
+        [TestCase(0f, 8f, 15f, 0f, 0f, 23f)]       // no room at all
+        public void KillLoot_IsTheVictimsBeakFirst_ThenTheBounty_BothHeldToTheFreeRoom(
+            float room, float victimBeak, float bounty, float expLoot, float expBounty, float expUnfit)
+        {
+            float loot = FoodTransferRules.Fit(victimBeak, room);
+            float bountyGained = FoodTransferRules.Fit(bounty, room - loot);
+            Assert.AreEqual(expLoot, loot, 1e-5f);
+            Assert.AreEqual(expBounty, bountyGained, 1e-5f);
+            Assert.AreEqual(expUnfit, victimBeak + bounty - loot - bountyGained, 1e-5f, "what does not fit is not gained");
+            Assert.LessOrEqual(loot + bountyGained, Math.Max(0f, room) + 1e-5f, "the hold never exceeds its capacity");
         }
 
         [Test]
@@ -194,7 +231,7 @@ namespace CluckWars.Tests
                 "report back run synchronously inside the call");
 
             StringAssert.DoesNotContain(RemovalCall, gated, "a shelled victim is still executed");
-            Assert.IsFalse(Regex.IsMatch(gated, BountyBagWrite), "a shelled victim still pays the flat bounty");
+            StringAssert.DoesNotContain("CreditExecuteBounty", gated, "a shelled victim still pays the flat bounty");
             StringAssert.Contains(RemovalCall, press);
             StringAssert.Contains("PayExecuteBounty(victim)", System.IO.File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs"));
         }

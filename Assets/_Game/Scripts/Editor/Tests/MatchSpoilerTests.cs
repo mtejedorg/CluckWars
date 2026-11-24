@@ -13,7 +13,7 @@ using MatchEventKind = CluckWars.Balance.MatchEventKind;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// The Spoiler's Death Mark, the execution, the removal, the bounty bag, the passive's bonus, the Thief's steal multiplier and the
+    /// The Spoiler's Death Mark, the execution, the removal, the kill loot, the passive's bonus, the Thief's steal multiplier and the
     /// forced-kills design, on synthetic maps and kits. Every number is the test's own (the one shipped-asset test reads the passives'
     /// hooks); no test asserts a win rate.
     /// </summary>
@@ -275,7 +275,7 @@ namespace CluckWars.Tests
         };
 
         [Test]
-        public void Kill_PaysCargoPlusBountyIntoTheBag_AndRemovesTheVictim()
+        public void Kill_PaysCargoPlusBountyIntoTheCargo_AndRemovesTheVictim()
         {
             const float amount = 6f, removal = 3f;
             var trace = new List<Glimpse>();
@@ -290,7 +290,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, kill.Other);
             Assert.AreEqual(amount + Bounty, kill.Amount, 1e-4f, "its beak plus the flat bounty");
             Assert.AreEqual(amount + Bounty, r.Counters[0].Bounty, 1e-4f);
-            Assert.AreEqual(amount + Bounty, r.Banked[0], 1e-3f, "the bag banks at the Spoiler's own base");
+            Assert.AreEqual(amount + Bounty, r.Banked[0], 1e-3f, "the loot banks at the Spoiler's own base");
             Assert.AreEqual(0f, r.Banked[1], "the victim lost what it carried");
 
             Assert.IsTrue(trace.First(t => t.Time >= kill.Time + Tick).Removed, "out of play after the kill");
@@ -358,7 +358,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(MatchSim.Spawn(map, 1).y, back.Pos.y, 1e-3f);
         }
 
-        // ---- the Spoiler's bonus, the bag, the Thief ----
+        // ---- the Spoiler's bonus, the kill loot, the Thief ----
 
         private static PolicyFactory Farm() => MatchTestKit.Policy((v, s) =>
             v.Seats[s].Cargo > 0f
@@ -419,20 +419,93 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Bag_IsBankedAtTheBase_AndIsStealable()
+        public void KillLoot_IsBankedAtTheBase_AndIsStealable_LikeAnyCargo()
         {
-            // At home the bag banks, whole.
+            // At home the loot banks, whole.
             var home = BagRun(null, null, 0f);
-            Assert.AreEqual(Bounty, home.Banked[0], 1e-3f, "an empty rival pays only the flat bounty, and the bag banks it");
+            Assert.AreEqual(Bounty, home.Banked[0], 1e-3f, "an empty rival pays only the flat bounty, and it banks");
 
-            // Away from home the bag can be stolen: the beak is empty, so the steal takes from the bag.
+            // Away from home the loot can be stolen: it is the Spoiler's cargo, nothing else.
             const float nominal = 3f;
             var robbed = BagRun(Vector2.zero, MatchTestKit.Steal(Big, nominal, 20f), 2f);
-            float expected = StealMath.Clamp(nominal, 100f, StealRules.Stealable(0f, Bounty));
+            float expected = StealMath.Clamp(nominal, 100f, StealRules.Stealable(Bounty));
             Assert.Greater(expected, 0f);
-            Assert.AreEqual(expected, robbed.Counters[2].Stolen, 1e-4f, "taken from the bag, since the beak was empty");
+            Assert.AreEqual(expected, robbed.Counters[2].Stolen, 1e-4f, "taken from the cargo the kill filled");
             Assert.AreEqual(expected, robbed.Counters[0].LostToSteals, 1e-4f);
             Assert.AreEqual(expected, robbed.Counters[2].StolenFromSeat[0], 1e-4f);
+        }
+
+        // ---- the kill loot is ordinary cargo, held to the killer's capacity (Maestro, 2026-11-24: no capacity-free bag) ----
+
+        // A Spoiler of the given capacity executes a victim whose beak holds `beak` when the Kill lands.
+        private static MatchResult CapacityKill(int spoilerCapacity, float beak)
+        {
+            var spoiler = MatchTestKit.Fighter("spoiler", 100f, new[] { MatchTestKit.Stun(Big, 8f, 30f), Mark(removal: 3f) }, capacity: spoilerCapacity);
+            var victim = MatchTestKit.Fighter("victim", 100f, new MatchAbility[0], peckAmount: beak, peckCooldown: 50f, castSeconds: 0.2f);
+            var (r, _) = KillDuel(spoiler, victim, Plan(null, null, (1.5f, 1), (1.6f, 0), (3f, 1)), MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1)));
+            return r;
+        }
+
+        [Test]
+        public void Kill_FillsTheBeakWithTheVictimsCargoFirst_ThenTheBountyIntoTheRoomLeft()
+        {
+            const int capacity = 10;
+            const float beak = 6f;
+            var r = CapacityKill(capacity, beak);
+            Assert.AreEqual(1, r.Kills[0]);
+            float room = capacity - beak;
+            float bountyKept = Mathf.Min(Bounty, room);
+            var c = r.Counters[0];
+            Assert.AreEqual(beak, c.KillCargoFromSeat[1], 1e-4f, "the victim's whole beak was drained");
+            Assert.AreEqual(beak + bountyKept, c.KillGainedFromSeat[1], 1e-4f, "its beak first, then the bounty into what room is left");
+            Assert.AreEqual(Bounty - bountyKept, c.KillUnfitFromSeat[1], 1e-4f, "the part of the bounty that did not fit is not gained");
+            Assert.AreEqual(beak + bountyKept, Of(r, MatchEventKind.Kill).Single().Amount, 1e-4f);
+            Assert.AreEqual(beak + bountyKept, r.Banked[0], 1e-3f, "what fitted banks; nothing more was ever in the beak");
+            Assert.LessOrEqual(r.Banked[0], capacity + 1e-3f, "the hold never exceeds its capacity");
+        }
+
+        [Test]
+        public void Kill_OnAVictimWithABeakBiggerThanTheRoom_TakesWhatFits_AndLeavesNothingOnTheVictim()
+        {
+            // The Fatty case: a beak larger than the Spoiler's whole capacity. The bounty finds no room, the rest of the beak is gone with the victim.
+            const int capacity = 4;
+            const float beak = 8f;
+            var r = CapacityKill(capacity, beak);
+            Assert.AreEqual(1, r.Kills[0]);
+            var c = r.Counters[0];
+            Assert.AreEqual(beak, c.KillCargoFromSeat[1], 1e-4f, "the victim is emptied whatever fits");
+            Assert.AreEqual(capacity, c.KillGainedFromSeat[1], 1e-4f, "the Spoiler's beak is full, no more");
+            Assert.AreEqual(beak + Bounty - capacity, c.KillUnfitFromSeat[1], 1e-4f, "the bounty and the rest of the beak did not fit");
+            Assert.AreEqual(capacity, r.Banked[0], 1e-3f);
+            Assert.AreEqual(0f, r.Banked[1], "the victim carried nothing to bank");
+        }
+
+        [Test]
+        public void Kill_WithATinyBeak_StillScoresTheKill_AndGainsOnlyWhatFits()
+        {
+            var r = CapacityKill(1, 8f);
+            Assert.AreEqual(1, r.Kills[0], "the kill itself is not conditional on room");
+            Assert.LessOrEqual(r.Counters[0].KillGainedFromSeat[1], 1f + 1e-4f);
+        }
+
+        [Test]
+        public void SpoilerCapacity_ComesFromThePassiveFloor_NotFromTheSharedClassStat()
+        {
+            var spoiler = AssetDatabase.LoadAssetAtPath<SpoilerPassiveSO>("Assets/_Game/Data/Abilities/Passives/Spoiler.asset");
+            var thief = AssetDatabase.LoadAssetAtPath<ThiefPassiveSO>("Assets/_Game/Data/Abilities/Passives/Thief.asset");
+            var sneaky = AssetDatabase.LoadAssetAtPath<ChickenStatsSO>("Assets/_Game/Data/Classes/Assassin.asset");
+            Assert.IsNotNull(spoiler);
+            Assert.IsNotNull(thief);
+            Assert.IsNotNull(sneaky);
+
+            float stat = sneaky.CargoCapacity;
+            Assert.AreEqual(Mathf.Max(stat, spoiler.MinimumCapacity), spoiler.ModifyCargoCapacity(stat, null), 1e-4f, "the floor, like the Hoarder's");
+            Assert.Greater(spoiler.ModifyCargoCapacity(stat, null), stat, "the Spoiler carries more than the shared class stat");
+            Assert.AreEqual(Mathf.Max(stat, thief.MinimumCapacity), thief.ModifyCargoCapacity(stat, null), 1e-4f, "the Thief reads the same stat through his own floor");
+
+            var fresh = ScriptableObject.CreateInstance<SpoilerPassiveSO>();
+            try { Assert.AreEqual(spoiler.MinimumCapacity, fresh.MinimumCapacity, 1e-6f, "the default is the shipped value"); }
+            finally { UnityEngine.Object.DestroyImmediate(fresh); }
         }
 
         private static MatchResult ThiefRun(MatchPassive passive, float nominal, float victimAmount)

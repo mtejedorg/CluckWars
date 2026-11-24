@@ -92,8 +92,8 @@ perk.hoarder.line,Carry {cap} food in one trip.
 perk.hoarder.detail,Carries at least {cap} food.
 perk.featherfoot.line,Bank {pct}% faster. Piles and bumps never slow you.
 perk.featherfoot.detail,"You bank food {pct}% faster, and food piles and bumping into rivals never slow you down."
-perk.spoiler.line,+{food} food if time runs out.
-perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first."
+perk.spoiler.line,+{food} food if time runs out. Carry {cap} food.
+perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first. A kill fills your beak: you carry up to {cap} food."
 loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.

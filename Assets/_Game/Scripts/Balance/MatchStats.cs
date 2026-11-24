@@ -162,7 +162,7 @@ namespace CluckWars.Balance
         {
             if (played == null) throw new ArgumentNullException(nameof(played));
             int wins = 0, winsWith = 0, clock = 0;
-            double final = 0.0, bagMade = 0.0, bagBanked = 0.0;
+            double final = 0.0, lootMade = 0.0, lootBanked = 0.0;
             foreach (var (r, seat) in played)
             {
                 if (r.WinnerWithoutSpoilerBonus == seat) wins++;
@@ -170,8 +170,8 @@ namespace CluckWars.Balance
                 if (r.NobodyReachedTarget) clock++;
                 final += r.Banked[seat];
                 var c = r.Counters[seat];
-                bagMade += c.LootTakeFood + c.LootBountyFood;
-                bagBanked += Math.Min(c.LootBankedFood, c.LootTakeFood + c.LootBountyFood);
+                lootMade += c.LootTakeFood + c.LootBountyFood;
+                lootBanked += Math.Min(c.LootBankedFood, c.LootTakeFood + c.LootBountyFood);
             }
             int n = played.Count;
             var row = new LootStealRow
@@ -180,7 +180,7 @@ namespace CluckWars.Balance
                 Win = WinInterval.Wilson(wins, n),
                 WinWithPrize = WinInterval.Wilson(winsWith, n),
                 MeanFinal = n > 0 ? (float)(final / n) : float.NaN,
-                BankedShare = bagMade > 0.0 ? (float)(bagBanked / bagMade) : float.NaN,
+                BankedShare = lootMade > 0.0 ? (float)(lootBanked / lootMade) : float.NaN,
                 NobodyReachedTarget = n > 0 ? clock / (float)n : float.NaN,
             };
             if (targets != null)

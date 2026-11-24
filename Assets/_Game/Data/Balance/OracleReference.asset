@@ -752,3 +752,348 @@ MonoBehaviour:
       Low: 0.12191
       High: 0.14925662
       Trials: 2400
+  - AcceptedOn: 2026-11-24
+    Note: 'Spoiler kill loot is ordinary cargo held to a 25 beak, no capacity-free
+      bag (Maestro 2026-11-24, BL-217): a record of the shipped state, not an acceptance
+      of balance'
+    BalanceHash: 5465b825
+    Design: Mixed, OnePerClass
+    Population: P0, P1, Mixed
+    RunSeed: 0x0000000001352902
+    Lines:
+    - Label: Speedy_Slippery
+      Population: P0
+      IsClass: 0
+      Rate: 0.34666666
+      Low: 0.3266084
+      High: 0.36728492
+      Trials: 2100
+    - Label: Speedy_Featherfoot
+      Population: P0
+      IsClass: 0
+      Rate: 0.34428573
+      Low: 0.32426476
+      High: 0.36487532
+      Trials: 2100
+    - Label: Fatty_Hoarder
+      Population: P0
+      IsClass: 0
+      Rate: 0.5090476
+      Low: 0.48766878
+      High: 0.5303934
+      Trials: 2100
+    - Label: Fatty_Bulwark
+      Population: P0
+      IsClass: 0
+      Rate: 0.3209524
+      Low: 0.3013277
+      High: 0.34123096
+      Trials: 2100
+    - Label: Warrior_Relentless
+      Population: P0
+      IsClass: 0
+      Rate: 0.07190476
+      Low: 0.06161995
+      High: 0.083752975
+      Trials: 2100
+    - Label: Warrior_Bully
+      Population: P0
+      IsClass: 0
+      Rate: 0.18714286
+      Low: 0.17103788
+      High: 0.20439038
+      Trials: 2100
+    - Label: Assassin_Spoiler
+      Population: P0
+      IsClass: 0
+      Rate: 0.19619048
+      Low: 0.17976682
+      High: 0.21372364
+      Trials: 2100
+    - Label: Assassin_Thief
+      Population: P0
+      IsClass: 0
+      Rate: 0.023809524
+      Low: 0.018106606
+      High: 0.031251483
+      Trials: 2100
+    - Label: Warrior
+      Population: P0
+      IsClass: 1
+      Rate: 0.12952381
+      Low: 0.11970625
+      High: 0.14001848
+      Trials: 4200
+    - Label: Warrior (one per class)
+      Population: P0
+      IsClass: 1
+      Rate: 0.080416664
+      Low: 0.07019549
+      High: 0.09197892
+      Trials: 2400
+    - Label: Speedy
+      Population: P0
+      IsClass: 1
+      Rate: 0.34547618
+      Low: 0.33124182
+      High: 0.35999298
+      Trials: 4200
+    - Label: Speedy (one per class)
+      Population: P0
+      IsClass: 1
+      Rate: 0.39375
+      Low: 0.37438738
+      High: 0.4134522
+      Trials: 2400
+    - Label: Fatty
+      Population: P0
+      IsClass: 1
+      Rate: 0.415
+      Low: 0.40018266
+      High: 0.42997268
+      Trials: 4200
+    - Label: Fatty (one per class)
+      Population: P0
+      IsClass: 1
+      Rate: 0.43125
+      Low: 0.41156125
+      High: 0.4511585
+      Trials: 2400
+    - Label: Assassin
+      Population: P0
+      IsClass: 1
+      Rate: 0.11
+      Low: 0.100891136
+      High: 0.11982165
+      Trials: 4200
+    - Label: Assassin (one per class)
+      Population: P0
+      IsClass: 1
+      Rate: 0.09458333
+      Low: 0.08351468
+      High: 0.10694778
+      Trials: 2400
+    - Label: Speedy_Slippery
+      Population: P1
+      IsClass: 0
+      Rate: 0.4757143
+      Low: 0.45441797
+      High: 0.49709928
+      Trials: 2100
+    - Label: Speedy_Featherfoot
+      Population: P1
+      IsClass: 0
+      Rate: 0.50476193
+      Low: 0.48338836
+      High: 0.52611804
+      Trials: 2100
+    - Label: Fatty_Hoarder
+      Population: P1
+      IsClass: 0
+      Rate: 0.15809524
+      Low: 0.14311726
+      High: 0.17432185
+      Trials: 2100
+    - Label: Fatty_Bulwark
+      Population: P1
+      IsClass: 0
+      Rate: 0.35619047
+      Low: 0.33598837
+      High: 0.37691775
+      Trials: 2100
+    - Label: Warrior_Relentless
+      Population: P1
+      IsClass: 0
+      Rate: 0.113809526
+      Low: 0.10092569
+      High: 0.12810372
+      Trials: 2100
+    - Label: Warrior_Bully
+      Population: P1
+      IsClass: 0
+      Rate: 0.18952382
+      Low: 0.17333359
+      High: 0.20684789
+      Trials: 2100
+    - Label: Assassin_Spoiler
+      Population: P1
+      IsClass: 0
+      Rate: 0.19619048
+      Low: 0.17976682
+      High: 0.21372364
+      Trials: 2100
+    - Label: Assassin_Thief
+      Population: P1
+      IsClass: 0
+      Rate: 0.0057142857
+      Low: 0.0032718158
+      High: 0.00996188
+      Trials: 2100
+    - Label: Warrior
+      Population: P1
+      IsClass: 1
+      Rate: 0.15166667
+      Low: 0.14113702
+      High: 0.16283295
+      Trials: 4200
+    - Label: Warrior (one per class)
+      Population: P1
+      IsClass: 1
+      Rate: 0.08625
+      Low: 0.07566908
+      High: 0.09815335
+      Trials: 2400
+    - Label: Speedy
+      Population: P1
+      IsClass: 1
+      Rate: 0.4902381
+      Low: 0.4751351
+      High: 0.50535893
+      Trials: 4200
+    - Label: Speedy (one per class)
+      Population: P1
+      IsClass: 1
+      Rate: 0.54875
+      Low: 0.528779
+      High: 0.5685652
+      Trials: 2400
+    - Label: Fatty
+      Population: P1
+      IsClass: 1
+      Rate: 0.25714287
+      Low: 0.2441508
+      High: 0.27057877
+      Trials: 4200
+    - Label: Fatty (one per class)
+      Population: P1
+      IsClass: 1
+      Rate: 0.27916667
+      Low: 0.26158312
+      High: 0.29745603
+      Trials: 2400
+    - Label: Assassin
+      Population: P1
+      IsClass: 1
+      Rate: 0.10095238
+      Low: 0.0922026
+      High: 0.11043149
+      Trials: 4200
+    - Label: Assassin (one per class)
+      Population: P1
+      IsClass: 1
+      Rate: 0.08583333
+      Low: 0.07527759
+      High: 0.097712845
+      Trials: 2400
+    - Label: Speedy_Slippery
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.40238094
+      Low: 0.3816038
+      High: 0.4235146
+      Trials: 2100
+    - Label: Speedy_Featherfoot
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.42571428
+      Low: 0.4047208
+      High: 0.44697908
+      Trials: 2100
+    - Label: Fatty_Hoarder
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.26809523
+      Low: 0.24958523
+      High: 0.28745216
+      Trials: 2100
+    - Label: Fatty_Bulwark
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.31238094
+      Low: 0.292916
+      High: 0.3325311
+      Trials: 2100
+    - Label: Warrior_Relentless
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.123809524
+      Low: 0.11040542
+      High: 0.13858747
+      Trials: 2100
+    - Label: Warrior_Bully
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.18761905
+      Low: 0.17149694
+      High: 0.20488197
+      Trials: 2100
+    - Label: Assassin_Spoiler
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.25142857
+      Low: 0.23333845
+      High: 0.27042648
+      Trials: 2100
+    - Label: Assassin_Thief
+      Population: Mixed
+      IsClass: 0
+      Rate: 0.028571429
+      Low: 0.022261364
+      High: 0.03660314
+      Trials: 2100
+    - Label: Warrior
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.15571429
+      Low: 0.1450636
+      High: 0.16699421
+      Trials: 4200
+    - Label: Warrior (one per class)
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.11291666
+      Low: 0.100868
+      High: 0.12620254
+      Trials: 2400
+    - Label: Speedy
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.41404763
+      Low: 0.39923614
+      High: 0.42901617
+      Trials: 4200
+    - Label: Speedy (one per class)
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.46291667
+      Low: 0.44304273
+      High: 0.48290914
+      Trials: 2400
+    - Label: Fatty
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.29023808
+      Low: 0.27670807
+      High: 0.3041515
+      Trials: 4200
+    - Label: Fatty (one per class)
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.30458334
+      Low: 0.28649464
+      High: 0.32329664
+      Trials: 2400
+    - Label: Assassin
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.14
+      Low: 0.12983453
+      High: 0.15082343
+      Trials: 4200
+    - Label: Assassin (one per class)
+      Population: Mixed
+      IsClass: 1
+      Rate: 0.11958333
+      Low: 0.10720577
+      High: 0.13317679
+      Trials: 2400

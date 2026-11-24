@@ -28,7 +28,7 @@ namespace CluckWars.Abilities
         [Min(0.01f)] public float LootBaseWeight = 4f;
         [Tooltip("Lottery weight per food banked at the rival's base (Maestro: it weighs a lot).")]
         [Min(0f)] public float LootBankedWeight = 1f;
-        [Tooltip("Lottery weight per food the rival carries, beak plus bounty bag (Maestro: somewhat less than banked).")]
+        [Tooltip("Lottery weight per food the rival carries, the food it holds (Maestro: somewhat less than banked).")]
         [Min(0f)] public float LootCarriedWeight = 0.5f;
         [Tooltip("Banked plus carried above this share of the match's win target earns the over bonus (0.625 of 40 is Maestro's 25).")]
         [Range(0f, 2f)] public float LootOverFraction = 0.625f;

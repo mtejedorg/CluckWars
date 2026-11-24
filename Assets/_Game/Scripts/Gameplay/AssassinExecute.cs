@@ -13,7 +13,7 @@ namespace CluckWars.Gameplay
     /// Press: mark a living rival anywhere, picked at random but weighted by how far it is from its own base, never the last
     /// mark unless it is the only rival (<see cref="MarkPickRules"/>). The Assassin then finds it, stuns it (his
     /// own Ambush or anyone's stun) and presses again within kill range before the window runs out. The numbers are data, on
-    /// <c>MarkKill.asset</c>. Success: transfer ALL cargo to capacity-exempt bounty bag + ~2s target removal.
+    /// <c>MarkKill.asset</c>. Success: transfer ALL cargo into the killer's ordinary cargo (as far as it fits) + ~2s target removal.
     /// Counterplays: run out the clock; stun the Assassin (denies the kill); reach your own base, where no ability reaches you.
     /// The mark does not end at home or at any range: only expiry, a kill, or the target leaving play ends it.
     /// </summary>
@@ -112,18 +112,20 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The execute bounty, on this Assassin's authority once the victim's authority reported the kill. Every other Assassin
         /// income route - Snatch, Sneaky Steal, the cargo transfer - needs the victim to be carrying, so without this an execute
-        /// on an empty-handed rival pays nothing and the class can be starved out early. Paid into the bounty bag rather than
-        /// onto the ground so a bystander cannot vulture it.
+        /// on an empty-handed rival pays nothing and the class can be starved out early. Paid into the ordinary cargo, into the room the
+        /// victim's cargo left (Maestro, 2026-11-24: no capacity-free store, a big beak is the Fatty's identity); what does not fit is
+        /// not gained. Never onto the ground, so a bystander cannot vulture it.
         /// </summary>
         public void PayExecuteBounty(ChickenController victim)
         {
+            if (_cargo == null) return;
             float bounty = ResolveExecuteBounty();
-            if (_cargo != null)
-                _log?.Info(MatchTelemetry.Source, MatchTelemetry.Kill(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(_controller), MatchTelemetry.Seat(victim),
-                    bounty, _cargo.TakeExecuteLootForTelemetry(victim.Id), _killedWhilePecking));
-            if (bounty <= 0f || _cargo == null) return;
-            _cargo.BountyBag += bounty;
-            _log?.Info(Source, $"Kill Executed! +{bounty:0.#} execute bounty into the bounty bag for {victim.name}.");
+            float gained = _cargo.CreditExecuteBounty(bounty);
+            _cargo.TakeExecuteLootForTelemetry(victim.Id, out float drained, out float lootGained);
+            _log?.Info(MatchTelemetry.Source, MatchTelemetry.Kill(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(_controller), MatchTelemetry.Seat(victim),
+                bounty, drained, lootGained + gained, _killedWhilePecking));
+            if (bounty <= 0f) return;
+            _log?.Info(Source, $"Kill Executed! +{gained:0.#} of the {bounty:0.#} execute bounty into the cargo for {victim.name} ({bounty - gained:0.#} did not fit).");
         }
 
         private ChickenController _controller;
@@ -196,7 +198,7 @@ namespace CluckWars.Gameplay
                     return false;
                 }
 
-                // Without these siblings there is no kill-credit id to hand out and no bag to
+                // Without these siblings there is no kill-credit id to hand out and no cargo to
                 // pay into, so say so rather than executing for free.
                 if (_cargo == null || _combat == null)
                 {
@@ -231,13 +233,13 @@ namespace CluckWars.Gameplay
                     // ChickenCargo.RPC_CreditExecuteLoot, so food the victim banked while stunned
                     // on its own doorstep is never paid twice. The expectation is recorded first
                     // because on a shared authority (solo, bots) both RPCs run synchronously
-                    // inside this call. RPC_TransferAllToBountyBag takes THIS behaviour's Id on
+                    // inside this call. RPC_TransferAllToExecutor takes THIS behaviour's Id on
                     // purpose: its receiver resolves an AssassinExecute and checks the mark.
                     bool takesCargo = StealRules.CanStealFrom(target);
                     if (takesCargo)
                     {
                         _cargo.ExpectExecuteLoot(target);
-                        target.Cargo.RPC_TransferAllToBountyBag(Id);
+                        target.Cargo.RPC_TransferAllToExecutor(Id);
                     }
 
                     // The victim's authority reports the kill back through RPC_CreditKill, which

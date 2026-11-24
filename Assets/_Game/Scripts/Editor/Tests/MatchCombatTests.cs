@@ -172,7 +172,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Steal_TakesFromCargoThenBag_CappedByFreeRoom()
+        public void Steal_IsTakenFromTheCargo_CappedByFreeRoom()
         {
             // In the simulation: the victim holds 6 (one Peck of 6), the thief has room for 4, wants 5.
             var r = StealRun(thiefCapacity: 4, factor: 1f, nominal: 5f);
@@ -181,11 +181,9 @@ namespace CluckWars.Tests
             Assert.AreEqual(expected, r.Counters[0].LostToSteals, 1e-4f);
             Assert.AreEqual(expected, r.Counters[1].StolenFromSeat[0], 1e-4f);
 
-            // The split between beak and bag is the game's own rule (the sim's bags fill from slice S4 on).
-            StealRules.SplitDrain(5f, 2f, 10f, out float fromCargo, out float fromBag);
-            Assert.AreEqual(2f, fromCargo, 1e-5f, "the beak first");
-            Assert.AreEqual(3f, fromBag, 1e-5f, "then the bag");
-            Assert.AreEqual(5f, MatchCombat.StealTake(5f, 1f, 100f, 2f, 10f), 1e-5f);
+            // There is no second store (the capacity-free bag is gone): a steal takes at most what the victim's cargo holds, the game's own rule.
+            Assert.AreEqual(2f, StealRules.DrainAmount(5f, 2f), 1e-5f);
+            Assert.AreEqual(2f, MatchCombat.StealTake(5f, 1f, 100f, 2f), 1e-5f);
         }
 
         [Test]

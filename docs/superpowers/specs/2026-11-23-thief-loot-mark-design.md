@@ -38,10 +38,13 @@ Given on the decision page `https://claude.ai/artifact/GN8NGtC569gTouuZ3ahPzT`. 
 
 ## 1b. Maestro's third note, 2026-11-24 (the loot is ordinary cargo)
 
-Received while round 2 was being built; it replaces the bounty-bag part of the design for the Thief (the Spoiler's execute bag is not touched here: Maestro is
-asked separately whether the same applies to it). His words:
+Received while round 2 was being built; it replaces the bounty-bag part of the design for the Thief (the Spoiler's execute bag was left for a separate question). His words:
 
 > "lo que dices de que la bolsa no ocupa lugar en la carga. Eso no me acaba de gustar... es como hacer trampas... no nos deja limitar la cantidad que tiene el pollo por back. Te podria estar campeando y si hace suficientes robos, pues a lo mejor podria ganar sin backear... Y eso le quita la identidad un poco al Fatty. Entonces yo prefiero no hacerlo asi. Prefiero subirle un poco la carga y que la bolsa vaya al bolsillo y se lo pueda robar y sea completamente normal."
+
+> **Note, 2026-11-24 (later the same day): the Spoiler's bag no longer exists either.** Maestro answered the separate question ("Sí, eso además le balancea en caso de que mate a un fatty. Pon 25 o así."):
+> an execute's loot (the victim's cargo, then `ExecuteBounty`) goes into the Spoiler's ordinary cargo, limited by free space, and his capacity is 25 through `SpoilerPassiveSO.MinimumCapacity`.
+> `ChickenCargo.BountyBag` is gone, so every mention below of "the Spoiler's bag" or "beak first, then bag" describes the design as it was when the section was written, not the game.
 
 What it means: no capacity-free bag. Everything a marked steal yields, the food taken and the new-food bounty, goes into the Thief's ordinary cargo, limited by free
 space, stealable, banked like any cargo (section 6: the stolen food first, then the bounty into the room left; the rest is lost). The Thief's carrying goes up a
@@ -59,8 +62,8 @@ Thief passive, so the capacity is `ThiefPassiveSO.MinimumCapacity`, a floor like
   victim cargo + bag)` (`MatchCombat.StealTake`; in the game `ChickenCargo.StealFrom`), drained beak first then bag
   (`StealRules.SplitDrain`), and lands in the thief's **beak** (capacity-limited). Assassin `CargoCapacity` 10.
 - **Kits with Steal** (they reference `Snatch.asset`): Thief, Relentless, Bully, Hoarder (`Passives/*.asset` `Kit`).
-- **The bounty bag** is `ChickenCargo.BountyBag` (`[Networked]`): ignores capacity, stealable (beak first, then bag),
-  banks at the base like the beak. The execute pays into it (`AssassinExecute.PayExecuteBounty`).
+- **The bounty bag** (removed 2026-11-24, see the note in section 1b) was `ChickenCargo.BountyBag` (`[Networked]`): ignored capacity, stealable (beak first, then bag),
+  banked at the base before the beak. The execute now pays into the ordinary cargo, held to the Spoiler's 25 (`AssassinExecute.PayExecuteBounty`).
 - **The mark lottery** is `MarkPickRules` (pure, Gameplay assembly): `Filter` drops the last mark unless it is the only
   rival; `PickWeighted` takes the highest `roll * home^2 * assassin * leader`; `LeaderWeight` is `MarkKill.asset`
   `LeaderPickWeight` 2 for the rival with the most banked food. Rolls are injected.

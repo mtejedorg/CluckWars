@@ -67,8 +67,6 @@ namespace CluckWars.Balance
         public Vector2 Pos;
         /// <summary>Food in the beak.</summary>
         public float Cargo;
-        /// <summary>Food in the Spoiler's bounty bag.</summary>
-        public float Bag;
         public float Banked;
         public bool Pecking;
         public bool Stunned;

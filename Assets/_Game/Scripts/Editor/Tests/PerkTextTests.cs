@@ -49,8 +49,9 @@ namespace CluckWars.Tests
                     return ($"Bank {Pct(f.DepositRateMultiplier - 1.0)}% faster. Piles and bumps never slow you.",
                             $"You bank food {Pct(f.DepositRateMultiplier - 1.0)}% faster, and food piles and bumping into rivals never slow you down.");
                 case SpoilerPassiveSO sp:
-                    return ($"+{sp.BonusFood} food if time runs out.",
-                            $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first.");
+                    int spCap = (int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero);
+                    return ($"+{sp.BonusFood} food if time runs out. Carry {spCap} food.",
+                            $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first. A kill fills your beak: you carry up to {spCap} food.");
                 default:
                     Assert.Fail($"{p.name} ({p.GetType().Name}) has no perk-text expectation. A new passive needs " +
                                 "a perk.*.line template in UiText.csv, PerkLineKey/PerkArgs on the class, and a row here.");
@@ -166,7 +167,8 @@ namespace CluckWars.Tests
             foreach (var p in ShippedPassives(out var cfg))
             {
                 if (!(p is SpoilerPassiveSO sp)) continue;
-                Assert.AreEqual($"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first.",
+                Assert.AreEqual($"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first. " +
+                    $"A kill fills your beak: you carry up to {(int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero)} food.",
                     sp.Description);
                 return;
             }
@@ -253,6 +255,7 @@ namespace CluckWars.Tests
                         break;
                     case SpoilerPassiveSO sp:
                         StringAssert.Contains($"{sp.BonusFood} bonus food", sp.Description);
+                        StringAssert.Contains($"carry up to {(int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero)} food", sp.Description);
                         break;
                     case FeatherfootPassiveSO f:
                         StringAssert.Contains("never slow", f.Description);

@@ -500,7 +500,7 @@ namespace CluckWars.Tests
         public void TheBounty_IsPaidOnTheKillReport_SoARefusedExecutePaysNothing_SourceGuard()
         {
             string press = AssassinExecuteCreditTests.MethodBody("Assets/_Game/Scripts/Gameplay/AssassinExecute.cs", "public bool Press(");
-            StringAssert.DoesNotContain("BountyBag +=", press, "a press the victim's authority refuses must leave no half-applied execute");
+            StringAssert.DoesNotContain("CreditExecuteBounty(", press, "a press the victim's authority refuses must leave no half-applied execute");
             StringAssert.Contains("PayExecuteBounty(", File.ReadAllText("Assets/_Game/Scripts/Gameplay/ChickenMatchStats.cs"));
         }
     }

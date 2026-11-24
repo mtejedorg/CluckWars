@@ -251,6 +251,12 @@ namespace CluckWars.Balance
                     AddRate("kills-played", $"{row.Kills} kills, with passive", pop, row.WinWithPassive, row.Label);
                 }
                 if (appear > 0) Add("spoiler", "kills per match", pop, kills / (float)appear, trials: (int)appear);
+                foreach (var l in s.KillLoot)
+                {
+                    Add("spoiler-loot", $"{l.Killer}, victim {l.Victim}: gained per kill", pop, l.GainedPerKill, trials: l.Kills);
+                    Add("spoiler-loot", $"{l.Killer}, victim {l.Victim}: did not fit per kill", pop, l.UnfitPerKill, trials: l.Kills);
+                    Add("spoiler-loot", $"{l.Killer}, victim {l.Victim}: victim's beak per kill", pop, l.CargoPerKill, trials: l.Kills);
+                }
                 if (s.ThiefIncome != null)
                 {
                     var t = s.ThiefIncome;
@@ -561,7 +567,7 @@ namespace CluckWars.Balance
             sb.AppendLine();
             sb.AppendLine("| Number | " + string.Join(" | ", pops) + " |");
             sb.AppendLine("|---|" + string.Join("|", pops.Select(_ => "---")) + "|");
-            foreach (var label in ls.Where(l => l.Group == "spoiler" || l.Group == "thief" || l.Group == "match").Select(l => (l.Group, l.Label)).Distinct())
+            foreach (var label in ls.Where(l => l.Group == "spoiler" || l.Group == "spoiler-loot" || l.Group == "thief" || l.Group == "match").Select(l => (l.Group, l.Label)).Distinct())
                 sb.AppendLine($"| {label.Group}: {label.Label} | " + string.Join(" | ", pops.Select(p =>
                 {
                     var l = Find(ls, label.Group, label.Label, p);
