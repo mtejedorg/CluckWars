@@ -664,8 +664,9 @@ namespace CluckWars.Gameplay
         /// </summary>
         /// <remarks>
         /// <paramref name="amount"/> is what the thief is entitled to after its own passive: an ability passes
-        /// <c>AbilityBaseSO.StealFrom</c>, which applies it. Every steal in the game comes through here, so the
-        /// "loaded thief cannot steal" and "a shell gives nothing" rules cannot differ between abilities.
+        /// <c>AbilityBaseSO.StealFrom</c>, which applies it. Every ordinary steal in the game comes through here, so the
+        /// "loaded thief cannot steal" and "a shell gives nothing" rules cannot differ between abilities. The Thief's marked rival has its own path
+        /// (<see cref="RequestMarkedSteal"/>), taken first by the Steal ability; every other steal comes through here.
         /// </remarks>
         public float StealFrom(ChickenController victim, float amount)
         {
@@ -959,7 +960,9 @@ namespace CluckWars.Gameplay
                 return;
             }
 
-            var settled = _marked.Settle(victimId, requestId, stolen, reached, Capacity, Cargo, Time.unscaledTime);
+            // "Marked rival removed: no pay" (BL-217): the bounty is owed only while the mark is still on this victim when the answer arrives.
+            bool markHolds = _loot != null && _loot.IsMarking(victim);
+            var settled = _marked.Settle(victimId, requestId, stolen, reached, markHolds, Capacity, Cargo, Time.unscaledTime);
             if (settled.Outcome == MarkedOutcome.Unknown)
             {
                 _log?.Warn(Source, $"{name}: rejected RPC_SettleMarkedSteal({stolen:0.00}) #{requestId} from {info.Source} - no such marked steal is open on {victim.name} " +

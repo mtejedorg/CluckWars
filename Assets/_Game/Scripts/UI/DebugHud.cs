@@ -403,7 +403,7 @@ namespace CluckWars.UI
         private static void AppendBalance(StringBuilder sb)
         {
             sb.Append("Balance ").Append(DiagnosticsReadout.BalanceHash)
-              .Append(" (").Append(DiagnosticsReadout.BalanceOrigin).AppendLine(")");
+              .Append(" (").Append(DiagnosticsReadout.BalanceOrigin).Append(")  proto ").AppendLine(DiagnosticsReadout.ProtocolVersion.ToString());
             var mismatch = DiagnosticsReadout.BalanceMismatch;
             if (mismatch != null) sb.Append("<color=yellow>BALANCE MISMATCH ").Append(mismatch).AppendLine("</color>");
         }

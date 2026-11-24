@@ -133,12 +133,12 @@ namespace CluckWars.Tests
                 Sha = "3c522ba+dirty", Built = "2026-10-20T10:00:00Z", Build = "26421080", DevTools = true, Platform = "Android",
                 Device = "Google Pixel 9", Gpu = "Mali-G715 MC7", Api = "Vulkan", Quality = "Mobile", PerfMode = true,
                 Width = 2424, Height = 1080, RefreshHz = 60.0, Os = "Android OS 15 / API-35 (AP4A=1)", Unity = "6000.3.14f1",
-                Date = "2026-10-20", Battery = SessionLine.Battery(0.8f), Balance = "9f0c2b71",
+                Date = "2026-10-20", Battery = SessionLine.Battery(0.8f), Balance = "9f0c2b71", Protocol = "2",
             };
             Assert.AreEqual(
                 "Session sha=3c522ba+dirty built=2026-10-20T10:00:00Z build=26421080 devtools=1 platform=Android " +
                 "device=Google_Pixel_9 gpu=Mali-G715_MC7 api=Vulkan quality=Mobile perfMode=1 res=2424x1080 hz=60 os=Android_OS_15_/_API-35_(AP4A1) " +
-                "unity=6000.3.14f1 date=2026-10-20 battery=80% bal=9f0c2b71",
+                "unity=6000.3.14f1 date=2026-10-20 battery=80% bal=9f0c2b71 proto=2",
                 SessionLine.Format(SessionLine.BootPrefix, f));
             StringAssert.StartsWith("SessionChange sha=", SessionLine.Format(SessionLine.ChangePrefix, f));
         }
@@ -150,7 +150,7 @@ namespace CluckWars.Tests
             Assert.AreEqual("n/a", SessionLine.Sanitize("   "));
             Assert.AreEqual("n/a", SessionLine.Battery(-1f));
             StringAssert.Contains(" hz=n/a ", SessionLine.Format("Session", default));
-            StringAssert.EndsWith(" bal=n/a", SessionLine.Format("Session", default));
+            StringAssert.EndsWith(" bal=n/a proto=n/a", SessionLine.Format("Session", default));
         }
 
         // ---- the build gate -------------------------------------------------------------------------------------

@@ -48,7 +48,7 @@ namespace CluckWars.Tests
             Assert.IsTrue(book.TryOpen(Victim, Nominal, victimHolds, Bounty, Capacity, cargo, 0f, out float asked, out ushort id));
             Assert.AreEqual(victimHolds, asked, 1e-4f, "the take is held to what the victim carries");
 
-            var s = book.Settle(Victim, id, asked, true, Capacity, cargo, 0.2f);
+            var s = book.Settle(Victim, id, asked, true, true, Capacity, cargo, 0.2f);
             Assert.AreEqual(MarkedOutcome.Reached, s.Outcome);
             Assert.AreEqual(victimHolds, s.Take, 1e-4f);
             Assert.AreEqual(Bounty, s.Bounty, 1e-4f, "room is 16, the take used 3, so the whole bounty fits");
@@ -63,7 +63,7 @@ namespace CluckWars.Tests
             Assert.IsTrue(book.TryOpen(Victim, Nominal, 40f, Bounty, Capacity, cargo, 0f, out float asked, out ushort id));
             Assert.AreEqual(Nominal, asked, 1e-4f);
 
-            var s = book.Settle(Victim, id, asked, true, Capacity, cargo, 0.1f);
+            var s = book.Settle(Victim, id, asked, true, true, Capacity, cargo, 0.1f);
             Assert.AreEqual(Nominal, s.Take, 1e-4f, "the steal comes first");
             Assert.AreEqual(Capacity - cargo - Nominal, s.Bounty, 1e-4f, "the bounty fills what is left of the 6");
             Assert.AreEqual(Bounty - s.Bounty, s.BountyLost, 1e-4f);
@@ -76,7 +76,7 @@ namespace CluckWars.Tests
             var book = NewBook(out _);
             Assert.IsTrue(book.TryOpen(Victim, Nominal, 0f, Bounty, Capacity, 0f, 0f, out float asked, out ushort id));
             Assert.AreEqual(0f, asked, "nothing to ask the victim for, but the victim's answer is still needed");
-            var s = book.Settle(Victim, id, 0f, true, Capacity, 0f, 0.1f);
+            var s = book.Settle(Victim, id, 0f, true, true, Capacity, 0f, 0.1f);
             Assert.AreEqual(MarkedOutcome.Reached, s.Outcome);
             Assert.AreEqual(0f, s.Take);
             Assert.AreEqual(Bounty, s.Bounty, 1e-4f);
@@ -88,7 +88,7 @@ namespace CluckWars.Tests
             var book = NewBook(out _);
             Assert.IsTrue(book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, Capacity, 0f, out float asked, out ushort id));
             Assert.AreEqual(0f, asked);
-            var s = book.Settle(Victim, id, 0f, true, Capacity, Capacity, 0.1f);
+            var s = book.Settle(Victim, id, 0f, true, true, Capacity, Capacity, 0.1f);
             Assert.AreEqual(MarkedOutcome.Reached, s.Outcome, "the mark is spent whatever fitted");
             Assert.AreEqual(0f, s.Take);
             Assert.AreEqual(0f, s.Bounty);
@@ -103,7 +103,7 @@ namespace CluckWars.Tests
             Assert.IsTrue(book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, cargo, 0f, out float asked, out ushort id));
             Assert.AreEqual(Capacity - cargo - Nominal - Bounty, requests.FreeSpace(Capacity, cargo, 0.05f), 1e-4f, "take and bounty are held while the request is open");
 
-            var s = book.Settle(Victim, id, 0f, false, Capacity, cargo, 0.1f);
+            var s = book.Settle(Victim, id, 0f, false, true, Capacity, cargo, 0.1f);
             Assert.AreEqual(MarkedOutcome.Blocked, s.Outcome);
             Assert.AreEqual(0f, s.Take);
             Assert.AreEqual(0f, s.Bounty);
@@ -112,11 +112,35 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void AMarkThatEndedInFlight_PaysTheTakeButNoBounty_AndFreesTheBountysRoom()
+        {
+            var book = NewBook(out var requests);
+            float cargo = 5f;
+            Assert.IsTrue(book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, cargo, 0f, out float asked, out ushort id));
+            var s = book.Settle(Victim, id, asked, true, false, Capacity, cargo, 0.1f);
+            Assert.AreEqual(MarkedOutcome.Reached, s.Outcome);
+            Assert.IsTrue(s.MarkEnded);
+            Assert.AreEqual(asked, s.Take, 1e-4f, "the steal itself still lands: the owner's rule is only about the bounty");
+            Assert.AreEqual(0f, s.Bounty, "marked rival removed: no pay");
+            Assert.AreEqual(0f, s.BountyLost, "it was never owed, so it is not reported as lost either");
+            Assert.AreEqual(Capacity - cargo, requests.FreeSpace(Capacity, cargo, 0.1f), 1e-4f, "no reservation is left behind, the bounty's included");
+            Assert.IsFalse(book.Pending(0.1f));
+        }
+
+        [Test]
+        public void TheSettlement_AsksTheMarkBeforePayingTheBounty()
+        {
+            string settle = Body(CargoPath, "public void RPC_SettleMarkedSteal(");
+            StringAssert.Contains("_loot.IsMarking(victim)", settle, "the bounty is owed only while the mark is still on that victim");
+            Assert.Less(settle.IndexOf("_loot.IsMarking(victim)", StringComparison.Ordinal), settle.IndexOf("_marked.Settle(", StringComparison.Ordinal));
+        }
+
+        [Test]
         public void ARefusalThatClaimsFood_IsStillWorthNothing()
         {
             var book = NewBook(out _);
             book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, 0f, 0f, out float asked, out ushort id);
-            var s = book.Settle(Victim, id, asked, false, Capacity, 0f, 0.1f);
+            var s = book.Settle(Victim, id, asked, false, true, Capacity, 0f, 0.1f);
             Assert.AreEqual(0f, s.Take, "reached false: the stolen figure is ignored");
         }
 
@@ -126,13 +150,13 @@ namespace CluckWars.Tests
             var book = NewBook(out _);
             book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, 0f, 0f, out float asked, out ushort id);
 
-            Assert.AreEqual(MarkedOutcome.Unknown, book.Settle(Other, id, asked, true, Capacity, 0f, 0.1f).Outcome, "another bird's report");
-            Assert.AreEqual(MarkedOutcome.Unknown, book.Settle(Victim, (ushort)(id + 1), asked, true, Capacity, 0f, 0.1f).Outcome, "another request's id");
+            Assert.AreEqual(MarkedOutcome.Unknown, book.Settle(Other, id, asked, true, true, Capacity, 0f, 0.1f).Outcome, "another bird's report");
+            Assert.AreEqual(MarkedOutcome.Unknown, book.Settle(Victim, (ushort)(id + 1), asked, true, true, Capacity, 0f, 0.1f).Outcome, "another request's id");
             Assert.IsTrue(book.Pending(0.1f), "a report that does not match leaves the request open");
 
-            var first = book.Settle(Victim, id, asked, true, Capacity, 0f, 0.2f);
+            var first = book.Settle(Victim, id, asked, true, true, Capacity, 0f, 0.2f);
             Assert.AreEqual(MarkedOutcome.Reached, first.Outcome);
-            var again = book.Settle(Victim, id, asked, true, Capacity, 0f, 0.3f);
+            var again = book.Settle(Victim, id, asked, true, true, Capacity, 0f, 0.3f);
             Assert.AreEqual(MarkedOutcome.Unknown, again.Outcome, "no double credit");
             Assert.AreEqual(0f, again.Take + again.Bounty);
         }
@@ -142,7 +166,7 @@ namespace CluckWars.Tests
         {
             var book = NewBook(out _);
             book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, 0f, 0f, out float asked, out ushort id);
-            var s = book.Settle(Victim, id, asked, true, Capacity, 0f, Window + 0.01f);
+            var s = book.Settle(Victim, id, asked, true, true, Capacity, 0f, Window + 0.01f);
             Assert.AreEqual(MarkedOutcome.Unknown, s.Outcome);
             Assert.AreEqual(0f, s.Take + s.Bounty, "no pay after the window, as for every steal report");
         }
@@ -151,7 +175,7 @@ namespace CluckWars.Tests
         public void AnUnsolicitedReport_PaysNothing()
         {
             var book = NewBook(out _);
-            var s = book.Settle(Victim, 0, 5f, true, Capacity, 0f, 0.1f);
+            var s = book.Settle(Victim, 0, 5f, true, true, Capacity, 0f, 0.1f);
             Assert.AreEqual(MarkedOutcome.Unknown, s.Outcome, "no marked steal was asked: a forged report has nothing to match");
             Assert.AreEqual(0f, s.Take + s.Bounty);
         }
@@ -161,7 +185,7 @@ namespace CluckWars.Tests
         {
             var book = NewBook(out _);
             book.TryOpen(Victim, Nominal, 9f, Bounty, Capacity, 0f, 0f, out float asked, out ushort id);
-            var s = book.Settle(Victim, id, asked * 100f, true, Capacity, 0f, 0.1f);
+            var s = book.Settle(Victim, id, asked * 100f, true, true, Capacity, 0f, 0.1f);
             Assert.AreEqual(asked, s.Take, 1e-4f);
             Assert.AreEqual(Bounty, s.Bounty, 1e-4f, "the bounty is the offered figure, never the victim's number");
         }
@@ -194,7 +218,7 @@ namespace CluckWars.Tests
             var book = NewBook(out _);
             book.TryOpen(Victim, Nominal * 1.6f, 99f, Bounty, 99f, 0f, 0f, out float asked, out ushort id);
             Assert.AreEqual(Nominal * 1.6f, asked, 1e-4f);
-            Assert.AreEqual(Bounty, book.Settle(Victim, id, asked, true, 99f, 0f, 0.1f).Bounty, 1e-4f);
+            Assert.AreEqual(Bounty, book.Settle(Victim, id, asked, true, true, 99f, 0f, 0.1f).Bounty, 1e-4f);
         }
 
         // ---- the one new pure rule ---------------------------------------------------------------------------------
@@ -307,8 +331,18 @@ namespace CluckWars.Tests
         {
             string events = RuntimeSourceGuardTests.Code(Scripts + "Gameplay/ChickenLocalEvents.cs");
             StringAssert.Contains("_lootTaken.Observe(s.LootTakenEventId)", events);
-            foreach (var path in RuntimeSourceGuardTests.RuntimeFiles().Where(p => !p.EndsWith("/Gameplay/ThiefLoot.cs") && !p.EndsWith("/Gameplay/ChickenLocalEvents.cs")))
-                StringAssert.DoesNotContain("LootTakenEventId", RuntimeSourceGuardTests.Code(path), $"{path} reads the loot counter itself (ARCH-EVT-03)");
+            foreach (var path in RuntimeSourceGuardTests.RuntimeFiles().Where(p => !p.EndsWith("/Gameplay/ChickenLocalEvents.cs")))
+            {
+                string code = RuntimeSourceGuardTests.Code(path);
+                if (path.EndsWith("/Gameplay/ThiefLoot.cs"))
+                {
+                    // The owner declares the counter and bumps it on the authority; it may not watch it (it subscribes to LocalEvents.LootTaken instead).
+                    code = System.Text.RegularExpressions.Regex.Replace(code, @"\[Networked\]\s*public byte LootTakenEventId\s*\{[^}]*\}", string.Empty);
+                    code = code.Replace("LootTakenEventId++", string.Empty);
+                    StringAssert.Contains("LocalEvents.LootTaken +=", code, "ThiefLoot's diagnostic log listens to the one observer");
+                }
+                StringAssert.DoesNotContain("LootTakenEventId", code, $"{path} reads the loot counter itself (ARCH-EVT-03)");
+            }
         }
 
         // ---- telemetry --------------------------------------------------------------------------------------------

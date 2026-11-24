@@ -102,7 +102,7 @@ namespace CluckWars.Gameplay
         /// <summary>The Peck's cut counter (BL-213): bumped on the authority when a stun, shove, execution or emptied pile ends a running cast.</summary>
         public byte PeckCutEventId;
 
-        /// <summary>The chicken carries a <c>ThiefLoot</c> (every chicken but a decoy does).</summary>
+        /// <summary>The chicken carries a <c>ThiefLoot</c> component (every chicken does, a decoy's copy stays <c>Off</c>; only a Thief's runs).</summary>
         public bool HasLoot;
         /// <summary>The Thief's loot-taken counter (BL-217): bumped on the authority when a marked steal is paid.</summary>
         public byte LootTakenEventId;

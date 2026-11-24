@@ -25,6 +25,8 @@ namespace CluckWars.Gameplay
         public float BountyLost;
         /// <summary>What the take lost to the free room (the victim drained more than fitted): lost like any steal overflow.</summary>
         public float TakeOverflow;
+        /// <summary>The mark was no longer on the victim when the answer came: the take is paid, the bounty is not (and is not "lost": it was never owed).</summary>
+        public bool MarkEnded;
     }
 
     /// <summary>
@@ -101,9 +103,11 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// The victim's answer: <paramref name="reached"/> says the steal got through, <paramref name="stolen"/> is what it really drained. Matches the one open
         /// request by victim and id inside the window and closes it, once (a repeat is <see cref="MarkedOutcome.Unknown"/>). A refusal credits nothing. A steal
-        /// that reached pays the take, held to what was asked and to the free room, and then the bounty into the room that is left.
+        /// that reached pays the take, held to what was asked and to the free room, and then the bounty into the room that is left, but only while
+        /// <paramref name="markHolds"/> (the mark is still on that victim: "marked rival removed, no pay"); if the mark ended in flight (the bird was executed,
+        /// the match ended) the take is still credited, the bounty is not (its reservation is already released) and <see cref="MarkedSettlement.MarkEnded"/> is set.
         /// </summary>
-        public MarkedSettlement Settle(TKey victim, ushort id, float stolen, bool reached, float capacity, float cargo, float now)
+        public MarkedSettlement Settle(TKey victim, ushort id, float stolen, bool reached, bool markHolds, float capacity, float cargo, float now)
         {
             if (!Pending(now) || _id != id || !_victim.Equals(victim)) return default;
             _live = false;
@@ -118,6 +122,8 @@ namespace CluckWars.Gameplay
                 overflow = settled.Overflow;
             }
             if (!reached) return new MarkedSettlement { Outcome = MarkedOutcome.Blocked, TakeOverflow = overflow };
+
+            if (!markHolds) return new MarkedSettlement { Outcome = MarkedOutcome.Reached, Take = take, TakeOverflow = overflow, MarkEnded = true };
 
             float bounty = FoodTransferRules.Fit(_offered, _requests.FreeSpace(capacity, cargo + take, now));
             return new MarkedSettlement { Outcome = MarkedOutcome.Reached, Take = take, Bounty = bounty, BountyLost = _offered - bounty, TakeOverflow = overflow };

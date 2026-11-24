@@ -108,8 +108,16 @@ namespace CluckWars.Networking
             }
 
             int maxPlayers = _matchConfig != null ? Mathf.Clamp(_matchConfig.MaxPlayers, 1, 16) : 4;
+
+            // BL-218: Photon only matches clients with the same app version, so builds whose networked layouts differ (NetworkProtocol.Version) never share a
+            // room. Everything else is the project's PhotonAppSettings asset, copied.
+            var photonSettings = Fusion.Photon.Realtime.PhotonAppSettings.Global.AppSettings.GetCopy();
+            photonSettings.AppVersion = NetworkProtocol.AppVersion;
+            _log?.Info(Source, $"Protocol {NetworkProtocol.Version} (photon app version '{photonSettings.AppVersion}'): only builds of this protocol meet in a room.");
+
             var result = await _runner.StartGame(new StartGameArgs
             {
+                CustomPhotonAppSettings = photonSettings,
                 GameMode = mode,
                 SessionName = sessionName,
                 SceneManager = sceneManager,

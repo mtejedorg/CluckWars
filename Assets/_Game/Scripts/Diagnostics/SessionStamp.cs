@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using CluckWars.Balance;
 using CluckWars.Logging;
+using CluckWars.Networking;
 using CluckWars.Settings;
 using UnityEngine;
 using Zenject;
@@ -15,6 +16,8 @@ namespace CluckWars.Diagnostics
         public string Sha, Built, Build, Platform, Device, Gpu, Api, Quality, Os, Unity, Date, Battery;
         /// <summary>8-hex hash of the live-ops balance delta in force (<c>BalanceBook.Hash</c>).</summary>
         public string Balance;
+        /// <summary>The network protocol version (<c>NetworkProtocol.Version</c>): builds with different ones never share a room.</summary>
+        public string Protocol;
         public bool DevTools, PerfMode;
         public int Width, Height;
         public double RefreshHz;
@@ -22,7 +25,7 @@ namespace CluckWars.Diagnostics
 
     /// <summary>
     /// Formats the <c>Session</c> line: <c>Session sha=.. built=.. build=.. devtools=0|1 platform=.. device=.. gpu=.. api=..
-    /// quality=.. perfMode=0|1 res=WxH hz=.. os=.. unity=.. date=yyyy-MM-dd battery=.. bal=..</c>. Values are made
+    /// quality=.. perfMode=0|1 res=WxH hz=.. os=.. unity=.. date=yyyy-MM-dd battery=.. bal=.. proto=..</c>. Values are made
     /// key=value-safe (whitespace → <c>_</c>, no <c>=</c>), empty ones print <c>n/a</c>. Pure; pinned by tests.
     /// </summary>
     public static class SessionLine
@@ -51,6 +54,7 @@ namespace CluckWars.Diagnostics
             Add(sb, "date", f.Date);
             Add(sb, "battery", f.Battery);
             Add(sb, "bal", f.Balance);
+            Add(sb, "proto", f.Protocol);
             return sb.ToString();
         }
 
@@ -147,6 +151,7 @@ namespace CluckWars.Diagnostics
                 Date = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 Battery = SessionLine.Battery(SystemInfo.batteryLevel),
                 Balance = _balanceHash,
+                Protocol = NetworkProtocol.Version.ToString(CultureInfo.InvariantCulture),
             };
         }
 
@@ -155,6 +160,7 @@ namespace CluckWars.Diagnostics
         {
             DiagnosticsReadout.BalanceHash = _balance.Hash;
             DiagnosticsReadout.BalanceOrigin = _balance.Origin.ToString();
+            DiagnosticsReadout.ProtocolVersion = NetworkProtocol.Version;
             return _balance.Hash;
         }
     }

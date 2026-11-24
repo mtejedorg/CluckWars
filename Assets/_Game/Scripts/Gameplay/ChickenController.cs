@@ -1182,7 +1182,7 @@ namespace CluckWars.Gameplay
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
         public AssassinExecute Execute => _assassin;
 
-        /// <summary>This chicken's loot-mark state machine (cached; runs only for a Thief), or null before <c>Spawned</c> and on a decoy.</summary>
+        /// <summary>This chicken's loot-mark state machine (cached; the component is on every chicken but only a Thief's runs it, the others stay <c>Off</c>), or null before <c>Spawned</c>.</summary>
         public ThiefLoot Loot => _thiefLoot;
 
         private IChickenModelPresenter _presenter;

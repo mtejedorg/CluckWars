@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-24 - Review fixes of slice A: no loot bounty after the mark ended; protocol version keeps mismatched builds apart (BL-217, BL-218, `develop`, not pushed)
+
+- **Bounty after the mark:** `ChickenCargo.RPC_SettleMarkedSteal` asks `_loot.IsMarking(victim)` before settling; `MarkedStealBook.Settle(..., markHolds, ...)` credits only the take when the mark ended in flight (victim executed, match over), pays no bounty and leaves nothing reserved (`MarkedSettlement.MarkEnded`). Owner's rule: marked rival removed, no pay.
+- **ARCH-EVT-03:** `ThiefLoot` no longer keeps a cursor on `LootTakenEventId`; its diagnostic log subscribes to `ChickenLocalEvents.LootTaken`. The guard `LootTaken_IsObservedByTheOneObserver...` now covers `ThiefLoot.cs` (it may declare and bump the counter, nothing else).
+- **BL-218 protocol version:** `NetworkProtocol.Version` (Networking, `Gameplay` assembly), now 2, bumped by hand when a `[Networked]` property or `[Rpc]` signature changes; `FusionNetworkService.StartAsync` copies the project's `PhotonAppSettings`, sets `AppVersion = "p" + Version` and passes it as `StartGameArgs.CustomPhotonAppSettings`, so Photon never puts builds of different protocols in one room. Shown as `proto=` in the Session line and as `proto` next to `Balance` in the F1 HUD. Guard `NetworkProtocolTests` fingerprints the set of networked members (FNV-1a over `Type::[Networked] decl` / `Type::[Rpc] signature`) and fails with the instructions when it changes without the version. To update: change the layout, bump the constant, run the test, paste the printed value into `ExpectedFingerprint` and the version into `ExpectedVersion`.
+- **Unverified:** two real builds of different protocols failing to meet (BL-218 test step). A mismatched joiner does not get an error: Photon finds no such room and Shared Mode creates its own under the same name.
+- **Docs upkeep owed to `librarian`:** FILE_STRUCTURE (`Networking/NetworkProtocol.cs`, `Editor/Tests/NetworkProtocolTests.cs`); ARCH-NET-14 (the protocol constant and its guard `NetworkProtocolTests`).
+
 ## 2026-11-24 - Thief loot mark in the game, slice A: networked mark, authority-confirmed marked steal, clock prize, bot, approved values (BL-217, `develop`, not pushed)
 
 - **Maestro's instruction** ("Una vez aprobado en el simulador, que este en el juego real"): the mark of design sections 4 to 6 and 19, with the approved values, is now the shipped game. Slice B (HUD, feedback, words) is NOT built: the mark works and is testable through state, events and logs; a human Thief cannot see who is marked (BL-219).

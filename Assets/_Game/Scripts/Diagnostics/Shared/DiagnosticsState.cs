@@ -34,6 +34,8 @@ namespace CluckWars.Diagnostics
         public static string BalanceHash = "n/a";
         /// <summary>Where that balance came from: Baseline / Cache / Remote (<c>BalanceOrigin</c>).</summary>
         public static string BalanceOrigin = "n/a";
+        /// <summary>The network protocol version (written by <c>SessionStamp</c>; 0 before boot). Shown next to <c>bal=</c> in the F1 HUD.</summary>
+        public static int ProtocolVersion;
         /// <summary>
         /// Set by <c>UGSService</c> when the lobby host's <c>bal</c> hash differs from this peer's (warn-only, D3c); null
         /// when they agree or nothing was compared.

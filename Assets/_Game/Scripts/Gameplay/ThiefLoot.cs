@@ -64,25 +64,33 @@ namespace CluckWars.Gameplay
             _controller = GetComponent<ChickenController>();
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
+            if (_controller != null) _controller.LocalEvents.LootTaken += OnLootTakenSeen;
         }
 
-        // Local, every peer, diagnostics only (slice A has no visual): what this peer last saw of the replicated mark, so a session's logs show the mark
-        // arriving on every peer, not only on the Thief's. Slice B's presentation reads the state and the event through ChickenLocalEvents.
+        public override void Despawned(NetworkRunner runner, bool hasState)
+        {
+            if (_controller != null) _controller.LocalEvents.LootTaken -= OnLootTakenSeen;
+        }
+
+        // Every peer, diagnostics only: the one observer (ChickenLocalEvents, ARCH-EVT-03) tells this peer a paid marked steal arrived, so a session's logs show it
+        // on every peer, not only on the Thief's. The presenters of slice B subscribe to the same event.
+        private void OnLootTakenSeen(LootTakenEvent e)
+        {
+            if (_log == null) return;
+            string victim = Runner != null && Runner.TryFindBehaviour(e.Victim, out ChickenController robbed) && robbed != null ? robbed.name : e.Victim.ToString();
+            _log.Info(Source, $"{name}: loot taken seen from {victim}: +{e.Take:0.#} stolen, +{e.Bounty:0.#} bounty ({(HasStateAuthority ? "authority" : "proxy")}).");
+        }
+
+        // Local, every peer, diagnostics only: what this peer last saw of the replicated mark, so a session's logs show the mark arriving on every peer,
+        // not only on the Thief's. The presentation reads the state, and the paid steal through ChickenLocalEvents.
         private NetworkBehaviourId _seenTarget;
-        private byte _seenTaken;
         private bool _seenInit;
 
         public override void Render()
         {
             if (_log == null) return;
             var target = MarkedTarget;
-            if (!_seenInit) { _seenInit = true; _seenTarget = target; _seenTaken = LootTakenEventId; return; }
-            if (LootTakenEventId != _seenTaken)
-            {
-                _seenTaken = LootTakenEventId;
-                string victim = Runner != null && Runner.TryFindBehaviour(LastLootVictim, out ChickenController robbed) && robbed != null ? robbed.name : LastLootVictim.ToString();
-                _log.Info(Source, $"{name}: loot taken seen from {victim}: +{LastLootTake:0.#} stolen, +{LastLootBounty:0.#} bounty ({(HasStateAuthority ? "authority" : "proxy")}).");
-            }
+            if (!_seenInit) { _seenInit = true; _seenTarget = target; return; }
             if (target == _seenTarget) return;
             _seenTarget = target;
             string who = target == NetworkBehaviourId.None ? "none"
@@ -205,8 +213,9 @@ namespace CluckWars.Gameplay
                 take, bountyGained, bountyLost));
             if (!IsMarking(victim))
             {
-                // The mark ended while the steal was in flight (the bird was executed, the round reset): the food is credited, there is nothing left to spend.
-                _log?.Info(Source, $"{name}: a marked steal on {victim.name} was paid after its mark had ended (+{take:0.#} +{bountyGained:0.#}).");
+                // The mark ended while the steal was in flight (the bird was executed, the round reset): the take is credited, no bounty is owed
+                // (ChickenCargo.RPC_SettleMarkedSteal pays it only while the mark holds), and there is nothing left to spend.
+                _log?.Info(Source, $"{name}: a marked steal on {victim.name} landed after its mark had ended (+{take:0.#} take, no bounty).");
                 return;
             }
             LastLootVictim = victim.Id;
