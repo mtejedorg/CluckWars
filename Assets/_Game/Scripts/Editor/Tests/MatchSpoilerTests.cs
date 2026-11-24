@@ -534,8 +534,14 @@ namespace CluckWars.Tests
         public void Thief_ShippedPassives_StealWithinTheirDeclaredMaximum()
         {
             var registry = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
+            // No shipped passive scales steals since the loot mark replaced the Thief's 1.6x (2026-11-24, shipped multiplier 1), so the hook is also
+            // exercised on a Thief built with the field's own default: whatever scales must stay inside its declared ceiling and really scale.
             var scalers = registry.Passives.Where(p => p.MaxStealMultiplier > 1f).ToList();
-            Assert.IsNotEmpty(scalers, "no passive scales steals; the Thief is gone or its ceiling is not declared");
+            var synthetic = ScriptableObject.CreateInstance<ThiefPassiveSO>();
+            try
+            {
+            scalers.Add(synthetic);
+            Assert.Greater(synthetic.MaxStealMultiplier, 1f, "the Thief's hook has no declared ceiling above 1 at its field default");
             foreach (var asset in scalers)
             {
                 var read = MatchKits.ReadPassive(asset, new float[0]);
@@ -546,6 +552,8 @@ namespace CluckWars.Tests
                 Assert.AreEqual(StealMath.Clamp(nominal * read.StealFactor, 100f, held), r.Counters[1].Stolen, 1e-4f, asset.name);
                 Assert.LessOrEqual(r.Counters[1].Stolen, nominal * read.MaxStealMultiplier + 1e-4f, asset.name);
             }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(synthetic); }
         }
 
         // ---- forced kills ----
@@ -678,8 +686,7 @@ namespace CluckWars.Tests
             var nav = OracleNav.For(inputs.Map, rules.ArenaHalf);
             var food = OracleKits.Food(inputs);
 
-            var spoiler = kits.Single(k => k.Passive.MatchEndBonusFood > 0f);
-            Assert.IsTrue(spoiler.Abilities.Any(a => a.Job == AbilityJob.DeathMark), "the Spoiler kit holds Death Mark");
+            var spoiler = kits.Single(k => k.Abilities.Any(a => a.Job == AbilityJob.DeathMark));
             var byClass = kits.Where(k => k.Class != spoiler.Class).GroupBy(k => k.Class).Select(g => g.ToArray()).ToArray();
             Assert.AreEqual(3, byClass.Length);
             var sets = from a in byClass[0] from b in byClass[1] from c in byClass[2] select new[] { a, b, c };

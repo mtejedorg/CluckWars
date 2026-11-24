@@ -83,7 +83,8 @@ perk.relentless.line,Your stuns and slows last {out}% longer.
 perk.relentless.detail,"Your stuns and slows last {out}% longer. Stuns, getting stuck and timed slows on you end {in}% sooner."
 perk.bully.line,Moves recharge {pct}% faster.
 perk.bully.detail,Applies to every move except Peck.
-perk.thief.line,Every steal grabs {steal}% more.
+perk.thief.line,A steal on your marked rival pays +{bounty} food. +{prize} if time runs out. Carry {cap} food.
+perk.thief.detail,"One rival at a time is your marked rival. A steal that reaches them takes their food and adds {bounty} new food to your beak, as far as it fits. If nobody reaches {goal} before time's up, you bank {prize} bonus food first. You carry up to {cap} food."
 perk.slippery.line,Ability slows on you are {pct}% weaker and end {pct}% sooner.
 perk.slippery.detail,Stuns still land in full. Pile and bump slows still apply.
 perk.bulwark.line,Barely budges when shoved.
@@ -92,8 +93,8 @@ perk.hoarder.line,Carry {cap} food in one trip.
 perk.hoarder.detail,Carries at least {cap} food.
 perk.featherfoot.line,Bank {pct}% faster. Piles and bumps never slow you.
 perk.featherfoot.detail,"You bank food {pct}% faster, and food piles and bumping into rivals never slow you down."
-perk.spoiler.line,+{food} food if time runs out. Carry {cap} food.
-perk.spoiler.detail,"If nobody reaches {goal} before time's up, you bank {food} bonus food first. A kill fills your beak: you carry up to {cap} food."
+perk.spoiler.line,Your Hunt picks the leader {x} times as often. Carry {cap} food.
+perk.spoiler.detail,"The bird with the most food at home is {x} times as likely to be hunted. A kill fills your beak: you carry up to {cap} food."
 loadout.row.shared,ANY BIRD
 loadout.row.class,{cls} ONLY
 loadout.detail.empty,Tap a move for the details.

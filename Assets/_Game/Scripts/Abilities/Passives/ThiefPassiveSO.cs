@@ -5,20 +5,20 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Assassin alternative.</b> Every steal takes more. The Assassin cannot forage at
-    /// all, so its entire income is predatory — this is the build that leans all the way
-    /// into that rather than waiting for executes.
+    /// <b>Assassin alternative.</b> The Thief's income is predatory (the Assassin cannot forage): one rival at a time carries his loot mark, and a Steal that
+    /// reaches it takes its food and adds <see cref="LootBounty"/> of new food into his ordinary cargo, held to its room (BL-217, design 2026-11-23). The
+    /// numbers live here, never on Steal, which the Warrior kits equip too. At the clock he banks <see cref="ClockPrize"/> before the winner is picked.
     /// </summary>
     [CreateAssetMenu(fileName = "Thief", menuName = "Cluck Wars/Passive/Thief", order = 18)]
     public sealed class ThiefPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("Multiplier on cargo taken per steal. The only steal passive since 2026-11-05: it is the " +
-                 "Assassin's only sustained income between executes.")]
+        [Tooltip("Multiplier on cargo taken per steal. Thief.asset ships 1 since 2026-11-24 (the loot mark replaced the 1.6x); the field stays so the " +
+                 "simulator can sweep it.")]
         [Min(1f)] public float StealMultiplier = 1.6f;
 
-        [Header("Loot mark (BL-217: simulator only, nothing in the game reads these yet)")]
+        [Header("Loot mark (BL-217)")]
         [Tooltip("New food a marked steal adds to the Thief's cargo on top of what it takes, as far as it fits (the stolen food comes first). " +
-                 "0 switches the loot mark off (the shipped value: the game does not have the mechanic yet).")]
+                 "0 switches the loot mark off; Thief.asset ships 10.")]
         [Min(0)] public int LootBounty = 0;
         [Tooltip("Seconds after which a mark moves to another rival. Checked only while Steal is on cooldown: with Steal ready the mark stays.")]
         [Min(1f)] public float LootSeconds = 12f;
@@ -37,11 +37,11 @@ namespace CluckWars.Abilities
 
         [Header("Carrying")]
         [Tooltip("Capacity floor of the Thief's beak, like the Hoarder's: the Sneaky class stat is shared with the Spoiler and does not move. " +
-                 "0 is the shipped value (no floor, the class capacity). It sets how many marked steals one trip holds.")]
+                 "0 is no floor (the class capacity); Thief.asset ships 20. It sets how many marked steals one trip holds.")]
         [Min(0f)] public float MinimumCapacity = 0f;
 
         [Header("End of the clock")]
-        [Tooltip("Food banked at the base when the timer expires with no winner, before the winner is picked. The Thief's alone; 0 is the shipped value.")]
+        [Tooltip("Food banked at the base when the timer expires with no winner, before the winner is picked. The Thief's alone; Thief.asset ships 20.")]
         [Min(0)] public int ClockPrize = 0;
 
         public ThiefPassiveSO()
@@ -75,7 +75,13 @@ namespace CluckWars.Abilities
         };
 
         public override string PerkLineKey => UiKeys.PerkThiefLine;
+        public override string PerkDetailKey => UiKeys.PerkThiefDetail;
+
+        // {goal} is the one number this passive does not own: the match's win target.
+        // A null MatchConfig leaves {goal} unsupplied, which UiText renders as #goal# and logs.
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
-            new (string, object)[] { ("steal", Percent(StealMultiplier - 1f)) };
+            match != null
+                ? new (string, object)[] { ("bounty", LootBounty), ("prize", ClockPrize), ("cap", Mathf.RoundToInt(MinimumCapacity)), ("goal", match.FoodTargetToWin) }
+                : new (string, object)[] { ("bounty", LootBounty), ("prize", ClockPrize), ("cap", Mathf.RoundToInt(MinimumCapacity)) };
     }
 }

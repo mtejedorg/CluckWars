@@ -3,6 +3,7 @@ using System.IO;
 using CluckWars.Abilities;
 using CluckWars.Gameplay;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace CluckWars.Tests
 {
@@ -29,11 +30,11 @@ namespace CluckWars.Tests
         [Test]
         public void TheShippedThiefPassive_ChangesNeitherCapacityNorStealability()
         {
-            // Shipped, the capacity floor is 0 (BL-217: it is raised by a what-if delta only; the loot mark's design gives the Thief a floor like the
-            // Hoarder's, through the passive and never through the class stat). No steal-proof hook, ever.
+            // The Thief's capacity is a floor on his passive like the Hoarder's (BL-217: never through the class stat), so it can only raise the class's
+            // capacity, never lower it. No steal-proof hook, ever.
             var thief = TestAssets.Load<ThiefPassiveSO>(TestAssets.AbilitiesDir + "/Passives/Thief.asset");
-            Assert.AreEqual(10f, thief.ModifyCargoCapacity(10f, null), "no capacity bonus or malus as shipped");
-            Assert.AreEqual(0f, thief.MinimumCapacity);
+            Assert.AreEqual(Mathf.Max(10f, thief.MinimumCapacity), thief.ModifyCargoCapacity(10f, null), "a floor: the class capacity or the floor, whichever is more");
+            Assert.AreEqual(100f, thief.ModifyCargoCapacity(100f, null), "a floor never takes capacity away");
             var src = Src("Abilities/Passives/ThiefPassiveSO.cs");
             StringAssert.DoesNotContain("StealProof", src);
         }

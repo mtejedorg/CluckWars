@@ -34,8 +34,10 @@ namespace CluckWars.Tests
                     return ($"Moves recharge {Pct(1.0 - b.CooldownMultiplier)}% faster.",
                             "Applies to every move except Peck.");
                 case ThiefPassiveSO t:
-                    string thief = $"Every steal grabs {Pct(t.StealMultiplier - 1.0)}% more.";
-                    return (thief, thief);
+                    int tCap = (int)Math.Round(t.MinimumCapacity, MidpointRounding.AwayFromZero);
+                    return ($"A steal on your marked rival pays +{t.LootBounty} food. +{t.ClockPrize} if time runs out. Carry {tCap} food.",
+                            $"One rival at a time is your marked rival. A steal that reaches them takes their food and adds {t.LootBounty} new food to your beak, as far as it fits. " +
+                            $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {t.ClockPrize} bonus food first. You carry up to {tCap} food.");
                 case SlipperyPassiveSO s:
                     return ($"Ability slows on you are {Pct(1.0 - s.Resist)}% weaker and end {Pct(1.0 - s.Resist)}% sooner.",
                             "Stuns still land in full. Pile and bump slows still apply.");
@@ -50,8 +52,11 @@ namespace CluckWars.Tests
                             $"You bank food {Pct(f.DepositRateMultiplier - 1.0)}% faster, and food piles and bumping into rivals never slow you down.");
                 case SpoilerPassiveSO sp:
                     int spCap = (int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero);
-                    return ($"+{sp.BonusFood} food if time runs out. Carry {spCap} food.",
-                            $"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first. A kill fills your beak: you carry up to {spCap} food.");
+                    // The pull is the Hunt's own number, read here from the Hunt asset the registry holds.
+                    var hunt = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath).All.OfType<MarkKillAbilitySO>().Single();
+                    string pull = hunt.LeaderPickWeight.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+                    return ($"Your Hunt picks the leader {pull} times as often. Carry {spCap} food.",
+                            $"The bird with the most food at home is {pull} times as likely to be hunted. A kill fills your beak: you carry up to {spCap} food.");
                 default:
                     Assert.Fail($"{p.name} ({p.GetType().Name}) has no perk-text expectation. A new passive needs " +
                                 "a perk.*.line template in UiText.csv, PerkLineKey/PerkArgs on the class, and a row here.");
@@ -167,12 +172,22 @@ namespace CluckWars.Tests
             foreach (var p in ShippedPassives(out var cfg))
             {
                 if (!(p is SpoilerPassiveSO sp)) continue;
-                Assert.AreEqual($"If nobody reaches {cfg.FoodTargetToWin} before time's up, you bank {sp.BonusFood} bonus food first. " +
-                    $"A kill fills your beak: you carry up to {(int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero)} food.",
-                    sp.Description);
+                Assert.AreEqual(Expected(sp, cfg).detail, sp.Description);
                 return;
             }
             Assert.Fail("No Spoiler in the ability registry.");
+        }
+
+        [Test]
+        public void ThiefAsset_Description_IsTheLineTemplate_WithTheCurrentNumbers()
+        {
+            foreach (var p in ShippedPassives(out var cfg))
+            {
+                if (!(p is ThiefPassiveSO t)) continue;
+                Assert.AreEqual(Expected(t, cfg).line, t.Description, "the stored text is the line template (the detail is too long for the ability strip: 140 characters)");
+                return;
+            }
+            Assert.Fail("No Thief in the ability registry.");
         }
 
         [Test]
@@ -205,16 +220,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void SpoilerDetail_WithoutAMatchConfig_IsLoudNotBlank()
+        public void ThiefDetail_WithoutAMatchConfig_IsLoudNotBlank()
         {
-            var spoiler = ScriptableObject.CreateInstance<SpoilerPassiveSO>();
+            var thief = ScriptableObject.CreateInstance<ThiefPassiveSO>();
             try
             {
-                StringAssert.Contains("#goal#", spoiler.PerkDetail(null),
+                StringAssert.Contains("#goal#", thief.PerkDetail(null),
                     "With no MatchConfig, {goal} must render as a visible marker, not vanish.");
                 Assert.IsNotEmpty(UiText.Problems, "The missing {goal} argument must be reported.");
             }
-            finally { UnityEngine.Object.DestroyImmediate(spoiler); }
+            finally { UnityEngine.Object.DestroyImmediate(thief); }
         }
 
         [Test]
@@ -248,13 +263,16 @@ namespace CluckWars.Tests
                         StringAssert.Contains("except Peck", b.Description);
                         break;
                     case ThiefPassiveSO t:
-                        StringAssert.Contains($"{Pct(t.StealMultiplier - 1.0)}%", t.Description);
+                        StringAssert.Contains($"pays +{t.LootBounty} food", t.Description);
+                        StringAssert.Contains($"+{t.ClockPrize} if time runs out", t.Description);
+                        StringAssert.Contains($"Carry {(int)Math.Round(t.MinimumCapacity, MidpointRounding.AwayFromZero)} food", t.Description);
+                        StringAssert.DoesNotContain("more", t.Description, "the 1.6x on every steal is gone: no text may still promise a bigger steal");
                         break;
                     case HoarderPassiveSO h:
                         StringAssert.Contains($"{(int)Math.Round(h.MinimumCapacity, MidpointRounding.AwayFromZero)} food", h.Description);
                         break;
                     case SpoilerPassiveSO sp:
-                        StringAssert.Contains($"{sp.BonusFood} bonus food", sp.Description);
+                        StringAssert.DoesNotContain("bonus food", sp.Description, "the Spoiler's end-of-clock prize is gone: no text may still promise it");
                         StringAssert.Contains($"carry up to {(int)Math.Round(sp.MinimumCapacity, MidpointRounding.AwayFromZero)} food", sp.Description);
                         break;
                     case FeatherfootPassiveSO f:

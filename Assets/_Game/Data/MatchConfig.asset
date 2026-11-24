@@ -15,7 +15,7 @@ MonoBehaviour:
   MatchDurationSeconds: 45
   FoodTargetToWin: 40
   SpoilerBounty: 15
-  ExecuteBounty: 15
+  ExecuteBounty: 17
   DeathStunSeconds: 5
   DepositRatePerSecond: 9
   ComebackEventSecondsLeft: 10

@@ -618,17 +618,17 @@ namespace CluckWars.Tests
             {
                 inputs.Book = book;
                 var shipped = MatchContext.From(inputs, OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius());
-                var moved = MatchWhatIf.ContextFor(inputs, Delta(("Thief", "MinimumCapacity", "16")), OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius(), out _, out string reason);
-                Assert.IsNotNull(moved, reason);
                 int thief = Array.FindIndex(shipped.Kits, k => k.Passive.Loot.IsThief);
                 int spoiler = Array.FindIndex(shipped.Kits, MatchDesigns.HoldsDeathMark);
                 Assert.GreaterOrEqual(thief, 0);
                 Assert.GreaterOrEqual(spoiler, 0);
-                float classCapacity = shipped.Kits[thief].Farm.CargoCapacity;
                 float spoilerCapacity = shipped.Kits[spoiler].Farm.CargoCapacity;
-                Assert.Greater(spoilerCapacity, classCapacity, "shipped, the Thief carries the shared class capacity and the Spoiler his own larger floor (2026-11-24: kill loot is ordinary cargo)");
-                Assert.Less(classCapacity, 16f, "the test's floor is above the class capacity");
-                Assert.AreEqual(16f, moved.Kits[thief].Farm.CargoCapacity, "the floor on the Thief's passive raises his capacity");
+                // A floor above whatever the Thief carries as shipped: it must raise his capacity, and only his.
+                float floor = shipped.Kits[thief].Farm.CargoCapacity + 4f;
+                var moved = MatchWhatIf.ContextFor(inputs, Delta(("Thief", "MinimumCapacity", floor.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+                    OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius(), out _, out string reason);
+                Assert.IsNotNull(moved, reason);
+                Assert.AreEqual(floor, moved.Kits[thief].Farm.CargoCapacity, "the floor on the Thief's passive raises his capacity");
                 Assert.AreEqual(spoilerCapacity, moved.Kits[spoiler].Farm.CargoCapacity, "the Thief's floor does not move the Spoiler's: each is on its own passive, the shared class stat is untouched");
             }
         }
@@ -667,13 +667,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheShippedThief_HasNoLootMark_AndNoClockPrize_SoTheGameIsUnchanged()
+        public void TheShippedThief_HasTheLootMark_AndTheClockPrize_AndNoOtherKitHasAPrize()
         {
             var context = MatchContext.From(ShippedInputs(), OracleMapBaker.ArenaHalf(), OracleMenu.BotArrivalRadius());
             var thief = context.Kits.Single(k => k.Passive.Loot.IsThief);
-            Assert.IsFalse(thief.Passive.Loot.Active, "the game has no loot mark yet: the shipped bounty is 0, the mechanic off");
-            Assert.AreEqual(0f, thief.Passive.MatchEndBonusFood, "no clock prize shipped; the Spoiler's bonus is the only one");
-            Assert.AreEqual(1, context.Kits.Count(k => k.Passive.MatchEndBonusFood > 0f));
+            Assert.IsTrue(thief.Passive.Loot.Active, "the loot mark is on in the shipped game (Maestro approved it after the simulator runs)");
+            Assert.Greater(thief.Passive.MatchEndBonusFood, 0f, "the Thief's clock prize is shipped");
+            Assert.AreEqual(1, context.Kits.Count(k => k.Passive.MatchEndBonusFood > 0f), "the Thief's is the only end-of-clock prize: the Spoiler's went with the loot mark");
+            Assert.IsTrue(context.Kits.Where(k => !k.Passive.Loot.IsThief).All(k => !k.Passive.Loot.Active), "no other kit has a mark");
         }
 
         [Test]

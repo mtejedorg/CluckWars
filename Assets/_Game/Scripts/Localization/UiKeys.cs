@@ -116,7 +116,8 @@ namespace CluckWars.Localization
         [UiArgs("out", "in")] public const string PerkRelentlessDetail = "perk.relentless.detail";
         [UiArgs("pct")] public const string PerkBullyLine = "perk.bully.line";
         public const string PerkBullyDetail = "perk.bully.detail";
-        [UiArgs("steal")] public const string PerkThiefLine = "perk.thief.line";
+        [UiArgs("bounty", "prize", "cap")] public const string PerkThiefLine = "perk.thief.line";
+        [UiArgs("bounty", "prize", "goal", "cap")] public const string PerkThiefDetail = "perk.thief.detail";
         [UiArgs("pct")] public const string PerkSlipperyLine = "perk.slippery.line";
         public const string PerkSlipperyDetail = "perk.slippery.detail";
         public const string PerkBulwarkLine = "perk.bulwark.line";
@@ -125,8 +126,8 @@ namespace CluckWars.Localization
         [UiArgs("cap")] public const string PerkHoarderDetail = "perk.hoarder.detail";
         [UiArgs("pct")] public const string PerkFeatherfootLine = "perk.featherfoot.line";
         [UiArgs("pct")] public const string PerkFeatherfootDetail = "perk.featherfoot.detail";
-        [UiArgs("food", "cap")] public const string PerkSpoilerLine = "perk.spoiler.line";
-        [UiArgs("goal", "food", "cap")] public const string PerkSpoilerDetail = "perk.spoiler.detail";
+        [UiArgs("x", "cap")] public const string PerkSpoilerLine = "perk.spoiler.line";
+        [UiArgs("x", "cap")] public const string PerkSpoilerDetail = "perk.spoiler.detail";
 
         // ---- Loadout ----
         public const string LoadoutRowShared = "loadout.row.shared";

@@ -490,13 +490,17 @@ namespace CluckWars.Tests
 
             var spoiler = passives.OfType<SpoilerPassiveSO>().FirstOrDefault();
             Assert.IsNotNull(spoiler, "No Spoiler asset — Assassin's signature specialization is missing.");
-            Assert.AreEqual(config.SpoilerBounty, spoiler.BonusFood,
-                $"Spoiler pays {spoiler.BonusFood} but MatchConfig.SpoilerBounty is {config.SpoilerBounty}. " +
-                "Two numbers describing one payout will drift; MatchConfig is the authority.");
-            Assert.Less(spoiler.BonusFood, config.FoodTargetToWin,
-                $"Spoiler's {spoiler.BonusFood} is at or above the {config.FoodTargetToWin} win target, so an " +
-                "Assassin could win from ZERO banked food by stalling the match out. The design sizes it to " +
-                "beat a typical stalemate leader, never to win from nothing.");
+
+            // The end-of-clock prize is a hook any passive can return (since 2026-11-24 the Thief's alone, 0 on the Spoiler). Whoever carries one,
+            // it must stay below the win target, or that bird could win from ZERO banked food by stalling the match out: the design sizes a prize
+            // to beat a typical stalemate leader, never to win from nothing. (MatchConfig.SpoilerBounty is read by no code.)
+            foreach (var passive in passives.Where(p => p is SpoilerPassiveSO || p is ThiefPassiveSO))
+            {
+                int prize = passive.MatchEndBonusFood(null);
+                Assert.Less(prize, config.FoodTargetToWin,
+                    $"{passive.name}'s clock prize {prize} is at or above the {config.FoodTargetToWin} win target, so its bird could win from ZERO " +
+                    "banked food by stalling the match out.");
+            }
         }
 
         [Test]

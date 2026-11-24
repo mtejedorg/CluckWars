@@ -400,7 +400,7 @@ namespace CluckWars.Tests
         {
             var passive = _abilities.Passives.OfType<SpoilerPassiveSO>().Single();
             float bonus = passive.MatchEndBonusFood(null);
-            Assert.Greater(bonus, 0f, "the Spoiler passive pays nothing: the test would prove nothing");
+            // Whatever the passive pays (0 since the Thief took the clock prize, 2026-11-24): the table adds exactly that.
             Assert.AreEqual(bonus, _baseline.SpoilerPassiveBonus);
             foreach (var row in _baseline.Spoiler)
             {

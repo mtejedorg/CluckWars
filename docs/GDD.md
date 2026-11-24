@@ -516,8 +516,8 @@ current, shipped state.
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Egg Shell**, **Shove** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Slow Area**, **Egg Shell**, **Steal** |
-| **Sneaky** | The Assassin (Spoiler) | Banks 15 bonus food if the clock expires with no winner; carries at least 25 food (`MinimumCapacity`, a kill's loot is ordinary cargo held to it) | **Hunt**, **Jump**, **Hide**, **Stun** |
-| | The Thief | Every steal takes 1.6x more | **Steal**, **Jump**, **Hide**, **Slow Area** |
+| **Sneaky** | The Assassin (Spoiler) | His Hunt picks the leader (the rival with the most food banked) twice as often (`MarkKill.asset` `LeaderPickWeight`, read by the passive's text); carries at least 25 food (`MinimumCapacity`, a kill's loot is ordinary cargo held to it). No end-of-clock prize since 2026-11-24 (`Spoiler.asset` `BonusFood` 0) | **Hunt**, **Jump**, **Hide**, **Stun** |
+| | The Thief | One rival at a time carries his **loot mark**; a Steal that reaches it adds a 10-food bounty of new food to his cargo (`Thief.asset` `LootBounty`, section 6.2); carries at least 20 food (`MinimumCapacity`); banks 20 bonus food at the clock if nobody won (`ClockPrize`). The old 1.6x on every steal is gone (`StealMultiplier` 1) | **Steal**, **Jump**, **Hide**, **Slow Area** |
 
 **Slot roles (Maestro, 2026-11-20).** The kits above are listed in slot order, and the order is a rule: slot 1 is the **income** move (Peck; Hunt for the Spoiler, Steal for the Thief), slot 2 **movement** (the Fatty's second attack instead), slot 3 the **flex** move (defence or self utility, or a second attack; the least used), slot 4 the **main attack**, the combo partner of slot 1. The touch hexes are tilted to match (ART.md section 6.7). `FixedKitTests.ShippedKits_HaveTheExactSlotOrder` pins the eight orders and `EveryKit_FollowsTheSlotRoles` the roles (BL-156).
 
@@ -592,6 +592,18 @@ rhythm (steal → bank → return), not a drain. Fatty's 35 cargo can only leave
 bites, so he *bleeds* under pressure instead of popping, and his defensive abilities are
 what he's actually playing. A **steal-proof** bird (Egg Shell, §7.2) refuses every
 steal outright: the thief is not credited, so the formula never runs.
+
+**The Thief's loot mark (BL-217, game slice A, 2026-11-24).** Only the Thief has one; every number is on `Thief.asset`, never on Steal, which the Warrior kits
+equip too (a Steal cast by any other kit is unchanged). While a round runs, one living rival of another corner carries the Thief's mark, drawn by a weighted
+lottery (`LootPickRules`: a base weight, more for food banked at home, somewhat less for food in the beak, a plus above 25 banked plus carried; never the last
+marked rival unless he is the only one; never a decoy or an ally). A Steal cast that reaches the marked rival is a **marked steal**: it takes what a Steal takes
+(5 food, `StealMultiplier` 1) and then adds `LootBounty` 10 of **new food**, both into the Thief's ordinary cargo, in that order, each held to its free room; what
+does not fit is lost, and an empty beak still pays the bounty. A full Thief gains nothing and the mark is still spent. The mark is spent only by a steal that really
+reached the rival: a shell (Egg Shell) or a base wall refuses it, nothing is paid and the mark stays. The next mark appears `LootLeadSeconds` (1 s) before Steal is
+ready again; a mark older than `LootSeconds` (12 s) moves to another rival only while Steal is on cooldown (with Steal ready it stays, "overdue", and moves the moment
+Steal goes on cooldown, whatever caused it). Everything is authority-confirmed like every food transfer (`ThiefLoot`, `ChickenCargo.RPC_DrainStolenMarked`,
+`RPC_SettleMarkedSteal`, `MarkedStealBook`): the victim's authority drains and reports; the Thief's authority credits the take and then the bounty, once. Slice A has no
+visual for the mark: it is state, events (`ChickenLocalEvents.LootTaken`) and `Telemetry` lines (`lootdraw`, `loottake`, `lootmove`); slice B shows it.
 
 ### 6.3 Control ladder
 
@@ -675,8 +687,8 @@ at 49.2 is past the end; it was 3 kills at 5 s / 10 s); any miss costs 9 s (5 s 
 and the stun is ready for the next. **Jump** (Shadowstep) lasts 0.18 s: dash 3 x 11.1 x 0.18 = 5.99 m (6.56 m at the old 12.15 speed; the reach figures below predate both changes). **Reach framing (2026-11-05, later):** Stun's reach plus Death Mark's `KillRange` stays 11.6 m. Ambush era: 3.6 + 8 = 11.6 m; now Stun 5.4 m + `KillRange` 6.2 m = 11.6 m (`MarkKill.asset`; Stun's reach grew 1.8 m, so the kill range gave 1.8 m back). `KillRange` is the planar distance at the Kill press; the code has no lunge term. The percentages below were computed for the Ambush era (10.2 m reach, 1.0 s stun) and are not recomputed. With Underdog Surge the dash is 8.39 m (9.19 m at 12.15), under the 9.85 m gap between two pinwheel arms, so it cannot cross two arms even with Underdog.
 **Walk home.** With a 3 s arm a victim within about 21-29 m of home (class and stun length dependent) who walks home is safe: about
 29-36% of marks. **D5 (changed twice on 2026-11-05):** Egg Shell is a 1 s slow-immune walk (stun, theft and execution still land) then a 2 s egg (steal-proof, unkillable and stun-immune), so one well-timed button covers part of the kill span for Hoarder and Bulwark (open for Maestro). **Bounty economy (D4):** the Assassin earns only from executes (victim cargo
-plus the flat `ExecuteBounty` 15 (5 until 2026-11-23), the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
-code; what is paid is `Spoiler.asset` BonusFood 15 at timer expiry with no winner. Mean victim cargo is about 5.7, so with the 15 bounty one kill is nominally worth about 20.7 food and two kills about 41.4, past the 40 target (arithmetic before the time to bank it and, since 2026-11-24, before the carry limit: the loot is ordinary cargo held to the Spoiler's 25, so two kills in one load never exceed 25 and the second trip home is part of the price; the match simulator's kills-to-win table is the measure). At the old 5, 3 banked kills were about 32 food, 8 short of 40. No rule added.
+plus the flat `ExecuteBounty` 17 (15 until 2026-11-24, 5 until 2026-11-23; raised with the Thief's loot mark because the Thief now robs the same victims), the same whoever the victim is; the leader Bounty comeback event and `LeaderExecuteBountyMultiplier` were removed on 2026-11-20). `MatchConfig.SpoilerBounty` 15 is read by no
+code. **The end-of-clock prize** (`MatchEndBonusFood`, banked into the home base before the winner is picked, `GameManager.AwardMatchEndBonuses`, the one call site) is the Thief's alone since 2026-11-24: `Thief.asset` `ClockPrize` 20; `Spoiler.asset` `BonusFood` 0 (the Spoiler's was 15). It is paid only when the timer expires with nobody at the target. Mean victim cargo is about 5.7, so with the 17 bounty one kill is nominally worth about 22.7 food and two kills about 45.4, past the 40 target (arithmetic before the time to bank it and, since 2026-11-24, before the carry limit: the loot is ordinary cargo held to the Spoiler's 25, so two kills in one load never exceed 25 and the second trip home is part of the price; the match simulator's kills-to-win table is the measure). At the old 5, 3 banked kills were about 32 food, 8 short of 40. No rule added.
 
 **Feedback (redesign 2026-11-03; all local presentation read from replicated state, every number in `FeedbackTuning`).**
 - **Assassin.** (The arm reads for every role: a countdown digit on the hunt marker until the arm, KILL stays dark until then, and a sting plays at the arm for each role.) The press runs a ~0.6 s *draw*: a highlight sweeps the standings rows (a tick per row) and locks on the
@@ -818,7 +830,7 @@ Ability text follows the `Description` field of each shipped `.asset`. Every num
 
 | Ability | Short | Cooldown | Who can pick it | Effect |
 |---|---|---|---|---|
-| **Steal** | ROB | 4 s | everyone | Robs 5 food from every rival carrier within 5.16 m (Thief x1.6); no knockback. Was Snatch: 4.3 m ahead, cooldown 3 s, with knockback, Assassin-only. |
+| **Steal** | ROB | 4 s | everyone | Robs 5 food from every rival carrier within 5.16 m; no knockback. A Thief also takes the bounty of the rival carrying his loot mark (section 6.2). Was Snatch: 4.3 m ahead, cooldown 3 s, with knockback, Assassin-only. |
 | **Stun** | STUN | 7 s | everyone | Stuns every rival within 5.4 m for 1.3 s. Was Wing Slam (4.5 m, 120 deg cone). Also the Spoiler's way to qualify a Hunt pounce. |
 | **Shove** | PUSH | 5 s | everyone | Shoves every rival within 5.4 m away (knockback force 16.2). Was Cluck Shock (4.5 m). |
 | **Slow** | SLOW | 6 s | everyone | Aura: slows every rival within 6.48 m to 55% speed for 3 s (a Slippery bird: to 73%, and only for the first 1.8 s). Was Feather Aura (5.4 m, "every chicken"). |
@@ -1149,7 +1161,7 @@ Reflects the four committed v0.4 plans (`docs/superpowers/plans/`).
   centre pile no longer permanent/regenerating (fixed supply).
 - **Combat** — shipped. HP/damage pipeline deleted; `ControlState`/`ControlRules` ladder;
   `StealMath` cap; `RPC_ApplyStun`; `AssassinExecute` (Death Mark, kill loot into ordinary cargo);
-  `MatchConfig` W=40 / 45 s / Spoiler +15 / DepositRate 9; class stats Oracle-solved.
+  `MatchConfig` W=40 / 45 s / Thief clock prize 20 / DepositRate 9; class stats Oracle-solved.
 - **Ability pool** — shipped. Steal/Control/Defense/Utility categories; ex-damage abilities
   converted to steal; new Ambush / Wing Slam / Shadowstep / Mark/Kill (now Death Mark); roster masks;
   Spine Coat steal-back rate-gated.
