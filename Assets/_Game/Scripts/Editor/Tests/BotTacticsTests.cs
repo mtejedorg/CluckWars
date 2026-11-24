@@ -556,6 +556,18 @@ namespace CluckWars.Tests
                 "With 25 s left there is time for another pile; panicking early throws away foraging.");
         }
 
+        /// <summary>
+        /// BL-217 review: the Death Mark gate was "loaded to the return threshold" only, so a Spoiler banking at home dropped below it
+        /// and left to mark with food still in the beak. A bot already returning keeps banking until empty.
+        /// </summary>
+        [TestCase(5f, 0.2f, 0.3f, true, true, TestName = "ReturningWithCargo_BelowThreshold_MustBankFirst")]
+        [TestCase(0f, 0f, 0.3f, true, false, TestName = "ReturningEmpty_MayMark")]
+        [TestCase(5f, 0.2f, 0.3f, false, false, TestName = "NotReturning_BelowThreshold_MayMark")]
+        [TestCase(8f, 0.3f, 0.3f, false, true, TestName = "AtThreshold_MustBank")]
+        [TestCase(10f, 0.4f, 0.3f, false, true, TestName = "AboveThreshold_MustBank")]
+        public void LoadedToBank_IsTheThresholdOrAReturnWithFoodStillCarried(float cargo, float fraction, float threshold, bool returning, bool expected) =>
+            Assert.AreEqual(expected, BotTactics.LoadedToBank(cargo, fraction, threshold, returning));
+
         [Test]
         public void AnEmptyBeak_NeverTriggersThePanicBank()
         {

@@ -570,6 +570,14 @@ namespace CluckWars.Gameplay
 
         // ---- Death Mark follow-through ------------------------------------------
 
+        /// <summary>
+        /// True while a bot must bank before it may press a new Death Mark: it is loaded to its return threshold, or it is already
+        /// heading home with food in the beak (the return latch keeps banking until empty, so a drop below the threshold mid-deposit
+        /// is no licence to leave with food still carried).
+        /// </summary>
+        public static bool LoadedToBank(float cargo, float cargoFraction, float returnThreshold, bool returning) =>
+            cargoFraction >= returnThreshold || (returning && cargo > 0f);
+
         /// <summary>How much of the stun a bot keeps beyond the arm: room for a tick of replication and the Kill press.</summary>
         public const float StunLeadMargin = 0.25f;
 

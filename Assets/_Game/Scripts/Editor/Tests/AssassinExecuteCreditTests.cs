@@ -40,10 +40,10 @@ namespace CluckWars.Tests
         private const string RemovalCall  = "RPC_ExecuteRemoval(";
 
         // A write to the ASSASSIN's cargo (=, +=, -=) from the victim's side: the proxy write that never replicates.
-        private const string AssassinCargoWrite = @"\bassassinCargo\.Cargo\s*[+\-]?=(?!=)";
+        private const string BountyCreditCall = "CreditExecuteBounty";
         // Any write to a Cargo property through a receiver, not the chicken's own (`Cargo += x`): Press and PayExecuteBounty must pay through
         // ChickenCargo.CreditExecuteBounty only.
-        private const string CargoWriteThroughReceiver = @"\b_?cargo\.Cargo\s*[+\-]?=(?!=)";
+        private const string CargoWriteThroughReceiver = @"\.Cargo\s*[+\-]?=(?!=)";
 
         // ---- 1. The ids Press hands out, against what the receivers resolve -------------
 
@@ -95,8 +95,9 @@ namespace CluckWars.Tests
         {
             string body = MethodBody(ChickenCargoPath, "public void RPC_TransferAllToExecutor(");
 
-            Assert.IsFalse(Regex.IsMatch(body, AssassinCargoWrite),
-                "RPC_TransferAllToExecutor writes the assassin's Cargo. It runs on the VICTIM's authority, " +
+            StringAssert.DoesNotContain(BountyCreditCall, body, "the bounty is paid on the kill report, never from the cargo transfer");
+            Assert.IsFalse(Regex.IsMatch(body, CargoWriteThroughReceiver),
+                "RPC_TransferAllToExecutor writes a Cargo through a receiver (the assassin's, whatever it is called).It runs on the VICTIM's authority, " +
                 "where the assassin's cargo is a proxy: a [Networked] write there never replicates and " +
                 "the loot vanishes in Shared-mode PvP. Report the drain via RPC_CreditExecuteLoot.");
 
@@ -155,7 +156,7 @@ namespace CluckWars.Tests
         public void CreditExecuteBounty_IsHeldToTheFreeRoom_OnTheKillersOwnAuthority()
         {
             string body = MethodBody(ChickenCargoPath, "public float CreditExecuteBounty(");
-            int authority = body.IndexOf("if (!HasStateAuthority) return 0f;", StringComparison.Ordinal);
+            int authority = body.IndexOf("if (!HasStateAuthority)", StringComparison.Ordinal);
             int fit = body.IndexOf("FoodTransferRules.Fit(bounty, FreeSpace)", StringComparison.Ordinal);
             int credit = body.IndexOf("Cargo += gained", StringComparison.Ordinal);
             Assert.GreaterOrEqual(authority, 0, "the bounty is written only on the killer's state authority");
@@ -169,7 +170,7 @@ namespace CluckWars.Tests
         [TestCase(25f, 0f, 15f, 0f, 15f, 0f)]      // an empty-handed victim: the bounty alone
         [TestCase(10f, 9f, 15f, 9f, 1f, 14f)]      // the shared Sneaky class capacity, a Thief
         [TestCase(0f, 8f, 15f, 0f, 0f, 23f)]       // no room at all
-        public void KillLoot_IsTheVictimsBeakFirst_ThenTheBounty_BothHeldToTheFreeRoom(
+        public void FoodTransferRules_Fit_HoldsLootThenBountyToTheFreeRoom_InThatOrder(
             float room, float victimBeak, float bounty, float expLoot, float expBounty, float expUnfit)
         {
             float loot = FoodTransferRules.Fit(victimBeak, room);
@@ -178,6 +179,19 @@ namespace CluckWars.Tests
             Assert.AreEqual(expBounty, bountyGained, 1e-5f);
             Assert.AreEqual(expUnfit, victimBeak + bounty - loot - bountyGained, 1e-5f, "what does not fit is not gained");
             Assert.LessOrEqual(loot + bountyGained, Math.Max(0f, room) + 1e-5f, "the hold never exceeds its capacity");
+        }
+
+        [Test]
+        public void ExecuteLootCredit_RunsBeforeTheBountyCredit_OnAKill()
+        {
+            // The loot rides the transfer RPC from Press; the bounty is paid by PayExecuteBounty on the kill report, which only the removal
+            // RPC (sent after the transfer) can produce. The victim's beak therefore takes its room first, as the Fit test above assumes.
+            string press = MethodBody(AssassinExecutePath, "public bool Press(");
+            int transfer = press.IndexOf(TransferCall, StringComparison.Ordinal);
+            int removal  = press.IndexOf(RemovalCall, StringComparison.Ordinal);
+            Assert.Greater(transfer, 0);
+            Assert.Greater(removal, transfer, "the loot transfer must be sent before the removal that produces the kill report and its bounty");
+            StringAssert.Contains(".RPC_CreditExecuteLoot(", MethodBody(ChickenCargoPath, "public void RPC_TransferAllToExecutor("));
         }
 
         [Test]

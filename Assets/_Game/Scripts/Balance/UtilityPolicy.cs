@@ -485,7 +485,7 @@ namespace CluckWars.Balance
                 int stun = Slot(AbilityJob.Stun, false);
                 bool stunBack = stun >= 0 && _me.CooldownLeft[1 + stun] <= mk.MarkArmSeconds;
                 float returnAt = float.IsNaN(_p.ReturnThreshold) ? FullShare : _p.ReturnThreshold;
-                bool loadedToBank = _all > Eps && _me.Cargo / _capacity >= returnAt;
+                bool loadedToBank = _all > Eps && BotTactics.LoadedToBank(_me.Cargo, _me.Cargo / _capacity, returnAt, _banking);
                 if (!loadedToBank && !_me.Stunned && Ready(markSlot) && stunBack) _cast = markSlot;
                 return false;
             }

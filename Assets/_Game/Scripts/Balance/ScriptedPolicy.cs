@@ -99,7 +99,8 @@ namespace CluckWars.Balance
 
             // A Death Mark in progress owns the bot until it pays or fizzles. An execute's loot is ordinary cargo (no bag since 2026-11-24): a Spoiler
             // that just killed holds at least the bounty, which is above the return threshold of a 25 beak (0.30 of 25 is 7.5), so the deposit rule goes home.
-            if (FollowThroughMark(v, me, kit, abilities, cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading), arrival, out var markIntent)) return markIntent;
+            if (FollowThroughMark(v, me, kit, abilities,
+                    BotTactics.LoadedToBank(cargo, cargoFraction, BotTactics.ReturnThreshold(_profile, _phase, _leading), _state == State.ReturnToBase), arrival, out var markIntent)) return markIntent;
 
             // Latch ReturnToBase until all cargo is deposited.
             if (_state == State.ReturnToBase && cargo > 0f)

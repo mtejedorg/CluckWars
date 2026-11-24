@@ -1046,7 +1046,7 @@ namespace CluckWars.Gameplay
             {
                 // Capacity 0 means the victim's Stats did not resolve on this peer - a wiring or
                 // spawn-order fault, not a game state. Any loot it reports will be refused; the
-                // flat execute bounty is paid by Press regardless.
+                // flat execute bounty is paid by PayExecuteBounty on the kill report regardless.
                 _log?.Warn(Source, $"{name}: execute on {victim.name} expects no loot - its carry " +
                     "capacity reads 0 here (Stats unresolved?) and no cargo is visible, so any loot report will be refused.");
             }
@@ -1059,7 +1059,12 @@ namespace CluckWars.Gameplay
         /// </summary>
         public float CreditExecuteBounty(float bounty)
         {
-            if (!HasStateAuthority) return 0f;
+            if (!HasStateAuthority)
+            {
+                // PayExecuteBounty runs on the killer's own state authority, so reaching here is a wiring bug; the bounty is lost.
+                _log?.Error(Source, $"{name}: CreditExecuteBounty({bounty:0.#}) called without state authority - the execute bounty is not paid.");
+                return 0f;
+            }
             float gained = FoodTransferRules.Fit(bounty, FreeSpace);
             if (gained > 0f) Cargo += gained;
             return gained;

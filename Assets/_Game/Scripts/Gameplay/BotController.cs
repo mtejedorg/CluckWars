@@ -251,7 +251,8 @@ namespace CluckWars.Gameplay
             // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep. An execute's loot is ordinary
             // cargo (no bag since 2026-11-24), so a Spoiler that just killed is a chicken above its return threshold and the deposit
             // rule below sends it home; a bot at or above that threshold banks before it marks again.
-            if (TryFollowThroughMark(cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))) return;
+            if (TryFollowThroughMark(BotTactics.LoadedToBank(cargo, cargoFraction, BotTactics.ReturnThreshold(_profile, _phase, _leading),
+                                                             _state == BotState.ReturnToBase))) return;
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
             // once actually on the base — a deposit accelerator is worthless anywhere else,
