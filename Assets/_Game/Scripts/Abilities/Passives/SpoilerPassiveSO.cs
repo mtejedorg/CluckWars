@@ -25,7 +25,7 @@ namespace CluckWars.Abilities
         [Tooltip("Capacity floor of the Spoiler's beak, like the Hoarder's: the Sneaky class stat is shared with the Thief and does not move. " +
                  "A kill's loot (the victim's cargo, then the execute bounty) is ordinary cargo held to this room (Maestro, 2026-11-24: " +
                  "no capacity-free bag, 25 or so). 0 would leave the class capacity.")]
-        [Min(0f)] public float MinimumCapacity = 25f;
+        [Min(0f)] public float MinimumCapacity = 30f;
 
         public SpoilerPassiveSO()
         {

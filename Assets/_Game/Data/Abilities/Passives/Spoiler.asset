@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.SpoilerPassiveSO
   DisplayName: Assassin
   ShortLabel: ASSN
-  Description: "The bird with the most food at home is 2 times as likely to be hunted. A kill fills your beak with food: you carry up to 25 food."
+  Description: "The bird with the most food at home is 2 times as likely to be hunted. A kill fills your beak with food: you carry up to 30 food."
   Icon: 
   AccentColor: {r: 0.55, g: 0.42, b: 0.85, a: 1}
   Category: 3
@@ -30,7 +30,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   BonusFood: 0
-  MinimumCapacity: 25
+  MinimumCapacity: 30
   Subclass: 7
   Kit:
   - {fileID: 11400000, guid: 585145f2a83ab174d85f6128aa98f927, type: 2}
