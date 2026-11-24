@@ -1,0 +1,461 @@
+# Thief loot mark and clock prize: design (BL-217)
+
+Date: 2026-11-23, revised 2026-11-24 with Maestro's answers. Status: design for Maestro's agreement. No plan, no code.
+Inputs: Maestro's rulings of 2026-11-23 and his answers of 2026-11-24 (both quoted below), `mechanics-designer` (opus)
+for the first numbers, `ux-designer` (opus, twice) for what each player sees, and the code read on `develop` at
+`c7349422`. The working name was "crown" until 2026-11-24; it is now the **loot mark** (`LootMark` in code).
+
+## 0. Why, and what is already ruled
+
+The Thief kit wins 2.4 / 0.6 / 3.0 % (P0 / P1 / mixed) against a 20 to 30 % target
+(`Captures/oracle/match-report-20261123-151552.md`); no numeric lever moved it past about +9 points
+(`Captures/oracle/match-whatif-20261123-111254.md`, best row T-C: multiplier 2.5 and cargo 14, mixed 11.8 %). In the
+mixed population it robs 3.86 victims, steals 24.18 food and banks 15.16 per match; it forages nothing. In a mirror of
+four Thieves every match is decided by the corner rule: nobody banks. The Spoiler, since commit `c7349422` (Hunt 5 s
+with a 2 s kill window, `ExecuteBounty` 15), measures 25.0 / 21.6 / 29.5 %.
+
+Maestro's rulings of 2026-11-23, binding:
+
+- "Vamos a hacer corona + premio sólo para él (hay que meter feedback visual y demás para la recompensa). Pero nada que vaya directo a base, todo al bolsillo."
+- "Yo esto lo haría por sorteo, como con el asesino. Que pese mucho la comida en base, algo menos la del bolsillo, y un plus a los que tengan más de 25."
+- "Comida nueva, como con el asesino."
+- "Pasa sólo al thief, ya veremos si lo recuperamos en un futuro."
+- Simulator first.
+
+## 1. Maestro's answers, 2026-11-24
+
+Given on the decision page `https://claude.ai/artifact/GN8NGtC569gTouuZ3ahPzT`. His notes are quoted as he wrote them.
+
+| # | Answer | His note | What it means here |
+|---|---|---|---|
+| D1 | (a) one payout per mark | - | A marked steal pays once; the mark is consumed and moves on. |
+| D2 | (a) automatic | "Depende del estado de la habilidad Robar. Si han pasado los 12 segundos, sólo cambia de objetivo si está en cooldown. Una vez consumida, aparece 1 segundo antes de que acabe el cooldown." | No button. The mark's life follows the Thief's Steal: after a marked steal, the next mark appears 1 s before Steal is ready; after 12 s the mark moves only while Steal is on cooldown, never while Steal is ready. Section 4. |
+| D3 | (b) banked plus carried | "más de 25" | The over-25 bonus tests banked + carried food. Section 5. |
+| D4 | (a) banked at the clock | - | The clock prize is banked into the base at timer expiry, as the Spoiler's is today. The one exception to "todo al bolsillo". Section 8. |
+| D5 | (c) a Hunt feature as passive | "La habilidad Mark/kill es tan compleja que parte de sus 'features' se pueden considerar pasiva." | The Spoiler's passive presents something Hunt already does. No new mechanic, no balance change. Section 9. |
+| D6 | (b) only Thief and victim | "Sólo thief y víctima. No debería ser una corona, lo que es confuso si no le cae al líder. Debería ser como una bolsa de monedas." | Only the Thief and the marked rival see the mark and the reward pop. The symbol is a bag of coins, not a crown. Section 11. |
+| D7 | (b) prudent values, then a table | "De todas formas, hay que modificar la carga. Mi idea es que tenga que robar 3 veces y 'backear' para ganar, parecido al asesino. Puede tener una tabla similar. Así también evitamos que robe dos veces seguidas al mismo persiguiéndole, remplazando el confuso cooldown por objetivo." | About three marked steals, carried home and banked, should win. The Thief's carrying changes so that works. A steals-to-win table like the Spoiler's `KillTargets`. The per-victim steal cooldown goes. Sections 6, 7 and 10. |
+
+## 2. What exists today (verified in code)
+
+- **Steal** is `SnatchAbilitySO` (`Assets/_Game/Data/Abilities/Snatch.asset`): `StealAmount` 5 from **every** rival carrier
+  within `SnatchRange` 5.16 m, `Cooldown` 4 s. Only a carrier is a target (`ExtraTargetFilter`: `cargo.Stealable > 0`).
+  A Steal with no valid target cannot fire (`RequiresEnemyInRange` true, `AbilityBaseSO.IsUsable`, line 304), so the
+  Thief cannot "burn" his cooldown on nothing.
+- **The 1.6x** is `ThiefPassiveSO.ModifyStealAmount` (`Passives/Thief.asset` `StealMultiplier` 1.6, `[Min(1f)]`). Perk text
+  `perk.thief.line` "Every steal grabs {steal}% more." The take is `StealMath.Clamp(nominal * factor, thief free room,
+  victim cargo + bag)` (`MatchCombat.StealTake`; in the game `ChickenCargo.StealFrom`), drained beak first then bag
+  (`StealRules.SplitDrain`), and lands in the thief's **beak** (capacity-limited). Assassin `CargoCapacity` 10.
+- **Kits with Steal** (they reference `Snatch.asset`): Thief, Relentless, Bully, Hoarder (`Passives/*.asset` `Kit`).
+- **The bounty bag** is `ChickenCargo.BountyBag` (`[Networked]`): ignores capacity, stealable (beak first, then bag),
+  banks at the base like the beak. The execute pays into it (`AssassinExecute.PayExecuteBounty`).
+- **The mark lottery** is `MarkPickRules` (pure, Gameplay assembly): `Filter` drops the last mark unless it is the only
+  rival; `PickWeighted` takes the highest `roll * home^2 * assassin * leader`; `LeaderWeight` is `MarkKill.asset`
+  `LeaderPickWeight` 2 for the rival with the most banked food. Rolls are injected.
+- **The clock prize** is `SpoilerPassiveSO.MatchEndBonusFood` (`Spoiler.asset` `BonusFood` 15); `GameManager.EndOnTimerExpiry`
+  banks every passive's bonus first, then picks the winner by base total. Beak and bag are not counted at the clock.
+  `MatchConfig.SpoilerBounty` 15 is read by no code.
+- **The simulator** (`Assets/_Game/Scripts/Balance/`): `MatchSim.Cast` loops every rival in range with `Stealable > 0`
+  and calls `DoSteal` (into `Cargo`, the beak; counts one steal per robbed victim). `PassiveFacts.MatchEndBonusFood`
+  is paid in `MatchSim.Finish` before `PickTimerWinner`. RNG streams `StreamComeback` 100, `StreamMark` 101,
+  `StreamSetup` 102 (`MatchRng.cs`). What-if scenarios are balance deltas over serialized asset fields
+  (`MatchWhatIf.cs`, `BalanceBook.Evaluate`), so every new number must be a serialized field to be swept.
+- **Kill targets** are `OracleReferenceSO.KillTargets` (`List<SpoilerKillTarget>`: `Kills`, `WithPassive`, `MinWinRate`,
+  `MaxWinRate`) in `Assets/_Game/Data/Balance/OracleReference.asset` (4: 0.90 to 1.00; 3: 0.80 to 1.00; 2 with passive:
+  0.00 to 0.20). `MatchStats.Label` turns them into IN / OUT report labels; no test reads them.
+
+### 2.1 The per-victim steal cooldown Maestro wants gone
+
+What it is: `SneakyStealAbilitySO.SameVictimCooldownSeconds` (10 s on `SneakySteal.asset`). After a Sneaky Steal took
+something from a bird, `ChickenController.LockStealOn` writes a lock into `_stealLocks` (a `TargetCooldowns<NetworkBehaviourId>`,
+`Gameplay/TargetCooldowns.cs`, authority-local, with a 0.5 s `StealLockFeedbackGrace`), and `SneakyStealAbilitySO.ExtraTargetFilter`
+refuses that bird through `IsStealLockedOn` until the lock ends. Round reset clears it (`ChickenController.cs` line 1857).
+Its text is `ability.sneakysteal.desc` "... Same bird: every {secs}s." (`UiText.csv` line 78).
+
+For which kits: **none that ship.** `SneakySteal.asset` has `Retired: 1` and no kit, registry or prefab references its GUID
+(checked with `git grep`). `SnatchAbilitySO` says so in its summary: "No per-victim lock (that lived in the retired
+Sneaky Steal)." The simulator has no per-victim lock either. In today's game a Thief, a Relentless, a Bully or a Hoarder
+can rob the same bird every 4 s; only the clamp (what that bird still carries) limits it. One related sim-only detail:
+P1 (`UtilityPolicy.BestSteal`) multiplies the value of its last victim by `Stickiness` 1.1, a small push to keep robbing
+the same bird.
+
+So Maestro's "cooldown por objetivo" is the old Sneaky Steal rule (perhaps remembered from its text or older builds). The
+decision is in section 10.
+
+## 3. The rule as a child hears it
+
+1. One rival carries your loot bag. Only you and that rival can see it.
+2. Rob the bird with the bag: you take its food and 10 new food falls into your bag.
+3. A new bag appears on another bird just before your Steal is ready again.
+4. Birds with lots of food, at home or in their beak, get the bag most often.
+5. Your bag is yours only once you bring it home. Rob three bags and bank them, and you win.
+6. If time runs out and nobody won, the Thief gets 20 extra food at home.
+
+## 4. The loot mark's life cycle (D2)
+
+**Who holds the state.** Each Thief owns one loot mark, decided on the Thief's state authority, as the Death Mark is
+(`AssassinExecute`). It reads two facts of the Thief's own Steal slot: `ready` (cooldown over) and `readyAt` (the time it
+will be). Fields on `Thief.asset`: `LootSeconds` 12 (the timeout), `LootLeadSeconds` 1 (how early the next mark appears).
+
+**States.**
+
+| State | Meaning |
+|---|---|
+| `Off` | Before GO, during the round-start pause, after a round reset. No mark. |
+| `Waiting` | No mark. Wakes at `drawAt = max(now, readyAt - LootLeadSeconds)`; when Steal is already ready, at once. |
+| `Live` | Mark on rival X, age below `LootSeconds`. Takeable. |
+| `Overdue` | Mark on X, age at least `LootSeconds`, Steal ready. Stays on X; still takeable. |
+
+**Transitions.**
+
+| From | Event | To | Effect |
+|---|---|---|---|
+| `Off` | GO | `Waiting` | Steal is normally ready at GO, so the first mark is drawn at once. |
+| `Waiting` | `now >= drawAt` and a candidate exists | `Live` | Draw with `LootPickRules` (section 5); age 0. No candidate (every rival removed): stay, retry each tick. |
+| `Live` or `Overdue` | A Thief Steal cast covers X and `LootRules.CanTake` holds | `Waiting` | Pay (section 6). X becomes the last marked. Steal is now on cooldown, so `drawAt = readyAt - 1 s` = 3 s after the cast. |
+| `Live` | Age reaches `LootSeconds` while Steal is on cooldown | `Waiting` | Mark ends, no pay. X is the last marked. `drawAt = max(now, readyAt - 1 s)`, so the new mark lands at once or within 3 s. |
+| `Live` | Age reaches `LootSeconds` while Steal is ready | `Overdue` | Nothing visible changes. |
+| `Overdue` | Steal goes on cooldown without taking X (it robbed someone else, or the cast on X was refused) | `Waiting` | Mark ends, no pay, X is the last marked; `drawAt = readyAt - 1 s`. |
+| `Live` or `Overdue` | X removed (executed) or leaves the match | `Waiting` | Mark ends, no pay, X is the last marked. |
+| any | Round reset (PLAY AGAIN) | `Off` | Cleared without effect; the last-marked memory is cleared too. |
+
+Rule in one line: **the timeout is checked only while Steal is on cooldown**, and a new mark is drawn at
+`max(now, readyAt - 1 s)`. Both of Maestro's sentences follow from it. A Steal cast on other carriers before 12 s does
+not move the mark (the timeout has not passed).
+
+**The marked rival's situations.**
+
+| Case | What happens |
+|---|---|
+| At home, behind his claimed base wall | Steal cannot reach him (the existing ability pair rule). The clock runs. If the Thief keeps Steal ready, the mark stays on him (`Overdue`) until he leaves or the Thief robs someone else. Hiding at home costs the victim his foraging. |
+| Shelled (Egg Shell, steal-proof) | The cast on him is refused (`StealRules.CanStealFrom`): no take, no pay, the Thief sees `SAFE`. The cast still spends Steal's cooldown, so after 12 s the mark moves. |
+| Hidden (Hide) | Hide hides the bag badge from the Thief as it hides the bird; the victim still sees his own badge. A Steal that really covers him still takes it. The clock runs. |
+| Executed by a Spoiler | Removed: the mark ends without pay (see the table). |
+| Empty beak and bag | Still a valid target for this Thief: `ExtraTargetFilter` accepts `Stealable > 0` **or** "marked by this caster". The take is 0, the bounty pays. |
+
+**The Thief's own situations.** Executed: his mark keeps running (nobody else can take it); his bag stays (unchanged,
+`ClearForRespawn`). Stunned: he cannot cast; the mark keeps running. Two Thieves: one mark each, independent; both
+may mark the same bird; each pays once to its own Thief. A same-corner ally and a decoy are never candidates.
+
+**Cycle arithmetic (estimate).** Mark 1 at GO; the Assassin's first contact has a median of 3.2 s (report, "Time to first
+contact"), the marked bird is not always the nearest, so say 4 to 5 s. Mark 2 appears 3 s after the steal; a walk of 3
+to 4 s (Assassin 11.1 m/s). With a trip home after each (3 s walk plus 14 / 9 = 1.6 s to deposit at
+`DepositRatePerSecond` 9), a cycle is about 8 to 10 s, so three banked marks land at about 26 to 32 s. Matches end at
+31.7 to 35.6 s on average. Three marks per match is therefore a good game, not a given; expect about 2 to 2.5 on
+average once shells, walls, stuns and Hide cost time.
+
+## 5. The lottery: `LootPickRules` (pure, Gameplay assembly)
+
+A static class next to `MarkPickRules`, every roll injected, so the game and the simulator call the same rule.
+
+- `Filter`: `MarkPickRules.Filter` as is (last marked out unless only one rival).
+- `Weight(banked, carried, t) = t.Base + t.BankedWeight * banked + t.CarriedWeight * carried + (banked + carried > t.OverThreshold ? t.OverBonus : 0)`.
+  "Carried" is beak plus bounty bag. D3 (b): the bonus tests banked **plus** carried.
+- `Pick(weights, roll)`: proportional. Walk the candidates in the caller's order; return the first whose running sum
+  passes `roll * sum`. Chance = weight / sum. -1 with no candidate; all weights 0 cannot happen while `Base` > 0, and
+  falls back to `MarkPickRules.Pick(count, roll)`.
+
+Proportional and not the mark's "highest roll x score", so the numbers read as chances (max-of-rolls turns 2:1 into 75 %).
+No position factor: the mark moves on a timeout, and a home factor would make hiding at home a way to dodge it.
+
+| Field on `Thief.asset` | Start | Why |
+|---|---|---|
+| `LootBaseWeight` | 4 | An empty bird stays drawable; the early draw is near uniform. |
+| `LootBankedWeight` | 1.0 per food | "Que pese mucho la comida en base." |
+| `LootCarriedWeight` | 0.5 per food | "Algo menos la del bolsillo." |
+| `LootOverFraction` | 0.625 of `FoodTargetToWin` (25 of 40) | "Más de 25", follows `MatchConfig`. |
+| `LootOverBonus` | 10 | "Un plus." |
+
+Worked example (three rivals, late): banked 28 / 18 / 10, carried 4 / 6 / 0. Totals 32 / 24 / 10, so only the first
+passes 25. Weights 4+28+2+10 = 44, 4+18+3 = 25, 4+10 = 14; sum 83; chances 53 / 30 / 17 %. With D3 (b) a bird at
+20 banked and 6 carried (26) gets the bonus too: 4+20+3+10 = 37. The bonus can flicker at a deposit only for a bird whose
+carried food is all that holds it over 25; the draw happens once per mark, so a flicker never moves a live mark.
+
+## 6. "Three marked steals and bank to win": the numbers (D7)
+
+**What a marked steal pays.** Two parts, both into the **bounty bag** (this is the change to the carrying):
+
+1. **The steal**: Snatch's normal `StealAmount` 5 through the clamp, except that the Thief's free room does not limit it
+   (it goes to the bag, not the beak). So `take = min(5 * StealMultiplier, victim cargo + bag)`.
+2. **The bounty**: `LootBounty` new food (as the execute bounty), flat, not multiplied, paid even when the take is 0.
+
+Every other bird the same cast covers is robbed normally, into the beak, capacity 10, unchanged.
+
+**The 1.6x goes** (recommended `StealMultiplier` 1.0; the field stays so the sim can sweep it). Reasons: the Thief's
+identity becomes the loot bag; a multiplier on every steal pays for chasing any carrier, which is what Maestro wants to
+stop; and "three bags win" only reads true if the bag is most of his income. The perk line changes to the loot mark
+(section 9).
+
+**Arithmetic (estimates, to be measured).**
+
+- Today, per robbed victim: 24.18 / 3.86 = 6.26 food mixed (P0 22.30 / 3.86 = 5.78, P1 21.77 / 3.39 = 6.42) at a nominal
+  8 (5 x 1.6). At a nominal 5 the clamp binds less often; assume about 4.2 per robbed carrier. A marked bird is drawn
+  toward the rich, but some are empty: assume a marked take of about 4.
+- A marked steal is then worth `V = 4 + LootBounty`. With `LootBounty` 10, V is about 14.
+- Kept share. Today the Thief banks 15.16 of 24.18 (63 %). A loot bag is a single lump the Thief walks straight home
+  with; assume 85 % reaches the base (rival Steal casts take beak first, then bag, 5 a hit, more for a Fatty's free room).
+- Other income: incidental steals on carriers near the marked bird, about 1.5 victims x 4.2 = 6 stolen, about 4 banked.
+- **3 marks banked**: 3 x 14 x 0.85 + 4 = 39.7, about the 40 target. **2 marks**: 2 x 14 x 0.85 + 4 = 27.8: no win on
+  the target; with the clock prize 27.8 + 20 = 47.8 beats a typical clock leader (28 to 39), but only 5 to 7.5 % of
+  matches reach the clock. **4 marks**: 51.6, wins unless someone is faster.
+- Mean income at 2 to 2.5 marks: about 28 to 34 banked, against 15.16 today. Winners reach 40 at about 32 to 36 s, so
+  the Thief wins his good games, which is what a 20 to 30 % rate needs.
+
+**Why not a bigger beak.** T-C (cargo 14, multiplier 2.5) bought +9 points mixed and changed nothing in kind. Putting the
+mark's yield in the bag fixes the one case that breaks the rule (a full beak clamping the marked take to 0) without
+making every normal steal bigger. `CargoCapacity` 10 stays.
+
+**Why he still goes home.** Only banked food wins and the bag is not counted at the clock; the bag is stealable by every
+Steal kit (Relentless, Bully, Hoarder, another Thief) beak first then bag, and the bots prize a carrier
+(`BotTactics.TargetPriority` uses the stealable share). A Thief walking with 28 in his bag is the best prey on the map.
+He may chain two bags before banking; that is his risk to take, as "robar 3 veces y backear" allows.
+
+**A rival's theft of the bag.** A rival's Steal takes from the Thief beak first, then bag, at the rival's normal take
+(5, or 5 x multiplier for another Thief, clamped by the rival's free room). The food goes to the rival's beak; it does
+not carry the bounty with it (the bounty was new food once, now it is plain food). If that rival is another Thief whose
+mark is on this Thief, it is a marked steal for him: he takes into his bag and gets his own bounty.
+
+**Recommended starting set and sweep ranges.**
+
+| Field | Start | Sweep |
+|---|---|---|
+| `Thief.asset` `LootBounty` | 10 | 6, 8, 10, 12, 14 |
+| `Thief.asset` `StealMultiplier` | 1.0 | 1.0, 1.3, 1.6 |
+| Marked take into the bag | yes | yes, no (beak, clamped by free room) as a probe |
+| `Thief.asset` `LootSeconds` | 12 | 8, 12, 16 |
+| `Thief.asset` `LootLeadSeconds` | 1 | 0, 1, 2 |
+| `Thief.asset` `ClockPrize` | 20 | 15, 20, 25 |
+| Lottery weights (base, banked, carried, bonus) | W1 = 4, 1, 0.5, 10 | W0 uniform 1, 0, 0, 0; W1; W2 = 2, 1.5, 0.5, 15 |
+| `Snatch.asset`, `Assassin.asset` | unchanged | none |
+
+"Marked take into the bag" is a serialized bool `LootTakeToBag` on `Thief.asset` so the probe is a delta.
+
+## 7. The steals-to-win table (D7)
+
+**These rows are my proposal, starting values for Maestro to change.** They mirror the Spoiler's `KillTargets`.
+
+| Marked steals in the match | Passive counted | Win rate | Reading |
+|---|---|---|---|
+| 4 | no | at least 90 % | Four bags is a won match. |
+| 3 | no | at least 75 % | "Robar 3 veces y backear": three bags banked usually win. Below the Spoiler's 80 % because a bag is cheaper to get than a kill and the Thief must still walk it home. |
+| 2 | yes (clock prize) | at most 20 % | Two bags win only through the clock prize or a weak field. |
+
+Data: a new list `ThiefLootTargets` on `OracleReference.asset`. Recommended form: generalise `SpoilerKillTarget` into one
+`WinTarget` struct (`Count`, `WithPassive`, `MinWinRate`, `MaxWinRate`) used by both lists, so `MatchStats.Label` has one
+home (field names keep `Kills` serialised via `FormerlySerializedAs` if renamed). Report labels only, never a test
+(as for the Spoiler).
+
+"Marked steals" counts marks taken, not banked: banking is the behaviour the row measures through the win rate. The
+report also shows, per row, the Thief's final banked and the share of his loot that reached the base.
+
+## 8. The end-of-clock prize, Thief only (D4)
+
+- `ThiefPassiveSO` gains `ClockPrize` **20** and overrides `MatchEndBonusFood` to return it. Paid exactly as the
+  Spoiler's today: `GameManager.AwardMatchEndBonuses` banks it into the home base, then the winner is picked. It is the
+  one thing that goes straight to the base; the loot bounty goes to the bag.
+- Stall check: an idle Thief at 0 gets 20 and loses to a clock leader at 28 to 39. A Thief with two banked bags (about
+  28) plus 20 beats most clock leaders, which is the "2 marks: at most 20 %" row through the clock share (5 to 7.5 %).
+- Food in the bag at the clock is not banked (unchanged).
+
+## 9. The Spoiler's passive after the move (D5)
+
+The Spoiler keeps a signature passive (`Spoiler.asset`, display name "Assassin"), `BonusFood` 0 (or the override
+removed), and the text presents one thing Hunt already does.
+
+**Chosen: the leader pull** (`MarkKill.asset` `LeaderPickWeight` 2, applied in `MarkPickRules.LeaderWeight`).
+
+- New `perk.spoiler.line`: "Your Hunt picks the leader {x} times as often."
+- New `perk.spoiler.detail`: "The bird with the most food at home is {x} times as likely to be hunted."
+- `{x}` reads `LeaderPickWeight` from the Hunt asset (numbers come from the data, never typed).
+
+Why this one, for a child: it works with no button (it is truly passive); it is the Spoiler's alone (the bag that
+ignores capacity is now the Thief's too, so it would not set the Spoiler apart); "the leader" is the bird on top of the
+standings, which every child can see; and it tells the leader why he keeps being hunted.
+
+What moves from the Hunt text: **nothing has to leave it.** `ability.markkill.desc` names the hunt time, the kill
+window, the stun, the reach and "take all their food"; the leader pull is in no player text today. The Hunt line stays
+as it is; the passive line names a behaviour that was silent. Rejected: moving "take all their food" or the
+`ExecuteBounty` 15 into the passive. That is the reward of pressing Hunt; out of the Hunt line, the Hunt text would no
+longer say what a pounce does.
+
+Text rows to change: `UiKeys.PerkSpoilerLine` / `PerkSpoilerDetail` args (`food`, `goal` become `x`) and their
+`UiText.csv` rows; GDD 5.3 table row. Zero balance effect.
+
+The Thief's perk line becomes the loot mark: "Rob the bird with your loot bag for +{bounty}. +{prize} at home if time
+runs out." (numbers from `Thief.asset`; final words by `narrative-designer`).
+
+## 10. The per-victim steal cooldown: removal (D7)
+
+Section 2.1: today it binds no shipped kit; it lives only in the retired Sneaky Steal and its support code.
+
+**Decision: it goes, for every kit, and no new one is added.** Steal is one job with one rule (Maestro 2026-11-05, "one
+ability per job"); the four kits that hold it share `Snatch.asset`, and a lock for the Thief alone would bring back the
+two-rule confusion Maestro names. The Thief's farming problem is about the bonus, and the bonus is now protected by the
+mark itself. Removal in the game slice: `SameVictimCooldownSeconds` and the lock calls in `SneakyStealAbilitySO`, its
+`{secs}` arg and the "Same bird" sentence of `ability.sneakysteal.desc`, `ChickenController._stealLocks`,
+`IsStealLockedOn`, `LockStealOn`, `StealLockFeedbackGrace` and the reset line, `TargetCooldowns` and their tests. The
+Sneaky Steal asset stays retired and otherwise as it is (the 2026-11-12 ruling keeps retired abilities for the alpha
+feedback; this removes only a rule Maestro has now ruled out).
+
+**What protects a victim from being farmed afterwards.**
+
+- The bonus: `MarkPickRules.Filter` never re-marks the last marked rival (unless he is the only one), so one Thief never
+  gets two bounties in a row from one bird. Two Thieves can each mark him once; the bounty is new food, so he loses only
+  the two takes.
+- The take: as today for every Steal kit, at most 5 per Steal cooldown (4 s), and the clamp shrinks it as the victim
+  empties. With the 1.6x gone, a Thief chasing one bird gets 5 per 4 s, less than that bird forages.
+- The bot and P1 follow the bag (section 12), so the rotation also moves the chase. P1's `Stickiness` 1.1 on the last
+  victim is kept for other kits and does not apply to the Thief's marked target (it is the bag that pulls him).
+
+## 11. Feedback with the coin-bag identity (D6, ux-designer)
+
+Only the Thief and the marked rival see the mark. All of it is local presentation (`ChangeDetector` + `Render`) driven by
+the replicated loot state; nothing is sent by RPC. PC and phone show the same elements.
+
+| Old crown element | New element | Who sees it | Reuses | Why |
+|---|---|---|---|---|
+| Crown on the crowned bird's head | Coin-bag badge over the marked bird's nameplate | Thief, victim | `ChickenStatusBadges` slot | The victim must know he is wanted. |
+| `CROWNED!` pop | `MARKED!` pop and a short buzz | Victim | Hunt pop path, haptic H8a | A self-pop on his own bird, so D7b holds. |
+| Crown badge on the Thief's floor arrow | Coin-bag badge on the Thief's arrow | Victim | `FloorRivalArrows.TryRepresentEmphasised`, the `HunterSkull` pattern | Who wants it and from where. |
+| Crown disc over the target | Coin-bag disc over the target (paw swapped for a bag); target's arrow forced on when off the floor circle | Thief | `MarkHudController` disc | Same job, new icon. |
+| Gold ground brackets | Kept: gold, only when the target is in Steal range | Thief | H1a brackets | "Fire now." |
+| Steal hex crown dot and pulse | Gold bag dot while a mark is live; pulse when the marked bird is within 5.16 m | Thief | H2a dot | Also carries the "coming" cue below. |
+| `CROWN +10` take pop | `LOOT +10` over the Thief, hit-confirm sound, strong buzz; the `+{n}` grab pop is suppressed for that 10 | Thief | Grab pop | A self-pop. |
+| Gap outline | Dropped as its own state; folded into "mark is coming" | - | - | The gap is now "Steal recharging", which the hex already shows. |
+| `SAFE` / `MISSED` | `SAFE` kept (wall, shell); `MISSED` dropped | Thief | H4a words | A mark no longer just times out; a move is shown by the bag hopping. |
+| Bystander crown and feather burst | Dropped | - | - | Bystanders see nothing (D6). |
+| Standings crown icon | Dropped | - | - | It is a public surface. `LbSkull{i}` untouched. |
+| Clock prize beat | Kept for everyone: `THIEF +20` flies into his base total, 1.2 s, the banner waits; strong buzz on the Thief's phone | All | Standings row | It changes the winner; an unexplained jump reads as a bug. A match-end result, not the mark. |
+| Crown and Hunt on one bird | Bag badge under the Hunt disc; one arrow per relationship; the K13 tint stays Hunt-only | Thief, victim, Spoiler | H13a | Unchanged logic. |
+
+New elements a child needs:
+
+- **Mark is coming** (Thief): on the Steal hex the empty bag dot fills with the cooldown sweep and turns solid gold 1 s
+  before Steal is ready, the instant the new target's disc and arrow light. No countdown, no word.
+- **Mark moves** (12 s, Steal on cooldown): the bag pops off the old bird (0.2 s) and onto the new one; the old victim's
+  badge fades in 0.3 s with no word; the new victim gets `MARKED!`. `Overdue` needs no element: nothing changes, which
+  is the truth.
+
+**What a bystander can still infer.** That the Thief robbed someone, from the existing steal chunks (`FoodChunkFlight`,
+`FeedbackTuning.StealChunksPerVictim` 3), and that he is rich, from his cargo. Gap (verified by the ux-designer): no UI or
+Visuals file reads `BountyBag`, so the bag, and with it the +10, is invisible on the cargo bar for everyone. Recommended
+as its own item, not mark-specific: the cargo bar shows the bag. No mark element for bystanders.
+
+New words (`UiKeys` and `UiText.csv`): `hud.pop.marked` MARKED!, `hud.pop.lootTake` LOOT +{n}, `hud.prize.thief`
+THIEF +{n}, `hud.badge.loot` LOOT. New `FeedbackPaletteSO` fields next to the Mark block: `LootGoldColor`,
+`LootEmptyColor` (never literals in `FeedbackTuning`, D3a). The final words wait for `narrative-designer`.
+
+**Player-facing name candidates** (for `narrative-designer`): Loot Bag, Jackpot, Fat Purse. "Mark" in `MARKED!` may clash
+with the Spoiler's old "Death Mark" naming; `narrative-designer` should pick one word for both the pop and the badge.
+
+## 12. Counterplay and abuse
+
+| Concern | Answer |
+|---|---|
+| Kingmaking | The lottery leans to the rich, so the Thief robs the leader most and helps the trailers. Measure the leader's win rate with and without a Thief in the match. |
+| A Thief that never banks | Bag food does not count at the clock and is stealable; hoarding loses. |
+| Stalling to the clock | 20 cannot win from zero (section 8). Watch the clock share. |
+| Leader hiding at home | He stops foraging; the Thief may keep Steal ready and wait (`Overdue`), or rob others and let the mark move. Both cost one of them time. |
+| Farming one bird | Section 10. |
+| Bag and Hunt on one bird | Allowed; a kill ends the mark without pay, so the two Assassins compete for the bird rather than stack on it. |
+
+## 13. Simulator slice first
+
+**Where the rules live.** `LootPickRules` (section 5) and `LootRules` (pure: `CanTake(inRange, walled, stealProof)`,
+`DrawAt(now, readyAt, lead)`, `TimedOut(age, seconds, stealReady)`, `MarkedTake(nominal, factor, victimCargo, victimBag)`)
+in `Assets/_Game/Scripts/Gameplay/`, so `MatchSim` (Balance folder, same Gameplay assembly through its `.asmref`) and
+later the game call the same code. Numbers on `ThiefPassiveSO`: `LootBounty`, `LootSeconds`, `LootLeadSeconds`,
+`LootTakeToBag`, `LootBaseWeight`, `LootBankedWeight`, `LootCarriedWeight`, `LootOverFraction`, `LootOverBonus`,
+`ClockPrize`; `StealMultiplier` stays and moves to 1.0. Every one is a what-if delta.
+
+**Facts and state.**
+
+- `PassiveFacts` (`MatchKit.cs`): a `Loot` block with those fields (`LootBounty` 0 = no mark); `MatchKits` reads them from
+  `ThiefPassiveSO`. `MatchEndBonusFood` already flows through, so the prize needs no sim code.
+- `MatchSim.Chick`: `LootState`, `LootTarget` (-1 none), `LootSince`, `LootDrawAt`, `HasLastLoot`, `LastLoot`.
+- A new RNG stream `StreamLoot` (103), so the mark stream and every other draw keep their common random numbers.
+- `Cast`, `AbilityJob.Steal`: the caster's marked bird is a valid target with an empty beak; for that bird, when
+  `LootRules.CanTake` holds, the take goes through `LootRules.MarkedTake` into the caster's `Bag` (or the beak when
+  `LootTakeToBag` is false), `LootBounty` is added to the `Bag`, the mark ends, `LootDrawAt` is set. Other birds: `DoSteal`
+  unchanged. A loot upkeep step beside `MarkUpkeep` runs the state machine of section 4 each tick, reading the caster's
+  Steal `CooldownLeft`.
+- `Remove`: a removed bird ends every mark on him. Round reset: `Off`.
+- `SeatView`: the seat's own `LootTarget` and, per rival, "marked by a Thief" (P1's flee option; P0 ignores it).
+- Counters: `LootOffered`, `LootTaken`, `LootTakeFood`, `LootBountyFood`, `LootTimeouts`, `LootRefused` (wall or shell),
+  `BagLostToSteals`; `MatchEventKind.Loot`.
+- `MatchReport` / `MatchWhatIf`: Thief rows for marks offered and taken, take and bounty food, bag food lost, clock prize
+  paid, the Thief-mirror corner-decided share, and the **steals-to-win rows** of section 7 labelled against
+  `ThiefLootTargets` (played rows under P0, P1 and mixed). A forced design (exactly k marks on schedule, as `ForcedKills`)
+  is a second step, only if the played rows are too thin.
+
+**P0, the game's bot.** Prey choice is `BotTactics.TargetPriority` (shared by `BotController` and `ScriptedPolicy`). Add
+a loot term: the bot's own marked rival scores as a full load (`cargoFraction` 1) whatever it carries and stays prey
+inside `HuntRadius`; the cast plan treats "marked rival in reach" like "carrier in reach". Banking: the bag counts in
+the carried share that sends it home (it already does through `Stealable`). Nothing else: no fleeing from a mark. The
+game bot gets the same through the same `BotTactics` change.
+
+**P1, the utility policy.** `BestSteal`: for the marked rival the value adds `LootBounty` plus the marked take, the
+`take < 1` skip does not apply, and `Stickiness` does not apply to him. The bag at risk already weighs in banking. The
+marked rival weighing a run home higher is a separate, optional measure.
+
+**What-if runs** (P0, P1, mixed; every row with `ExecuteBounty` 15, `Spoiler.asset` `BonusFood` 0, `StealMultiplier`
+1.0 unless swept):
+
+- Stage A, 15 scenarios: `LootBounty` {6, 8, 10, 12, 14} x `ClockPrize` {15, 20, 25}; W1; `LootSeconds` 12; lead 1.
+- Stage B, on the best Stage A row: `StealMultiplier` {1.0, 1.3, 1.6}; weights W0, W1, W2; `LootSeconds` {8, 12, 16};
+  lead {0, 1, 2}; `LootTakeToBag` false once; clock prize 30 once as a stall probe.
+
+**Go when all hold:** the Thief at 20 to 30 % under P0, P1 and mixed (inside the margins); the Spoiler stays 21 to 30 %;
+no other kit moves more than 5 points; matches on the clock at 12 % or less; mean length no more than 2 s shorter; the
+Thief mirror no longer 100 % corner-decided; 1.8 to 3.0 marks taken per match; the steals-to-win rows IN or within their
+margin of the band (3 marks at least 75 %, 2 marks with the prize at most 20 %).
+**No-go when any holds:** the Thief above 35 % under any policy; any kit moves more than 8 points; clock share above 15 %;
+the 2-mark row above 35 % (the prize, not the bags, would be winning).
+The oracle is a guide: Maestro decides on the numbers.
+
+## 14. The game slice after that (list, not a plan)
+
+- **Networked state and authority.** A `ThiefLoot` NetworkBehaviour on the chicken (added only for the Thief, as
+  `AssassinExecute` is for the Spoiler): `[Networked] LootTarget`, `LootSince`, `LootDrawAt`, state; last marked is
+  authority-local. It reads its own Steal slot's cooldown. Drawn on the Thief's authority with `LootPickRules`. Gameplay
+  assembly; no new Fusion assembly, `AssembliesToWeave` unchanged.
+- **Reward, authority-confirmed.** At the cast, the Thief's authority records a loot expectation for the marked bird (a
+  `PendingStealLedger`, as `ExpectExecuteLoot`). The marked bird's authority drains the take (`RPC_DrainStolen` path,
+  free room ignored for this bird) and confirms the mark (not steal-proof, within `StealRules.IsWithinStealRange` plus
+  margin, no wall) through a receiver-validated RPC; only a confirmation that matches a pending expectation inside its
+  window pays the take and `LootBounty` into `BountyBag`, once. A refused confirm leaves the mark. `StealRules.MaxSingleSteal`
+  must cover the marked take (5 x multiplier); the bounty is not a drain.
+- **Rules.** `SnatchAbilitySO.ExtraTargetFilter` accepts the caster's marked bird; `LootPickRules`, `LootRules`; removal
+  (`ChickenCombat` execute) and round reset clear marks; decoys never drawn.
+- **Per-victim lock removal** (section 10).
+- **Passives.** `ThiefPassiveSO`: loot fields, `ClockPrize`, `MatchEndBonusFood` override, `StealMultiplier` 1.0, new
+  `PerkArgs`. `SpoilerPassiveSO`: `BonusFood` 0 or override removed, new text args (`LeaderPickWeight`). The
+  `GameManager.AwardMatchEndBonuses` comment updated.
+- **BalanceBook.** New fields tunable by delta; none on the deny list; `tools/balance/schema.py` mirrors that.
+- **Oracle data.** `ThiefLootTargets` on `OracleReference.asset` (section 7).
+- **HUD and VFX.** Section 11, plus the cargo bar showing the bag.
+- **Bots.** `BotTactics.TargetPriority` loot term, `BotController` cast plan.
+- **Text.** `UiKeys` and `UiText.csv` rows (section 11), Thief and Spoiler perk lines with numbers from the data,
+  `ability.sneakysteal.desc` without "Same bird".
+- **Tests.** EditMode: `LootPickRules` (weights, the banked-plus-carried bonus, proportional pick, filter, fallback),
+  `LootRules` (each transition of section 4, including `Overdue` and the 1 s lead), the empty-beak target filter, the
+  ledger confirm (forged and late confirms refused), the clock prize paid before the winner, the Spoiler paying nothing;
+  `FixedKitTests` unchanged; simulator parity tests for the loot mark.
+- **Docs.** GDD 5.3, 6.2 (loot mark), 6.4 (Spoiler no prize), `docs/FEEDBACK.md`, `docs/site/index.html` (republish),
+  `docs/STATE.md`; `librarian` for `docs/FILE_STRUCTURE.md` and the rules docs (TargetCooldowns removed, new Gameplay files).
+
+## 15. Open decisions for Maestro
+
+None. Every point above follows from his answers or is a starting value the simulator sweeps. Decided here without
+asking (say so if wrong): `StealMultiplier` to 1.0; the marked take goes to the bag; `CargoCapacity` unchanged; the
+per-victim lock removed for every kit; the steals-to-win rows of section 7; the leader pull as the Spoiler's passive;
+the clock prize beat shown to everyone.
+
+## 16. Assumptions and what was not verified
+
+- All numbers in sections 4 to 8 are estimates for the simulator, not measurements: the marked take of about 4, the 85 %
+  of a bag that reaches home, the 1.5 incidental victims, the 2 to 2.5 marks per match, the 8 to 10 s cycle.
+- Steal is assumed ready at GO (no round-start cooldown on Snatch); not traced in the game.
+- Whether the steal chunks draw for every client is assumed (ux-designer); the cargo bar does not show the bag (verified
+  by the ux-designer: no UI or Visuals file reads `BountyBag`).
+- The simulator does not model a placed Slow Area zone or body collision (its own list); neither changes the mark.
