@@ -41,6 +41,25 @@ namespace CluckWars.Gameplay
                 tick, killer, victim, payout, bounty, victimCargo, gained, payout > gained ? payout - gained : 0f, victimPecking ? 1 : 0);
         }
 
+        public const string LootMoveTimeout = "timeout", LootMoveGone = "gone";
+
+        /// <summary>A Thief's loot mark was drawn on <paramref name="victim"/> (written by the Thief's authority).</summary>
+        /// <param name="candidates">Rivals in the draw.</param>
+        /// <param name="chance">The victim's share of the lottery's weights, 0 to 1.</param>
+        public static string LootDraw(int tick, string thief, string victim, int candidates, float chance) =>
+            string.Format(CultureInfo.InvariantCulture, "lootdraw tick={0} thief={1} victim={2} candidates={3} chance={4:0.00}",
+                tick, thief, victim, candidates, chance);
+
+        /// <summary>A marked steal was paid (written by the Thief's authority once the victim confirmed): the food taken from the victim, the bounty that fitted
+        /// and the bounty that did not (lost).</summary>
+        public static string LootTake(int tick, string thief, string victim, float stolen, float bounty, float unfit) =>
+            string.Format(CultureInfo.InvariantCulture, "loottake tick={0} thief={1} victim={2} stolen={3:0.00} bounty={4:0.00} unfit={5:0.00}",
+                tick, thief, victim, stolen, bounty, unfit);
+
+        /// <summary>A mark ended unpaid: <see cref="LootMoveTimeout"/> (old with Steal on cooldown, the mark moves) or <see cref="LootMoveGone"/> (its bird left play).</summary>
+        public static string LootMove(int tick, string thief, string victim, float age, string reason) =>
+            string.Format(CultureInfo.InvariantCulture, "lootmove tick={0} thief={1} victim={2} age={3:0.00} reason={4}", tick, thief, victim, age, reason);
+
         /// <param name="seconds">Playable seconds since the round's GET READY ended.</param>
         public static string Contact(int tick, string seat, string rival, int round, float seconds, float distance) =>
             string.Format(CultureInfo.InvariantCulture, "contact tick={0} seat={1} rival={2} round={3} t={4:0.00} dist={5:0.00}",

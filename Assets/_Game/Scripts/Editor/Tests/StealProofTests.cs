@@ -94,16 +94,20 @@ namespace CluckWars.Tests
         [Test]
         public void RpcDrainStolen_RefusesWhenStealProof_AndReportsZero_BeforeAnyDrain()
         {
-            string body = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
+            // The drain body is DrainForThief since the Thief's marked steal (BL-217): RPC_DrainStolen and RPC_DrainStolenMarked share it.
+            string body = Body(Src("Gameplay/ChickenCargo.cs"), "private float DrainForThief(", 3200);
             int proof  = body.IndexOf("_controller.IsStealProof", StringComparison.Ordinal);
-            int report = body.IndexOf("ReportSteal(thief, 0f, requestId)", StringComparison.Ordinal);
+            int refusal = body.IndexOf("refused = true;", StringComparison.Ordinal);
             int drain  = body.IndexOf("float actual = StealRules.DrainAmount(", StringComparison.Ordinal);
             int stamp  = body.IndexOf("StealEventId++", StringComparison.Ordinal);
             Assert.Greater(proof, 0);
-            Assert.Greater(report, proof, "the zero report is sent from the refusal branch");
-            Assert.Greater(drain, report, "refusal must return before the drain");
-            Assert.Greater(stamp, report, "a refused steal must not name a thief (no LastThiefId/StealEventId)");
-            StringAssert.Contains("return;", body.Substring(proof, drain - proof));
+            Assert.Greater(refusal, proof, "the refusal is flagged from the shell branch");
+            Assert.Greater(drain, refusal, "refusal must return before the drain");
+            Assert.Greater(stamp, refusal, "a refused steal must not name a thief (no LastThiefId/StealEventId)");
+            StringAssert.Contains("return 0f;", body.Substring(proof, drain - proof), "a refusal drains nothing");
+
+            string rpc = Body(Src("Gameplay/ChickenCargo.cs"), "public void RPC_DrainStolen(", 3200);
+            StringAssert.Contains("ReportSteal(thief, DrainForThief(thief, amount, out _), requestId)", rpc, "the zero report of a refusal goes out through the same ReportSteal");
         }
 
         [Test]

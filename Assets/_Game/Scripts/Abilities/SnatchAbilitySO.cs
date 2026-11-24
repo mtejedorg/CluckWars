@@ -65,11 +65,17 @@ namespace CluckWars.Abilities
         public override bool TargetEffectIncludesSteal => true;
         public override bool TargetEffectIncludesControl => KnockbackStrength > 0f; // the shove, when there is one
 
-        /// <summary>Only a cargo-carrier is a valid Snatch target — an empty-handed rival in range now gets the "immune / no-effect" telegraph instead of a knockback that used to land anyway.</summary>
+        /// <summary>
+        /// Only a cargo-carrier is a valid Snatch target — an empty-handed rival in range now gets the "immune / no-effect" telegraph instead of a knockback that
+        /// used to land anyway. The one exception is the rival carrying the caster's own loot mark (a Thief's, BL-217): the bounty is paid even with nothing to take.
+        /// Every other kit has no mark, so for it nothing changes.
+        /// </summary>
         protected override bool ExtraTargetFilter(ChickenController caster, ChickenController candidate)
         {
             var cargo = candidate.Cargo;
-            return cargo != null && cargo.Stealable > 0f;
+            if (cargo != null && cargo.Stealable > 0f) return true;
+            var loot = caster != null ? caster.Loot : null;
+            return loot != null && loot.IsMarking(candidate);
         }
 
         public override void OnActivate(AbilityContext ctx)
@@ -79,8 +85,24 @@ namespace CluckWars.Abilities
             if (thiefCargo == null) return;
 
             GatherTargets(thief, _scratch);
+
+            // The Thief's marked rival first (BL-217): his take and the loot bounty are one marked steal, authority-confirmed (ThiefLoot.TakeMarked), and they
+            // get first call on the beak's room. Handled here so the loop below sees the same list; a kit with no mark skips this and plays as before.
+            var loot = thief.Loot;
+            int markedIndex = -1;
+            if (loot != null && loot.MarkLive)
+            {
+                for (int i = 0; i < _scratch.Count; i++)
+                    if (loot.IsMarking(_scratch[i])) { markedIndex = i; break; }
+                if (markedIndex >= 0 && loot.TakeMarked(_scratch[markedIndex], ResolveStealAmount(StealAmount, thief)))
+                    thief.KnockAway(_scratch[markedIndex], KnockbackStrength);
+                else
+                    markedIndex = -1;   // a shell or an open marked steal refused it: it is robbed like any rival, or not at all
+            }
+
             for (int i = 0; i < _scratch.Count; i++)
             {
+                if (i == markedIndex) continue;
                 // A steal-proof victim (Egg Shell / Turtle Mode) gives nothing (StealFrom's gate); the shove below
                 // is unaffected (ApplyKnockback has its own control-immunity check) and names the thief, so a base
                 // wall refuses it exactly where it refuses the steal. Nothing is sent for a strength of 0 (shipped).

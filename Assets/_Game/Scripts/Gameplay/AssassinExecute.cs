@@ -484,7 +484,7 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>Food banked at the base of <paramref name="corner"/>, 0 when it has none (or no base is live).</summary>
-        private static float BankedFood(int corner)
+        internal static float BankedFood(int corner)
         {
             var bases = PlayerBase.ActiveBases;
             for (int i = 0; i < bases.Count; i++)

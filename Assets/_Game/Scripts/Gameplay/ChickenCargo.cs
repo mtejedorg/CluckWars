@@ -269,6 +269,8 @@ namespace CluckWars.Gameplay
 
             _controller = GetComponent<ChickenController>();
             _combat = GetComponent<ChickenCombat>();
+            _loot = GetComponent<ThiefLoot>();
+            _marked = new MarkedStealBook<NetworkBehaviourId>(_requests);
 
             _cargoDetector = GetChangeDetector(ChangeDetector.Source.SimulationState);
             _cargoReader = GetPropertyReader<float>(nameof(Cargo));
@@ -745,6 +747,18 @@ namespace CluckWars.Gameplay
                 return;
             }
 
+            ReportSteal(thief, DrainForThief(thief, amount, out _), requestId);
+        }
+
+        /// <summary>
+        /// Victim side of a steal, once the thief is resolved: what this authority really drains for <paramref name="amount"/>, 0 for a refusal
+        /// (<paramref name="refused"/> true) or an empty load. The one drain body, shared by <see cref="RPC_DrainStolen"/> and the Thief's marked steal
+        /// (<see cref="RPC_DrainStolenMarked"/>), so a shell, a wall or an empty load can never differ between them.
+        /// </summary>
+        private float DrainForThief(ChickenController thief, float amount, out bool refused)
+        {
+            refused = false;
+
             // Steal-proof (Egg Shell / Turtle Mode). Every thief checks StealRules.CanStealFrom
             // before asking, so reaching this point means the shell went up inside one round trip
             // of the thief's scan (the same sub-RTT race Immovable has). The thief has credited
@@ -755,8 +769,8 @@ namespace CluckWars.Gameplay
             {
                 _log?.Info(Source, $"{name}: steal by {thief.name} hit {(walled ? "a base wall" : "a shell that went up")} " +
                                    "inside one round trip — nothing drained.");
-                ReportSteal(thief, 0f, requestId);
-                return;
+                refused = true;
+                return 0f;
             }
 
             if (Stealable <= 0f)
@@ -765,12 +779,12 @@ namespace CluckWars.Gameplay
                 // this tick (another thief may have taken it first). The thief is told so and
                 // credits nothing: its estimate of this load never became food.
                 _log?.Debug(Source, $"{thief.name} stole from an empty load — nothing to drain.");
-                ReportSteal(thief, 0f, requestId);
-                return;
+                return 0f;
             }
 
             // Never more than the victim holds (an execute's loot is ordinary cargo, so it is taken like any other food).
             float actual = StealRules.DrainAmount(amount, Cargo);
+            if (actual <= 0f) return 0f;   // a marked steal may ask for nothing (a full Thief): no drain, no steal event
             Cargo = Mathf.Max(0f, Cargo - actual);
 
             // Name the thief for the victim's §3.2 direction cue — see LastThiefId, and
@@ -779,14 +793,14 @@ namespace CluckWars.Gameplay
             // above without touching these, because neither is an impact and neither may name
             // anybody. Both properties go out in this one tick, so every peer sees the id and
             // the name it points at in the same snapshot.
-            LastThiefId = thiefId;
+            LastThiefId = thief.Id;
             StealEventId++;
 
             _log?.Info(Source, $"Stolen: -{actual:0.00} from {name} [{_controller.Class}/{SpecOf(_controller)}] by {thief.name} " +
                                $"[{thief.Class}/{SpecOf(thief)}] → Cargo={Cargo:0.0}.");
 
             _log?.Info(MatchTelemetry.Source, MatchTelemetry.Steal(MatchTelemetry.Tick(Runner), MatchTelemetry.Seat(thief), MatchTelemetry.Seat(_controller), actual));
-            ReportSteal(thief, actual, requestId);
+            return actual;
         }
 
         /// <summary>
@@ -853,6 +867,119 @@ namespace CluckWars.Gameplay
             if (settled.ToCargo <= 0f) return;
             _stealCreditFrame = Time.frameCount;   // I5: Render holds this gain own +n until the kernels land
             _log?.Debug(Source, $"Steal settled: +{settled.Credited:0.00} from {victim.name} (asked {settled.Requested:0.00}) → Cargo={Cargo:0.0}.");
+        }
+
+        // ---- The Thief's marked steal (BL-217): a steal that also pays the loot bounty, authority-confirmed like every food transfer ----
+
+        private MarkedStealBook<NetworkBehaviourId> _marked;
+        private ThiefLoot _loot;
+
+        /// <summary>A marked steal has been sent and not answered (inside the settle window). While it is, the mark does not time out: the answer decides it.</summary>
+        public bool MarkedStealPending => _marked != null && _marked.Pending(Time.unscaledTime);
+
+        /// <summary>
+        /// The Thief's marked steal, thief side: reserves room for the take (a steal's normal take, <paramref name="amount"/> already scaled by the passive,
+        /// held to the free room and to what the victim carries) and then for the <paramref name="bounty"/> in what is left, records the request and asks
+        /// the victim's authority (<see cref="RPC_DrainStolenMarked"/>). Nothing is credited here (<see cref="MarkedStealBook{TKey}"/> holds the rules).
+        /// Called by <c>ThiefLoot.TakeMarked</c> on the Thief's own state authority only. False when nothing was sent (a shell, a marked steal still open,
+        /// no authority): the mark stays.
+        /// </summary>
+        public bool RequestMarkedSteal(ChickenController victim, float amount, float bounty)
+        {
+            if (!HasStateAuthority || victim == null || victim.Cargo == null || _controller == null)
+            {
+                _log?.Error(Source, $"{name}: RequestMarkedSteal ignored (authority={HasStateAuthority}, victim={(victim != null ? victim.name : "null")}) - a wiring fault.");
+                return false;
+            }
+            if (!StealRules.CanStealFrom(victim))
+            {
+                _log?.Info(Source, $"{name}: marked steal on {victim.name} refused - steal-proof.");
+                return false;
+            }
+
+            // Recorded BEFORE the call: on a shared authority (a bot, solo) the victim's answer comes back synchronously inside it.
+            if (!_marked.TryOpen(victim.Id, amount, victim.Cargo.Stealable, bounty, Capacity, Cargo, Time.unscaledTime, out float take, out ushort id)) return false;
+            victim.Cargo.RPC_DrainStolenMarked(take, _controller.Id, id);
+            return true;
+        }
+
+        /// <summary>
+        /// Victim side of a marked steal: drains what is really there (up to <paramref name="amount"/>, which may be 0: an empty beak, or a full Thief) through
+        /// the same body as an ordinary steal (<see cref="DrainForThief"/>) and tells the Thief's authority whether the steal reached this chicken or was
+        /// refused (<see cref="RPC_SettleMarkedSteal"/>). The victim does not judge the mark: the Thief's own ledger decides whether a bounty is owed, and a
+        /// forged call here can drain no more than an ordinary steal can (same thief, range and amount bounds).
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_DrainStolenMarked(float amount, NetworkBehaviourId thiefId, ushort requestId, RpcInfo info = default)
+        {
+            string rejection = null;
+            if (!(amount >= 0f) || float.IsInfinity(amount)) rejection = "the amount is not a finite number of zero or more.";
+            else if (amount > 0f) IsPlausibleAmount(amount, out rejection);
+            if (rejection != null)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_DrainStolenMarked({amount:0.00}) from {info.Source} — {rejection}");
+                ReportMarkedRefusalToSender(thiefId, requestId, info);
+                return;
+            }
+
+            if (!TryResolveThief(thiefId, info, out var thief, out string thiefRejection))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_DrainStolenMarked({amount:0.00}) from {info.Source} — {thiefRejection}");
+                ReportMarkedRefusalToSender(thiefId, requestId, info);
+                return;
+            }
+
+            float actual = DrainForThief(thief, amount, out bool refused);
+            if (thief.Cargo != null) thief.Cargo.RPC_SettleMarkedSteal(actual, !refused, _controller.Id, requestId);
+            else _log?.Error(Source, $"{name}: cannot report the marked steal — {thief.name} has no ChickenCargo.");
+        }
+
+        /// <summary>A rejected marked drain still answers when the named thief is a chicken the sender owns: "refused, nothing drained", so its slot closes now.</summary>
+        private void ReportMarkedRefusalToSender(NetworkBehaviourId thiefId, ushort requestId, in RpcInfo info)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(thiefId, out ChickenController named)) return;
+            if (named == _controller || !RpcClaim.SenderSpeaksFor(named, info) || named.Cargo == null) return;
+            named.Cargo.RPC_SettleMarkedSteal(0f, false, _controller.Id, requestId);
+        }
+
+        /// <summary>
+        /// The victim's answer to <see cref="RequestMarkedSteal"/>, on the Thief's authority: <paramref name="stolen"/> is what the victim really drained and
+        /// <paramref name="reached"/> says the steal got through (false: a shell or a wall refused it). Honoured only from the victim's own authority
+        /// (<see cref="RpcClaim"/>), against the one open marked steal it names (id and victim), inside the settle window, once. A refusal closes the slot and
+        /// credits nothing; the mark stays. Otherwise the stolen food is credited first and the bounty into the room left, both held to the free room; what
+        /// does not fit is lost. This is the only place the loot bounty becomes food, and only after the victim's report: no optimistic credit.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_SettleMarkedSteal(float stolen, bool reached, NetworkBehaviourId victimId, ushort requestId, RpcInfo info = default)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(victimId, out ChickenController victim) ||
+                victim == _controller || !RpcClaim.SenderSpeaksFor(victim, info))
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_SettleMarkedSteal({stolen:0.00}) from {info.Source} - {victimId} is not a victim it speaks for.");
+                return;
+            }
+
+            var settled = _marked.Settle(victimId, requestId, stolen, reached, Capacity, Cargo, Time.unscaledTime);
+            if (settled.Outcome == MarkedOutcome.Unknown)
+            {
+                _log?.Warn(Source, $"{name}: rejected RPC_SettleMarkedSteal({stolen:0.00}) #{requestId} from {info.Source} - no such marked steal is open on {victim.name} " +
+                    "(unsolicited, already settled or expired).");
+                return;
+            }
+
+            WarnOverflow("a marked steal", settled.TakeOverflow);
+            if (settled.Outcome == MarkedOutcome.Blocked)
+            {
+                _loot?.OnMarkedStealRefused(victim);
+                return;
+            }
+
+            // The take first, then the bounty: both already held to the free room by the book. This is the only place the loot bounty becomes food.
+            float gained = settled.Take + settled.Bounty;
+            if (gained > 0f) Cargo += gained;
+            if (settled.Take > 0f) _stealCreditFrame = Time.frameCount;
+            if (_loot == null) _log?.Error(Source, $"{name}: a marked steal was paid but there is no ThiefLoot to consume the mark.");
+            _loot?.OnMarkedStealPaid(victim, settled.Take, settled.Bounty, settled.BountyLost);
         }
 
         /// <summary>
@@ -1303,6 +1430,7 @@ namespace CluckWars.Gameplay
             _baseDepositTicks = 0;
             _requests.Clear();
             _pendingExecutes.Clear();
+            _marked?.Clear();
 
             Cargo = 0f;
             _log?.Debug(Source, "Reset for new match: Cargo=0.");

@@ -237,6 +237,7 @@ namespace CluckWars.Gameplay
         private ChickenCargo _cargo;
         private AbilityController _abilities;
         private AssassinExecute _assassin;
+        private ThiefLoot _thiefLoot;
         private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
 
@@ -622,6 +623,7 @@ namespace CluckWars.Gameplay
             _cargo = GetComponent<ChickenCargo>();
             _abilities = GetComponent<AbilityController>();
             _assassin = GetComponent<AssassinExecute>();
+            _thiefLoot = GetComponent<ThiefLoot>();
             BindPresentation();   // presentation caches its indicator / nameplate / badge stack here
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
@@ -1179,6 +1181,9 @@ namespace CluckWars.Gameplay
 
         /// <summary>This chicken's execute state machine (cached), or null before <c>Spawned</c>.</summary>
         public AssassinExecute Execute => _assassin;
+
+        /// <summary>This chicken's loot-mark state machine (cached; runs only for a Thief), or null before <c>Spawned</c> and on a decoy.</summary>
+        public ThiefLoot Loot => _thiefLoot;
 
         private IChickenModelPresenter _presenter;
         private static bool s_presenterMissingReported;
@@ -1854,6 +1859,7 @@ namespace CluckWars.Gameplay
             // Drop a live Death Mark first, without its fail cooldown: left in place, it would expire into the new round
             // and re-arm its cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();
+            _thiefLoot?.ResetForNewRound();
             _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.

@@ -28,6 +28,38 @@ namespace CluckWars.Tests
             Self = Vector2.zero, Rivals = rivals, RivalCount = rivals.Length, Attacks = attacks, AttackCount = attacks.Length, MarkSlot = -1,
         };
 
+        // ---- the loot mark (a Thief's, BL-217) -------------------------------------------------------------------------
+
+        private static FighterRival LootRival(float x, float cargo = 0f, bool untouchable = false) =>
+            new FighterRival { Position = new Vector2(x, 0f), Cargo = cargo, Untouchable = untouchable, LootMarked = true };
+
+        [Test]
+        public void TheLootMarkedRival_IsRobbedInReach_WhateverItCarries()
+        {
+            var d = FighterTactics.Choose(View(new[] { Rival(1f, cargo: 9f), LootRival(3f, cargo: 0f) }, Attack(0, AbilityJob.Steal)));
+            Assert.AreEqual(0, d.Slot, "Steal is pressed: the marked rival pays the bounty with an empty beak");
+            Assert.AreEqual(1, d.Chase, "and the target is the marked one, not the nearer loaded rival");
+        }
+
+        [Test]
+        public void TheLootMarkedRival_IsChasedFromAnyDistance_WhileStealIsOutOfReachOrOnCooldown()
+        {
+            var far = FighterTactics.Choose(View(new[] { LootRival(FighterTactics.ChaseMetres * 3f) }, Attack(0, AbilityJob.Steal)));
+            Assert.AreEqual(-1, far.Slot);
+            Assert.AreEqual(0, far.Chase, "walks at it from any distance, like the game's bot");
+            var cooling = FighterTactics.Choose(View(new[] { LootRival(2f) }, Attack(0, AbilityJob.Steal, ready: false)));
+            Assert.AreEqual(-1, cooling.Slot);
+            Assert.AreEqual(0, cooling.Chase);
+        }
+
+        [Test]
+        public void ALootMarkedRival_NothingReaches_IsLeftToTheOrdinaryRules()
+        {
+            var d = FighterTactics.Choose(View(new[] { LootRival(2f, untouchable: true), Rival(3f, cargo: 4f) }, Attack(0, AbilityJob.Steal)));
+            Assert.AreEqual(0, d.Slot, "a shelled or walled mark is abandoned: Steal goes to the loaded rival in reach");
+            Assert.AreEqual(-1, d.Chase);
+        }
+
         // ---- Stun / Shove / Steal -------------------------------------------------------------------------------------
 
         [Test]

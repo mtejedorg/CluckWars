@@ -94,6 +94,7 @@ namespace CluckWars.Gameplay
         private ChickenCargo      _cargo;
         private AbilityController _abilities;
         private AssassinExecute   _execute;
+        private ThiefLoot         _loot;
         private ILogService       _log;
 
         // ---- Strategy -------------------------------------------------------
@@ -148,6 +149,9 @@ namespace CluckWars.Gameplay
         private MatchPhase _phase   = MatchPhase.Opening;
         private bool       _leading;
 
+        /// <summary>Steal is kept for the Thief's marked rival this think (<see cref="BotLootRules.HoldSteal"/>): <see cref="TryCast"/> skips it.</summary>
+        private bool _holdSteal;
+
         /// <summary>What this bot believes of each rival's position (<see cref="BotSightRules"/>): live while the rival is
         /// visible, the last position seen while it is hidden. Every decision reads rival positions through
         /// <see cref="Sight"/>, never off the rival's transform (<c>BotSightTests</c> guards it).</summary>
@@ -172,6 +176,7 @@ namespace CluckWars.Gameplay
             _cargo      = GetComponent<ChickenCargo>();
             _abilities  = GetComponent<AbilityController>();
             _execute    = GetComponent<AssassinExecute>();
+            _loot       = GetComponent<ThiefLoot>();
 
             _profile = BotTactics.ProfileFor(_controller != null ? _controller.Class : ChickenClass.Warrior);
 
@@ -236,11 +241,14 @@ namespace CluckWars.Gameplay
 
             // Priority 0: BANK OR LOSE IT. Cargo in the beak scores nothing when the timer
             // expires, and on a 45 s match the window to walk home is small. This outranks
-            // everything, including a fight the bot is winning.
-            if (BotTactics.MustBankNow(cargo, distHome, EstimateMoveSpeed(),
-                                       MatchTimeRemaining(), EstimateDepositSeconds(cargo)))
+            // everything, including a fight the bot is winning. A Thief with the loot mark on banks by its own rule
+            // (BotLootRules.BankNow: the clock, the win, or a beak too full for the next marked steal), which includes the clock test.
+            bool lootThief = _loot != null && _loot.Facts.Active;
+            if (lootThief ? LootBankNow(cargo, distHome)
+                          : BotTactics.MustBankNow(cargo, distHome, EstimateMoveSpeed(),
+                                                   MatchTimeRemaining(), EstimateDepositSeconds(cargo)))
             {
-                EnterReturnToBase(homePos, "clock");
+                EnterReturnToBase(homePos, lootThief ? "loot" : "clock");
                 return;
             }
 
@@ -288,11 +296,16 @@ namespace CluckWars.Gameplay
             // Priority 2: DEPOSIT — enough banked-in-beak to be worth the walk. The
             // threshold moves with the clock and the scoreboard: a leader in the endgame
             // banks early and stops being a target, a trailing bot holds a bigger load.
-            if (cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))
+            // (A loot Thief decided at priority 0.)
+            if (!lootThief && cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))
             {
                 EnterReturnToBase(homePos, $"cargo={cargoFraction:P0}");
                 return;
             }
+
+            // Priority 2b: THE LOOT MARK — walk to the marked rival at any distance and keep Steal for it (BotLootRules).
+            if (lootThief && TryChaseMarked())
+                return;
 
             // Priority 3: HUNT / STALK — the most VALUABLE rival in reach, which is very
             // often not the nearest one. Empty-handed rivals are only worth attacking
@@ -540,6 +553,8 @@ namespace CluckWars.Gameplay
                 int priority = IndexInPlan(plan, ability.ResolveBotRole());
                 if (priority < 0) continue;
 
+                if (_holdSteal && ability.Is(AbilityJob.Steal)) continue;   // kept for the marked rival
+
                 if (!ability.IsUsable(_controller)) continue;
 
                 float reach = BotTactics.EffectiveReach(ability);
@@ -582,6 +597,59 @@ namespace CluckWars.Gameplay
 
             _log?.Debug(Source, $"{Who} cast slot {bestSlot} ('{chosen.name}', role={chosen.ResolveBotRole()}) " +
                 $"for {situation}.");
+            return true;
+        }
+
+        /// <summary>
+        /// The Thief's loot mark (BL-217): <see cref="BotLootRules.BankNow"/> with the live numbers. The same decision the match simulator's P0 takes with
+        /// the same function (<c>ScriptedPolicy</c>).
+        /// </summary>
+        private bool LootBankNow(float cargo, float distHome)
+        {
+            var gm = GameManager.Instance;
+            var config = gm != null ? gm.Config : null;
+            float depositRate = config != null ? config.DepositRatePerSecond : 9f;
+            return BotLootRules.BankNow(cargo, _cargo != null ? _cargo.Capacity : 0f, _loot.Facts.Bounty,
+                _homeBase != null ? _homeBase.FoodTotal : 0f, gm != null ? Mathf.Max(1, gm.FoodTargetToWin) : 40f,
+                distHome, EstimateMoveSpeed(), depositRate, MatchTimeRemaining());
+        }
+
+        /// <summary>
+        /// Walks to the marked rival and casts Steal once it is in reach (BotLootRules.Pursue / HoldSteal). Returns false, leaving the ordinary rules, when there is
+        /// no live mark or the rival is abandoned (shelled, behind its base wall, given up while hidden): Steal then goes elsewhere and the mark moves.
+        /// </summary>
+        private bool TryChaseMarked()
+        {
+            if (_loot == null || _abilities == null || !_loot.MarkLive) return false;
+            if (!Runner.TryFindBehaviour(_loot.MarkedTarget, out ChickenController mark) || mark == null ||
+                (mark.Combat != null && mark.Combat.IsRemoved)) return false;
+
+            var sight = Sight(mark);
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            bool behindWall = config != null && PlayerBase.TryGetBaseCentre(mark.HomeCornerIndex, out Vector2 centre) &&
+                              BotLootRules.BehindWall(new Vector2(sight.Position.x, sight.Position.z), centre, config.BaseKeepOutRadius);
+            if (!BotLootRules.Pursue(true, !sight.GivenUp, mark.IsStealProof, behindWall)) return false;
+
+            int slot = AbilityController.InvalidSlot;
+            for (int i = 0; i < _abilities.EquippedSlotCount; i++)
+                if (_abilities.GetSlot(i).Is(AbilityJob.Steal)) { slot = i; break; }
+            float dist = Planar.Distance(_controller.transform.position, sight.Position);
+            if (slot != AbilityController.InvalidSlot)
+            {
+                var steal = _abilities.GetSlot(slot);
+                _holdSteal = BotLootRules.HoldSteal(true, dist, Mathf.Max(0.1f, EstimateMoveSpeed()), _abilities.ResolvedCooldownFor(slot));
+                if (_abilities.IsReady(slot) && steal.IsUsable(_controller))
+                {
+                    bool onMarked = dist <= BotTactics.EffectiveReach(steal) * BotTactics.CommitReachFraction && steal.WouldAffect(_controller, mark);
+                    if ((onMarked || !_holdSteal) && _abilities.BotTryActivate(slot))
+                        _log?.Debug(Source, $"{Who} cast Steal (slot {slot}) for the loot mark on {mark.name} ({(onMarked ? "on the marked rival" : "on another rival in reach")}).");
+                }
+            }
+
+            _state      = BotState.Hunt;
+            _moveTarget = sight.Position;
+            if (_state != _prevState)
+                _log?.Debug(Source, $"{Who} → Hunt (loot mark on {mark.name}, {dist:0.0} m).");
             return true;
         }
 
@@ -889,6 +957,7 @@ namespace CluckWars.Gameplay
             var selfPos = _controller.transform.position;
             var all     = ChickenController.ActiveControllers;
 
+            _holdSteal        = false;
             _nearestRival     = null;
             _nearestRivalDist = float.MaxValue;
             _preyTarget       = null;

@@ -186,13 +186,15 @@ namespace CluckWars.Diagnostics
             bool fights = _brain.Personality.Fights;
             var execute = fights ? self.GetComponent<AssassinExecute>() : null;
             NetworkBehaviourId marked = execute != null ? execute.MarkedTarget : NetworkBehaviourId.None;
+            var loot = fights ? self.Loot : null;
+            NetworkBehaviourId lootMarked = loot != null && loot.MarkLive ? loot.MarkedTarget : NetworkBehaviourId.None;
             var chickens = ChickenController.ActiveControllers;
             for (int i = 0; i < chickens.Count && view.RivalCount < MaxRivals; i++)
             {
                 var c = chickens[i];
                 if (c == null || c == self || c.IsDecoy || c.Object == null || !c.Object.IsValid) continue;
                 var cp = c.transform.position;
-                if (fights) _fRivals[view.RivalCount] = FighterFacts(c, mine3, marked);
+                if (fights) _fRivals[view.RivalCount] = FighterFacts(c, mine3, marked, lootMarked);
                 _rivals[view.RivalCount++] = new AutoPlayRival
                 {
                     Position = new Vector2(cp.x, cp.z),
@@ -297,7 +299,7 @@ namespace CluckWars.Diagnostics
             return -1;
         }
 
-        private static FighterRival FighterFacts(ChickenController c, Vector3 selfPos, NetworkBehaviourId marked)
+        private static FighterRival FighterFacts(ChickenController c, Vector3 selfPos, NetworkBehaviourId marked, NetworkBehaviourId lootMarked)
         {
             var abilities = c.Abilities;
             int peck = abilities != null ? abilities.FindPeckSlot() : AbilityController.InvalidSlot;
@@ -310,6 +312,7 @@ namespace CluckWars.Diagnostics
                 Stunned = c.CurrentControlState == ControlState.Stunned,
                 Untouchable = c.IsStealProof || PlayerBase.WallBetween(selfPos, cp),
                 Marked = marked != NetworkBehaviourId.None && c.Id == marked,
+                LootMarked = lootMarked != NetworkBehaviourId.None && c.Id == lootMarked,
             };
         }
 

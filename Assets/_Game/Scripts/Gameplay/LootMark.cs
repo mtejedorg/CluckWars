@@ -111,6 +111,12 @@ namespace CluckWars.Gameplay
         public static float DrawAt(float now, float readyAt, float lead) => Math.Max(now, readyAt - Math.Max(0f, lead));
 
         /// <summary>
+        /// The next mark is due: Steal is <paramref name="lead"/> seconds or less from ready (or ready). The same moment <see cref="DrawAt"/> names, read from
+        /// the cooldown still left instead of a stored time, so the game follows the Steal slot's own timer as it runs (the simulator stores the time).
+        /// </summary>
+        public static bool DrawDue(float stealCooldownLeft, float lead) => stealCooldownLeft <= Math.Max(0f, lead) + 1e-4f;
+
+        /// <summary>
         /// A mark that is <paramref name="seconds"/> old moves only while Steal is on cooldown; with Steal ready it stays (the Overdue state).
         /// </summary>
         public static bool TimedOut(float age, float seconds, bool stealReady) => age >= seconds && !stealReady;

@@ -15,6 +15,8 @@ namespace CluckWars.Diagnostics
         public bool Untouchable;
         /// <summary>It is this seat's Death Mark target.</summary>
         public bool Marked;
+        /// <summary>It carries this seat's loot mark (a Thief's, BL-217): a Steal that reaches it pays the bounty even with nothing to take.</summary>
+        public bool LootMarked;
     }
 
     /// <summary>One equipped attack. <see cref="Reach"/> is its range-only radius; <see cref="Ready"/> = it can be pressed right now (off cooldown, usable).</summary>
@@ -55,7 +57,8 @@ namespace CluckWars.Diagnostics
     /// <summary>
     /// The fighter personality's target choice (<c>cw_personality fighter</c>, BL-208), pure so EditMode tests pin it. It
     /// plays the kit's attacks at a legal target and nothing else: Stun and Shove at the nearest rival in reach, a rival
-    /// with a Peck cast running first; Steal at a loaded rival in reach; for a Death Mark kit, mark, chase the marked rival,
+    /// with a Peck cast running first; Steal at a loaded rival in reach, or at the rival carrying this seat's loot mark whatever it carries
+    /// (and a walk at that rival from any distance, as the game's bot does); for a Death Mark kit, mark, chase the marked rival,
     /// stun it so the stun is still running when the arm ends, and press Kill the moment it lands. The caller turns a decision
     /// into a press on the normal input path.
     /// </summary>
@@ -99,6 +102,20 @@ namespace CluckWars.Diagnostics
                 return d;
             }
 
+            int loot = LootMarkedRival(v);
+            if (loot >= 0)
+            {
+                var r = v.Rivals[loot];
+                d.Chase = loot;
+                float dist = (r.Position - v.Self).magnitude;
+                for (int i = 0; i < v.AttackCount; i++)
+                {
+                    var a = v.Attacks[i];
+                    if (a.Ready && a.Job == AbilityJob.Steal && dist <= a.Reach) { d.Slot = a.Slot; return d; }
+                }
+                return d;       // keep closing in: Steal is on cooldown or the rival is out of reach
+            }
+
             float best = float.NegativeInfinity;
             for (int i = 0; i < v.AttackCount; i++)
             {
@@ -127,6 +144,13 @@ namespace CluckWars.Diagnostics
 
             d.Chase = ChaseTarget(v);
             return d;
+        }
+
+        /// <summary>The rival carrying this seat's loot mark, unless nothing reaches it right now (a shell, a base wall): the bot abandons it the same way.</summary>
+        private static int LootMarkedRival(in FighterView v)
+        {
+            for (int i = 0; i < v.RivalCount; i++) if (v.Rivals[i].LootMarked && !v.Rivals[i].Untouchable) return i;
+            return -1;
         }
 
         private static int MarkedRival(in FighterView v)

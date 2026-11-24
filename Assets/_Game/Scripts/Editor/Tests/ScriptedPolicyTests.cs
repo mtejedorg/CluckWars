@@ -318,8 +318,14 @@ namespace CluckWars.Tests
             {
                 "BotTactics.MustBankNow(", "BotTactics.ReturnThreshold(", "BotTactics.ResolvePhase(", "BotTactics.NextMarkStep(", "BotTactics.CastPlan(",
                 "BotTactics.PileCost(", "BotTactics.TargetPriority(", "BotTactics.ShouldStealGuard(", "BotTactics.ScoreCastCandidate(",
+                "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(",
             })
                 StringAssert.Contains(call, source, "P0 must call the game's own decision, not restate it.");
+
+            // And the game's bot calls the same ones (BL-217 slice A): P0 mirrors the bot's priority list, so a drift is a bot that no longer plays what P0 measures.
+            string bot = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Gameplay/BotController.cs"));
+            foreach (var call in new[] { "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(" })
+                StringAssert.Contains(call, bot, "the game's bot must call the decision P0 calls.");
             StringAssert.DoesNotContain("BotSightRules", source, "Sight goes through MatchSight, the only caller of the rule.");
         }
     }

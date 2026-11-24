@@ -496,8 +496,10 @@ namespace CluckWars.Tests
             string drain = Body(CargoPath, "public void RPC_DrainStolen(");
             Assert.AreEqual(2, Regex.Matches(drain, @"ReportRefusalToSender\(thiefId, requestId, info\)").Count,
                 "the implausible-amount and unresolved / out-of-reach thief exits both answer (R-1)");
-            Assert.AreEqual(2, Regex.Matches(drain, @"ReportSteal\(thief, 0f, requestId\)").Count, "shell / wall, and the empty load");
-            StringAssert.Contains("ReportSteal(thief, actual, requestId)", drain);
+            StringAssert.Contains("ReportSteal(thief, DrainForThief(thief, amount, out _), requestId)", drain, "every drain, refused or empty or real, reports what it drained");
+            string body = Body(CargoPath, "private float DrainForThief(");
+            Assert.AreEqual(3, Regex.Matches(body, @"return 0f;").Count, "shell / wall, the empty load, and a drain of nothing all report 0");
+            StringAssert.Contains("return actual;", body);
 
             string refusal = Body(CargoPath, "private void ReportRefusalToSender(");
             StringAssert.Contains("SpeaksFor(named, info)", refusal, "only a thief the sender owns is answered");
@@ -545,9 +547,12 @@ namespace CluckWars.Tests
                     // The execute's two payments (the capacity-free bag is gone, so they credit the cargo): the loot report, which the
                     // assassin's pending-execute ledger gates, and the flat bounty, paid on the kill report. Both are held to the free room.
                     "public void RPC_CreditExecuteLoot(", "public float CreditExecuteBounty(",
+                    // The Thief's marked steal (BL-217): the take and then the bounty, credited only by the victim's answer to the one open request
+                    // (MarkedStealBook), held to the free room.
+                    "public void RPC_SettleMarkedSteal(",
                 }
                 .Sum(sig => Regex.Matches(Body(CargoPath, sig), @"(?<![\w.])Cargo\s*\+=").Count);
-            Assert.AreEqual(6, allowed);
+            Assert.AreEqual(7, allowed);
             Assert.AreEqual(allowed, credits, "ChickenCargo credits cargo outside a settlement: that is an optimistic credit again.");
         }
     }
