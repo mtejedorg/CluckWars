@@ -366,6 +366,31 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void DenyLead_FollowsTheTake_NotTheVictimsWholeLoad()
+        {
+            Assert.AreEqual(0.125f, UtilityPolicy.DenyLead(0f, 5f, 40f), 1e-6f);
+            Assert.AreEqual(0.25f, UtilityPolicy.DenyLead(5f, 5f, 40f), 1e-6f, "banked food counts, the take adds to it");
+            Assert.AreEqual(1f, UtilityPolicy.DenyLead(38f, 5f, 40f), "never above 1");
+            Assert.AreEqual(0.1f, UtilityPolicy.DenyLead(4f, -3f, 40f), 1e-6f, "a negative take is no take");
+
+            // The same 5-food Steal on a rival holding 5 or 20: the take is 5 either way, so the decision is the same.
+            MatchIntent Scene(float rivalCargo)
+            {
+                var me = MatchTestKit.Fighter("thief", 6f, new[] { Steal(5f, 5f, 4f) }, peckAmount: 3f, peckCooldown: 1f, castSeconds: 0.4f, capacity: 20);
+                var view = View(Four(me, Kit("rival")));
+                view.PileFood[OracleMapSO.CentreIndex] = 10f;
+                view.Seats[0].Pos = Vector2.zero;
+                view.Seats[1].Pos = new Vector2(10f, 0f);
+                view.Seats[1].Cargo = rivalCargo;
+                return Think(view);
+            }
+            var small = Scene(5f);
+            var big = Scene(20f);
+            Assert.AreEqual(small.PeckPile, big.PeckPile);
+            Assert.AreEqual(small.Goal, big.Goal);
+        }
+
+        [Test]
         public void P1Champion_PrefersAFreshRivalOverThePile_OnlyWhenThePeckIsSlower()
         {
             // The same scene at a fast and at a slow Peck: the Champion's Steal on a rival mid-cast (the bite plus the Steal) beats the pile only when foraging is slow.

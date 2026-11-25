@@ -447,7 +447,7 @@ namespace CluckWars.Balance
                     float carried = _all + gain;
                     float seconds = wait + homeAfter + carried / _dep;
                     if (seconds > v.TimeLeft) continue;
-                    float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);
+                    float lead = DenyLead(v.Seats[r].Banked, gain, winTarget);   // what this hit takes from him, not his whole load
                     best = Mathf.Max(best, carried / Mathf.Max(Eps, seconds) * (1f + DenyWeight * lead));
                 }
                 if (best <= 0f) continue;
@@ -512,6 +512,13 @@ namespace CluckWars.Balance
             return false;
         }
 
+        /// <summary>
+        /// How far from winning a victim stands once the cast has taken its food: its banked food plus the take, over the win target. P1 used the victim's whole
+        /// cargo, so a 2-food take from a full beak was valued as if the whole beak went, and every kit that steals left a pile to chase one (BL-225).
+        /// </summary>
+        public static float DenyLead(float victimBanked, float take, float winTarget) =>
+            Mathf.Clamp01((victimBanked + Mathf.Max(0f, take)) / Mathf.Max(1f, winTarget));
+
         private void SprintTo(MatchView v, Vector2 goal)
         {
             if (_cast >= 0 || _me.Stunned || Vector2.Distance(_me.Pos, goal) < SprintMetres) return;
@@ -560,7 +567,7 @@ namespace CluckWars.Balance
                 float carried = _all + take + bounty;
                 float seconds = wait + homeAfter + carried / _dep;
                 if (seconds > v.TimeLeft) continue;     // no time to bank it
-                float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);
+                float lead = DenyLead(v.Seats[r].Banked, take, winTarget);   // what this cast takes from him (for the Champion the bite and the trophies too), not his whole load
                 float value = carried / Mathf.Max(Eps, seconds) * (1f + DenyWeight * lead);
                 if (r == _lastVictim && !marked) value *= Stickiness;   // it is the loot that pulls a Thief to the marked bird, not the habit
                 _value[r] = value;
