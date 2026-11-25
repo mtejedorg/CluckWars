@@ -42,6 +42,9 @@ namespace CluckWars.Gameplay
         /// conservative superset costs an attacker 1.6 food of slack on a check they still
         /// cannot pass with a fabricated number.
         /// <para>
+        /// <b>Hit-steal and debts (design 2026-11-25).</b> The Enforcer's capped debts add <c>Debt.Steal x Debt.Cap</c> to a Steal, and the Bully's Stun,
+        /// Shove and Slow ask the drain for their own amount though their abilities declare no steal; both stay inside the bound (ARCH-NET-05).
+        /// <para>
         /// Returns 0 for an empty or steal-free pool. The caller must read that as "no honest
         /// bound could be derived" and skip the check rather than reject everything — see
         /// <c>ChickenCargo.ResolveStealBounds</c>.
@@ -51,6 +54,8 @@ namespace CluckWars.Gameplay
         {
             float maxAmount = 0f;
             float maxMultiplier = 1f;
+            float maxDebtBonus = 0f;
+            float maxHitSteal = 0f;
 
             if (pool != null)
             {
@@ -58,12 +63,18 @@ namespace CluckWars.Gameplay
                 {
                     if (ability == null) continue;
                     maxAmount = Mathf.Max(maxAmount, ability.NominalStealAmount);
-                    if (ability is PassiveAbilitySO passive)
-                        maxMultiplier = Mathf.Max(maxMultiplier, passive.MaxStealMultiplier);
+                    if (!(ability is PassiveAbilitySO passive)) continue;
+                    maxMultiplier = Mathf.Max(maxMultiplier, passive.MaxStealMultiplier);
+                    var debt = passive.Debt;
+                    maxDebtBonus = Mathf.Max(maxDebtBonus, debt.Steal * Mathf.Max(debt.Cap, 0));
+                    var hit = passive.HitSteal;
+                    maxHitSteal = Mathf.Max(maxHitSteal, hit.Stun, hit.Shove, hit.Slow);
                 }
             }
 
-            return maxAmount * maxMultiplier;
+            // The Enforcer's debts add food to a Steal (design 2026-11-25, 16.2): the bound is the largest steal plus the full bonus a capped count
+            // can add. The Bully's hit-steal is its own call of the drain with no ability amount behind it: the largest hit amount counts too.
+            return Mathf.Max(maxAmount * maxMultiplier + maxDebtBonus, maxHitSteal);
         }
 
         /// <summary>
@@ -152,11 +163,32 @@ namespace CluckWars.Gameplay
             float max = 0f;
             if (pool == null) return max;
 
+            List<AbilityBaseSO> abilities = null;
+            List<PassiveAbilitySO> hitStealers = null;
             foreach (var ability in pool)
+            {
+                if (ability == null) continue;
                 max = Mathf.Max(max, Reach(ability));
+                (abilities ??= new List<AbilityBaseSO>()).Add(ability);
+                if (ability is PassiveAbilitySO passive && passive.HitSteal.Active)
+                    (hitStealers ??= new List<PassiveAbilitySO>()).Add(passive);
+            }
+
+            // A hit-steal rides on the Stun, Shove or Slow that hit: every hitter whose job some hit-steal passive prices reaches as far as its own shape.
+            if (hitStealers != null)
+                foreach (var ability in abilities)
+                    foreach (var passive in hitStealers)
+                        if (passive.HitSteal.AmountFor(ability.Job) > 0f) { max = Mathf.Max(max, HitReach(ability)); break; }
 
             return max;
         }
+
+        /// <summary>
+        /// How far a hitter whose Stun, Shove or Slow carries a hit-steal can be from its victim when the drain lands: the aim shape's total
+        /// forward reach, <c>AimRadius + AimForwardOffset</c>, the same shape <see cref="Reach"/> starts from (no jump allowance: a hitter does not jump).
+        /// </summary>
+        public static float HitReach(AbilityBaseSO ability) =>
+            ability == null ? 0f : Mathf.Max(0f, ability.AimRadius) + Mathf.Max(0f, ability.AimForwardOffset);
 
         /// <summary>
         /// How far apart <paramref name="ability"/>'s caster and victim can be when its steal

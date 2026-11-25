@@ -1243,7 +1243,7 @@ namespace CluckWars.Balance
                     if (MatchCombat.Refused(IncomingEffect.Stun, _egg[victim], _walk[victim])) return;
                     float seconds = MatchCombat.ControlSeconds(e, PassiveOf(caster), victimPassive);
                     float remaining = Math.Max(0f, v.StunUntil - _time);
-                    if (!ControlReapplyRules.IncomingExtends(remaining, seconds)) return;
+                    if (!HitAffectRules.StunAffects(false, remaining, seconds)) return;   // the game's own "affected" test (the simulator has no control immunity)
                     bool castingBefore = Casting(v);                                 // read before the stun cuts the cast: the bite still sees it
                     bool freshBefore = IsFresh(victim, PassiveOf(caster).Bite);
                     v.StunUntil = _time + seconds;
@@ -1322,7 +1322,7 @@ namespace CluckWars.Balance
                 v.ThinkNow = true;
                 bool knocked = impulse.sqrMagnitude > ShoveCounts;
                 if (v.Pecking && PeckCastRules.IsCut(false, knocked, false)) Cut(victim, CutCause.Shove);
-                if (impulse.sqrMagnitude > 0f)
+                if (HitAffectRules.ShoveMoves(false, knockback, PassiveOf(victim).KnockbackFactor))
                 {
                     HitSteal(caster, victim, job);
                     if (job == AbilityJob.Shove) EnforcerHit(caster, victim, job, castingBefore, freshBefore);   // a Steal's own knock is not a second hit

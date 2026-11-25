@@ -255,7 +255,8 @@ namespace CluckWars.Tests
         {
             string source = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Balance/MatchSim.cs"));
             StringAssert.Contains("class Core", source, "the scan found the simulator");
-            foreach (var call in new[] { "HitStealRules.Take(", "HitStealRules.Locked(", "ControlReapplyRules.IncomingExtends(" })
+            // The "affected" tests live in HitAffectRules since G2 (BL-226), which calls ControlReapplyRules.IncomingExtends itself (HitAffectRulesTests pins that).
+            foreach (var call in new[] { "HitStealRules.Take(", "HitStealRules.Locked(", "HitAffectRules.StunAffects(", "HitAffectRules.ShoveMoves(" })
                 StringAssert.Contains(call, source, "the simulator must call the game's rule, not restate it.");
         }
 

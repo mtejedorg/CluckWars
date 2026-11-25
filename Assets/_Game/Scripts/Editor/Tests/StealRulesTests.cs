@@ -134,6 +134,97 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, StealRules.MaxSingleSteal(new AbilityBaseSO[] { null }), 0.0001f);
         }
 
+        // ---- The hit-steal and the debt bonus (design 2026-11-25, 16.2) ----
+
+        private readonly List<Object> _made = new List<Object>();
+
+        [TearDown]
+        public void DestroyMade()
+        {
+            foreach (var o in _made) if (o != null) Object.DestroyImmediate(o);
+            _made.Clear();
+        }
+
+        private BullyPassiveSO MakeBully(float stun, float shove, float slow = 0f)
+        {
+            var p = ScriptableObject.CreateInstance<BullyPassiveSO>();
+            p.HitStealStun = stun; p.HitStealShove = shove; p.HitStealSlow = slow;
+            _made.Add(p);
+            return p;
+        }
+
+        private EnforcerPassiveSO MakeEnforcer(float perDebt, int cap)
+        {
+            var p = ScriptableObject.CreateInstance<EnforcerPassiveSO>();
+            p.DebtSteal = perDebt; p.DebtCap = cap;
+            _made.Add(p);
+            return p;
+        }
+
+        // The pool without any passive: the shipped passives carry their own (today off) facts, which these tests set themselves.
+        private static List<AbilityBaseSO> PlainAbilities() => Registry().All.Where(a => !(a is PassiveAbilitySO)).ToList();
+
+        [Test]
+        public void MaxSingleSteal_CoversTheHitStealAndTheFullDebtBonus()
+        {
+            var plain = PlainAbilities();
+            float old = StealRules.MaxSingleSteal(plain);
+
+            // A debt bonus on top of the biggest steal: a capped count of the passive's per-debt food.
+            var withDebts = new List<AbilityBaseSO>(plain) { MakeEnforcer(2f, 3) };
+            Assert.AreEqual(old + 6f, StealRules.MaxSingleSteal(withDebts), 1e-4f, "the full bonus (perDebt x cap) rides on the largest steal");
+
+            // A hit-steal amount larger than any steal the pool can make is covered too (the Stun and Shove declare no steal themselves).
+            var withHit = new List<AbilityBaseSO>(plain) { MakeBully(old + 5f, 1f) };
+            Assert.AreEqual(old + 5f, StealRules.MaxSingleSteal(withHit), 1e-4f, "the biggest hit-steal amount");
+            Assert.IsTrue(StealRules.IsPlausibleAmount(old + 5f, StealRules.MaxSingleSteal(withHit)), "an honest hit-steal drain is not refused");
+
+            // A small hit-steal never lowers the bound.
+            var small = new List<AbilityBaseSO>(plain) { MakeBully(2f, 2f, 2f) };
+            Assert.AreEqual(old, StealRules.MaxSingleSteal(small), 1e-4f);
+        }
+
+        [Test]
+        public void MaxSingleSteal_WithNoHitStealOrDebt_IsTheOldBound()
+        {
+            var plain = PlainAbilities();
+            var pool = new List<AbilityBaseSO>(plain) { MakeBully(0f, 0f), MakeEnforcer(0f, 3) };
+            float oldBound = plain.Max(a => a.NominalStealAmount) * Mathf.Max(1f, plain.OfType<PassiveAbilitySO>().Select(p => p.MaxStealMultiplier).DefaultIfEmpty(1f).Max());
+            Assert.AreEqual(oldBound, StealRules.MaxSingleSteal(pool), 1e-4f, "passives that are off add nothing");
+        }
+
+        [Test]
+        public void MaxReach_CoversEveryHitterOfAHitStealPassive()
+        {
+            var plain = PlainAbilities();
+            var pool = new List<AbilityBaseSO>(plain) { MakeBully(2f, 2f) };
+            float bound = StealRules.MaxReach(pool);
+
+            var hitters = plain.Where(a => a.Job == AbilityJob.Stun || a.Job == AbilityJob.Shove).ToList();
+            Assert.IsNotEmpty(hitters, "the pool holds Stun and Shove abilities (the check is not vacuous).");
+            foreach (var h in hitters)
+            {
+                Assert.GreaterOrEqual(bound, StealRules.HitReach(h), $"{h.name} hits at {StealRules.HitReach(h):0.00} m but the bound is {bound:0.00} m.");
+                Assert.IsTrue(StealRules.IsWithinStealRange(Vector3.zero, new Vector3(StealRules.HitReach(h), 0f, 0f), bound, 0f), $"an honest hit-steal by {h.name} at the edge of its reach");
+            }
+            Assert.AreEqual(Mathf.Max(StealRules.MaxReach(plain), hitters.Max(h => StealRules.HitReach(h))), bound, 1e-4f,
+                "the bound is today's value or the longest hitter, whichever is larger");
+        }
+
+        [Test]
+        public void MaxReach_IgnoresHittersWhenHitStealIsOff()
+        {
+            var plain = PlainAbilities();
+            var off = new List<AbilityBaseSO>(plain) { MakeBully(0f, 0f) };
+            Assert.AreEqual(StealRules.MaxReach(plain), StealRules.MaxReach(off), 1e-4f, "no hit-steal passive, no hitter reach");
+
+            // Only the jobs a passive prices count: a Stun-only hit-steal does not lengthen the bound by a Shove's reach.
+            var stunOnly = new List<AbilityBaseSO>(plain) { MakeBully(2f, 0f) };
+            var stuns = plain.Where(a => a.Job == AbilityJob.Stun).ToList();
+            float expected = Mathf.Max(StealRules.MaxReach(plain), stuns.Max(s => StealRules.HitReach(s)));
+            Assert.AreEqual(expected, StealRules.MaxReach(stunOnly), 1e-4f);
+        }
+
         // ---- The reach bound -----------------------------------------------------
 
         [Test]
