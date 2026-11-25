@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ThiefPassiveSO
   DisplayName: Thief
   ShortLabel: THEF
-  Description: Rob the bird with your loot bag for 10 extra food. 20 extra food if time runs out. Carry 15 food.
+  Description: Rob the bird with your loot bag for 8 extra food. 20 extra food if time runs out. Carry 16 food.
   Icon: 
   AccentColor: {r: 0.45, g: 0.35, b: 0.7, a: 1}
   Category: 3
@@ -29,8 +29,8 @@ MonoBehaviour:
   CastMotion: 8
     serializedVersion: 2
     m_Bits: 256
-  StealMultiplier: 1
-  LootBounty: 10
+  StealMultiplier: 1.6
+  LootBounty: 8
   LootSeconds: 12
   LootLeadSeconds: 1
   LootBaseWeight: 4
@@ -38,7 +38,7 @@ MonoBehaviour:
   LootCarriedWeight: 0.5
   LootOverFraction: 0.625
   LootOverBonus: 10
-  MinimumCapacity: 15
+  MinimumCapacity: 16
   ClockPrize: 20
   Subclass: 8
   Kit:
