@@ -100,7 +100,7 @@ namespace CluckWars.Balance
             _home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
             _speed = Mathf.Max(0.1f, _kit.Farm.MoveSpeed);
             _dep = Mathf.Max(0.5f, _kit.Farm.DepositRate);
-            _capacity = Mathf.Max(1f, _kit.Farm.CargoCapacity);
+            _capacity = Mathf.Max(1f, _me.Capacity);
             _all = _me.Cargo;
             _baseCentres = null;
             float distHome = WalkMetres(v, _me.Pos, _home);

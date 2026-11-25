@@ -63,7 +63,7 @@ namespace CluckWars.Tests
                 int slots = 1 + (kits[s]?.Abilities?.Length ?? 0);
                 view.Seats[s] = new SeatView
                 {
-                    Present = kits[s] != null, Seen = true, Known = true, MarkTarget = -1, MarkedBy = -1,
+                    Capacity = kits[s]?.Farm.CargoCapacity ?? 0, Present = kits[s] != null, Seen = true, Known = true, MarkTarget = -1, MarkedBy = -1,
                     Pos = _map.Places[OracleMapSO.BaseIndex(s)].Pos, CooldownLeft = new float[slots],
                 };
             }

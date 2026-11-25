@@ -78,7 +78,7 @@ namespace CluckWars.Balance
             Perceive(v, me);
 
             float cargo = me.Cargo;
-            float capacity = Mathf.Max(1, kit.Farm.CargoCapacity);
+            float capacity = Mathf.Max(1f, me.Capacity);
             float cargoFraction = Mathf.Clamp01(cargo / capacity);
             float distHome = Vector2.Distance(me.Pos, home);
             float returnAt = BotTactics.ReturnThreshold(_profile, _phase, _leading, capacity);
@@ -222,7 +222,7 @@ namespace CluckWars.Balance
                 if (dist < _nearestDist) { _nearestDist = dist; _nearest = r; }
                 if (preyRadius <= 0f) continue;
 
-                float capacity = Mathf.Max(1, v.Kits[r].Farm.CargoCapacity);
+                float capacity = Mathf.Max(1f, rival.Capacity);
                 float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo) / capacity);
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
                 float priority = BotTactics.TargetPriority(dist, frac, banked, preyRadius, _profile.LeaderFocus);

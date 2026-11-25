@@ -54,6 +54,7 @@ namespace CluckWars.Tests
             var setup = MatchTestKit.Setup(MatchTestKit.OpenMap(Half), kits, MatchTestKit.Stand, Half);
             setup.Rules.Farm.ClockSeconds = clock;
             setup.RecordEvents = true;
+            setup.Food.Personal = 100f;   // a bite is never held back by a small pile
             return setup;
         }
 
@@ -257,5 +258,385 @@ namespace CluckWars.Tests
             foreach (var call in new[] { "HitStealRules.Take(", "HitStealRules.Locked(", "ControlReapplyRules.IncomingExtends(" })
                 StringAssert.Contains(call, source, "the simulator must call the game's rule, not restate it.");
         }
+
+        // ================================================================ the Trophy Hunter
+
+        private static MatchKit Hunter(float reach, int room = 0, int cap = 3, bool clearOnBank = false, int capacity = 100, float breakCooldown = 2.5f,
+            float immune = 2.5f, float peckCooldown = 500f, params MatchAbility[] abilities)
+        {
+            var kit = MatchTestKit.Fighter("hunter", 100f, abilities, peckAmount: 3f, peckCooldown: peckCooldown, castSeconds: 0.1f, capacity: capacity);
+            kit.Passive.Break = new PeckBreakFacts { Reach = reach, Cooldown = breakCooldown, ImmuneSeconds = immune };
+            kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = room, Cap = cap, ClearOnBank = clearOnBank };
+            return kit;
+        }
+
+        // A forager whose Peck casts for `castSeconds` and then is far from ready again.
+        private static MatchKit Pecker(string label, float bite, float castSeconds, float cooldown = 500f) =>
+            MatchTestKit.Fighter(label, 100f, new MatchAbility[0], peckAmount: bite, peckCooldown: cooldown, castSeconds: castSeconds);
+
+        // The hunter stands where it is and presses a break on `target` whenever that rival is casting a Peck and the break is ready.
+        private static PolicyFactory BreakWhenCasting(int target) =>
+            MatchTestKit.Policy((v, s) =>
+            {
+                var intent = MatchTestKit.StandAt(v, s);
+                if (v.Seats[target].Pecking && v.Seats[s].BreakLeft <= 1e-4f) { intent.Break = true; intent.BreakTarget = target; }
+                return intent;
+            });
+
+        private static MatchSetup Pair(MatchKit hunter, MatchKit victim, PolicyFactory hunterPolicy, float clock, Action<MatchSetup> tweak = null)
+        {
+            var setup = MatchTestKit.Duel(MatchTestKit.OpenMap(Half), hunter, victim, hunterPolicy, MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1)), Half, clock);
+            tweak?.Invoke(setup);
+            return setup;
+        }
+
+        [Test]
+        public void Break_CutsTheCast_TakesTheBite_RestStaysInThePile()
+        {
+            // The victim's bite is 6 from a pile of 10; the hunter's beak holds 4: it takes 4, the other 2 of the bite stay in the pile.
+            var r = MatchSim.Run(Pair(Hunter(Big, capacity: 4), Pecker("victim", 6f, 1f), BreakWhenCasting(1), 3f), 1);
+            var c = r.Counters[0];
+            Assert.AreEqual(1, c.Breaks);
+            Assert.AreEqual(4f, c.BreakFood, 1e-4f, "held to the free room");
+            Assert.AreEqual(2f, c.BreakLeftInPile, 1e-4f, "what does not fit stays in the pile, never the centre");
+            Assert.AreEqual(0f, r.Counters[1].Foraged, "nothing landed for the victim");
+            Assert.AreEqual(1, r.Counters[1].PecksBroken);
+            Assert.AreEqual(1, r.Counters[1].CutsByCause[(int)CutCause.Break]);
+            Assert.AreEqual(4f, r.Banked[0], 1e-3f, "the bite sat in the breaker's ordinary cargo and banked");
+            Assert.AreEqual(1, r.Events.Count(e => e.Kind == MatchEventKind.PeckBreak));
+            Assert.AreEqual(0f, c.OverflowToCentre);
+            Assert.AreEqual(0, r.RejectedIntents);
+        }
+
+        [Test]
+        public void Break_EarnsATrophy_EvenWhenNoFoodFits()
+        {
+            var r = MatchSim.Run(Pair(Hunter(Big, capacity: 0), Pecker("victim", 6f, 1f), BreakWhenCasting(1), 3f), 1);
+            var c = r.Counters[0];
+            Assert.AreEqual(1, c.Breaks);
+            Assert.AreEqual(0f, c.BreakFood);
+            Assert.AreEqual(6f, c.BreakLeftInPile, 1e-4f, "the whole bite stayed in the pile");
+            Assert.AreEqual(1, c.TrophiesEarned, "the cut is the feat");
+            Assert.AreEqual(0f, r.Counters[1].Foraged);
+        }
+
+        [Test]
+        public void Break_AfterTheCastEnded_FallsBackToAPilePeck_ElseCancelsAndSpendsNothing()
+        {
+            // The victim's cast lasts 0.1 s, so it is over at 3.0 when the press resolves.
+            PolicyFactory PressAt(Vector2? at, int pile)
+            {
+                bool pressed = false;
+                return MatchTestKit.Policy((v, s) =>
+                {
+                    var intent = MatchIntent.Idle(at ?? v.Seats[s].Pos);
+                    if (!pressed && v.Time >= 3f) { pressed = true; intent.Break = true; intent.BreakTarget = 1; intent.PeckPile = pile; }
+                    return intent;
+                });
+            }
+
+            // At its own pile with a Peck ready: the press is an ordinary Peck.
+            var map = MatchTestKit.OpenMap(Half);
+            Vector2 pile = map.Places[OracleMapSO.PersonalIndex(0)].Pos;
+            var r = MatchSim.Run(Pair(Hunter(Big, peckCooldown: 1f), Pecker("victim", 3f, 0.1f), PressAt(pile, OracleMapSO.PersonalIndex(0)), 5f), 1);
+            Assert.AreEqual(0, r.Counters[0].Breaks);
+            Assert.AreEqual(1, r.Counters[0].BreakFallbacks);
+            Assert.AreEqual(0, r.Counters[0].BreakCancels);
+            Assert.Greater(r.Counters[0].Foraged, 0f, "the fallback pecked the pile");
+
+            // Away from every pile: nothing to break, nothing to peck, a visible cancel that spends nothing.
+            r = MatchSim.Run(Pair(Hunter(Big), Pecker("victim", 3f, 0.1f), PressAt(null, -1), 5f), 1);
+            Assert.AreEqual(1, r.Counters[0].BreakCancels);
+            Assert.AreEqual(0, r.Counters[0].BreakFallbacks + r.Counters[0].Breaks);
+            Assert.AreEqual(0, r.Counters[0].Casts, "no ability slot was spent");
+            Assert.AreEqual(0, r.RejectedIntents);
+
+            // A rival outside the break's reach is no target: the press falls through the same way.
+            r = MatchSim.Run(Pair(Hunter(2f), Pecker("victim", 6f, 1f), BreakWhenCasting(1), 3f), 1);
+            Assert.AreEqual(0, r.Counters[0].Breaks);
+            Assert.Greater(r.Counters[0].BreakCancels, 0);
+            Assert.AreEqual(6f, r.Counters[1].Foraged, 1e-4f, "his Peck landed");
+        }
+
+        [Test]
+        public void Break_SetsBreakCooldown_AndTheVictimsImmunity()
+        {
+            // The victim pecks every 0.6 s for 0.4 s. Immune for 5 s: only the first break lands, the later presses are refused.
+            MatchKit Victim() => Pecker("victim", 1f, 0.4f, 0.6f);
+            var r = MatchSim.Run(Pair(Hunter(Big, breakCooldown: 1f, immune: 5f), Victim(), BreakWhenCasting(1), 4f), 1);
+            Assert.AreEqual(1, r.Counters[0].Breaks);
+            Assert.Greater(r.Counters[0].BreakRefused, 0, "the later presses met the immunity");
+
+            // No immunity: only the break's own cooldown spaces the breaks.
+            r = MatchSim.Run(Pair(Hunter(Big, breakCooldown: 1f, immune: 0f), Victim(), BreakWhenCasting(1), 4f), 1);
+            var times = r.Events.Where(e => e.Kind == MatchEventKind.PeckBreak).Select(e => e.Time).ToList();
+            Assert.GreaterOrEqual(times.Count, 2);
+            for (int i = 1; i < times.Count; i++) Assert.GreaterOrEqual(times[i] - times[i - 1], 1f - 1e-3f, "BreakCooldown spaces the breaks");
+        }
+
+        [Test]
+        public void Break_NeverSpendsTheBreakersOwnPeckCycle()
+        {
+            // BreakCooldown gates breaks only (Maestro, 2026-11-25): the hunter's own Pecks are the same with and without the break.
+            PolicyFactory Own(bool press) => MatchTestKit.Policy((v, s) =>
+            {
+                var intent = MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(0));
+                if (press && v.Seats[1].Pecking && v.Seats[s].BreakLeft <= 1e-4f && !v.Seats[s].Pecking) { intent.Break = true; intent.BreakTarget = 1; }
+                return intent;
+            });
+            MatchResult Play(bool press) => MatchSim.Run(Pair(Hunter(Big, peckCooldown: 0.5f), Pecker("victim", 3f, 0.3f, 0.7f), Own(press), 6f), 1);
+            var with = Play(true);
+            var without = Play(false);
+            Assert.Greater(with.Counters[0].Breaks, 0, "the break landed");
+            Assert.AreEqual(without.Counters[0].Foraged, with.Counters[0].Foraged, 1e-4f, "his own Pecks did not change");
+        }
+
+        [Test]
+        public void Break_WalledOrImmune_IsRefused()
+        {
+            // The hunter stands inside its own base's wall, the victim outside: a base wall stands between them.
+            var r = MatchSim.Run(Pair(Hunter(Big), Pecker("victim", 6f, 1f), BreakWhenCasting(1), 3f, s => s.Rules.KeepOutRadius = 3f), 1);
+            Assert.AreEqual(0, r.Counters[0].Breaks);
+            Assert.Greater(r.Counters[0].BreakRefused, 0);
+            Assert.AreEqual(6f, r.Counters[1].Foraged, 1e-4f, "the victim's Peck landed");
+        }
+
+        [Test]
+        public void BreakWithoutTheKit_IsARejectedIntent()
+        {
+            var plain = MatchTestKit.Fighter("plain", 100f, new MatchAbility[0]);
+            var r = MatchSim.Run(Pair(plain, Pecker("victim", 6f, 1f), BreakWhenCasting(1), 3f), 1);
+            Assert.Greater(r.RejectedIntents, 0, "a kit with no break asked for one: a wiring bug, not a game state");
+            Assert.AreEqual(0, r.Counters[0].Breaks);
+        }
+
+        [Test]
+        public void TwoBreakersOneVictim_TheSecondFallsBack()
+        {
+            PolicyFactory AtOwnPile = MatchTestKit.Policy((v, s) =>
+            {
+                int pile = OracleMapSO.PersonalIndex(s);
+                Vector2 at = v.Map.Places[pile].Pos;
+                var intent = MatchIntent.Idle(at);
+                if (v.Seats[1].Pecking && Vector2.Distance(v.Seats[s].Pos, at) < 0.3f) { intent.Break = true; intent.BreakTarget = 1; intent.PeckPile = pile; }
+                return intent;
+            });
+            var kits = new[] { Hunter(Big, peckCooldown: 5f), Pecker("victim", 6f, 1f), Hunter(Big, peckCooldown: 5f), null };
+            var setup = Arena(kits, 2f);
+            setup.Policies[0] = AtOwnPile;
+            setup.Policies[2] = AtOwnPile;
+            setup.Policies[1] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1));
+            var r = MatchSim.Run(setup, 1);
+            Assert.AreEqual(1, r.Counters[0].Breaks + r.Counters[2].Breaks, "the first in the rotating order broke the cast");
+            Assert.AreEqual(1, r.Counters[0].BreakFallbacks + r.Counters[2].BreakFallbacks, "the second met an ended cast and pecked its pile");
+            Assert.AreEqual(1, r.Counters[1].PecksBroken);
+        }
+
+        [Test]
+        public void Trophies_FromBreaksAndSteals_OnePerCast_CappedAtTheCap()
+        {
+            // One Steal cast robs three birds: one trophy. Cap 3: the fourth cast earns nothing more.
+            var hunter = Hunter(Big, room: 2, cap: 3, abilities: MatchTestKit.Steal(Big, 5f, 1f));
+            var rivals = new[] { Pecker("a", 20f, 0.1f), Pecker("b", 20f, 0.1f), Pecker("c", 20f, 0.1f) };
+            var kits = new MatchKit[] { hunter, rivals[0], rivals[1], rivals[2] };
+            var setup = Arena(kits, 7f);
+            setup.Policies[0] = Casts((2f, 0), (3.2f, 0), (4.4f, 0), (5.6f, 0));
+            for (int i = 1; i < 4; i++) setup.Policies[i] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(i));
+            var r = MatchSim.Run(setup, 1);
+            var c = r.Counters[0];
+            Assert.AreEqual(12, c.Steals, "three robbed birds on each of four casts");
+            Assert.AreEqual(3, c.TrophiesEarned, "a trophy a cast, however many birds, and none past the cap");
+            Assert.AreEqual(3, c.TrophyPeak);
+            Assert.AreEqual(3, c.TrophiesAtEnd, "banking keeps trophies when the passive says so");
+            Assert.AreEqual(0, r.Counters[1].TrophiesEarned + r.Counters[1].TrophiesLost, "a rival that is not a Trophy Hunter holds none");
+        }
+
+        private static PolicyFactory Wander(params (float time, int slot)[] plan)
+        {
+            int next = 0;
+            return MatchTestKit.Policy((v, s) =>
+            {
+                var intent = MatchIntent.Idle(Vector2.zero);
+                if (next < plan.Length && v.Time + 1e-4f >= plan[next].time) intent.CastSlot = plan[next++].slot;
+                return intent;
+            });
+        }
+
+        // Seat 1 is a hunter (class capacity 10, room 5, cap 3) that wanders and steals from two rich carriers until it holds 25 food and 3 trophies.
+        private static MatchSetup RichHunter(float clock, MatchKit seat0, PolicyFactory policy0)
+        {
+            var hunter = Hunter(Big, room: 5, cap: 3, capacity: 10, abilities: MatchTestKit.Steal(Big, 8f, 1f));
+            var kits = new MatchKit[] { seat0, hunter, Pecker("a", 30f, 0.1f), Pecker("b", 30f, 0.1f) };
+            var setup = Arena(kits, clock);
+            setup.Policies[0] = policy0;
+            setup.Policies[1] = Wander((2f, 0), (3.5f, 0), (5f, 0), (6.2f, 0));
+            for (int i = 2; i < 4; i++) setup.Policies[i] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(i));
+            return setup;
+        }
+
+        [Test]
+        public void Robbed_LosesOne_AndTheExcessGoesToTheCentrePile()
+        {
+            // The hunter holds 25 in a beak of 10 + 3 x 5. A rival's steal of 2 leaves 23 and costs a trophy: the beak is 20 and 3 food go to the centre.
+            var thief = MatchTestKit.Fighter("thief", 100f, new[] { MatchTestKit.Steal(Big, 2f, 1f) });
+            float centreMax = 0f;
+            var setup = RichHunter(8f, thief, Casts((7f, 0)));
+            setup.Policies[2] = MatchTestKit.Policy((v, s) =>
+            {
+                centreMax = Mathf.Max(centreMax, v.PileFood[OracleMapSO.CentreIndex]);
+                return MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(2));
+            });
+            var r = MatchSim.Run(setup, 1);
+            var h = r.Counters[1];
+            Assert.AreEqual(3, h.TrophyPeak);
+            Assert.AreEqual(1, h.TrophiesLost, "the steal took food: one trophy");
+            Assert.AreEqual(3f, h.OverflowToCentre, 1e-3f, "23 in a beak of 20");
+            Assert.AreEqual(1, r.Events.Count(e => e.Kind == MatchEventKind.Overflow));
+            Assert.AreEqual(2, h.TrophiesAtEnd);
+            Assert.AreEqual(43f, centreMax, 1e-3f, "the centre pile took the excess (40 + 3)");
+        }
+
+        [Test]
+        public void Executed_LosesAll_NothingOverflows()
+        {
+            var spoiler = MatchTestKit.Fighter("spoiler", 100f, new[] { MatchTestKit.DeathMark(1f, 5f, 5f, 3f, 3f, 2f) });
+            var setup = RichHunter(9f, spoiler, MatchTestKit.Stand);
+            setup.Seats[3] = null;
+            setup.Policies[3] = null;
+            setup.Forced = new ForcedKills { Spoiler = 0, Kills = 1, Victims = ForcedVictims.Loaded, Times = new[] { 7f } };
+            var r = MatchSim.Run(setup, 1);
+            var h = r.Counters[1];
+            Assert.AreEqual(3, h.TrophyPeak);
+            Assert.AreEqual(3, h.TrophiesLost, "an execution takes every trophy");
+            Assert.AreEqual(0, h.TrophiesAtEnd);
+            Assert.AreEqual(0f, h.OverflowToCentre, "the killer drained the beak first: nothing overflows");
+            Assert.AreEqual(1, r.Kills[0]);
+        }
+
+        [Test]
+        public void Banking_KeepsTrophies()
+        {
+            var r = MatchSim.Run(BankingHunter(clearOnBank: false), 1);
+            var h = r.Counters[0];
+            Assert.AreEqual(2, h.TrophiesAtEnd, "kept through banking");
+            Assert.AreEqual(0, h.TrophiesCleared);
+            Assert.Greater(r.Banked[0], 0f, "he did bank");
+            Assert.AreEqual(10f, h.TrophyRoomOffered, 1e-3f, "two trophies of 5 at the trip home");
+            Assert.AreEqual(5f, h.TrophyRoomFilled, 1e-3f, "the trip carried 15 in a class beak of 10: 5 of the room was used");
+        }
+
+        [Test]
+        public void Banking_ClearsTrophies_WhenThePassiveSaysSo()
+        {
+            var r = MatchSim.Run(BankingHunter(clearOnBank: true), 1);
+            var h = r.Counters[0];
+            Assert.AreEqual(2, h.TrophiesEarned);
+            Assert.AreEqual(2, h.TrophiesCleared, "a streak ends at the bank");
+            Assert.AreEqual(0, h.TrophiesAtEnd);
+            Assert.AreEqual(10f, h.TrophyRoomOffered, 1e-3f);
+            Assert.AreEqual(5f, h.TrophyRoomFilled, 1e-3f);
+        }
+
+        // Seat 0: class beak 10, room 5; steals twice from a rich carrier (15 food, 2 trophies), then walks home and banks it.
+        private static MatchSetup BankingHunter(bool clearOnBank)
+        {
+            var hunter = Hunter(Big, room: 5, cap: 3, clearOnBank: clearOnBank, capacity: 10, abilities: MatchTestKit.Steal(Big, 10f, 1f));
+            var setup = Arena(new MatchKit[] { hunter, Pecker("a", 30f, 0.1f), null, null }, 11f);
+            int step = 0;
+            setup.Policies[0] = MatchTestKit.Policy((v, s) =>
+            {
+                Vector2 home = v.Map.Places[OracleMapSO.BaseIndex(s)].Pos;
+                var intent = MatchIntent.Idle(v.Time >= 4.5f ? home : Vector2.zero);
+                if (step == 0 && v.Time >= 2f) { step = 1; intent.CastSlot = 0; }
+                else if (step == 1 && v.Time >= 3.5f) { step = 2; intent.CastSlot = 0; }
+                return intent;
+            });
+            setup.Policies[1] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(1));
+            return setup;
+        }
+
+        [Test]
+        public void EveryCapacityRead_GoesThroughCapacityOf()
+        {
+            string sim = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Balance/MatchSim.cs"));
+            StringAssert.Contains("class Core", sim, "the scan found the simulator");
+            int reads = sim.Split('\n').Count(l => !l.TrimStart().StartsWith("//") && l.Contains("Farm.CargoCapacity"));
+            Assert.AreEqual(1, reads, "MatchSim reads the class capacity once, inside CapacityOf");
+            StringAssert.Contains("float CapacityOf(int s) =>", sim);
+            StringAssert.Contains("Farm.CargoCapacity + TrophyRules.Room(", sim);
+            foreach (string policy in new[] { "ScriptedPolicy.cs", "UtilityPolicy.cs" })
+            {
+                string text = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Balance", policy));
+                StringAssert.Contains("class ", text, "the scan found " + policy);
+                StringAssert.DoesNotContain("CargoCapacity", text, policy + " reads SeatView.Capacity, the one capacity the simulator computes");
+            }
+        }
+
+        [Test]
+        public void Sim_CallsTheSharedRules_NotCopies_Trophy()
+        {
+            string source = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Balance/MatchSim.cs"));
+            StringAssert.Contains("class Core", source);
+            foreach (var call in new[] { "PeckBreakRules.CanBreak(", "PeckBreakRules.Bite(", "PeckBreakRules.Resolve(", "TrophyRules.Overflow(", "TrophyRules.Earn(",
+                "TrophyRules.LoseOne(", "TrophyRules.StealEarns(", "TrophyRules.Room(" })
+                StringAssert.Contains(call, source, "the simulator must call the shared rule, not restate it.");
+        }
+
+        private static MatchResult TrophyFight(bool shipped, ulong seed)
+        {
+            var hunter = Hunter(0f, room: 0, cap: 3, capacity: 30, peckCooldown: 1f, abilities: MatchTestKit.Steal(8f, 5f, 3f));
+            if (!shipped) { hunter.Passive.Break = default; hunter.Passive.Trophy = TrophyFacts.None; }
+            var kits = new[] { hunter, Carrier("b", 3f), Carrier("c", 3f), Carrier("d", 3f) };
+            foreach (var k in kits.Skip(1)) { k.Farm.PeckCooldown = 1f; k.Farm.CargoCapacity = 30; }
+            var setup = Arena(kits, 25f);
+            setup.Policies[0] = MatchTestKit.Policy((v, s) =>
+            {
+                var intent = MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(0));
+                if (v.Seats[s].CooldownLeft[1] <= 1e-4f) intent.CastSlot = 0;
+                return intent;
+            });
+            for (int i = 1; i < 4; i++) setup.Policies[i] = MatchTestKit.Pecker(OracleMapSO.PersonalIndex(0));
+            return MatchSim.Run(setup, seed);
+        }
+
+        [Test]
+        public void ShippedOff_PlaysExactlyAsBefore_TrophyHalf()
+        {
+            // The Trophy Hunter as shipped (no reach, room 0, a cap of 3) against no facts at all.
+            foreach (ulong seed in new ulong[] { 1, 2, 3 })
+            {
+                var a = TrophyFight(true, seed);
+                var b = TrophyFight(false, seed);
+                Assert.AreEqual(b.Winner, a.Winner);
+                Assert.AreEqual(b.EndSeconds, a.EndSeconds);
+                CollectionAssert.AreEqual(b.Banked, a.Banked);
+                Assert.AreEqual(b.Events.Count, a.Events.Count(e => e.Kind != MatchEventKind.Trophy), "the only extra events are the trophy counts");
+                for (int s = 0; s < 4; s++)
+                {
+                    Assert.AreEqual(b.Counters[s].Foraged, a.Counters[s].Foraged, $"seat {s}");
+                    Assert.AreEqual(b.Counters[s].Stolen, a.Counters[s].Stolen, $"seat {s}");
+                    Assert.AreEqual(b.Counters[s].LostToSteals, a.Counters[s].LostToSteals, $"seat {s}");
+                    Assert.AreEqual(0f, a.Counters[s].OverflowToCentre);
+                    Assert.AreEqual(0, a.Counters[s].Breaks);
+                }
+            }
+            Assert.Greater(TrophyFight(true, 1).Counters[0].Steals, 0, "the hunter did steal: the comparison is not vacuous");
+        }
+
+        [Test]
+        public void SlidingWindowSum_IsTheMostInAnyWindow()
+        {
+            var w = new SlidingWindowSum(5f);
+            w.Add(0f, 3f);
+            w.Add(4f, 2f);
+            Assert.AreEqual(5f, w.Max, 1e-6f, "both inside one 5 s window");
+            w.Add(5f, 1f);
+            Assert.AreEqual(5f, w.Max, 1e-6f, "the amount at 0 left the window at 5: 2 + 1 is less");
+            w.Add(9f, 4f);
+            Assert.AreEqual(5f, w.Max, 1e-6f, "at 9 the window holds 1 + 4");
+            w.Add(9.5f, 3f);
+            Assert.AreEqual(8f, w.Max, 1e-6f, "1 + 4 + 3 inside one window");
+        }
+
     }
 }

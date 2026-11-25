@@ -270,6 +270,8 @@ namespace CluckWars.Balance
 
     public static class MatchReports
     {
+        /// <summary>The window of the "worst loss for a victim" row of the Warrior block, in seconds. A report constant, not a game number.</summary>
+        public const float LossWindowSeconds = 5f;
         public const float Target = 0.25f;
         public const float BandLow = 0.20f;
         public const float BandHigh = 0.30f;

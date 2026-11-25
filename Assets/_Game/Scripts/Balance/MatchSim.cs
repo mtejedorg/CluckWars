@@ -6,10 +6,10 @@ using UnityEngine;
 
 namespace CluckWars.Balance
 {
-    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot, HitSteal }
+    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot, HitSteal, PeckBreak, Trophy, Overflow }
 
     /// <summary>Why a running Peck was cut. <see cref="OwnMove"/> is the chicken's own doing (it cast another ability).</summary>
-    public enum CutCause : byte { None, Stun, Shove, Execution, EmptyPile, OwnMove }
+    public enum CutCause : byte { None, Stun, Shove, Execution, EmptyPile, OwnMove, Break }
 
     /// <summary>One thing that happened, for statistics, debugging and the comparison with the real game's telemetry.</summary>
     public struct MatchEvent
@@ -32,6 +32,7 @@ namespace CluckWars.Balance
                 case CutCause.Execution: return MatchTelemetry.CauseExecution;
                 case CutCause.EmptyPile: return MatchTelemetry.CauseEmptyPile;
                 case CutCause.OwnMove: return "own-move";
+                case CutCause.Break: return "break";
                 default: return "none";
             }
         }
@@ -271,6 +272,8 @@ namespace CluckWars.Balance
             public int Slot;
             public int Target;
             public bool LegalWhenDecided;
+            /// <summary>A Peck break press on <see cref="Target"/> (<see cref="Slot"/> is unused).</summary>
+            public bool Break;
         }
 
         // The sources the simulator registers on a chicken's AbilityEffectStack. The game keys them by ability slot; only distinctness matters here.
@@ -357,6 +360,11 @@ namespace CluckWars.Balance
 
             // hit-steal (the Bully's): when each victim is next open to this chicken's hits, by victim seat
             public readonly float[] HitLockUntil = new float[Seats];
+
+            // trophies and the Peck break (the Trophy Hunter's)
+            public int Trophies;
+            public float BreakImmuneUntil;
+            public float NextBreakAt;
         }
 
         private sealed class Core
@@ -402,6 +410,7 @@ namespace CluckWars.Balance
             private readonly bool[] _egg = new bool[Seats];
             private readonly bool[] _walk = new bool[Seats];
             private readonly List<(int seat, CastRequest req)> _valid = new List<(int, CastRequest)>(Seats);
+            private readonly SlidingWindowSum[] _loss = new SlidingWindowSum[Seats * Seats];
             private float _time;
             private int _i;
             private int _winner = -1;
@@ -463,6 +472,7 @@ namespace CluckWars.Balance
                     };
                     var abilities = kit != null && kit.Abilities != null ? kit.Abilities : Array.Empty<MatchAbility>();
                     _view.Seats[seat].CooldownLeft = new float[1 + abilities.Length];
+                    _view.Seats[seat].HitLockLeft = new float[Seats];
                     if (kit == null) continue;
 
                     ch.Abilities = abilities;
@@ -541,6 +551,8 @@ namespace CluckWars.Balance
                     ResolveCasts();
                     AuraTick();
                     for (int k = 0; k < Seats; k++) Act((_i + k) % Seats);
+                    for (int s = 0; s < Seats; s++)
+                        if (_c[s].Trophies > 0) _result.Counters[s].TrophySeconds += _c[s].Trophies * _tick;
                 }
                 return Finish();
             }
@@ -554,6 +566,9 @@ namespace CluckWars.Balance
             private float Opacity(Chick ch) => Hidden(ch) ? ch.HideOpacity : 1f;
 
             private MatchPassive PassiveOf(int s) => _s.Seats[s].Passive;
+
+            // The beak: the class capacity through the passive plus the room the held trophies add. The only reader of Farm.CargoCapacity here.
+            private float CapacityOf(int s) => _s.Seats[s].Farm.CargoCapacity + TrophyRules.Room(_c[s].Trophies, PassiveOf(s).Trophy);
 
             // ---- piles (nine baked, plus the Golden Pile) ----
 
@@ -681,7 +696,7 @@ namespace CluckWars.Balance
                 var kit = _s.Seats[s].Farm;
                 ch.Pecking = false;
                 ch.ThinkNow = true;
-                float take = PeckCastRules.LandingTake(kit.PeckAmount, kit.CargoCapacity - ch.Cargo, PileFood(ch.PeckPile));
+                float take = PeckCastRules.LandingTake(kit.PeckAmount, CapacityOf(s) - ch.Cargo, PileFood(ch.PeckPile));
                 if (take <= 0f) return;
                 ch.Cargo += take;
                 TakeFromPile(ch.PeckPile, take);
@@ -719,6 +734,7 @@ namespace CluckWars.Balance
                 }
                 if (ch.Cargo > Eps) return;
 
+                BankTrophies(s, ch);
                 ch.Cargo = 0f;
                 ch.LootHeld = 0f;
                 ch.MarksThisTrip = 0;
@@ -731,16 +747,20 @@ namespace CluckWars.Balance
             private bool CanStartPeck(int s)
             {
                 var ch = _c[s];
-                if (!ch.HasIntent || ch.Intent.PeckPile < 0 || ch.Pecking) return false;
+                return ch.HasIntent && ch.Intent.PeckPile >= 0 && !ch.Pecking && CanPeckAt(s, ch.Intent.PeckPile);
+            }
+
+            // Could this chicken start a Peck on `pile` now? Everything but the intent: the state, the cooldown, the food, the room, the reach.
+            private bool CanPeckAt(int s, int pile)
+            {
+                var ch = _c[s];
                 // A stunned chicken cannot cast; a hidden one does not auto-Peck, nor one whose Shield still has its egg to come or running
                 // (AbilityController.AnyStealthRunning: the chain would break it, and the Peck would be a cast that cancels the egg), and a
                 // dashing one is busy.
                 if (Stunned(ch) || ShieldLive(ch) || Hidden(ch) || ch.Dashing) return false;
-                int pile = ch.Intent.PeckPile;
-                var kit = _s.Seats[s].Farm;
                 return _time + Eps >= ch.NextPeckAt
                     && PileFood(pile) > Eps
-                    && ch.Cargo < kit.CargoCapacity - Eps
+                    && ch.Cargo < CapacityOf(s) - Eps
                     && MatchGeometry.InReach(_map, PlaceOf(pile), ch.Pos);
             }
 
@@ -790,6 +810,12 @@ namespace CluckWars.Balance
                         v.Known = !sighting.GivenUp;
                         v.Pos = v.Known ? MatchSight.PlanarPosition(sighting) : Vector2.zero;
                     }
+                    v.Capacity = ch.Present ? CapacityOf(s) : 0f;
+                    v.Trophies = ch.Trophies;
+                    v.PeckCastLeft = ch.Pecking ? Math.Max(0f, ch.PeckDoneAt - _time) : 0f;
+                    v.BreakImmuneLeft = Math.Max(0f, ch.BreakImmuneUntil - _time);
+                    v.BreakLeft = Math.Max(0f, ch.NextBreakAt - _time);
+                    for (int r = 0; r < Seats; r++) v.HitLockLeft[r] = Math.Max(0f, ch.HitLockUntil[r] - _time);
                     var cd = v.CooldownLeft;
                     cd[0] = Math.Max(0f, ch.NextPeckAt - _time);
                     for (int a = 0; a < ch.Abilities?.Length; a++) cd[1 + a] = Math.Max(0f, ch.AbReady[a] - _time);
@@ -837,16 +863,21 @@ namespace CluckWars.Balance
                 bool badCast = intent.CastSlot >= ch.Abilities.Length || intent.CastSlot < -1
                     || intent.CastTarget < -1 || intent.CastTarget >= Seats
                     || (intent.CastSlot < 0 && intent.CastTarget >= 0);
-                if (badPile || badCast || float.IsNaN(intent.Goal.x) || float.IsNaN(intent.Goal.y))
+                bool badBreak = intent.Break && (intent.BreakTarget < 0 || intent.BreakTarget >= Seats || intent.BreakTarget == s);
+                if (badPile || badCast || badBreak || float.IsNaN(intent.Goal.x) || float.IsNaN(intent.Goal.y))
                 {
                     _result.RejectedIntents++;
                     return;
                 }
                 if (intent.CastSlot >= 0) ch.Casts.Add(new CastRequest { Slot = intent.CastSlot, Target = intent.CastTarget, LegalWhenDecided = castLegalWhenDecided });
 
-                // The movement part of the intent; the cast part is a one-off and is not part of what the chicken keeps doing.
+                if (intent.Break) ch.Casts.Add(new CastRequest { Break = true, Target = intent.BreakTarget, LegalWhenDecided = true });
+
+                // The movement part of the intent; the cast and the break are one-offs and not part of what the chicken keeps doing.
                 intent.CastSlot = -1;
                 intent.CastTarget = -1;
+                intent.Break = false;
+                intent.BreakTarget = -1;
                 // A goal inside a wall's clearance or outside the arena cannot be walked to: the chicken goes to the nearest standing point instead.
                 // A pile intent walks to its pile, so its goal is not read.
                 if (intent.PeckPile < 0) intent.Goal = _nav.NearestClear(intent.Goal);
@@ -897,6 +928,7 @@ namespace CluckWars.Balance
                     int used = 0;
                     foreach (var req in ch.Casts)
                     {
+                        if (req.Break) { _valid.Add((s, req)); continue; }   // a press, not an ability slot: resolved in ResolveBreak
                         if ((used & (1 << req.Slot)) != 0 || !CanCast(s, req.Slot))
                         {
                             // Legal when decided: the delay spent the slot or let a stun land. Anything else is a policy asking for the impossible.
@@ -919,9 +951,16 @@ namespace CluckWars.Balance
                 ch.AbReady[slot] = _time + ab.Cooldown;
                 _result.Counters[s].Casts++;
                 Record(MatchEventKind.CastStart, s, -1, slot, CutCause.None);
-                if (ch.Pecking) Cut(s, CutCause.OwnMove);                          // Peck ends on the next move
-                if (ab.Job != AbilityJob.Hide && Hidden(ch) && ch.HideEndsOnMove) ch.HideUntil = _time; // using a move ends Hide
-                if (ab.Job != AbilityJob.Shield) CancelShieldFollowUp(ch);                              // any other cast cancels the egg
+                OwnMove(s, ab.Job);
+            }
+
+            // What any move of the chicken's own does to its running states: the Peck ends, Hide ends, the Shield's egg is cancelled.
+            private void OwnMove(int s, AbilityJob job)
+            {
+                var ch = _c[s];
+                if (ch.Pecking) Cut(s, CutCause.OwnMove);                                          // Peck ends on the next move
+                if (job != AbilityJob.Hide && Hidden(ch) && ch.HideEndsOnMove) ch.HideUntil = _time; // using a move ends Hide
+                if (job != AbilityJob.Shield) CancelShieldFollowUp(ch);                              // any other cast cancels the egg
             }
 
             // The Shield's egg is live from the cast until it ends, unless another cast cancelled it (AbilityController.HasLiveFollowUp).
@@ -950,6 +989,7 @@ namespace CluckWars.Balance
             private void Cast(int s, CastRequest req)
             {
                 var ch = _c[s];
+                if (req.Break) { ResolveBreak(s, req.Target); return; }
                 var ab = ch.Abilities[req.Slot];
                 if (ch.Removed) return;                                // executed earlier this tick: nothing of its own lands
                 if (ab.Job == AbilityJob.DeathMark) { CastDeathMark(s, req.Slot); return; }
@@ -960,6 +1000,7 @@ namespace CluckWars.Balance
                     {
                         // The Thief's marked rival is a valid target even with nothing to take (Snatch's filter: a carrier or the caster's mark).
                         int marked = LootLive(ch) && req.Slot == ch.LootSlot ? ch.LootTarget : -1;
+                        float taken = 0f;
                         for (int v = 0; v < Seats; v++)
                         {
                             if (v == marked)
@@ -973,7 +1014,7 @@ namespace CluckWars.Balance
                                     if (inRange) _result.Counters[s].LootRefused++;
                                     continue;
                                 }
-                                TakeLoot(s, v, ab);
+                                taken += TakeLoot(s, v, ab);
                             }
                             else
                             {
@@ -981,10 +1022,11 @@ namespace CluckWars.Balance
                                 var victim = _c[v];
                                 if (StealRules.Stealable(victim.Cargo) <= 0f) continue;     // Snatch only targets a carrier
                                 if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
-                                DoSteal(s, v, ab);
+                                taken += DoSteal(s, v, ab);
                             }
                             if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback, ab.Job);
                         }
+                        if (PassiveOf(s).Trophy.IsTrophyHunter && TrophyRules.StealEarns(taken)) EarnTrophy(s);   // one trophy a cast, however many birds it robbed
                         break;
                     }
                     case AbilityJob.Stun:
@@ -1032,13 +1074,13 @@ namespace CluckWars.Balance
                 }
             }
 
-            private void DoSteal(int thief, int victim, in MatchAbility ab)
+            private float DoSteal(int thief, int victim, in MatchAbility ab)
             {
                 var t = _c[thief];
                 var v = _c[victim];
-                float room = _s.Seats[thief].Farm.CargoCapacity - t.Cargo;
+                float room = CapacityOf(thief) - t.Cargo;
                 float take = MatchCombat.StealTake(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo);
-                if (take <= 0f) return;
+                if (take <= 0f) return 0f;
                 _result.Counters[victim].LootLostToSteals += TakeLootShare(v, take);
                 v.Cargo -= take;
                 t.Cargo += take;
@@ -1049,6 +1091,9 @@ namespace CluckWars.Balance
                 tn.StolenFromSeat[victim] += take;
                 _result.Counters[victim].LostToSteals += take;
                 Record(MatchEventKind.Steal, thief, victim, take, CutCause.None);
+                NoteLoss(thief, victim, take);
+                Robbed(victim);
+                return take;
             }
 
             // ---- the Thief's loot mark (BL-217; design 2026-11-23 section 4) ----
@@ -1058,12 +1103,12 @@ namespace CluckWars.Balance
             // A marked steal (Maestro, 2026-11-24, third note: ordinary cargo, no bag): the stolen food first, held to the Thief's free room and to what
             // the bird carries, then the new-food bounty into what room is left. What does not fit is lost. The mark is spent either way, and the next
             // one is scheduled from the Steal cooldown the cast has just started.
-            private void TakeLoot(int thief, int victim, in MatchAbility ab)
+            private float TakeLoot(int thief, int victim, in MatchAbility ab)
             {
                 var t = _c[thief];
                 var v = _c[victim];
                 var loot = PassiveOf(thief).Loot;
-                float room = _s.Seats[thief].Farm.CargoCapacity - t.Cargo;
+                float room = CapacityOf(thief) - t.Cargo;
                 LootRules.MarkedGain(ab.StealAmount, PassiveOf(thief).StealFactor, room, v.Cargo, loot.Bounty,
                     out float take, out float bounty, out float wanted);
                 ref SeatCounters tn = ref _result.Counters[thief];
@@ -1075,6 +1120,8 @@ namespace CluckWars.Balance
                     tn.Steals++;
                     tn.StolenFromSeat[victim] += take;
                     _result.Counters[victim].LostToSteals += take;
+                    NoteLoss(thief, victim, take);
+                    Robbed(victim);
                 }
                 t.Cargo += take + bounty;
                 t.LootHeld += take + bounty;
@@ -1086,6 +1133,7 @@ namespace CluckWars.Balance
                 v.ThinkNow = t.ThinkNow = true;
                 Record(MatchEventKind.Loot, thief, victim, take + bounty, CutCause.None);
                 EndLoot(thief);
+                return take;
             }
 
             // The loot share of `amount` leaving a cargo (a deposit or a theft): pro rata of what the cargo holds. Returns the loot food that left.
@@ -1211,7 +1259,7 @@ namespace CluckWars.Balance
                 var v = _c[victim];
                 ref SeatCounters cn = ref _result.Counters[caster];
                 bool locked = HitStealRules.Locked(_time, c.HitLockUntil[victim]);
-                float room = _s.Seats[caster].Farm.CargoCapacity - c.Cargo;
+                float room = CapacityOf(caster) - c.Cargo;
                 float stealable = StealRules.Stealable(v.Cargo);
                 float take = HitStealRules.Take(amount, room, stealable, locked);
                 if (take <= 0f)
@@ -1233,6 +1281,8 @@ namespace CluckWars.Balance
                 _result.Counters[victim].LostToSteals += take;
                 _result.Counters[victim].HitLostFood += take;
                 Record(MatchEventKind.HitSteal, caster, victim, take, CutCause.None);
+                NoteLoss(caster, victim, take);
+                Robbed(victim);
             }
 
             private void ApplySlow(Chick v, float factor, float seconds)
@@ -1278,6 +1328,145 @@ namespace CluckWars.Balance
                             _c[v].AuraFactor = Math.Min(_c[v].AuraFactor, PassiveOf(v).ReceivedSlowFactor(ab.AreaSlowFactor));
                         }
                     }
+                }
+            }
+
+            // ---- trophies, overflow and the Peck break (the Trophy Hunter's, design 2026-11-25) ----
+
+            // A rival took food from this chicken (a Steal, a marked steal or a hit-steal): it loses a trophy, and a smaller beak lets the excess go.
+            private void Robbed(int victim)
+            {
+                var v = _c[victim];
+                if (v.Trophies > 0)
+                {
+                    v.Trophies = TrophyRules.LoseOne(v.Trophies);
+                    _result.Counters[victim].TrophiesLost++;
+                    Record(MatchEventKind.Trophy, victim, -1, -1f, CutCause.None);
+                }
+                SpillOverflow(victim);
+            }
+
+            // The capacity fell below the cargo: the excess goes to the centre pile at once. The pile's maximum is not raised.
+            private void SpillOverflow(int s)
+            {
+                var ch = _c[s];
+                float excess = TrophyRules.Overflow(ch.Cargo, CapacityOf(s));
+                if (excess <= Eps) return;
+                ch.Cargo -= excess;
+                if (ch.LootHeld > ch.Cargo) ch.LootHeld = ch.Cargo;
+                _pile[OracleMapSO.CentreIndex] += excess;
+                _result.Counters[s].OverflowToCentre += excess;
+                ch.ThinkNow = true;
+                Record(MatchEventKind.Overflow, s, OracleMapSO.CentreIndex, excess, CutCause.None);
+            }
+
+            private void EarnTrophy(int s)
+            {
+                var ch = _c[s];
+                var facts = PassiveOf(s).Trophy;
+                int next = TrophyRules.Earn(ch.Trophies, facts.Cap);
+                if (next == ch.Trophies) return;                          // at the cap a gain does nothing
+                ch.Trophies = next;
+                ref SeatCounters n = ref _result.Counters[s];
+                n.TrophiesEarned++;
+                if (next > n.TrophyPeak) n.TrophyPeak = next;
+                Record(MatchEventKind.Trophy, s, -1, 1f, CutCause.None);
+            }
+
+            // A trip home ends (the beak is empty): note how much of the trophies' room the trip used, then clear the trophies when the passive says so.
+            private void BankTrophies(int s, Chick ch)
+            {
+                var facts = PassiveOf(s).Trophy;
+                if (!facts.IsTrophyHunter || ch.Trophies <= 0) return;
+                ref SeatCounters n = ref _result.Counters[s];
+                float added = TrophyRules.Room(ch.Trophies, facts);
+                n.TrophyRoomOffered += added;
+                n.TrophyRoomFilled += Math.Min(added, Math.Max(0f, ch.Visit - (CapacityOf(s) - added)));   // what the trip carried above the class capacity
+                if (!facts.ClearOnBank) return;
+                n.TrophiesCleared += ch.Trophies;
+                ch.Trophies = 0;
+                Record(MatchEventKind.Trophy, s, -1, 0f, CutCause.None);
+            }
+
+            // The most one victim lost to one taker inside any window (hit-steals, Steals, breaks), for the "worst 5 s" row.
+            private void NoteLoss(int taker, int victim, float amount)
+            {
+                if (amount <= 0f) return;
+                int k = taker * Seats + victim;
+                var window = _loss[k] ?? (_loss[k] = new SlidingWindowSum(MatchReports.LossWindowSeconds));
+                window.Add(_time, amount);
+                ref SeatCounters n = ref _result.Counters[taker];
+                if (window.Max > n.WorstVictimLoss5s) n.WorstVictimLoss5s = window.Max;
+            }
+
+            // A pile with food in reach that an ordinary Peck could start on now: the intent's pile first, else the nearest. -1 for none.
+            private int FallbackPile(int s)
+            {
+                var ch = _c[s];
+                if (ch.HasIntent && ch.Intent.PeckPile >= 0 && CanPeckAt(s, ch.Intent.PeckPile)) return ch.Intent.PeckPile;
+                int best = -1;
+                float bestDist = float.PositiveInfinity;
+                for (int p = 0; p <= OracleMapSO.PileCount; p++)
+                {
+                    int pile = p == OracleMapSO.PileCount ? MatchGeometry.GoldenPile : p;
+                    if (!CanPeckAt(s, pile)) continue;
+                    float d = Vector2.Distance(ch.Pos, PlaceOf(pile).Pos);
+                    if (d < bestDist) { bestDist = d; best = pile; }
+                }
+                return best;
+            }
+
+            // The release of a break press (design 4.1): the previewed rival's cast is cut and its bite is the breaker's; if that cast is already over the
+            // press is an ordinary Peck when one can start, else a visible cancel that spends nothing. A break does not touch the breaker's Peck cycle.
+            private void ResolveBreak(int s, int target)
+            {
+                var ch = _c[s];
+                var facts = PassiveOf(s).Break;
+                ref SeatCounters n = ref _result.Counters[s];
+                if (!facts.Active) { _result.RejectedIntents++; return; }                        // a kit with no break asked for one
+                if (ch.Removed) return;                                                           // taken out earlier this tick: nothing of its own lands
+                if (_stunSnap[s] || ch.Dashing || ch.Pecking || _time + Eps < ch.NextBreakAt) { n.BreakRefused++; return; }
+
+                var v = _c[target];
+                bool rivalHere = v.Present && !v.Removed;
+                bool casting = rivalHere && v.Pecking && _time + Eps < v.PeckDoneAt;
+                float dist = rivalHere ? Vector2.Distance(ch.Pos, v.Pos) : float.PositiveInfinity;
+                bool walled = rivalHere && MatchCombat.KeepOutBlocks(ch.Pos, v.Pos, _baseCentres, _rules.KeepOutRadius);
+                bool immune = _time + Eps < v.BreakImmuneUntil;
+                bool canBreak = rivalHere && PeckBreakRules.CanBreak(casting, dist, facts.Reach, walled, _egg[target], immune);
+                if (!canBreak && casting && dist <= facts.Reach && (walled || _egg[target] || immune)) n.BreakRefused++;
+
+                int pile = canBreak ? -1 : FallbackPile(s);
+                switch (PeckBreakRules.Resolve(canBreak, pile >= 0))
+                {
+                    case BreakOutcome.Break:
+                    {
+                        OwnMove(s, AbilityJob.None);
+                        float victimBite = _s.Seats[target].Farm.PeckAmount;
+                        int victimPile = v.PeckPile;
+                        float pileFood = PileFood(victimPile);
+                        float bite = PeckBreakRules.Bite(victimBite, pileFood, CapacityOf(s) - ch.Cargo);
+                        Cut(target, CutCause.Break);
+                        if (bite > 0f) { TakeFromPile(victimPile, bite); ch.Cargo += bite; }
+                        ch.NextBreakAt = _time + facts.Cooldown;
+                        v.BreakImmuneUntil = _time + facts.ImmuneSeconds;
+                        ch.ThinkNow = v.ThinkNow = true;
+                        n.Breaks++;
+                        n.BreakFood += bite;
+                        n.BreakLeftInPile += Math.Max(0f, Math.Min(victimBite, pileFood) - bite);
+                        _result.Counters[target].PecksBroken++;
+                        NoteLoss(s, target, bite);
+                        EarnTrophy(s);                                                            // the cut is the feat: a trophy even when no food fits
+                        Record(MatchEventKind.PeckBreak, s, target, bite, CutCause.Break);
+                        break;
+                    }
+                    case BreakOutcome.FallbackPeck:
+                        n.BreakFallbacks++;
+                        StartPeck(s, pile);
+                        break;
+                    default:
+                        n.BreakCancels++;
+                        break;
                 }
             }
 
@@ -1363,7 +1552,7 @@ namespace CluckWars.Balance
                 var sp = _c[s];
                 var v = _c[victim];
                 float loot = EggPhase(v) ? 0f : v.Cargo;
-                float room = Math.Max(0f, _s.Seats[s].Farm.CargoCapacity - sp.Cargo);
+                float room = Math.Max(0f, CapacityOf(s) - sp.Cargo);
                 float lootGained = FoodTransferRules.Fit(loot, room);
                 float bountyGained = FoodTransferRules.Fit(_rules.ExecuteBounty, room - lootGained);
                 float pay = loot + _rules.ExecuteBounty;
@@ -1379,6 +1568,13 @@ namespace CluckWars.Balance
                 n.KillCargoFromSeat[victim] += loot;
                 n.KillGainedFromSeat[victim] += gained;
                 n.KillUnfitFromSeat[victim] += pay - gained;
+                if (v.Trophies > 0)                                       // an execution takes every trophy, after the beak was drained: nothing overflows
+                {
+                    _result.Counters[victim].TrophiesLost += v.Trophies;
+                    v.Trophies = 0;
+                    Record(MatchEventKind.Trophy, victim, -1, 0f, CutCause.None);
+                    SpillOverflow(victim);                                // a shelled victim kept its beak; the smaller capacity may no longer hold it
+                }
                 Record(MatchEventKind.Kill, s, victim, gained, CutCause.None);
                 Remove(victim, removalSeconds);
             }
@@ -1484,7 +1680,7 @@ namespace CluckWars.Balance
                 // The dash of a Jump ends when its seconds are up and the chicken stands clear of every wall.
                 if (ch.Dashing && _time + Eps >= ch.DashUntil && _nav.IsClear(ch.Pos, ch.Pos)) { ch.Dashing = false; ch.WaypointValid = false; }
 
-                if (CanStartPeck(s)) StartPeck(s);
+                if (CanStartPeck(s)) StartPeck(s, ch.Intent.PeckPile);
                 // A stunned chicken's movement tick does not run (ChickenController: ControlRules.CanMove), so its push waits for the stun to end.
                 if (ControlRules.CanMove(Stunned(ch) ? ControlState.Stunned : ControlState.Free)) ApplyPush(ch);
                 if (!ch.Pecking && !Stunned(ch) && !EggPhase(ch)) Move(s);
@@ -1492,12 +1688,12 @@ namespace CluckWars.Balance
                 if (ch.HasIntent && !ch.Arrived && Standing(s)) { ch.Arrived = true; ch.ThinkNow = true; }
             }
 
-            private void StartPeck(int s)
+            private void StartPeck(int s, int pile)
             {
                 var ch = _c[s];
                 var kit = _s.Seats[s].Farm;
                 ch.Pecking = true;
-                ch.PeckPile = ch.Intent.PeckPile;
+                ch.PeckPile = pile;
                 ch.PeckDoneAt = _time + kit.PeckCastSeconds;
                 ch.NextPeckAt = _time + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds);
                 ch.ExposedMask = 0;
@@ -1697,7 +1893,11 @@ namespace CluckWars.Balance
 
             private MatchResult Finish()
             {
-                for (int s = 0; s < Seats; s++) _result.Banked[s] = _c[s].Banked;
+                for (int s = 0; s < Seats; s++)
+                {
+                    _result.Banked[s] = _c[s].Banked;
+                    _result.Counters[s].TrophiesAtEnd = _c[s].Trophies;
+                }
 
                 if (_winner >= 0)
                 {

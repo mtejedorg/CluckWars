@@ -113,6 +113,30 @@ namespace CluckWars.Balance
         }
     }
 
+    /// <summary>
+    /// The most that sums inside any window of <c>window</c> seconds (half open: an amount at time t counts for a later add until t + window is reached).
+    /// Amounts are added in time order.
+    /// </summary>
+    public sealed class SlidingWindowSum
+    {
+        private readonly float _window;
+        private readonly System.Collections.Generic.Queue<(float time, float amount)> _items = new System.Collections.Generic.Queue<(float, float)>();
+        private float _sum;
+
+        public SlidingWindowSum(float window) { _window = window; }
+
+        /// <summary>The largest sum seen in any window so far.</summary>
+        public float Max { get; private set; }
+
+        public void Add(float time, float amount)
+        {
+            _items.Enqueue((time, amount));
+            _sum += amount;
+            while (_items.Count > 0 && _items.Peek().time + _window <= time) _sum -= _items.Dequeue().amount;
+            if (_sum > Max) Max = _sum;
+        }
+    }
+
     /// <summary>The comeback event's numbers: when it fires and what its outcomes do. Filled from the game's constants by <see cref="MatchKits.Rules"/>.</summary>
     public struct ComebackSettings
     {
@@ -169,6 +193,37 @@ namespace CluckWars.Balance
         public int HitRefusedRoom;
         /// <summary>Food hit-steals took from this seat (victim side; also in <see cref="LostToSteals"/>).</summary>
         public float HitLostFood;
+        /// <summary>Peck breaks this seat landed (the Trophy Hunter's).</summary>
+        public int Breaks;
+        /// <summary>Food breaks took from the victims' piles into this seat's cargo (not counted as foraged).</summary>
+        public float BreakFood;
+        /// <summary>Food of the victim's bite that did not fit this seat's beak and stayed in the pile.</summary>
+        public float BreakLeftInPile;
+        /// <summary>Break presses whose cast was already over and that became an ordinary pile Peck.</summary>
+        public int BreakFallbacks;
+        /// <summary>Break presses with no cast to break and no pile Peck to fall back to: a visible cancel that spent nothing.</summary>
+        public int BreakCancels;
+        /// <summary>Break presses that could not be made (stunned, dashing, mid Peck, break not ready) or met a wall, an egg or an immune rival.</summary>
+        public int BreakRefused;
+        /// <summary>This seat's Peck casts that were broken by a rival (victim side; also in <see cref="CutsByCause"/>).</summary>
+        public int PecksBroken;
+        public int TrophiesEarned;
+        /// <summary>Trophies a rival's take or an execution cost this seat.</summary>
+        public int TrophiesLost;
+        /// <summary>Trophies cleared because this seat banked (<c>TrophiesClearOnBank</c>).</summary>
+        public int TrophiesCleared;
+        public int TrophyPeak;
+        /// <summary>Trophy seconds: the trophies held, summed over every tick and multiplied by the tick, for the mean held.</summary>
+        public float TrophySeconds;
+        public int TrophiesAtEnd;
+        /// <summary>Beak room the held trophies added at each trip home that began with trophies held, summed.</summary>
+        public float TrophyRoomOffered;
+        /// <summary>Of that room, the food the trip carried above the class capacity (the room actually used), summed.</summary>
+        public float TrophyRoomFilled;
+        /// <summary>Food that left this seat's beak for the centre pile because its capacity fell below its cargo.</summary>
+        public float OverflowToCentre;
+        /// <summary>The most one victim lost to this seat's hit-steals, Steals and breaks inside any <see cref="MatchReports.LossWindowSeconds"/> window.</summary>
+        public float WorstVictimLoss5s;
         public float FirstContact;
         /// <summary>Food this seat took from each seat (index = victim).</summary>
         public float[] StolenFromSeat;
