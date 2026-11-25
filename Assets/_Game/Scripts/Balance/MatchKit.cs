@@ -84,6 +84,8 @@ namespace CluckWars.Balance
         public float MatchEndBonusFood;
         /// <summary>The Thief's loot mark (<see cref="LootMarkFacts.Active"/> false for every other passive and for the shipped Thief).</summary>
         public LootMarkFacts Loot;
+        /// <summary>The Bully's hit-steal (<see cref="HitStealFacts.Active"/> false for every other passive and for the shipped Bully).</summary>
+        public HitStealFacts HitSteal;
         /// <summary>Every slow factor the shipped kits emit, and what this passive turns each into when it is the victim (parallel arrays).</summary>
         public float[] SlowFactorsEmitted;
         public float[] SlowFactorsReceived;

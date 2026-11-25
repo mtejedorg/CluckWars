@@ -157,6 +157,18 @@ namespace CluckWars.Balance
         public float LootHuntOverlapSeconds;
         public int Casts;
         public int Steals;
+        /// <summary>Hits of this seat's Stun, Shove or Slow that took food (the Bully's hit-steal).</summary>
+        public int HitTakes;
+        /// <summary>Food those hits took into this seat's cargo (also counted in <see cref="Stolen"/>, not in <see cref="Steals"/>).</summary>
+        public float HitFood;
+        /// <summary>Hits that affected a rival but took nothing because that rival was locked for this seat.</summary>
+        public int HitRefusedLock;
+        /// <summary>Hits that took nothing because the rival held no food.</summary>
+        public int HitRefusedNoFood;
+        /// <summary>Hits that took nothing because this seat's beak was full.</summary>
+        public int HitRefusedRoom;
+        /// <summary>Food hit-steals took from this seat (victim side; also in <see cref="LostToSteals"/>).</summary>
+        public float HitLostFood;
         public float FirstContact;
         /// <summary>Food this seat took from each seat (index = victim).</summary>
         public float[] StolenFromSeat;

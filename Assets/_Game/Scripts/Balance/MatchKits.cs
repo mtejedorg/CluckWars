@@ -105,6 +105,7 @@ namespace CluckWars.Balance
                 MaxStealMultiplier = passive.MaxStealMultiplier,
                 MatchEndBonusFood = passive.MatchEndBonusFood(null),
                 Loot = passive.LootMark,
+                HitSteal = passive.HitSteal,
                 SlowFactorsEmitted = (float[])emittedSlowFactors.Clone(),
                 SlowFactorsReceived = received,
             };

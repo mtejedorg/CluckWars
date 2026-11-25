@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace CluckWars.Balance
 {
-    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot }
+    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot, HitSteal }
 
     /// <summary>Why a running Peck was cut. <see cref="OwnMove"/> is the chicken's own doing (it cast another ability).</summary>
     public enum CutCause : byte { None, Stun, Shove, Execution, EmptyPile, OwnMove }
@@ -354,6 +354,9 @@ namespace CluckWars.Balance
             /// <summary>Loot food (marked take plus bounty) still in the cargo; a share of it leaves with every deposit or theft.</summary>
             public float LootHeld;
             public int MarksThisTrip;
+
+            // hit-steal (the Bully's): when each victim is next open to this chicken's hits, by victim seat
+            public readonly float[] HitLockUntil = new float[Seats];
         }
 
         private sealed class Core
@@ -980,7 +983,7 @@ namespace CluckWars.Balance
                                 if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
                                 DoSteal(s, v, ab);
                             }
-                            if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback);
+                            if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback, ab.Job);
                         }
                         break;
                     }
@@ -989,7 +992,7 @@ namespace CluckWars.Balance
                         for (int v = 0; v < Seats; v++)
                         {
                             if (!RivalCanBeHit(s, v, ab.Radius)) continue;
-                            Control(s, v, ab.Control);
+                            Control(s, v, ab.Control, ab.Job);
                         }
                         break;
                     case AbilityJob.Shove:
@@ -997,7 +1000,7 @@ namespace CluckWars.Balance
                         {
                             if (!RivalCanBeHit(s, v, ab.Radius)) continue;
                             if (MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) continue;
-                            Shove(s, v, ab.Knockback);
+                            Shove(s, v, ab.Knockback, ab.Job);
                         }
                         break;
                     case AbilityJob.SlowArea:
@@ -1170,7 +1173,7 @@ namespace CluckWars.Balance
                 _result.Counters[s].LootOffered++;
             }
 
-            private void Control(int caster, int victim, ControlEmission e)
+            private void Control(int caster, int victim, ControlEmission e, AbilityJob job)
             {
                 var v = _c[victim];
                 var victimPassive = PassiveOf(victim);
@@ -1184,6 +1187,7 @@ namespace CluckWars.Balance
                     v.WasStunned = true;
                     v.ThinkNow = true;
                     if (v.Pecking && PeckCastRules.IsCut(true, false, false)) Cut(victim, CutCause.Stun);
+                    HitSteal(caster, victim, job);
                 }
                 else if (e.Kind == ControlKind.Slow)
                 {
@@ -1191,7 +1195,44 @@ namespace CluckWars.Balance
                     float seconds = MatchCombat.ControlSeconds(e, PassiveOf(caster), victimPassive);
                     ApplySlow(v, victimPassive.ReceivedSlowFactor(e.SlowFactor), seconds);
                     v.ThinkNow = true;
+                    HitSteal(caster, victim, job);
                 }
+            }
+
+            // The Bully's hit-steal (design 2026-11-25): a Stun that extended the victim's stun, a Shove that moved him or a Slow that landed takes the
+            // job's amount from his cargo into the caster's, clamped to the caster's free room and his food, once per victim per lock. A hit that took
+            // nothing starts no lock. The caller has already refused the egg and the base wall, so a refused hit never reaches here.
+            private void HitSteal(int caster, int victim, AbilityJob job)
+            {
+                var facts = PassiveOf(caster).HitSteal;
+                float amount = facts.AmountFor(job);
+                if (amount <= 0f) return;
+                var c = _c[caster];
+                var v = _c[victim];
+                ref SeatCounters cn = ref _result.Counters[caster];
+                bool locked = HitStealRules.Locked(_time, c.HitLockUntil[victim]);
+                float room = _s.Seats[caster].Farm.CargoCapacity - c.Cargo;
+                float stealable = StealRules.Stealable(v.Cargo);
+                float take = HitStealRules.Take(amount, room, stealable, locked);
+                if (take <= 0f)
+                {
+                    if (locked) cn.HitRefusedLock++;
+                    else if (stealable <= 0f) cn.HitRefusedNoFood++;
+                    else cn.HitRefusedRoom++;
+                    return;
+                }
+                _result.Counters[victim].LootLostToSteals += TakeLootShare(v, take);
+                v.Cargo -= take;
+                c.Cargo += take;
+                v.ThinkNow = c.ThinkNow = true;
+                c.HitLockUntil[victim] = _time + facts.LockSeconds;
+                cn.Stolen += take;
+                cn.HitTakes++;
+                cn.HitFood += take;
+                cn.StolenFromSeat[victim] += take;
+                _result.Counters[victim].LostToSteals += take;
+                _result.Counters[victim].HitLostFood += take;
+                Record(MatchEventKind.HitSteal, caster, victim, take, CutCause.None);
             }
 
             private void ApplySlow(Chick v, float factor, float seconds)
@@ -1203,7 +1244,7 @@ namespace CluckWars.Balance
                 v.SlowUntil = (float)merged.Until;
             }
 
-            private void Shove(int caster, int victim, float knockback)
+            private void Shove(int caster, int victim, float knockback, AbilityJob job)
             {
                 var v = _c[victim];
                 Vector2 away = v.Pos - _c[caster].Pos;
@@ -1214,6 +1255,7 @@ namespace CluckWars.Balance
                 v.ThinkNow = true;
                 bool knocked = impulse.sqrMagnitude > ShoveCounts;
                 if (v.Pecking && PeckCastRules.IsCut(false, knocked, false)) Cut(victim, CutCause.Shove);
+                if (impulse.sqrMagnitude > 0f) HitSteal(caster, victim, job);
             }
 
             // Slow Area: every tick of its run, each rival inside gets the aura's factor for that tick, through the victim's passive. The aura
