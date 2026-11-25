@@ -11,7 +11,7 @@ namespace CluckWars.Gameplay
     {
         /// <summary>
         /// A hit of this kit pays food now: a Stun, Shove or Slow it holds has an active hit-steal amount, or the bite is on with food (a share above 0) and the
-        /// kit holds a Stun, Shove or Steal to land it. A Enforcer's fresh stack alone is no food: it pays only through the Steal, which already opens the gate.
+        /// kit holds a Stun, Shove or Steal to land it. An Enforcer's fresh stack alone is no food: it pays only through the Steal, which already opens the gate.
         /// </summary>
         public static bool HitPays(in HitStealFacts hit, in BiteFacts bite, bool holdsStun, bool holdsShove, bool holdsSlow, bool holdsSteal) =>
             (holdsStun && hit.AmountFor(AbilityJob.Stun) > 0f)
@@ -21,8 +21,8 @@ namespace CluckWars.Gameplay
 
         /// <summary>
         /// The bot may chase a rival: always, except for a Brawler (the Warrior's strategy) that holds no Steal and has no hit that pays, which forages instead.
-        /// The other strategies keep their chase whatever they hold (a Predator hunts by its class, a Bunker engages with a stun), so no shipped kit changes:
-        /// both shipped Warrior kits hold Steal.
+        /// The other strategies keep their chase whatever they hold (a Predator hunts by its class, a Bunker engages with a stun), so no shipped kit changes
+        /// but the Warrior's: the Enforcer holds Steal, the Bully (no Steal since 2026-11-25) holds a Stun and a Shove whose hit-steal pays.
         /// </summary>
         public static bool MayEngage(bool brawler, bool holdsSteal, bool hitPays) => !brawler || holdsSteal || hitPays;
     }

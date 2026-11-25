@@ -86,8 +86,8 @@ namespace CluckWars.Tests
         // stops early. The multiplier comes from the shipped passive through the same resolver the cast uses.
         private static float ResolvedRelentless(float baseSeconds)
         {
-            var registry = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
-            var relentless = registry.Passives.OfType<RelentlessPassiveSO>().Single();
+            // Relentless is shelved (out of the registry since 2026-11-25) but any passive that lengthens outgoing stuns must feed the HUD the same way.
+            var relentless = (RelentlessPassiveSO)WarriorPassiveDataTests.ShelvedRelentless();
             Assert.Greater(relentless.OutgoingControlMultiplier, 1f, "Relentless should lengthen outgoing stuns.");
             return AbilityBaseSO.ResolveOutgoingControlSeconds(baseSeconds, relentless);
         }

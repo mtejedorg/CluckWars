@@ -5,30 +5,30 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Warrior alternative: the spammer.</b> Abilities come back faster. Kit: Peck, Steal, Stun, Jump.
+    /// <b>Warrior alternative: the spammer.</b> Abilities come back faster, and the Stun and the Shove that land take food. Kit: Peck, Jump, Stun, Shove.
     /// </summary>
     /// <remarks>
     /// <b>Reworked 2026-11-05 (Maestro).</b> The Warrior is the all-rounder: a bit of steal, crowd control, pecking
-    /// and movement, each weaker than the specialist's. Bully took over the cooldown reduction Relentless had
-    /// (x0.75); its old steal x1.4 and +2 cargo were dropped, so it farms exactly like a naked Warrior, so the
-    /// Balance Oracle needs no special case for it.
+    /// and movement, each weaker than the specialist's. Bully took over the cooldown reduction Relentless had (x0.75).
+    /// <b>2026-11-25 (BL-226):</b> the Steal left the kit; a Stun or a Shove that really affects a rival takes
+    /// <see cref="HitStealStun"/> / <see cref="HitStealShove"/> food, and <see cref="PassiveAbilitySO.PeckCooldownMultiplier"/> slows the Peck, so the
+    /// kit forages less than a naked Warrior and earns the difference by hitting.
     /// <para>
-    /// ⚠️ <b>Deliberately excludes Peck.</b> Peck is an ability with a cooldown like any other, so a blanket
-    /// reduction would hand the Warrior ~25% more farming throughput, an effect that lives entirely outside the
-    /// Balance Oracle's naked axiom. This is a combat passive; making it a farming passive by accident is exactly
-    /// the drift the Oracle exists to catch.
+    /// <b>The x0.75 still skips Peck.</b> Peck is an ability with a cooldown like any other, so a blanket reduction would hand the Warrior ~25% more
+    /// farming throughput outside the Balance Oracle's naked axiom; the Peck's own cadence is the separate, deliberate
+    /// <see cref="PassiveAbilitySO.PeckCooldownMultiplier"/>.
     /// </para>
     /// </remarks>
     [CreateAssetMenu(fileName = "Bully", menuName = "Cluck Wars/Passive/Bully", order = 16)]
     public sealed class BullyPassiveSO : PassiveAbilitySO
     {
-        [Tooltip("Multiplier on ability cooldowns. 0.75 = 25% faster. Does NOT apply to Peck.")]
+        [Tooltip("Multiplier on ability cooldowns. 0.75 = 25% faster. Does NOT apply to Peck (see PeckCooldownMultiplier).")]
         [Range(0.25f, 1f)] public float CooldownMultiplier = 0.75f;
 
-        [Header("Hit-steal (design 2026-11-25; shipped off)")]
-        [Tooltip("Food a Stun that really affects a rival takes into this chicken's cargo. 0 = off (shipped).")]
+        [Header("Hit-steal (design 2026-11-25)")]
+        [Tooltip("Food a Stun that really affects a rival takes into this chicken's cargo. 0 = off.")]
         [Min(0f)] public float HitStealStun = 0f;
-        [Tooltip("Food a Shove that really moves a rival takes into this chicken's cargo. 0 = off (shipped).")]
+        [Tooltip("Food a Shove that really moves a rival takes into this chicken's cargo. 0 = off.")]
         [Min(0f)] public float HitStealShove = 0f;
         [Tooltip("Food an instant Slow that lands takes into this chicken's cargo. 0 = off (designed 0: Slow Area never takes).")]
         [Min(0f)] public float HitStealSlow = 0f;
@@ -45,7 +45,11 @@ namespace CluckWars.Abilities
         public override string PerkLineKey => UiKeys.PerkBullyLine;
         public override string PerkDetailKey => UiKeys.PerkBullyDetail;
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
-            new (string, object)[] { ("pct", Percent(1f - CooldownMultiplier)) };
+            new (string, object)[]
+            {
+                ("pct", Percent(1f - CooldownMultiplier)), ("stun", Num(HitStealStun)), ("shove", Num(HitStealShove)),
+                ("lock", Num(HitStealLockSeconds)), ("peck", Percent(PeckCooldownMultiplier - 1f)),
+            };
 
         public override HitStealFacts HitSteal => new HitStealFacts
         {

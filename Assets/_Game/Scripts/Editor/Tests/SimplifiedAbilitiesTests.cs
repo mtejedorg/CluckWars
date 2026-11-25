@@ -269,7 +269,7 @@ namespace CluckWars.Tests
         {
             var registered = new HashSet<AbilityBaseSO>(Registry.All);
             var retired = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir).Where(a => a.Retired).ToList();
-            Assert.AreEqual(19, retired.Count, "the 17 replaced on 2026-11-05, Egg Shell, and Quick Drop (now Featherfoot's passive)");
+            Assert.AreEqual(20, retired.Count, "the 17 replaced on 2026-11-05, Egg Shell, Quick Drop (now Featherfoot's passive) and Relentless (parked as a possible future idea, 2026-11-25)");
             foreach (var a in retired)
             {
                 Assert.IsFalse(registered.Contains(a), a.name);
@@ -277,8 +277,8 @@ namespace CluckWars.Tests
             }
         }
 
-        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Jump", "Stun", "Steal")]          // Maestro 2026-11-05 Warrior rework; slot roles 2026-11-20
-        [TestCase(ChickenSubclass.Warrior_Relentless, "Peck", "Speed", "Slow", "Steal")]
+        [TestCase(ChickenSubclass.Warrior_Bully, "Peck", "Jump", "Stun", "Shove")]          // Maestro 2026-11-05 Warrior rework; slot roles 2026-11-20; Steal swapped for Shove 2026-11-25 (the hits take food)
+        [TestCase(ChickenSubclass.Warrior_Enforcer, "Peck", "Stun", "Shove", "Steal")]   // Maestro 2026-11-25: the Enforcer replaces Relentless
         [TestCase(ChickenSubclass.Speedy_Featherfoot, "Peck", "Speed", "Slow", "Shove")]   // Maestro 2026-11-05: Speedys do not steal
         [TestCase(ChickenSubclass.Speedy_Slippery, "Peck", "Speed", "Slow", "Shove")]
         [TestCase(ChickenSubclass.Fatty_Bulwark, "Peck", "Stun", "Egg Shell", "Shove")]

@@ -93,8 +93,8 @@ namespace CluckWars.Tests
         /// </summary>
         private static readonly (string passive, string[] slots)[] ShippedKits =
         {
-            ("Bully",      new[] { "Peck",     "Shadowstep", "WingSlam",    "Snatch" }),
-            ("Relentless", new[] { "Peck",     "SpeedBurst", "Slow",        "Snatch" }),
+            ("Bully",      new[] { "Peck",     "Shadowstep", "WingSlam",    "CluckShock" }),
+            ("Enforcer",   new[] { "Peck",     "WingSlam",   "CluckShock",  "Snatch" }),
             ("Featherfoot", new[] { "Peck",    "SpeedBurst", "Slow",        "CluckShock" }),
             ("Slippery",   new[] { "Peck",     "SpeedBurst", "Slow",        "CluckShock" }),
             ("Bulwark",    new[] { "Peck",     "WingSlam",   "TurtleMode",  "CluckShock" }),
@@ -120,15 +120,16 @@ namespace CluckWars.Tests
             foreach (var p in Registry.Passives)
             {
                 var kit = p.Kit;
-                bool fatty = p.Subclass.ClassOf() == ChickenClass.Fatty;
+                // The Fatty has no movement ability; neither has the Enforcer's kit (Peck, Stun, Shove, Steal: it hits, it does not run, Maestro 2026-11-25).
+                bool secondAttack = p.Subclass.ClassOf() == ChickenClass.Fatty || p.Subclass == ChickenSubclass.Warrior_Enforcer;
 
                 // Slot 1: income. Peck at a pile, the Spoiler's Death Mark (Hunt), the Thief's Steal.
                 Assert.IsTrue(kit[0].Is(AbilityJob.Peck) || kit[0].Is(AbilityJob.DeathMark) || kit[0].Is(AbilityJob.Steal),
                     $"{p.name}: slot 1 '{kit[0].name}' is not an income ability");
 
-                // Slot 2: movement (Speed, Jump). The Fatty has none, so its slot 2 holds the second attack.
-                if (fatty)
-                    Assert.IsTrue(IsAttack(kit[1]), $"{p.name}: slot 2 '{kit[1].name}' must be the Fatty's second attack (Steal or Control)");
+                // Slot 2: movement (Speed, Jump). A kit with none holds its second attack there.
+                if (secondAttack)
+                    Assert.IsTrue(IsAttack(kit[1]), $"{p.name}: slot 2 '{kit[1].name}' must be the kit's second attack (Steal or Control)");
                 else
                     Assert.IsTrue(kit[1].Is(AbilityJob.Speed) || kit[1].Is(AbilityJob.Jump), $"{p.name}: slot 2 '{kit[1].name}' is not a movement ability");
 
@@ -276,12 +277,12 @@ namespace CluckWars.Tests
         [Test]
         public void Free_TheKitIsNotRead()
         {
-            // Relentless since 2026-11-05: Jump, the Warrior's only class (non-shared) ability, is in the Bully kit now.
-            var relentless = Spec(ChickenSubclass.Warrior_Relentless);
+            // Jump, the Warrior's only class (non-shared) ability, is in the Bully kit and not in the Enforcer's.
+            var enforcer = Spec(ChickenSubclass.Warrior_Enforcer);
             var log = new RecordingLog();
-            var chosen = Registry.GetClassAbilitiesForClass(ChickenClass.Warrior).Where(a => !relentless.Kit.Contains(a)).ToArray();
-            Assert.IsNotEmpty(chosen, "test fixture: a Warrior ability outside the Relentless kit");
-            CollectionAssert.Contains(Spawn(LoadoutMode.Free, ChickenClass.Warrior, relentless, log, chosen[0]), chosen[0]);
+            var chosen = Registry.GetClassAbilitiesForClass(ChickenClass.Warrior).Where(a => !enforcer.Kit.Contains(a)).ToArray();
+            Assert.IsNotEmpty(chosen, "test fixture: a Warrior ability outside the Enforcer kit");
+            CollectionAssert.Contains(Spawn(LoadoutMode.Free, ChickenClass.Warrior, enforcer, log, chosen[0]), chosen[0]);
         }
 
         // ---- bots ---------------------------------------------------------------------------------------------------
@@ -392,7 +393,7 @@ namespace CluckWars.Tests
 
             Assert.IsTrue(LastSetupResolver.TryResolve(rec, Registry.All, LoadoutMode.Fixed, out var r, out var problem), problem);
             CollectionAssert.AreEqual(spec.Kit, r.Slots);
-            CollectionAssert.AreEqual(new[] { "Peck", "Shadowstep", "WingSlam", "Snatch" }, r.Slots.Select(a => a.name).ToArray());
+            CollectionAssert.AreEqual(new[] { "Peck", "Shadowstep", "WingSlam", "CluckShock" }, r.Slots.Select(a => a.name).ToArray());
         }
 
         [Test]

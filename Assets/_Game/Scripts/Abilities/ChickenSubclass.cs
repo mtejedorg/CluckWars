@@ -18,7 +18,7 @@ namespace CluckWars.Abilities
     public enum ChickenSubclass : byte
     {
         None                = 0,
-        Warrior_Relentless  = 1, // Warrior
+        Warrior_Enforcer   = 1, // Warrior (was Warrior_Relentless until 2026-11-25; the value did not move)
         Warrior_Bully       = 2, // Warrior
         Speedy_Slippery     = 3, // Speedy
         Speedy_Featherfoot  = 4, // Speedy
@@ -39,7 +39,7 @@ namespace CluckWars.Abilities
     public enum ChickenSubclassFlags : ushort
     {
         None                = 0,
-        Warrior_Relentless  = 1 << 0,
+        Warrior_Enforcer    = 1 << 0,
         Warrior_Bully       = 1 << 1,
         Speedy_Slippery     = 1 << 2,
         Speedy_Featherfoot  = 1 << 3,
@@ -71,7 +71,7 @@ namespace CluckWars.Abilities
         /// </summary>
         public static ChickenClass ClassOf(this ChickenSubclass subclass) => subclass switch
         {
-            ChickenSubclass.Warrior_Relentless or ChickenSubclass.Warrior_Bully     => ChickenClass.Warrior,
+            ChickenSubclass.Warrior_Enforcer or ChickenSubclass.Warrior_Bully     => ChickenClass.Warrior,
             ChickenSubclass.Speedy_Slippery   or ChickenSubclass.Speedy_Featherfoot => ChickenClass.Speedy,
             ChickenSubclass.Fatty_Hoarder    or ChickenSubclass.Fatty_Bulwark   => ChickenClass.Fatty,
             ChickenSubclass.Assassin_Spoiler    or ChickenSubclass.Assassin_Thief     => ChickenClass.Assassin,

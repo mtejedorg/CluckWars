@@ -13,9 +13,9 @@
 
 .PARAMETER Mode    solo | shared2 | shared4 | hostleave
 .PARAMETER Rounds  rounds to play (auto-loop). Default 3.
-.PARAMETER Perk      Fixed kits: client1's specialization, -cw_perk <ChickenSubclass> (Warrior_Relentless, Warrior_Bully,
+.PARAMETER Perk      Fixed kits: client1's specialization, -cw_perk <ChickenSubclass> (Warrior_Enforcer, Warrior_Bully,
            Speedy_Slippery, Speedy_Featherfoot, Fatty_Hoarder, Fatty_Bulwark, Assassin_Spoiler, Assassin_Thief). All 8 solo:
-           'Warrior_Relentless','Warrior_Bully','Speedy_Slippery','Speedy_Featherfoot','Fatty_Hoarder','Fatty_Bulwark',
+           'Warrior_Enforcer','Warrior_Bully','Speedy_Slippery','Speedy_Featherfoot','Fatty_Hoarder','Fatty_Bulwark',
            'Assassin_Spoiler','Assassin_Thief' | % { .\tools\test-session\scenario-pc.ps1 -Mode solo -Perk $_ }
 .PARAMETER BotPerks  Solo bots by index, -cw_botperks a,b,c ('-' rolls), e.g. -BotPerks 'Assassin_Spoiler,Warrior_Bully,Fatty_Bulwark'.
 .PARAMETER AutoZone  B10: every EXE gets -cw_autozone (each peer casts its zone ability ~1.5 s before every round end and

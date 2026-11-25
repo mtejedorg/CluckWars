@@ -16,6 +16,7 @@ DENIED = {
     "AllowedClasses", "PeckSlotPreEquippedBy", "SignaturePreEquippedBy", "Category", "BotRole", "AccentKey",
     "TerrainTraversal", "JumpTier", "CastMotion", "Retired",   # AbilityBaseSO
     "Subclass",                                                  # PassiveAbilitySO
+    "FreshBiteShare",                                            # EnforcerPassiveSO (the game plays no food bite)
     "MaxPlayers", "TargetingMode", "LoadoutMode",                # MatchConfigSO
 }
 

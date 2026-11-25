@@ -23,7 +23,7 @@ namespace CluckWars.Balance
         public double ReplicateScale = 1.0;
         public List<WhatIfScenario> Scenarios = new List<WhatIfScenario>();
         /// <summary>
-        /// The roster swap (<c>"roster":{"Relentless":"Enforcer"}</c>, asset names): the passive named by the key gives its seat to the one named by the
+        /// The roster swap (<c>"roster":{"Enforcer":"Relentless"}</c>, asset names): the passive named by the key gives its seat to the one named by the
         /// value for the whole run, baseline included (<see cref="OracleRoster"/>). Empty for no swap.
         /// </summary>
         public List<KeyValuePair<string, string>> Roster = new List<KeyValuePair<string, string>>();
@@ -43,7 +43,7 @@ namespace CluckWars.Balance
                         result.ReplicateScale = member.Value.Number;
                         break;
                     case "roster":
-                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"Enforcer\"}"; return false; }
+                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Enforcer\":\"Relentless\"}"; return false; }
                         foreach (var swap in member.Value.Members)
                         {
                             if (swap.Value.Kind != JsonKind.String || string.IsNullOrWhiteSpace(swap.Value.Text) || string.IsNullOrWhiteSpace(swap.Key))
@@ -139,7 +139,7 @@ namespace CluckWars.Balance
         public string SpoilerKit, ThiefKit;
         /// <summary>The kit with a hit-steal (or the Bully's asset) and the Enforcer's kit, for the Warrior overviews; null when none plays.</summary>
         public string BullyKit, DebtKit;
-        /// <summary>The roster swap this run played under, as "Relentless -> Enforcer" lines; null for none.</summary>
+        /// <summary>The roster swap this run played under, as "Enforcer -> Relentless" lines; null for none.</summary>
         public string Roster;
         public string[] KitLabels;
         public WhatIfResult Baseline;

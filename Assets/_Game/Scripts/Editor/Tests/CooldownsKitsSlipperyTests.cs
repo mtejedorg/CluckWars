@@ -142,7 +142,7 @@ namespace CluckWars.Tests
                 Assert.AreEqual(0.55f, p.ModifyIncomingSlowFactor(0.55f, null), 1e-6f, p.name);
             }
             var bulwark = Shipped<BulwarkPassiveSO>();
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = (RelentlessPassiveSO)WarriorPassiveDataTests.ShelvedRelentless();   // shelved 2026-11-25: out of the registry, its numbers still pinned
             foreach (var kind in new[] { ControlKind.Stun, ControlKind.Root, ControlKind.Slow })
             {
                 Assert.AreEqual(0.65f, bulwark.ModifyControlDuration(1f, kind, null), 1e-6f, "Bulwark " + kind);

@@ -19,6 +19,10 @@ namespace CluckWars.Tests
 
         private static AbilityRegistrySO Registry => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
         private static T Shipped<T>() where T : PassiveAbilitySO => Registry.Passives.OfType<T>().Single();
+        // Relentless left the roster on 2026-11-25 (retired, kept as a possible future idea): its own behaviour is still pinned, on the asset loaded by path.
+        private static RelentlessPassiveSO Shelved() => (RelentlessPassiveSO)WarriorPassiveDataTests.ShelvedRelentless();
+        /// <summary>The registry as it would be were the shelved Relentless seated again: what its ceilings must then cover.</summary>
+        private static AbilityBaseSO[] WithRelentless() => Registry.All.Concat(new AbilityBaseSO[] { Shelved() }).ToArray();
         private static T Asset<T>() where T : AbilityBaseSO => TestAssets.LoadAllIn<T>(TestAssets.AbilitiesDir).Single();
         private static string Src(string file) => File.ReadAllText(Path.Combine(AbilitiesSrc, file)).Replace("\r\n", "\n");
 
@@ -35,7 +39,7 @@ namespace CluckWars.Tests
         public void ShippedNumbers_AreTheRuling_AndTheConstructorDefaultsMatchTheAssets()
         {
             var bully = Shipped<BullyPassiveSO>();
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             Assert.AreEqual(0.75f, bully.CooldownMultiplier, 1e-6f);
             Assert.AreEqual(0.75f, relentless.DurationMultiplier, 1e-6f);
             Assert.AreEqual(1.3f, relentless.OutgoingDurationMultiplier, 1e-6f);
@@ -73,7 +77,7 @@ namespace CluckWars.Tests
         [Test]
         public void Relentless_ShortensIncomingControl_ButNotKnockbackOrCooldowns()
         {
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             var stun = Asset<WingSlamAbilitySO>();
             foreach (var kind in new[] { ControlKind.Stun, ControlKind.Root, ControlKind.Slow })
                 Assert.AreEqual(0.75f, relentless.ModifyControlDuration(1f, kind, null), 1e-6f, kind.ToString());
@@ -82,15 +86,14 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void OnlyRelentless_LengthensOutgoingControl()
+        public void OnlyRelentless_LengthensOutgoingControl_AndItIsShelved()
         {
-            foreach (var p in Registry.Passives)
-            {
-                if (p is RelentlessPassiveSO) Assert.AreEqual(1.3f, p.OutgoingControlMultiplier, 1e-6f, p.name);
-                else Assert.AreEqual(1f, p.OutgoingControlMultiplier, p.name);
-            }
-            Assert.AreEqual(1.3f, ControlClaimRules.MaxOutgoingControlMultiplier(Registry.All), 1e-6f,
-                "the ceiling's factor is read from the shipped passives");
+            foreach (var p in Registry.Passives) Assert.AreEqual(1f, p.OutgoingControlMultiplier, p.name);
+            Assert.AreEqual(1.3f, Shelved().OutgoingControlMultiplier, 1e-6f);
+            Assert.AreEqual(1f, ControlClaimRules.MaxOutgoingControlMultiplier(Registry.All), 1e-6f,
+                "no registered passive lengthens outgoing control, so the shipped ceiling's factor is 1");
+            Assert.AreEqual(1.3f, ControlClaimRules.MaxOutgoingControlMultiplier(WithRelentless()), 1e-6f,
+                "the ceiling's factor is read from the passives of the registry, so seating Relentless again lifts it");
             Assert.AreEqual(1f, ControlClaimRules.MaxOutgoingControlMultiplier(null));
         }
 
@@ -99,7 +102,7 @@ namespace CluckWars.Tests
         [Test]
         public void ARelentlessStun_OnASlipperyVictim_Is_Authored_x1_3_Only()
         {
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             var slippery = Shipped<SlipperyPassiveSO>();
             var stun = Asset<WingSlamAbilitySO>();
 
@@ -121,9 +124,9 @@ namespace CluckWars.Tests
         [Test]
         public void ABoostedStun_IsAccepted_AndAClaimAboveTheBoostedCeiling_IsRefused()
         {
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             var stun = Asset<WingSlamAbilitySO>();
-            var ceiling = ControlClaimRules.CeilingFor(Registry.All, ControlKind.Stun);   // what ChickenController derives
+            var ceiling = ControlClaimRules.CeilingFor(WithRelentless(), ControlKind.Stun);   // what ChickenController derives, were Relentless seated
 
             float boosted = AbilityBaseSO.ResolveOutgoingControlSeconds(stun.StunDuration, relentless);
             Assert.AreEqual(boosted, ceiling.MaxSeconds, 1e-4f, "stun ceiling = longest authored stun x strongest outgoing factor");
@@ -137,7 +140,7 @@ namespace CluckWars.Tests
         {
             // No registered ability sends an RPC slow since 2026-11-05 (the Slow aura is a zone), so the mechanism is
             // checked on the authored Dust Kick plus the shipped Relentless: the day a slow sender is registered, it holds.
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             var kick = Asset<DustKickAbilitySO>();
             var ceiling = ControlClaimRules.CeilingFor(new AbilityBaseSO[] { kick, relentless }, ControlKind.Slow);
 
@@ -148,8 +151,11 @@ namespace CluckWars.Tests
             Assert.AreEqual(ControlClaimRules.Verdict.ImplausibleDuration,
                 ControlClaimRules.Evaluate(Honest(ControlKind.Slow, boosted + 0.01f, kick.SlowFactor), ceiling));
 
-            // The registry's only RPC slow is the instant Slow (2026-11-13): its ceiling is its seconds x Relentless 1.3.
-            Assert.AreEqual(Asset<SlowAbilitySO>().SlowSeconds * 1.3f, ControlClaimRules.CeilingFor(Registry.All, ControlKind.Slow).MaxSeconds, 1e-4f);
+            // The registry's only RPC slow is the instant Slow (2026-11-13): its ceiling is its seconds x the strongest outgoing factor
+            // (1 as shipped, Relentless 1.3 were it seated again).
+            float slowSeconds = Asset<SlowAbilitySO>().SlowSeconds;
+            Assert.AreEqual(slowSeconds, ControlClaimRules.CeilingFor(Registry.All, ControlKind.Slow).MaxSeconds, 1e-4f);
+            Assert.AreEqual(slowSeconds * 1.3f, ControlClaimRules.CeilingFor(WithRelentless(), ControlKind.Slow).MaxSeconds, 1e-4f);
         }
 
         [Test]
@@ -157,7 +163,7 @@ namespace CluckWars.Tests
         {
             // No passive lengthens a root, so its bound (and the Root Egg zone's lifetime evidence) stays the authored one.
             var quake = Asset<GroundQuakeAbilitySO>();
-            var ceiling = ControlClaimRules.CeilingFor(new AbilityBaseSO[] { quake, Shipped<RelentlessPassiveSO>() }, ControlKind.Root);
+            var ceiling = ControlClaimRules.CeilingFor(new AbilityBaseSO[] { quake, Shelved() }, ControlKind.Root);
             Assert.AreEqual(quake.EmittedControl.Seconds, ceiling.MaxSeconds, 1e-6f);
         }
 
@@ -186,7 +192,7 @@ namespace CluckWars.Tests
         [Test]
         public void OutgoingSeconds_LengthensStunsAndSlows_NeverRoots_ExactlyAsTheOldSendersDid()
         {
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             Assert.Greater(relentless.OutgoingControlMultiplier, 1f);
             foreach (var passive in new PassiveAbilitySO[] { null, relentless, Shipped<BullyPassiveSO>() })
             foreach (float seconds in new[] { 0.35f, 1f, 1.3f, 1.4f, 1.8f, 2.5f })
@@ -211,7 +217,7 @@ namespace CluckWars.Tests
         public void TheSlowAura_UnderRelentless_RunsAndLives1_3xLonger_WithItsCooldownUnchanged()
         {
             var aura = Asset<FeatherAuraAbilitySO>();
-            var relentless = Shipped<RelentlessPassiveSO>();
+            var relentless = Shelved();
             Assert.IsTrue(aura.ActiveDurationIsOutgoingControl);
             foreach (var a in Registry.All.Where(a => a != null && !(a is FeatherAuraAbilitySO)))
                 Assert.IsFalse(a.ActiveDurationIsOutgoingControl, $"{a.name}: only the aura's run time is its crowd control");

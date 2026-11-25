@@ -423,7 +423,7 @@ namespace CluckWars.Tests
             var names = new[] { "Peck", "CluckShock", "WingSlam", "SpeedBurst" };
             var rec = new LastSetupRecord
             {
-                Class = (int)ChickenClass.Warrior, Subclass = (int)ChickenSubclass.Warrior_Relentless,
+                Class = (int)ChickenClass.Warrior, Subclass = (int)ChickenSubclass.Warrior_Enforcer,
                 Abilities = names, Mode = (int)SessionMode.Solo,
             };
             Assert.IsTrue(Resolve(rec, reg, out var r, out var problem), problem);

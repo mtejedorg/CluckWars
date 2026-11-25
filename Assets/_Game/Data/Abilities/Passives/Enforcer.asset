@@ -14,29 +14,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.EnforcerPassiveSO
   DisplayName: Enforcer
   ShortLabel: ENFR
-  Description: Hit a bird that has just pecked and you stack one more debt on it. Every hit on the same bird is a debt, and each debt makes your Steal on that bird bigger.
-  Icon: 
-  AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
+  Description: Hit a bird and it owes you. Each debt makes your Steal take 2 more
+    food.
+  AccentKey: 0
+  CustomAccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
   Category: 3
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 1
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  SearchMask:
   CastMotion: 8
-    serializedVersion: 2
-    m_Bits: 256
-  FreshSeconds: 0
-  FreshBiteShare: 0
-  DebtSteal: 0
-  DebtCap: 3
-  DebtSeconds: 6
+  AreaKind: 0
+  Retired: 0
   Subclass: 1
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
   - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
   - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
   - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
+  PeckCooldownMultiplier: 1.2
+  FreshSeconds: 1.5
+  FreshBiteShare: 0
+  DebtSteal: 2
+  DebtCap: 3
+  DebtSeconds: 6

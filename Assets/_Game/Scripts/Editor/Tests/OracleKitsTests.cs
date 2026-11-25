@@ -176,16 +176,20 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void PeckCooldownMultiplier_ShippedAtOne_ChangesNothing_AndADeltaSlowsOneKitOnly()
+        public void PeckCooldownMultiplier_ShippedPerKit_NeverFasterAndOnlyOnWarriors_AndADeltaSlowsOneKitOnly()
         {
-            foreach (var passive in _abilities.Passives) Assert.AreEqual(1f, passive.PeckCooldownMultiplier, $"{passive.name} ships at 1");
+            foreach (var passive in _abilities.Passives)
+            {
+                if (passive.Subclass.ClassOf() == ChickenClass.Warrior) Assert.GreaterOrEqual(passive.PeckCooldownMultiplier, 1f, $"{passive.name}: a kit may slow its Peck, never speed it");
+                else Assert.AreEqual(1f, passive.PeckCooldownMultiplier, $"{passive.name} ships at 1");
+            }
             Assert.AreEqual(0.71f, PeckCastRules.Cooldown(0.71f, 1f), 1e-6f, "at 1 the class cooldown, exactly");
             Assert.AreEqual(1.065f, PeckCastRules.Cooldown(0.71f, 1.5f), 1e-5f);
             Assert.AreEqual(0.71f * PeckCastRules.MinCooldownMultiplier, PeckCastRules.Cooldown(0.71f, 0f), 1e-6f, "a multiplier under the floor counts as the floor");
 
             var before = OracleKits.All(Inputs());
             foreach (var passive in _abilities.Passives)
-                Assert.AreEqual(Stats(passive.Subclass.ClassOf()).PeckCooldown, Kit(before, passive.Subclass).PeckCooldown, passive.name + ": shipped, the class cooldown or the passive's own ruling");
+                Assert.AreEqual(PeckCastRules.Cooldown(Stats(passive.Subclass.ClassOf()).PeckCooldown, passive.PeckCooldownMultiplier), Kit(before, passive.Subclass).PeckCooldown, 1e-5f, passive.name + ": shipped, the class cooldown through the passive's own multiplier");
 
             var verdict = _book.Evaluate("{\"schema\":1,\"assets\":{\"Bully\":{\"PeckCooldownMultiplier\":1.5}}}", "test");
             Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
@@ -195,7 +199,7 @@ namespace CluckWars.Tests
             {
                 var b = Kit(before, passive.Subclass);
                 var a = Kit(after, passive.Subclass);
-                if (passive.Subclass == ChickenSubclass.Warrior_Bully) Assert.AreEqual(b.PeckCooldown * 1.5f, a.PeckCooldown, 1e-5f);
+                if (passive.Subclass == ChickenSubclass.Warrior_Bully) Assert.AreEqual(PeckCastRules.Cooldown(Stats(ChickenClass.Warrior).PeckCooldown, 1.5f), a.PeckCooldown, 1e-5f);
                 else Assert.AreEqual(b, a, passive.name + " is untouched");
             }
         }
@@ -251,12 +255,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void LabelOf_ShippedPassivesKeepTheirSubclassName_TheSwapReadsWarriorEnforcer()
+        public void LabelOf_ShippedPassivesKeepTheirSubclassName_TheShelvedKitReadsWarriorRelentless()
         {
             foreach (var passive in _abilities.Passives)
                 Assert.AreEqual(passive.Subclass.ToString(), OracleKits.LabelOf(passive), $"{passive.name} keeps the label the reports already use");
-            var hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/Enforcer.asset");
-            Assert.AreEqual("Warrior_Enforcer", OracleKits.LabelOf(hunter), "an asset not named like its subclass's suffix reads <Class>_<asset>");
+            var shelved = WarriorPassiveDataTests.ShelvedRelentless();
+            Assert.AreEqual("Warrior_Relentless", OracleKits.LabelOf(shelved), "an asset not named like its subclass's suffix reads <Class>_<asset>");
         }
     }
 }

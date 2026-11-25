@@ -226,9 +226,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedOff_PlaysExactlyAsBefore()
+        public void OffFacts_PlayExactlyAsTheNakedKit()
         {
-            // The shipped Bully's facts (every amount 0, the lock authored) against no facts at all.
+            // Facts built by hand with every amount 0 and the lock authored (what the Bully shipped as until 2026-11-25; the shipped assets are on now) against no facts at all.
             var shipped = new HitStealFacts { LockSeconds = 3f };
             foreach (ulong seed in new ulong[] { 1, 2, 3 })
             {
@@ -262,7 +262,7 @@ namespace CluckWars.Tests
 
         // ================================================================ the Enforcer (Maestro, 2026-11-25: a hit on a fresh rival takes no food, it stacks a debt)
 
-        // A Enforcer on a fast, big-reach kit. `share` is the passive's FreshBiteShare: 0 as shipped (no food from a fresh hit), 1 the old bite.
+        // An Enforcer on a fast, big-reach kit. `share` is the passive's FreshBiteShare: 0 as shipped (no food from a fresh hit), 1 the old bite.
         private static MatchKit Champ(int capacity = 100, float fresh = 1f, float share = 0f, float debtSteal = 2f, int cap = 3, float seconds = 20f, params MatchAbility[] abilities)
         {
             var kit = MatchTestKit.Fighter("champ", 100f, abilities, peckAmount: 3f, peckCooldown: 500f, castSeconds: 0.1f, capacity: capacity);
@@ -581,9 +581,9 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedOff_PlaysExactlyAsBefore_Enforcer()
+        public void OffFacts_PlayExactlyAsTheNakedKit_Enforcer()
         {
-            // The Enforcer as shipped (no fresh window, debts adding nothing) against no facts at all.
+            // The Enforcer's facts built by hand off (no fresh window, debts adding nothing; what it shipped as until 2026-11-25) against no facts at all.
             foreach (ulong seed in new ulong[] { 1, 2, 3 })
             {
                 var a = EnforcerFight(true, seed);

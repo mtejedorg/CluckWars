@@ -14,29 +14,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.BullyPassiveSO
   DisplayName: Bully
   ShortLabel: BULY
-  Description: Moves recharge 25% faster. Applies to every move except Peck.
-  Icon: 
-  AccentColor: {r: 0.86, g: 0.3, b: 0.3, a: 1}
+  Description: Moves recharge 25% faster, except Peck, which is 40% slower. A stun
+    takes 2 food, a shove 2.
+  AccentKey: 0
+  CustomAccentColor: {r: 0.86, g: 0.3, b: 0.3, a: 1}
   Category: 3
   TerrainTraversal: 0
   JumpTier: 0
-  SlotKind: 1
   AllowedClasses: 1
+  PeckSlotPreEquippedBy: 0
+  SignaturePreEquippedBy: 0
   BotRole: 0
   Duration: 0.05
   Cooldown: 0
-  SearchMask:
   CastMotion: 8
-    serializedVersion: 2
-    m_Bits: 256
-  CooldownMultiplier: 0.75
-  HitStealStun: 0
-  HitStealShove: 0
-  HitStealSlow: 0
-  HitStealLockSeconds: 3
+  AreaKind: 0
+  Retired: 0
   Subclass: 2
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
   - {fileID: 11400000, guid: d5cbb7478daa2d94eb14fc2015dba412, type: 2}
   - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
-  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}
+  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
+  PeckCooldownMultiplier: 1.4
+  CooldownMultiplier: 0.75
+  HitStealStun: 2
+  HitStealShove: 2
+  HitStealSlow: 0
+  HitStealLockSeconds: 3

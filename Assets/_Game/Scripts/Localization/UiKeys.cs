@@ -114,8 +114,10 @@ namespace CluckWars.Localization
         // ---- Perks (templated from each passive's own fields) ----
         [UiArgs("out")] public const string PerkRelentlessLine = "perk.relentless.line";
         [UiArgs("out", "in")] public const string PerkRelentlessDetail = "perk.relentless.detail";
-        [UiArgs("pct")] public const string PerkBullyLine = "perk.bully.line";
-        public const string PerkBullyDetail = "perk.bully.detail";
+        [UiArgs("pct", "peck", "stun", "shove")] public const string PerkBullyLine = "perk.bully.line";
+        [UiArgs("pct", "peck", "stun", "shove", "lock")] public const string PerkBullyDetail = "perk.bully.detail";
+        [UiArgs("steal")] public const string PerkEnforcerLine = "perk.enforcer.line";
+        [UiArgs("fresh", "steal", "cap", "secs", "peck")] public const string PerkEnforcerDetail = "perk.enforcer.detail";
         [UiArgs("bounty", "prize", "cap")] public const string PerkThiefLine = "perk.thief.line";
         [UiArgs("bounty", "prize", "goal", "cap")] public const string PerkThiefDetail = "perk.thief.detail";
         [UiArgs("pct")] public const string PerkSlipperyLine = "perk.slippery.line";

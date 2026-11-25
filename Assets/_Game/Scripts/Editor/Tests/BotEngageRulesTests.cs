@@ -36,16 +36,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedWarriorKits_BothHoldSteal_SoNoShippedBehaviourChanges()
+        public void ShippedWarriorKits_EachGateOpensOnAStealOrAHitThatPays()
         {
             var registry = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
             var warriors = registry.Passives.Where(p => p.AllowedClasses == ChickenClassFlags.Warrior).ToList();
-            Assert.AreEqual(2, warriors.Count, "Bully and Relentless");
+            Assert.AreEqual(2, warriors.Count, "Bully and Enforcer");
             foreach (var passive in warriors)
             {
                 Assert.IsTrue(FixedKit.TryResolve(LoadoutMode.Fixed, passive, out var kit, out var problem), problem);
-                Assert.IsTrue(kit.Any(a => a != null && a.Job == AbilityJob.Steal), passive.name + " holds Steal");
-                Assert.IsTrue(BotEngageRules.MayEngage(true, true, false), passive.name + ": the gate stays open");
+                bool holdsSteal = kit.Any(a => a != null && a.Job == AbilityJob.Steal);
+                bool hitPays = BotEngageRules.HitPays(passive.HitSteal, passive.Bite,
+                    kit.Any(a => a != null && a.Job == AbilityJob.Stun), kit.Any(a => a != null && a.Job == AbilityJob.Shove),
+                    kit.Any(a => a != null && a.Job == AbilityJob.Slow), holdsSteal);
+                Assert.IsTrue(BotEngageRules.MayEngage(true, holdsSteal, hitPays), passive.name + ": a Warrior kit with no Steal must hold a hit that pays, or its bot never fights");
             }
         }
     }

@@ -353,6 +353,8 @@ namespace CluckWars.Balance
                 nameof(AbilityBaseSO.CastMotion), nameof(AbilityBaseSO.Retired),
             },
             [typeof(PassiveAbilitySO)] = new[] { nameof(PassiveAbilitySO.Subclass) },
+            // The game plays no food bite (Maestro 2026-11-25: a fresh hit takes no food), so a delta must not switch on a rule the game does not play.
+            [typeof(EnforcerPassiveSO)] = new[] { nameof(EnforcerPassiveSO.FreshBiteShare) },
             [typeof(MatchConfigSO)] = new[]
             {
                 nameof(MatchConfigSO.MaxPlayers), nameof(MatchConfigSO.TargetingMode), nameof(MatchConfigSO.LoadoutMode),

@@ -43,7 +43,7 @@ namespace CluckWars.Tests
 
         private PeckAbilitySO Peck() => Make<PeckAbilitySO>();
 
-        private RelentlessPassiveSO Warrior(ChickenSubclass sub = ChickenSubclass.Warrior_Relentless)
+        private RelentlessPassiveSO Warrior(ChickenSubclass sub = ChickenSubclass.Warrior_Enforcer)
         {
             var p = Make<RelentlessPassiveSO>();
             p.Subclass = sub;
@@ -139,8 +139,8 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_FindsAbilitiesBySubclassAndSlot()
         {
-            var variant = Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
-            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var variant = Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
+            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             var otherSubclass = Claim(Make<ScrapAbilitySO>(), ChickenSubclass.Warrior_Bully, Slot.Signature);
 
             PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(), Reg(variant, otherSubclass, headbutt), Peck(),
@@ -153,9 +153,9 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_OneAbilityCanServeSeveralSubclasses()
         {
-            var peck = Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
+            var peck = Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
             Claim(peck, ChickenSubclass.Warrior_Bully, Slot.Peck);
-            foreach (var sub in new[] { ChickenSubclass.Warrior_Relentless, ChickenSubclass.Warrior_Bully })
+            foreach (var sub in new[] { ChickenSubclass.Warrior_Enforcer, ChickenSubclass.Warrior_Bully })
             {
                 PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(sub), Reg(peck), null, out var peckSlot, out _);
                 Assert.AreSame(peck, peckSlot);
@@ -173,7 +173,7 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_NonPeckInThePeckSlot_MeansNoForcedPeck()
         {
-            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
+            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
             PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(), Reg(headbutt), Peck(), out var peckSlot, out _);
             Assert.AreSame(headbutt, peckSlot, "A deliberate non-Peck Peck slot is respected; plain Peck is not forced.");
         }
@@ -181,7 +181,7 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_OffClassPreEquipSurvives()
         {
-            var markKill = Claim(Make<MarkKillAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var markKill = Claim(Make<MarkKillAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(), Reg(markKill), Peck(), out _, out var sig);
             Assert.AreSame(markKill, sig);
         }
@@ -214,8 +214,8 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_Conflict_TakesTheFirstInRegistryOrder()
         {
-            var first = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
-            var second = Claim(Make<ScrapAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var first = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
+            var second = Claim(Make<ScrapAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
 
             PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(), Reg(first, second), null, out _, out var sig);
             Assert.AreSame(first, sig);
@@ -226,7 +226,7 @@ namespace CluckWars.Tests
         [Test]
         public void Resolve_IgnoresAPassiveClaimant()
         {
-            var passive = Claim(Make<BullyPassiveSO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var passive = Claim(Make<BullyPassiveSO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             PreEquippedLoadout.Resolve(ChickenClass.Warrior, Warrior(), Reg(passive), null, out _, out var sig);
             Assert.IsNull(sig);
         }
@@ -236,8 +236,8 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_CompleteSubclass_HasNoIssues()
         {
-            var reg = Reg(Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
-                          Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature));
+            var reg = Reg(Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Peck),
+                          Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature));
             Assert.IsEmpty(PreEquippedLoadout.Validate(Warrior(), reg, Peck()));
         }
 
@@ -254,8 +254,8 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_ReportsSlotConflict_NamingEveryClaimant()
         {
-            var a = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
-            var b = Claim(Make<ScrapAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var a = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
+            var b = Claim(Make<ScrapAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             a.name = "AAA"; b.name = "BBB";
             var issues = PreEquippedLoadout.Validate(Warrior(), Reg(a, b), Peck());
             var conflict = issues.Single(i => i.Status == PreEquipStatus.SlotConflict);
@@ -284,8 +284,8 @@ namespace CluckWars.Tests
             // open to every class but the Speedy, so the fixture pins the flag itself).
             var offClass = Make<ShadowstepAbilitySO>();
             offClass.AllowedClasses = ChickenClassFlags.Assassin;
-            var reg = Reg(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
-                          Claim(offClass, ChickenSubclass.Warrior_Relentless, Slot.Signature));
+            var reg = Reg(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck),
+                          Claim(offClass, ChickenSubclass.Warrior_Enforcer, Slot.Signature));
             var issues = PreEquippedLoadout.Validate(Warrior(), reg, Peck());
 
             Assert.IsTrue(Has(issues, PreEquipStatus.OffClassAbility));
@@ -298,11 +298,11 @@ namespace CluckWars.Tests
         public void Validate_CannotForage_NotRaised_WhenAPeckIsPreEquipped_TheSlotIsEmpty_OrTheClassCannotForage()
         {
             var plain = Peck();
-            var peckOnly = Reg(Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
-                               Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature));
+            var peckOnly = Reg(Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Peck),
+                               Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature));
             Assert.IsFalse(Has(PreEquippedLoadout.Validate(Warrior(), peckOnly, plain), PreEquipStatus.CannotForage));
 
-            var sigOnly = Reg(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Signature));
+            var sigOnly = Reg(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Signature));
             Assert.IsFalse(Has(PreEquippedLoadout.Validate(Warrior(), sigOnly, plain), PreEquipStatus.CannotForage),
                 "An empty Peck slot falls back to the plain Peck at runtime.");
 
@@ -328,8 +328,8 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_SameAbilityInBothSlots_IsAnError_AndResolveKeepsItInThePeckSlotOnly()
         {
-            var headbutt = Claim(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
-                                 ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var headbutt = Claim(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck),
+                                 ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             var issue = PreEquippedLoadout.Validate(Warrior(), Reg(headbutt), Peck())
                 .Single(i => i.Status == PreEquipStatus.SameAbilityInBothSlots);
             Assert.AreEqual(PreEquipSeverity.Error, issue.Severity);
@@ -342,7 +342,7 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_SameAbilityForDifferentSubclassesInDifferentColumns_IsNotFlagged()
         {
-            var headbutt = Claim(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck),
+            var headbutt = Claim(Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck),
                                  ChickenSubclass.Warrior_Bully, Slot.Signature);
             Assert.IsFalse(Has(PreEquippedLoadout.Validate(Warrior(), Reg(headbutt), Peck()), PreEquipStatus.SameAbilityInBothSlots));
         }
@@ -350,7 +350,7 @@ namespace CluckWars.Tests
         [Test]
         public void Validate_PeckInTheSignatureColumn_IsAnError_AndResolveIgnoresIt()
         {
-            var peckSig = Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Signature);
+            var peckSig = Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Signature);
             var issues = PreEquippedLoadout.Validate(Warrior(), Reg(peckSig), Peck());
             var illegal = issues.Single(i => i.Status == PreEquipStatus.IllegalSignature);
             Assert.AreEqual(PreEquipSeverity.Error, illegal.Severity);
@@ -421,10 +421,10 @@ namespace CluckWars.Tests
             Assert.IsTrue(PreEquippedLoadout.Forages(ChickenClass.Warrior, Warrior(), Reg(), plain),
                 "An empty Peck slot on a forager falls back to the plain Peck, so it forages.");
 
-            var variant = Claim(Peck(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
+            var variant = Claim(Peck(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
             Assert.IsTrue(PreEquippedLoadout.Forages(ChickenClass.Warrior, Warrior(), Reg(variant), plain));
 
-            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
+            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
             Assert.IsFalse(PreEquippedLoadout.Forages(ChickenClass.Warrior, Warrior(), Reg(headbutt), plain),
                 "A deliberate non-Peck in the Peck slot means no forced Peck.");
 
@@ -450,7 +450,7 @@ namespace CluckWars.Tests
         public void ClassForages_IsTrueWhenAnySpecializationOfTheClassForages()
         {
             var plain = Peck();
-            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Relentless, Slot.Peck);
+            var headbutt = Claim(Make<HeadbuttAbilitySO>(), ChickenSubclass.Warrior_Enforcer, Slot.Peck);
             var relentless = Warrior();                                   // Peck slot = Headbutt: does not forage
             var bully = Warrior(ChickenSubclass.Warrior_Bully);                   // empty Peck slot: falls back, forages
             var passives = new PassiveAbilitySO[] { relentless, bully };
@@ -478,7 +478,7 @@ namespace CluckWars.Tests
             var issues = PreEquippedLoadout.ValidateRoster(new PassiveAbilitySO[] { Warrior() }, Reg());
             var noAsset = issues.Where(i => i.Status == PreEquipStatus.SubclassHasNoAsset).Select(i => i.Subclass).ToList();
             CollectionAssert.DoesNotContain(noAsset, ChickenSubclass.None);
-            CollectionAssert.DoesNotContain(noAsset, ChickenSubclass.Warrior_Relentless);
+            CollectionAssert.DoesNotContain(noAsset, ChickenSubclass.Warrior_Enforcer);
             Assert.AreEqual(System.Enum.GetValues(typeof(ChickenSubclass)).Length - 2, noAsset.Count);
         }
 

@@ -81,8 +81,10 @@ ability.spinecoat.desc,"For {secs}s, any rival who bumps into you loses {n} food
 ability.turtlemode.desc,"Walk slowly for {walk}s (slows can't stop you), then turn into an egg for {egg}s: nothing can touch you. Press again to come out early."
 perk.relentless.line,Your stuns and slows last {out}% longer.
 perk.relentless.detail,"Your stuns and slows last {out}% longer. Stuns, getting stuck and timed slows on you end {in}% sooner."
-perk.bully.line,Moves recharge {pct}% faster.
-perk.bully.detail,Applies to every move except Peck.
+perk.bully.line,"Moves recharge {pct}% faster, except Peck, which is {peck}% slower. A stun takes {stun} food, a shove {shove}."
+perk.bully.detail,"Moves recharge {pct}% faster, except Peck, which is {peck}% slower. A stun that lands takes {stun} food from that rival, a shove that moves it takes {shove}. The same rival can only be hit for food every {lock} seconds."
+perk.enforcer.line,Hit a bird and it owes you. Each debt makes your Steal take {steal} more food.
+perk.enforcer.detail,"Every stun or shove that lands makes that bird owe you one debt. Hit a bird that is pecking, or pecked food up in the last {fresh} seconds, and it owes one more. Each debt makes your Steal take {steal} more food, up to {cap} debts. Debts go away after {secs} seconds with no new one. Your Peck is {peck}% slower."
 perk.thief.line,Rob the bird with your loot bag for {bounty} extra food. {prize} extra food if time runs out. Carry {cap} food.
 perk.thief.detail,"One rival carries your loot bag, and only you and that bird can see it. Rob that bird: you grab the food it holds, and {bounty} new food drops into your beak, as far as it fits. A new bag shows up just before your Steal is ready again. If time runs out before anyone reaches {goal}, you get {prize} extra food at home. You carry up to {cap} food."
 perk.slippery.line,Ability slows on you are {pct}% weaker and end {pct}% sooner.

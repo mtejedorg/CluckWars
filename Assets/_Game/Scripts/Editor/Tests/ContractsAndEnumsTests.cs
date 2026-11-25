@@ -68,7 +68,7 @@ namespace CluckWars.Tests
         {
             // Passive .asset files serialise the integer, so these are append-only.
             Assert.AreEqual(0, (byte)ChickenSubclass.None);
-            Assert.AreEqual(1, (byte)ChickenSubclass.Warrior_Relentless);
+            Assert.AreEqual(1, (byte)ChickenSubclass.Warrior_Enforcer);
             Assert.AreEqual(2, (byte)ChickenSubclass.Warrior_Bully);
             Assert.AreEqual(3, (byte)ChickenSubclass.Speedy_Slippery);
             Assert.AreEqual(4, (byte)ChickenSubclass.Speedy_Featherfoot);

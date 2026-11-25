@@ -25,7 +25,7 @@ param(
     [ValidateSet('timescale','fighters')][string]$Mode = 'timescale',
     [double]$Scale = 1,
     [int]$Seed = 20261121,
-    [string]$Perk = 'Warrior_Relentless',
+    [string]$Perk = 'Warrior_Enforcer',
     [string]$BotPerks = 'Warrior_Bully,Fatty_Hoarder,Speedy_Slippery',
     [string]$Personality = 'runner',
     [int]$Rounds = 3,

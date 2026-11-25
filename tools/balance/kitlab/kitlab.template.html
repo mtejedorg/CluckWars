@@ -548,7 +548,7 @@ function fromLocal(){try{state.kits=JSON.parse(localStorage.getItem('kitlab.kits
 var DP_PASSIVE={cdr:['CooldownMultiplier',function(v){return 1-v/100;}],steal:['StealMultiplier',function(v){return 1+v/100;}],
   cc:['DurationMultiplier',function(v){return v/100;}],slowIn:['Resist',function(v){return v/100;}],kb:['KnockbackMultiplier',function(v){return v/100;}],
   bank:['DepositRateMultiplier',function(v){return v/100;}],ccOut:['OutgoingDurationMultiplier',function(v){return v/100;}]};
-var DP_DENY={AllowedClasses:1,PeckSlotPreEquippedBy:1,SignaturePreEquippedBy:1,Category:1,BotRole:1,AccentKey:1,TerrainTraversal:1,JumpTier:1,CastMotion:1,Retired:1,Subclass:1,MaxPlayers:1,TargetingMode:1,LoadoutMode:1};
+var DP_DENY={AllowedClasses:1,PeckSlotPreEquippedBy:1,SignaturePreEquippedBy:1,Category:1,BotRole:1,AccentKey:1,TerrainTraversal:1,JumpTier:1,CastMotion:1,Retired:1,Subclass:1,FreshBiteShare:1,MaxPlayers:1,TargetingMode:1,LoadoutMode:1};
 function r4(v){return Math.round(v*10000)/10000;}
 function buildDelta(){
   var assets={},kits={},build=[],issues=[],count=0;

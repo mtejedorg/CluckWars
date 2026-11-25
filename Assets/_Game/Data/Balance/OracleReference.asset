@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: OracleReference
   m_EditorClassIdentifier: 
   AcceptedOn: 2026-11-25
-  Note: Warrior 10.8 speed, cargo 20, Peck 0.71/0.4 (2026-11-25)
+  Note: 'G7: the Enforcer replaces Relentless, the Bully''s kit and Peck x1.4 (BL-226)'
   MapFingerprint: be5e5449aca95e44
   Origin: 1
   Entries:
@@ -29,11 +29,11 @@ MonoBehaviour:
   - Label: Fatty_Bulwark
     BestSeconds: 20.022224
     OffsetSeconds: 0
-  - Label: Warrior_Relentless
-    BestSeconds: 21.49723
-    OffsetSeconds: 5
+  - Label: Warrior_Enforcer
+    BestSeconds: 57.18756
+    OffsetSeconds: 0
   - Label: Warrior_Bully
-    BestSeconds: 48.64871
+    BestSeconds: 56.25006
     OffsetSeconds: 5
   KillTargets:
   - Kills: 4

@@ -71,7 +71,7 @@ namespace CluckWars.Tests
             // granted a third ability slot that every class now has.
             var expected = new Dictionary<ChickenClass, string>
             {
-                { ChickenClass.Warrior,  "Relentless" },
+                { ChickenClass.Warrior,  "Enforcer" },   // took Relentless's seat and its IsSignature, 2026-11-25
                 { ChickenClass.Speedy,   "Slippery" },
                 { ChickenClass.Fatty,    "Hoarder" },
                 { ChickenClass.Assassin, "Spoiler" },
@@ -1299,7 +1299,8 @@ namespace CluckWars.Tests
         public void EveryPassive_HasAUniqueSubclassMatchingItsClass()
         {
             var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
-            var identityIssues = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities)
+            // A retired passive (Relentless, parked 2026-11-25) keeps its old Subclass value and is read by nobody: it is out of the roster.
+            var identityIssues = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>().Where(p => !p.Retired), abilities)
                 .Where(i => i.Status == PreEquipStatus.MissingSubclassId
                          || i.Status == PreEquipStatus.SubclassClassMismatch
                          || i.Status == PreEquipStatus.DuplicateSubclass
@@ -1326,7 +1327,7 @@ namespace CluckWars.Tests
             // Scrap and Sneaky Steal -> Steal (Snatch), Ground Quake -> Stun (WingSlam). Free mode only.
             var expected = new (ChickenSubclass sub, string peck, string sig)[]
             {
-                (ChickenSubclass.Warrior_Relentless,  "Peck",     "CluckShock"),
+                (ChickenSubclass.Warrior_Enforcer,  "Peck",     "CluckShock"),
                 (ChickenSubclass.Warrior_Bully,       "Peck",     "Snatch"),
                 (ChickenSubclass.Speedy_Slippery,    "Peck",     "-"),
                 (ChickenSubclass.Speedy_Featherfoot, "Peck",     "-"),
@@ -1338,7 +1339,7 @@ namespace CluckWars.Tests
 
             foreach (var (sub, peck, sig) in expected)
             {
-                var passive = abilities.OfType<PassiveAbilitySO>().Single(p => p.Subclass == sub);
+                var passive = abilities.OfType<PassiveAbilitySO>().Single(p => p.Subclass == sub && !p.Retired);
                 PreEquippedLoadout.TryGetSingleClass(passive.AllowedClasses, out var cls);
                 PreEquippedLoadout.Resolve(cls, passive, abilities, plainPeck, out var peckSlot, out var signature);
                 Assert.AreEqual(peck, peckSlot != null ? peckSlot.name : "-", $"{sub} Peck slot");
@@ -1425,7 +1426,7 @@ namespace CluckWars.Tests
         public void ShippedRoster_HasNoPreEquipErrors()
         {
             var abilities = TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.AbilitiesDir);
-            var errors = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>(), abilities,
+            var errors = PreEquippedLoadout.ValidateRoster(abilities.OfType<PassiveAbilitySO>().Where(p => !p.Retired), abilities,
                     abilities.OfType<PeckAbilitySO>().FirstOrDefault())
                 .Where(i => i.Severity == PreEquipSeverity.Error).Select(i => i.Message).ToList();
             Assert.IsEmpty(errors, string.Join(System.Environment.NewLine, errors));

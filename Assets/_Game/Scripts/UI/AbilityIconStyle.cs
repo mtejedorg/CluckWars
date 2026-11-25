@@ -63,7 +63,7 @@ namespace CluckWars.UI
             { "HoarderPassiveSO",     "cw-hex-icon--hoarder" },
             { "BulwarkPassiveSO",     "cw-hex-icon--bulwark" },
             { "RelentlessPassiveSO",  "cw-hex-icon--relentless" },
-            { "EnforcerPassiveSO","cw-hex-icon--enforcer" },   // simulator-only kit; shares Relentless's art until the game slice
+            { "EnforcerPassiveSO","cw-hex-icon--enforcer" },   // the Warrior's default kit since 2026-11-25; still shares Relentless's art until the icon slice (G9e)
             { "BullyPassiveSO",       "cw-hex-icon--bully" },
             { "SpoilerPassiveSO",     "cw-hex-icon--spoiler" },
             { "ThiefPassiveSO",       "cw-hex-icon--thief" },

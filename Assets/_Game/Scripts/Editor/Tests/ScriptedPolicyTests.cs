@@ -471,7 +471,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(-1, Think(view).PeckPile, "an active hit-steal on a held Stun pays: it chases a loaded rival");
         }
 
-        // A Enforcer with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
+        // An Enforcer with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
         private static MatchKit Enforcer(float peckCooldown = 0.71f, BotProfile? profile = null)
         {
             var stun = Make(MatchTestKit.Stun(5f, 1.3f, 7f), BotRole.Control, 5f, true);
