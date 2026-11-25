@@ -74,6 +74,7 @@ namespace CluckWars.Balance
         private Vector2 _home;
         private float _speed, _dep, _capacity, _all, _tHome;
         private int _cast;
+        private int _break;
         private Vector2[] _baseCentres;
         private readonly bool[] _ok = new bool[Seats];
         private readonly float[] _dist = new float[Seats];
@@ -97,6 +98,7 @@ namespace CluckWars.Balance
             _kit = v.Kits[_seat];
             _ab = _kit.Abilities ?? Array.Empty<MatchAbility>();
             _cast = -1;
+            _break = -1;
             _home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
             _speed = Mathf.Max(0.1f, _kit.Farm.MoveSpeed);
             _dep = Mathf.Max(0.5f, _kit.Farm.DepositRate);
@@ -148,11 +150,20 @@ namespace CluckWars.Balance
             }
             _lastVictim = -1;
 
+            // The Bully's hit-steal: walk to the rival whose hit pays best per second, when that beats the farm.
+            if (BestHit(v, ref rng, out int hitVictim, out float hitRate, out Vector2 hitGoal) && hitRate > farmRate)
+            {
+                HitForFood(v);
+                bool inReach = _cast >= 0 || Vector2.Distance(_me.Pos, hitGoal) <= HitReach() * BotTactics.CommitReachFraction;
+                if (!inReach) SprintTo(v, hitGoal);
+                return Finish(inReach ? _me.Pos : Reach(_me.Pos, hitGoal, arrival), -1);
+            }
+
             if (pile >= 0)
             {
                 _target = pile;
-                // A free hit on a rival in mid-Peck beside me costs nothing, so long as it does not cost my own Peck.
-                PeckCut(v);
+                // A free hit on a rival in mid-Peck beside me costs nothing, so long as it does not cost my own Peck. A hit that takes food comes first.
+                if (!HitForFood(v)) PeckCut(v);
                 SprintTo(v, PlaceOf(v, pile).Pos);
                 return Finish(PlaceOf(v, pile).Pos, pile);
             }
@@ -237,7 +248,7 @@ namespace CluckWars.Balance
         // ---- intents ----
 
         private MatchIntent Finish(Vector2 goal, int pile) =>
-            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1 };
+            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1, Break = _break >= 0, BreakTarget = _break };
 
         // The bot counts as arrived inside its arrival radius: stand where it is instead of walking to the exact point.
         private static Vector2 Reach(Vector2 from, Vector2 to, float arrival) =>
@@ -355,12 +366,128 @@ namespace CluckWars.Balance
         private void PeckCut(MatchView v)
         {
             if (_cast >= 0 || _me.Stunned || _me.Pecking) return;
+            if (BreakFor(v)) return;
             for (int r = 0; r < Seats; r++)
             {
                 if (!_ok[r] || !v.Seats[r].Pecking || v.Seats[r].Hidden || v.Seats[r].Shelled) continue;
                 if (!v.Kits[r].Farm.Forages) continue;
                 if (CastOn(v, r, AbilityJob.Shove, false) || CastOn(v, r, AbilityJob.Stun, true)) return;
             }
+        }
+
+        // The Trophy Hunter's break: the press is either a break or a pile Peck, so it is made when what it gains (the bite, the bite the rival does
+        // not get, and the trophy's room while a trophy is still to win) is more than the Peck the press would have been.
+        private bool BreakFor(MatchView v)
+        {
+            var facts = _kit.Passive.Break;
+            if (!facts.Active || _me.BreakLeft > Eps) return false;
+            var trophy = _kit.Passive.Trophy;
+            float reaction = float.IsNaN(_p.ReactionDelay) ? 0f : Mathf.Max(0f, _p.ReactionDelay);
+            float reach = facts.Reach * BotTactics.CommitReachFraction;
+            float free = Mathf.Max(0f, _capacity - _me.Cargo);
+            int best = -1;
+            float bestValue = 0f;
+            for (int r = 0; r < Seats; r++)
+            {
+                var rival = v.Seats[r];
+                if (!_ok[r] || rival.Hidden || rival.Shelled) continue;
+                bool walled = MatchCombat.KeepOutBlocks(_me.Pos, rival.Pos, BaseCentres(v), v.Rules.KeepOutRadius);
+                if (!BotBreakRules.Candidate(rival.Pecking, rival.PeckCastLeft, _dist[r], reach, walled, rival.BreakImmuneLeft > 0f, reaction)) continue;
+                float bite = v.Kits[r].Farm.PeckAmount;
+                float value = PeckBreakRules.Bite(bite, bite, free) + bite + (_me.Trophies < trophy.Cap ? trophy.Room : 0);
+                if (value > bestValue) { bestValue = value; best = r; }
+            }
+            if (best < 0 || bestValue <= v.OwnPileBite(_seat)) return false;
+            _break = best;
+            return true;
+        }
+
+        // ---- the Bully's hit-steal ----
+
+        // The longest reach of a hitter of the kit.
+        private float HitReach()
+        {
+            float reach = 0f;
+            var facts = _kit.Passive.HitSteal;
+            foreach (var a in _ab)
+                if ((a.Job == AbilityJob.Stun || a.Job == AbilityJob.Shove) && facts.AmountFor(a.Job) > 0f && a.Radius > reach) reach = a.Radius;
+            return reach;
+        }
+
+        // What one cast of a ready hitter would take over the rivals it reaches (each held to the room left), and the cast to make: the larger gain,
+        // the shorter cooldown on a tie. A free overlay, so it never moves the chicken.
+        private bool HitForFood(MatchView v)
+        {
+            var facts = _kit.Passive.HitSteal;
+            if (!facts.Active || _cast >= 0 || _me.Stunned) return false;
+            int stun = -1, shove = -1;
+            float stunGain = 0f, shoveGain = 0f;
+            for (int s = 0; s < _ab.Length; s++)
+            {
+                var a = _ab[s];
+                if ((a.Job != AbilityJob.Stun && a.Job != AbilityJob.Shove) || !Ready(s)) continue;
+                float amount = facts.AmountFor(a.Job);
+                if (amount <= 0f) continue;
+                float left = Mathf.Max(0f, _capacity - _me.Cargo);
+                float total = 0f;
+                for (int r = 0; r < Seats; r++)
+                {
+                    if (!_ok[r] || v.Seats[r].Shelled || v.Seats[r].Hidden || !Hits(v, r, a.Radius * BotTactics.CommitReachFraction)) continue;
+                    float gain = BotHitStealRules.Gain(amount, StealRules.Stealable(v.Seats[r].Cargo), left, _me.LockLeftOn(r) > Eps);
+                    left -= gain;
+                    total += gain;
+                }
+                if (a.Job == AbilityJob.Stun) { stun = s; stunGain = total; } else { shove = s; shoveGain = total; }
+            }
+            if (!BotHitStealRules.CastForFood(Mathf.Max(stunGain, shoveGain))) return false;
+            int pick = BotHitStealRules.PickHitter(stunGain, shoveGain,
+                stun >= 0 ? _ab[stun].Cooldown : float.MaxValue, shove >= 0 ? _ab[shove].Cooldown : float.MaxValue);
+            if (pick == BotHitStealRules.Stun) _cast = stun;
+            else if (pick == BotHitStealRules.Shove) _cast = shove;
+            return _cast >= 0;
+        }
+
+        // The rival whose hit pays best per second: its food over the seconds to get in reach (or for the hitter to be ready), walk it home and bank it.
+        private bool BestHit(MatchView v, ref MatchRng rng, out int victim, out float rate, out Vector2 goal)
+        {
+            victim = -1;
+            rate = 0f;
+            goal = _me.Pos;
+            var facts = _kit.Passive.HitSteal;
+            if (!facts.Active || _me.Stunned) return false;
+            float free = Mathf.Max(0f, _capacity - _me.Cargo);
+            float winTarget = Mathf.Max(1f, v.Rules.Farm.WinTarget);
+            for (int r = 0; r < Seats; r++)
+            {
+                _score[r] = float.NegativeInfinity;
+                _value[r] = 0f;
+                if (!_ok[r] || v.Seats[r].Shelled) continue;
+                float best = 0f;
+                for (int s = 0; s < _ab.Length; s++)
+                {
+                    var a = _ab[s];
+                    float amount = (a.Job == AbilityJob.Stun || a.Job == AbilityJob.Shove) ? facts.AmountFor(a.Job) : 0f;
+                    if (amount <= 0f) continue;
+                    float gain = BotHitStealRules.Gain(amount, StealRules.Stealable(v.Seats[r].Cargo), free, false);
+                    if (!BotHitStealRules.CastForFood(gain)) continue;
+                    float wait = Mathf.Max(_me.CooldownLeft[1 + s], Mathf.Max(0f, _dist[r] - a.Radius * BotTactics.CommitReachFraction) / _speed);
+                    wait = Mathf.Max(wait, _me.LockLeftOn(r));   // a locked rival gives nothing until the lock ends
+                    float homeAfter = Mathf.Max(0f, Vector2.Distance(v.Seats[r].Pos, _home) - v.Map.BaseRadius) / _speed;
+                    float carried = _all + gain;
+                    float seconds = wait + homeAfter + carried / _dep;
+                    if (seconds > v.TimeLeft) continue;
+                    float lead = Mathf.Clamp01((v.Seats[r].Banked + v.Seats[r].Cargo) / winTarget);
+                    best = Mathf.Max(best, carried / Mathf.Max(Eps, seconds) * (1f + DenyWeight * lead));
+                }
+                if (best <= 0f) continue;
+                _value[r] = best;
+                _score[r] = best;
+            }
+            victim = PickBest(_score, Seats, ref rng);
+            if (victim < 0) return false;
+            rate = _value[victim];
+            goal = v.Seats[victim].Pos;
+            return true;
         }
 
         private void SprintTo(MatchView v, Vector2 goal)

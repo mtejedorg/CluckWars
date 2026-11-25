@@ -105,6 +105,9 @@ namespace CluckWars.Balance
         public float BreakLeft;
         /// <summary>Seconds each rival stays locked against this seat's hit-steal, by rival seat. Meaningful for the policy's own seat.</summary>
         public float[] HitLockLeft;
+
+        /// <summary>Seconds <paramref name="rival"/> stays locked against this seat's hit-steal (0 when nothing is known about it).</summary>
+        public float LockLeftOn(int rival) => HitLockLeft != null && rival >= 0 && rival < HitLockLeft.Length ? HitLockLeft[rival] : 0f;
     }
 
     /// <summary>The snapshot a policy thinks on. One instance per match, refreshed every tick; a policy must not keep it.</summary>
@@ -124,6 +127,26 @@ namespace CluckWars.Balance
         public OracleMapSO Map;
         public OracleNav Nav;
         public MatchRules Rules;
+
+        /// <summary>
+        /// The food the seat's own Peck would take if it pressed one now: 0 unless it may start one (ready, not stunned, room left) at a pile with
+        /// food inside its reach. The break rules ask it: a press is either a break or a pile Peck.
+        /// </summary>
+        public float OwnPileBite(int seat)
+        {
+            var me = Seats[seat];
+            float free = me.Capacity - me.Cargo;
+            if (me.Stunned || me.Pecking || free <= 0f || me.CooldownLeft == null || me.CooldownLeft[0] > 1e-4f) return 0f;
+            float bite = Kits[seat].Farm.PeckAmount;
+            for (int p = 0; p < OracleMapSO.PileCount; p++)
+                if (PileFood[p] > 1e-4f && MatchGeometry.InReach(Map, p, me.Pos)) return Mathf.Min(bite, Mathf.Min(free, PileFood[p]));
+            if (GoldenActive && GoldenFood > 1e-4f)
+            {
+                var golden = new OraclePlace { Kind = OraclePlaceKind.Centre, Seat = -1, Pos = GoldenPos, Footprint = Map.GoldenFootprint, Yaw = 0f };
+                if (MatchGeometry.InReach(Map, golden, me.Pos)) return Mathf.Min(bite, Mathf.Min(free, GoldenFood));
+            }
+            return 0f;
+        }
     }
 
     public interface IMatchPolicy

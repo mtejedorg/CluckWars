@@ -364,5 +364,46 @@ namespace CluckWars.Tests
                 CollectionAssert.AreEqual(a.Results[i].Banked, b.Results[i].Banked, $"cell {i}");
             }
         }
+
+        [Test]
+        public void P1_BreaksOnlyWhenTheValueBeatsItsOwnPeck()
+        {
+            // The press is a break or a pile Peck. Value of a break: the bite, the bite the rival does not get, and the trophy's room while one is to win.
+            MatchKit Hunter(float peckAmount)
+            {
+                var kit = MatchTestKit.Fighter("hunter", 6f, new MatchAbility[0], peckAmount: peckAmount, capacity: 20);
+                kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
+                kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+                return kit;
+            }
+            MatchView Scene(float myPeck, float rivalBite)
+            {
+                var view = View(Four(Hunter(myPeck), MatchTestKit.Fighter("rival", 6f, new MatchAbility[0], peckAmount: rivalBite, capacity: 20)));
+                view.PileFood[OracleMapSO.CentreIndex] = 10f;
+                view.Seats[0].Pos = Vector2.zero;                    // inside the centre pile's reach
+                view.Seats[1].Pos = new Vector2(2f, 0f);
+                view.Seats[1].Pecking = true;
+                view.Seats[1].PeckCastLeft = 0.5f;
+                return view;
+            }
+
+            var intent = Think(Scene(3f, 6f));
+            Assert.IsTrue(intent.Break, "6 + 6 + 2 of value against a Peck of 3");
+            Assert.AreEqual(1, intent.BreakTarget);
+            Assert.IsFalse(Think(Scene(10f, 1f)).Break, "1 + 1 + 2 of value against a Peck of 10: it pecks");
+
+            var capped = Scene(10f, 4f);
+            capped.Seats[0].Trophies = 3;
+            Assert.IsFalse(Think(capped).Break, "4 + 4 against 10, and no trophy left to win");
+
+            var notReady = Scene(3f, 6f);
+            notReady.Seats[0].BreakLeft = 1f;
+            Assert.IsFalse(Think(notReady).Break, "the break is not ready");
+
+            var walled = Scene(3f, 6f);
+            walled.Seats[1].BreakImmuneLeft = 1f;
+            Assert.IsFalse(Think(walled).Break, "the rival was just broken");
+        }
+
     }
 }
