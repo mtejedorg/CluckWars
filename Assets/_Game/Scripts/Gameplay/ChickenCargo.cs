@@ -649,7 +649,11 @@ namespace CluckWars.Gameplay
             var settled = _requests.SettlePeck(pileId, requestId, amount, MaxPeck, Capacity, Cargo, Time.unscaledTime);
             if (settled.Credited <= 0f && settled.Overflow <= 0f) return;   // the pile was emptied first, or it refused: a legal no-op
 
-            if (settled.ToCargo > 0f) Cargo += settled.ToCargo;
+            if (settled.ToCargo > 0f)
+            {
+                Cargo += settled.ToCargo;
+                _controller.Abilities?.NotePeckFed();   // food landed: the "just landed" fresh state opens (a landing that took 0 opens none)
+            }
             WarnOverflow("a peck", settled.Overflow);
             if (settled.Outcome == SettleOutcome.Late) WarnLateSettle(nameof(RPC_SettlePeck), info, pile.name, requestId, settled.Credited);
             else if (_log != null && _log.IsEnabled(Logging.LogLevel.Verbose))

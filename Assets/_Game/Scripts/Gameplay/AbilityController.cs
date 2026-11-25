@@ -102,6 +102,83 @@ namespace CluckWars.Gameplay
         [Networked] public byte PeckLandedEventId { get; private set; }
         internal void NotePeckLanded() { if (HasStateAuthority) PeckLandedEventId++; }
 
+        // ---- The Peck's fresh state (design 2026-11-25, 16.2; BL-226) ----
+        // A rival is "fresh" to an Enforcer while its Peck casts and for FreshSeconds after a Peck that landed food. The window is the HITTER's number,
+        // so the state is a tick stamp plus state ids, not a TickTimer on the pecker (ARCH-NET-15 exception, recorded by the librarian).
+
+        /// <summary>The tick (<c>Runner.Tick.Raw</c>) of this chicken's last Peck that landed food; 0 with none this round. Written by <see cref="NotePeckFed"/>, authority only.</summary>
+        [Networked] public int FedTick { get; private set; }
+        /// <summary>The fresh state id that landing opened: it is the "just landed" state while it equals <see cref="FreshStateId"/> (a newer cast ends it).</summary>
+        [Networked] public byte FedStateId { get; private set; }
+        /// <summary>Bumped at every Peck cast start and at every fed landing: each is a new, unbitten fresh state. Byte counters wrap and are never reset (ARCH-EVT-02).</summary>
+        [Networked] public byte FreshStateId { get; private set; }
+        /// <summary>The fresh state an Enforcer has already hit (<see cref="RPC_MarkBitten"/>): the state is spent while this equals <see cref="FreshStateId"/>.</summary>
+        [Networked] public byte BittenStateId { get; private set; }
+
+        /// <summary>The Peck slot is running now (a replicated read, so every peer sees it).</summary>
+        public bool IsPeckCasting
+        {
+            get
+            {
+                int slot = FindPeckSlot();
+                return slot != InvalidSlot && IsSlotActive(slot);
+            }
+        }
+
+        /// <summary>Seconds left on the running Peck cast; 0 when none runs.</summary>
+        public float PeckCastLeft
+        {
+            get
+            {
+                int slot = FindPeckSlot();
+                if (slot == InvalidSlot || !IsSlotActive(slot) || Runner == null) return 0f;
+                return GetActiveTimer(slot).RemainingTime(Runner) ?? 0f;
+            }
+        }
+
+        /// <summary>Seconds since the last Peck that landed food; infinity with none (or before the runner exists).</summary>
+        public float SecondsSinceFed =>
+            FedTick == 0 || Runner == null ? float.PositiveInfinity : Mathf.Max(0f, (Runner.Tick.Raw - FedTick) * Runner.DeltaTime);
+
+        /// <summary>The current fresh state has already been hit by an Enforcer.</summary>
+        public bool FreshBitten => BittenStateId == FreshStateId;
+
+        /// <summary>A Peck cast just started: a new fresh state opens. Authority only (it runs inside the cast).</summary>
+        internal void NoteFreshStart() { if (HasStateAuthority) FreshStateId++; }
+
+        /// <summary>A Peck landed food in the cargo (<c>ChickenCargo.RPC_SettlePeck</c>, only when something was credited): a new fresh state opens as "just landed". Authority only.</summary>
+        internal void NotePeckFed()
+        {
+            if (!HasStateAuthority || Runner == null) return;
+            FreshStateId++;
+            FedStateId = FreshStateId;
+            FedTick = Runner.Tick.Raw;
+        }
+
+        /// <summary>Is this chicken fresh to a hitter whose window is <paramref name="freshSeconds"/>, on this peer's view of it. The one composition of <see cref="BiteRules.Fresh"/>.</summary>
+        public bool IsFreshFor(float freshSeconds) =>
+            BiteRules.Fresh(IsPeckCasting, SecondsSinceFed, BiteRules.LandedWithFood(FedTick, FedStateId, FreshStateId), BittenStateId == FreshStateId, freshSeconds);
+
+        private static readonly RpcRejectionLimiter BiteRejectionLimiter = new RpcRejectionLimiter();
+
+        /// <summary>
+        /// An Enforcer's hit spent fresh state <paramref name="stateId"/> of this chicken. Sent by the hitter's authority; honoured only from a sender that
+        /// speaks for an Enforcer (ARCH-NET-03) and only while the id is still the current state, so a late claim cannot spend a newer one.
+        /// A fresh hit moves no food, so a wrong or late claim costs nothing but a debt that was already granted.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_MarkBitten(byte stateId, NetworkBehaviourId hitterId, RpcInfo info = default)
+        {
+            if (Runner == null || !Runner.TryFindBehaviour(hitterId, out ChickenController hitter) || hitter == _controller ||
+                !RpcClaim.SenderSpeaksFor(hitter, info) || hitter.Passive == null || !hitter.Passive.Debt.IsEnforcer)
+            {
+                if (BiteRejectionLimiter.Allow(info.Source, out string held))
+                    _log?.Warn(Source, $"{name}: rejected RPC_MarkBitten from {info.Source} - {hitterId} is not an Enforcer it speaks for." + held);
+                return;
+            }
+            if (stateId == FreshStateId) BittenStateId = stateId;
+        }
+
         /// <summary>Bumped by the state authority when a running Peck cast is CUT by something done to the chicken (a stun, a shove, an
         /// emptied pile, an execution): never when the cast completes (that is <see cref="PeckLandedEventId"/>), never when the chicken ends
         /// it with its own next move (a handoff the player chose). One-shot, wraps at 255; peers observe it through ChickenLocalEvents (BL-213).</summary>
@@ -1425,6 +1502,7 @@ namespace CluckWars.Gameplay
             for (int slot = 0; slot < SlotCount; slot++) SetCooldown(slot, TickTimer.None);
             CancelCharge();   // also drops the pending hold, so a held ability cannot fire in the next round
             if (PeckChainActive) PeckChainActive = false;
+            FedTick = 0;   // a landing of the last round is not "just landed" in this one; the byte ids are never reset (ARCH-EVT-02)
         }
 
         /// <summary>An executed chicken: every running slot ends through its own OnDeactivate and any aim / peck chain is

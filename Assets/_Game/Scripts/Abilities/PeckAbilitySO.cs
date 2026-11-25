@@ -102,6 +102,7 @@ namespace CluckWars.Abilities
             // Root the chicken for the whole cast. Cleared in OnDeactivate, which AbilityController calls on natural
             // end AND on every early teardown, so the lock cannot outlive the cast. No food is asked yet.
             chicken.Effects.SetMovementLock(ctx.Slot);
+            chicken.Abilities.NoteFreshStart();   // a new cast is a new, unbitten fresh state for an Enforcer's hit
         }
 
         public override void OnDeactivate(AbilityContext ctx)

@@ -27,6 +27,13 @@ namespace CluckWars.Gameplay
         public static bool Fresh(bool casting, float sinceLanded, bool landedWithFood, bool bitten, float freshSeconds) =>
             freshSeconds > 0f && !bitten && (casting || (landedWithFood && sinceLanded <= freshSeconds));
 
+        /// <summary>
+        /// The replicated "just landed" state is still the current one: a Peck landed food (<paramref name="fedTick"/> not 0) and no cast started and
+        /// no newer landing opened since (<paramref name="fedStateId"/> still equals <paramref name="freshStateId"/>).
+        /// </summary>
+        public static bool LandedWithFood(int fedTick, byte fedStateId, byte freshStateId) =>
+            fedTick != 0 && fedStateId == freshStateId;
+
         /// <summary>The bite from a casting rival's pile: the rival's own Peck amount, held to the food in the pile and to the Enforcer's free room.</summary>
         public static float FromCast(float victimPeckAmount, float pileFood, float freeRoom)
         {

@@ -17,6 +17,16 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void LandedWithFood_OnlyForTheCurrentState()
+        {
+            Assert.IsTrue(BiteRules.LandedWithFood(120, 5, 5), "the landing's state is still the current one");
+            Assert.IsFalse(BiteRules.LandedWithFood(120, 5, 6), "a newer cast started: the landing's state is over");
+            Assert.IsFalse(BiteRules.LandedWithFood(0, 5, 5), "no landing this round (the stamp is 0), whatever the ids say");
+            Assert.IsFalse(BiteRules.LandedWithFood(0, 0, 0), "a fresh chicken has landed nothing");
+            Assert.IsTrue(BiteRules.LandedWithFood(7, 0, 0), "a byte id of 0 is a state like any other once a landing is stamped");
+        }
+
+        [Test]
         public void Fresh_FreshSecondsZero_IsNeverFresh_EvenMidCast()
         {
             Assert.IsFalse(BiteRules.Fresh(true, 0f, true, false, 0f));
