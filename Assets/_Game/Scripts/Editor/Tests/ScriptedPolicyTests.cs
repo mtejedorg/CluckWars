@@ -387,7 +387,11 @@ namespace CluckWars.Tests
             // And the game's bot calls the same ones (BL-217 slice A): P0 mirrors the bot's priority list, so a drift is a bot that no longer plays what P0 measures.
             string bot = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Gameplay/BotController.cs"));
             foreach (var call in new[] { "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(",
-                "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(" })
+                "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(",
+                // The Warrior kits (BL-226 G6): the bot decides the Bully's hits and the Enforcer's debts with the functions P0 calls.
+                "BotHitStealRules.Gain(", "BotHitStealRules.CastForFood(", "BotHitStealRules.PickHitter(", "BotHitStealRules.WorthHunting(",
+                "BotEnforcerRules.FreshLeft(", "BotEnforcerRules.HitFresh(", "BotEnforcerRules.PickBuilder(", "BotEnforcerRules.Cash(", "BotEnforcerRules.StealGain(",
+                "BotEnforcerRules.Fight(" })
                 StringAssert.Contains(call, bot, "the game's bot must call the decision P0 calls.");
             StringAssert.DoesNotContain("BotSightRules", source, "Sight goes through MatchSight, the only caller of the rule.");
             StringAssert.DoesNotContain("BotBreakRules", source, "the Peck break is gone from the design.");

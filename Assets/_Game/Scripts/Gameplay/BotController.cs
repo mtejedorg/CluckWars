@@ -228,6 +228,7 @@ namespace CluckWars.Gameplay
             // that produced it, or the bot stands turning toward a rival that left.
             _pileGoal   = null;
             _faceIntent = null;
+            ReadWarriorFacts();   // before Perceive: WorthAHit and WorthAFight read them (ScriptedPolicy.Think does the same)
 
             // Resolve home BEFORE perceiving: Perceive's leading check reads _homeBase, and
             // on the very first think it would otherwise be null and report "not leading".
@@ -239,6 +240,11 @@ namespace CluckWars.Gameplay
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
             float distHome      = Planar.Distance(_controller.transform.position, homePos);
             float returnAt      = BotTactics.ReturnThreshold(_profile, _phase, _leading, _cargo != null ? _cargo.Capacity : 0f);
+
+            // Free actions of the Warrior kits under test (design 2026-11-25, section 7): a hit for food (the Bully), a builder or a cash on a rival (the Enforcer).
+            // Mirrors of ScriptedPolicy.HitForFood and EnforcerOverlay, in the same place of the think; each is silent for a kit without the facts.
+            HitForFood();
+            EnforcerOverlay();
 
             // Priority 0: BANK OR LOSE IT. Cargo in the beak scores nothing when the timer
             // expires, and on a 45 s match the window to walk home is small. This outranks
@@ -505,7 +511,7 @@ namespace CluckWars.Gameplay
         /// </summary>
         private bool TryStealInPassing(float cargo)
         {
-            if (_abilities == null || _cargo == null) return false;
+            if (_abilities == null || _cargo == null || _freeCast) return false;
 
             int slot = AbilityController.InvalidSlot;
             for (int i = 0; i < _abilities.EquippedSlotCount; i++)
@@ -586,7 +592,7 @@ namespace CluckWars.Gameplay
         /// </remarks>
         private bool TryCast(BotSituation situation, ChickenController target)
         {
-            if (_abilities == null) return false;
+            if (_abilities == null || _freeCast) return false;   // a free cast of the Warrior kits already went this think
 
             var plan = BotTactics.CastPlan(_profile.Strategy, situation,
                                            targetIsLoaded: _preyCargo > 0f && target == _preyTarget);
@@ -1005,6 +1011,233 @@ namespace CluckWars.Gameplay
             return corners[Mathf.Min(_navCorner, corners.Length - 1)];
         }
 
+        // ---- The Warrior kits under test (design 2026-11-25, section 7) ----------
+        //
+        // Mirrors of ScriptedPolicy.HitForFood, WorthAHit, WorthAFight and EnforcerOverlay, called in P0's places (the drift guard
+        // BotWarriorOrderTests pins the order). The decisions are BotHitStealRules and BotEnforcerRules, the functions P0 calls; this class only reads the facts.
+        // A rival is considered only through what the bot sees of it (BotSightRules, ARCH-DATA-15): not given up, not faded, not in a shell.
+        // The bot has no reaction delay, as P0 runs at 0 (MatchReport, "Reaction delay baseline").
+
+        private const float Eps = 1e-4f;                   // as ScriptedPolicy.Eps
+        private const float MinFightSeconds = 0.25f;       // as the literal in ScriptedPolicy.WorthAFight
+
+        private HitStealFacts _hit;
+        private BiteFacts     _bite;
+        private DebtFacts     _debt;
+        private float         _hitReach;
+        private float         _fightReach;
+        private bool          _freeCast;
+
+        /// <summary>The Enforcer's rule is on: the bite or the debt Steal has a number above 0 (with both off it plays its plain kit by the ordinary rules).</summary>
+        private bool EnforcerOn => _debt.IsEnforcer && (_bite.Active || _debt.Steal > 0f);
+
+        private void ReadWarriorFacts()
+        {
+            var passive = _abilities != null ? _abilities.Passive : null;
+            _hit  = passive != null ? passive.HitSteal : HitStealFacts.None;
+            _bite = passive != null ? passive.Bite : BiteFacts.None;
+            _debt = passive != null ? passive.Debt : DebtFacts.None;
+            _hitReach = _fightReach = 0f;   // read from the kit again every think: a loadout can change
+            _freeCast = false;
+        }
+
+        /// <summary>A rival the bot may act on now: alive, seen, not faded and not in a steal-proof shell. <paramref name="sight"/> is what the bot believes of it.</summary>
+        private bool Actionable(ChickenController rival, out RivalSighting sight)
+        {
+            sight = default;
+            if (rival == null || rival == _controller || (rival.Combat != null && rival.Combat.IsRemoved)) return false;
+            sight = Sight(rival);
+            return !sight.GivenUp && !sight.Hidden && !rival.IsStealProof;
+        }
+
+        private int SlotOfJob(AbilityJob job)
+        {
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                if (_abilities.GetSlot(slot).Is(job)) return slot;
+            return -1;
+        }
+
+        private float Room => _cargo != null ? _cargo.FreeSpace : 0f;
+
+        private static float StealableOf(ChickenController rival) => rival.Cargo != null ? rival.Cargo.Stealable : 0f;
+
+        private float LockLeftOn(ChickenController rival) => _controller.Hits != null ? _controller.Hits.LockLeftOn(rival) : 0f;
+
+        private bool Ready(int slot) => slot >= 0 && _abilities.IsReady(slot) && _abilities.GetSlot(slot).IsUsable(_controller);
+
+        // The ability would land on the rival now, at the commit fraction of its reach (range, the base wall, a Steal's food).
+        private bool CanHit(int slot, ChickenController rival, in RivalSighting sight)
+        {
+            var ab = _abilities.GetSlot(slot);
+            return Planar.Distance(_controller.transform.position, sight.Position) <= BotTactics.EffectiveReach(ab) * BotTactics.CommitReachFraction && ab.WouldAffect(_controller, rival);
+        }
+
+        private bool FreeCast(int slot, string why)
+        {
+            if (slot < 0 || !_abilities.BotTryActivate(slot)) return false;
+            _freeCast = true;
+            _log?.Debug(Source, $"{Who} cast slot {slot} ('{_abilities.GetSlot(slot).name}') {why}.");
+            return true;
+        }
+
+        /// <summary>How long <paramref name="rival"/> stays fresh to a hit (BotEnforcerRules.FreshLeft over its replicated Peck state); 0 when it is not.</summary>
+        private float FreshLeftOf(ChickenController rival)
+        {
+            var peck = rival.Abilities;
+            if (peck == null) return 0f;
+            return BotEnforcerRules.FreshLeft(peck.IsPeckCasting, peck.PeckCastLeft, peck.SecondsSinceFed,
+                BiteRules.LandedWithFood(peck.FedTick, peck.FedStateId, peck.FreshStateId), peck.FreshBitten, _bite.FreshSeconds);
+        }
+
+        // A hit that takes food: cast a ready Stun or Shove when some rival in its reach would give at least 1 (BotHitStealRules). One cast per think.
+        private void HitForFood()
+        {
+            if (!_hit.Active || _freeCast || _abilities == null || _controller.IsStunned) return;
+            var all = ChickenController.ActiveControllers;
+            int stunSlot = -1, shoveSlot = -1;
+            float stunGain = 0f, shoveGain = 0f;
+            for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+            {
+                var ab = _abilities.GetSlot(slot);
+                if (ab == null || (!ab.Is(AbilityJob.Stun) && !ab.Is(AbilityJob.Shove)) || !Ready(slot)) continue;
+                float amount = _hit.AmountFor(ab.Job);
+                if (amount <= 0f) continue;
+                float left = Mathf.Max(0f, Room);
+                float total = 0f;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var rival = all[i];
+                    if (!Actionable(rival, out var sight) || !CanHit(slot, rival, sight)) continue;
+                    float gain = BotHitStealRules.Gain(amount, StealableOf(rival), left, LockLeftOn(rival) > Eps);
+                    left -= gain;
+                    total += gain;
+                }
+                if (ab.Is(AbilityJob.Stun)) { stunSlot = slot; stunGain = total; } else { shoveSlot = slot; shoveGain = total; }
+            }
+            if (!BotHitStealRules.CastForFood(Mathf.Max(stunGain, shoveGain))) return;
+            float stunCooldown = stunSlot >= 0 ? _abilities.ResolvedCooldownFor(stunSlot) : float.MaxValue;
+            float shoveCooldown = shoveSlot >= 0 ? _abilities.ResolvedCooldownFor(shoveSlot) : float.MaxValue;
+            int pick = BotHitStealRules.PickHitter(stunGain, shoveGain, stunCooldown, shoveCooldown);
+            if (pick == BotHitStealRules.Stun) FreeCast(stunSlot, "for a hit-steal (Stun)");
+            else if (pick == BotHitStealRules.Shove) FreeCast(shoveSlot, "for a hit-steal (Shove)");
+        }
+
+        // Is a rival worth walking to for a hit: it would give at least 1 food and its lock ends before the walk does.
+        private bool WorthAHit(ChickenController rival, float dist)
+        {
+            if (_hitReach <= 0f)
+            {
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                {
+                    var ab = _abilities.GetSlot(slot);
+                    if (ab == null || (!ab.Is(AbilityJob.Stun) && !ab.Is(AbilityJob.Shove)) || _hit.AmountFor(ab.Job) <= 0f) continue;
+                    float reach = BotTactics.EffectiveReach(ab);
+                    if (!float.IsPositiveInfinity(reach) && reach > _hitReach) _hitReach = reach;
+                }
+            }
+            float gain = BotHitStealRules.Gain(Mathf.Max(_hit.Stun, _hit.Shove), StealableOf(rival), Mathf.Max(0f, Room), false);
+            float walk = Mathf.Max(0f, dist - _hitReach) / Mathf.Max(0.1f, EstimateMoveSpeed());
+            return BotHitStealRules.WorthHunting(gain, LockLeftOn(rival), walk);
+        }
+
+        // A rival worth leaving the pile for: the fight's food per second (a bite when it is still fresh on arrival, then the Steal on the debts the
+        // builder and the bite would have put on it) beats the Peck's (BotEnforcerRules.Fight).
+        private bool WorthAFight(ChickenController rival, float dist)
+        {
+            if (_fightReach <= 0f)
+            {
+                for (int slot = 0; slot < _abilities.EquippedSlotCount; slot++)
+                {
+                    var ab = _abilities.GetSlot(slot);
+                    if (ab == null || (!ab.Is(AbilityJob.Stun) && !ab.Is(AbilityJob.Shove) && !ab.Is(AbilityJob.Steal))) continue;
+                    float reach = BotTactics.EffectiveReach(ab);
+                    if (!float.IsPositiveInfinity(reach) && reach > _fightReach) _fightReach = reach;
+                }
+            }
+            float walk = Mathf.Max(0f, dist - _fightReach) / Mathf.Max(0.1f, EstimateMoveSpeed());
+            const float reaction = 0f;
+            bool fresh = BotEnforcerRules.HitFresh(FreshLeftOf(rival) - walk, reaction);
+            float room = Mathf.Max(0f, Room);
+            float rivalCargo = StealableOf(rival);
+            var peck = rival.Abilities;
+            float bite = 0f;
+            if (fresh)
+            {
+                float rivalPeck = PeckAbilitySO.AmountFor(rival) * _bite.FoodShare;
+                bite = rivalPeck <= 0f ? 0f : (peck != null && peck.IsPeckCasting) ? Mathf.Min(rivalPeck, room) : BiteRules.FromCargo(rivalPeck, room, rivalCargo);
+            }
+            int steal = SlotOfJob(AbilityJob.Steal);
+            float stealGain = 0f;
+            if (steal >= 0)
+            {
+                int count = _controller.Debts != null ? _controller.Debts.CountOn(rival) : 0;
+                if (fresh) count = Mathf.Min(_debt.Cap, count + 2);   // the builder's hit and the fresh stack
+                float left = peck != null && peck.IsPeckCasting ? rivalCargo : Mathf.Max(0f, rivalCargo - bite);
+                stealGain = BotEnforcerRules.StealGain(ResolvedStealAmount(steal), 1f, _debt.Steal, count, room - bite, left);
+            }
+            float seconds = walk + 2f * Mathf.Max(MinFightSeconds, reaction);
+            return BotEnforcerRules.Fight(bite + stealGain, seconds, PeckAbilitySO.AmountFor(_controller), PeckCycleSeconds());
+        }
+
+        // A free cast of the Enforcer, in the order of the design: a builder on a fresh rival in reach (or the Steal when no builder is ready and
+        // the rival carries), else a due cash of the debts on a rival in Steal's reach. One cast per think; it never moves the chicken.
+        private void EnforcerOverlay()
+        {
+            if (!EnforcerOn || _freeCast || _abilities == null || _controller.IsStunned) return;
+            int stun = SlotOfJob(AbilityJob.Stun), shove = SlotOfJob(AbilityJob.Shove), steal = SlotOfJob(AbilityJob.Steal);
+            bool stealReady = Ready(steal);
+            var all = ChickenController.ActiveControllers;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var rival = all[i];
+                if (!Actionable(rival, out var sight)) continue;
+                if (!BotEnforcerRules.HitFresh(FreshLeftOf(rival), 0f)) continue;
+                bool stunOk = Ready(stun) && CanHit(stun, rival, sight);
+                bool shoveOk = Ready(shove) && CanHit(shove, rival, sight);
+                int pick = BotEnforcerRules.PickBuilder(stunOk, shoveOk,
+                    stun >= 0 ? _abilities.ResolvedCooldownFor(stun) : float.MaxValue, shove >= 0 ? _abilities.ResolvedCooldownFor(shove) : float.MaxValue);
+                if (pick == BotEnforcerRules.Stun) { FreeCast(stun, "to stack a debt on a fresh rival (Stun)"); return; }
+                if (pick == BotEnforcerRules.Shove) { FreeCast(shove, "to stack a debt on a fresh rival (Shove)"); return; }
+                // No builder in reach: the Steal stacks the fresh debt too, when the rival carries and it is in reach.
+                if (stealReady && CanHit(steal, rival, sight)) { FreeCast(steal, "to stack a debt on a fresh rival (Steal)"); return; }
+            }
+
+            if (!stealReady) return;
+            float nextBuilder = float.MaxValue;
+            if (stun >= 0) nextBuilder = Mathf.Min(nextBuilder, _abilities.CooldownRemaining(stun));
+            if (shove >= 0) nextBuilder = Mathf.Min(nextBuilder, _abilities.CooldownRemaining(shove));
+            var debts = _controller.Debts;
+            if (debts == null) return;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var rival = all[i];
+                if (!Actionable(rival, out var sight)) continue;
+                int count = debts.CountOn(rival);
+                if (count < 1 || !CanHit(steal, rival, sight)) continue;
+                float gain = BotEnforcerRules.StealGain(ResolvedStealAmount(steal), 1f, _debt.Steal, count, Room, StealableOf(rival));
+                if (!BotEnforcerRules.Cash(count, _debt.Cap, debts.DecayLeftOn(rival), nextBuilder, gain)) continue;
+                FreeCast(steal, "to cash the debts on a rival (Steal)");
+                return;
+            }
+        }
+
+        /// <summary>The Steal slot's nominal amount after this chicken's own passive (the factor ScriptedPolicy passes as <c>StealFactor</c>).</summary>
+        private float ResolvedStealAmount(int slot)
+        {
+            float nominal = _abilities.GetSlot(slot).NominalStealAmount;
+            var passive = _abilities.Passive;
+            return passive != null ? passive.ModifyStealAmount(nominal, _controller) : nominal;
+        }
+
+        /// <summary>One full Peck cycle: the longer of its cooldown and its cast (what ScriptedPolicy reads off the kit's farm numbers).</summary>
+        private float PeckCycleSeconds()
+        {
+            int slot = _abilities.FindPeckSlot();
+            if (slot == AbilityController.InvalidSlot) return 0f;
+            return Mathf.Max(_abilities.ResolvedCooldownFor(slot), PeckCastRules.CastSeconds(_controller.Stats, _abilities.GetSlot(slot).Duration));
+        }
+
         // ---- Perception (runs inside the throttled Think) -------------------
 
         /// <summary>
@@ -1060,6 +1293,9 @@ namespace CluckWars.Gameplay
                 }
 
                 if (preyRadius <= 0f) continue;
+
+                if (_hit.Active && !WorthAHit(c, dist)) continue;    // the Bully hunts only a rival that would give food by the time he is there
+                if (EnforcerOn && !WorthAFight(c, dist)) continue;   // the Enforcer leaves the pile only for a fight that beats the Peck
 
                 var   rivalCargo = c.Cargo;
                 float frac       = rivalCargo != null ? rivalCargo.StealableFraction : 0f;
