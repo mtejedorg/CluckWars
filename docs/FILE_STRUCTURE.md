@@ -48,11 +48,11 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
 | `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 28 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 209 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 215 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 150 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 32 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 328 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 334 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -99,8 +99,8 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | `Diagnostics` | `CluckWars.Diagnostics` | 27 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 9 |
 | `Editor` | `Assembly-CSharp-Editor` | 18 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 302 |
-| `Gameplay` | `CluckWars.Gameplay` | 98 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 308 |
+| `Gameplay` | `CluckWars.Gameplay` | 104 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
 | `Injection` | `CluckWars.Core` | 1 |
@@ -146,10 +146,9 @@ Non-script file counts by folder (depth 3):
 | `Audio/UI` | 17 `.wav`, 1 `.md` |
 | `Data` | 10 `.asset` |
 | `Data/Abilities` | 30 `.asset` |
-| `Data/Abilities/Passives` | 8 `.asset` |
+| `Data/Abilities/Passives` | 9 `.asset` |
 | `Data/Balance` | 2 `.asset` |
 | `Data/Classes` | 4 `.asset` |
-| `Data/Simulator` | 1 `.asset` |
 | `Editor` | 8 `.cs` |
 | `Materials` | 1 `.mat` |
 | `Prefabs` | 6 `.prefab` |
@@ -196,30 +195,30 @@ Non-script file counts by folder (depth 3):
 | Match lifecycle and flow | `GameManager` (match state machine, timer, win check; spawned from `Assets/_Game/Prefabs/GameManager.prefab` by `MatchBootstrapper`), `MatchState`, `MatchBootstrapper` (match entry point in `Game.unity`), `MatchSignals`, `MatchFlowRules`, `MatchBackRules`, `MatchPresentationRules`, `MatchSummaryLines`, `MatchEventKind`, `ComebackRules`, `RoundTeleportRules`, `RoundStartCooldownRules`, `LocalJoinClock`, `ArenaReadiness`, `ArenaWarmup`, `ISessionSelectionService` and `SessionSelectionService` (both in `Gameplay/Session/`) |
 | Match telemetry | `MatchTelemetry` (pure formatting of the `steal`, `peckcut`, `kill` and `contact` lines under the `Telemetry` source tag; BL-208) |
 | Spawn corners and player identity | `CornerAssignment`, `CornerSlotRules`, `SpawnPlacement`, `PlayerColors` |
-| The chicken | `ChickenController` (motion, control windows, RPC entry points, `Local` / `LocalDriven`), `ChickenCargo`, `ChickenCombat` (execute removal/respawn; hosts `SenderLatency` / `PeerLatency`), `ChickenMovement`, `ChickenTraversal`, `ChickenCapsule`, `ChickenMatchStats`, `ChickenLocalEvents`, `EventEdge`, `ListenerList`, `ControlState`, `EffectWindow`, `ContactHysteresis`, `RecentPositions`, `LocalChickenRules`, `IChickenModelPresenter`, `Doppelganger`, `SilentCargoWrite` |
+| The chicken | `ChickenController` (motion, control windows, RPC entry points, `Local` / `LocalDriven`), `ChickenCargo`, `ChickenHitSteal`, `EnforcerDebts`, `ChickenCombat` (execute removal/respawn; hosts `SenderLatency` / `PeerLatency`), `ChickenMovement`, `ChickenTraversal`, `ChickenCapsule`, `ChickenMatchStats`, `ChickenLocalEvents`, `EventEdge`, `ListenerList`, `ControlState`, `EffectWindow`, `ContactHysteresis`, `RecentPositions`, `LocalChickenRules`, `IChickenModelPresenter`, `Doppelganger`, `SilentCargoWrite` |
 | Chicken classes | `ChickenClass` (the enum), `ChickenClassInfo` (holds `ChickenClasses`), `ChickenStatsSO`, `ChickenClassRegistrySO` |
 | Ability runtime | `AbilityController` (slots, cooldowns, `LoadoutCodes`), `AbilityRegistrySO`, `AbilityActivationRules`, `AbilityAimForward`, `AbilityRunRules`, `AbilityEffectStack`, `AbilityCue`, `AbilityZone`, `AreaEffectRules`, `ZoneDiscMesh`, `FixedKit`, `PreEquippedLoadout`, `LoadoutClaimRules`, `PeckChainRules`, `PeckCastRules` (the Peck cast: when it ends naturally, when a stun or shove cuts it; pure), `TargetCooldowns`, `JumpResolver`, `LootMark` (the Thief's loot mark rules, shared with the match simulator) |
-| Warrior identity rules (BL-222, shipped off) | `HitStealRules` (the Bully's steal on a Peck hit), `BiteRules` (the Enforcer's fresh window: a hit on a rival that pecked within it takes no food and adds one extra debt), `DebtRules` (the Enforcer's per-enemy debts, which inflate its Steal); pure, shared by the simulator and, later, the game; both kits are simulator-only and shipped off |
+| Warrior identity rules (BL-222, BL-226; both kits ship) | `HitStealRules` (the Bully's take on a Stun, Shove or Slow that affected a rival, and its per-victim lock), `BiteRules` (the Enforcer's fresh window: a hit on a rival that pecked within it takes no food and adds one extra debt), `DebtRules` (the Enforcer's per-enemy debts, which inflate its Steal); pure, shared by the simulator and the game. The game side: `HitAffectRules` (the one "did this Stun or Shove affect the rival" test; the caster runs it over the victim's replicated state), `HitStealLedger` (the Bully's per-victim lock, authority-local), `ChickenHitSteal` (the `NetworkBehaviour` that asks the victim for the hit-steal food through `ChickenCargo.StealFrom`), `DebtBook` (one debt slot and its pure moves over `DebtRules`), `EnforcerDebts` (the `NetworkBehaviour` holding the Enforcer's replicated per-rival debts, the fresh-hit bite and the debt cash), `FreshSpendBook` (which fresh state of a rival an Enforcer already bit; authority-local) |
 | Death Mark (Assassin execute) | `AssassinExecute`, `ExecuteRules`, `ExecuteRespawnRules`, `MarkPickRules` |
 | Thief loot mark | `ThiefLoot` (the `NetworkBehaviour` on the chicken: networked mark, state, age timer and the `LootTakenEventId` one-shot; runs only for a Thief), `MarkedStealBook` (the Thief's ledger of the one open marked steal; pure) |
 | Food, bases and transfers | `FoodPile`, `PlayerBase`, `FoodTransferRules` (holds `FoodRequests`), `PendingStealLedger`, `StealMath`, `StealRules`, `BaseDepositRules`, `BaseKeepOutRules`, `BaseWallRules`, `PileFootprintShape` |
 | RPC claims and control | `RpcClaim` (holds `RpcRejectionLimiter`), `ControlClaimRules`, `ControlReapplyRules` |
 | Map and terrain | `MapGenerator`, `PinwheelLayout`, `SectorScatter`, `TerrainObstacle`, `TerrainTraversal`, `ArenaDensityMetric` |
-| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotLootRules` (pure rules for the Thief bot's loot mark: pursue, hold Steal, bank now; the game's bot and the simulator's P0 call the same functions), `BotHitStealRules` and `BotEnforcerRules` (pure rules for the Bully's hit-steal and the Enforcer's bite and debts; called by the simulator's policies, not yet by `BotController`; simulator-only kits, shipped off; BL-222), `BotEngageRules` (when a Brawler bot may leave its work to chase a rival: it needs a Steal or a hit that pays, else it forages; called by `BotController` and by the simulator's P0; BL-224), `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
+| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotLootRules` (pure rules for the Thief bot's loot mark: pursue, hold Steal, bank now; the game's bot and the simulator's P0 call the same functions), `BotHitStealRules` and `BotEnforcerRules` (pure rules for the Bully's hit-steal and the Enforcer's bite and debts; called by the simulator's policies and by `BotController`; BL-222, BL-226), `BotEngageRules` (when a Brawler bot may leave its work to chase a rival: it needs a Steal or a hit that pays, else it forages; called by `BotController` and by the simulator's P0; BL-224), `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
 | Shared config assets | `MatchConfigSO`, `PrefabRegistrySO`, `ColorSchemeSO` |
 
 **`Scripts/Abilities`** (45 files + 9 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
 abstract bases `AbilityBaseSO`, `PassiveAbilitySO` and `StunBurstAbilitySO` (shared base of `AmbushAbilitySO` and
 `WingSlamAbilitySO`, which is why it has no asset), and the shared vocabulary: `AbilityContext`, `AbilityAim`,
 `AbilityTargeting`, `AbilityJob`, `AccentKey`, `CastArchetype`, `ChickenSubclass`, `AreaEffectKind`,
-`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`, `AbilityOracleFacts` (the numbers the oracle reads off an ability, declared by the ability). `Passives/` holds the 9 `<Name>PassiveSO` classes: the 8 shipped ones and `EnforcerPassiveSO` (unregistered, simulator only, shipped off, BL-222).
+`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`, `AbilityOracleFacts` (the numbers the oracle reads off an ability, declared by the ability). `Passives/` holds the 9 `<Name>PassiveSO` classes: the 8 registered ones (`EnforcerPassiveSO` among them) and `RelentlessPassiveSO` (retired, parked; BL-226).
 
 ### 3.2 `Assets/_Game/Data`
 
 ScriptableObject assets only; the full class-to-asset table is section 5. Subfolders: `Data` (10 project-wide
 singletons: registries, `MatchConfig`, palettes, haze/fence manifests), `Data/Abilities` (30 ability assets),
-`Data/Abilities/Passives` (8 specializations, which also carry the fixed kits), `Data/Classes` (4 `ChickenStatsSO`, one
-per class), `Data/Simulator` (assets only the match simulator uses: `Enforcer.asset`, the Warrior's second simulator kit; kept outside `Abilities/` because the roster tests treat every asset in that folder as shipped; never registered, never in a scene; BL-222).
+`Data/Abilities/Passives` (9 specialization assets, 8 registered, which also carry the fixed kits; `Relentless.asset` is retired), `Data/Classes` (4 `ChickenStatsSO`, one
+per class).
 
 - **Retired abilities:** 19 of the 30 ability assets have `Retired: 1` (the `Retired` field on `AbilityBaseSO`: "kept in
   the repo, out of the registry, every kit and the free pool"). Exactly those 19 are absent from
@@ -329,6 +328,7 @@ All under `Assets/_Game/Scripts/` unless the path says otherwise. One line each,
 **The chicken**
 - `Gameplay/ChickenController.cs`: the chicken NetworkBehaviour: motion from the Fusion input buffer, control windows, knockback, the stun/root/slow RPCs, `ChickenController.Local` / `LocalDriven`.
 - `Gameplay/ChickenCargo.cs`: carried food, pile collection, deposit; food crosses authorities by request and settlement.
+- `Gameplay/ChickenHitSteal.cs`, `Gameplay/EnforcerDebts.cs`: the Warrior kits' `NetworkBehaviour`s (hit-steal; replicated debts and the fresh-hit bite); every chicken carries both, only a passive with the matching facts runs one.
 - `Gameplay/ChickenCombat.cs`: execute removal and respawn state machine; hosts `SenderLatency` and `PeerLatency`, the RTT reads.
 - `Gameplay/ChickenMovement.cs`: pure-C# movement helper (input vector to `CharacterController.Move`).
 - `Gameplay/AbilityController.cs`: the four ability slots, activation from the input buffer, per-slot cooldowns, replicated `LoadoutCodes`.
@@ -454,18 +454,18 @@ Every `.asset` under `Assets/_Game/Data`, with the class its `m_Script` GUID res
 | `Data/Abilities` | `WingSlamAbilitySO` | `Abilities/WingSlamAbilitySO.cs` | `WingSlam.asset` (registered) |
 | `Data/Abilities/Passives` | `BullyPassiveSO` | `Abilities/Passives/BullyPassiveSO.cs` | `Bully.asset` (registered) |
 | `Data/Abilities/Passives` | `BulwarkPassiveSO` | `Abilities/Passives/BulwarkPassiveSO.cs` | `Bulwark.asset` (registered) |
+| `Data/Abilities/Passives` | `EnforcerPassiveSO` | `Abilities/Passives/EnforcerPassiveSO.cs` | `Enforcer.asset` (registered) |
 | `Data/Abilities/Passives` | `FeatherfootPassiveSO` | `Abilities/Passives/FeatherfootPassiveSO.cs` | `Featherfoot.asset` (registered) |
 | `Data/Abilities/Passives` | `HoarderPassiveSO` | `Abilities/Passives/HoarderPassiveSO.cs` | `Hoarder.asset` (registered) |
-| `Data/Abilities/Passives` | `RelentlessPassiveSO` | `Abilities/Passives/RelentlessPassiveSO.cs` | `Relentless.asset` (registered) |
+| `Data/Abilities/Passives` | `RelentlessPassiveSO` | `Abilities/Passives/RelentlessPassiveSO.cs` | `Relentless.asset` (retired) |
 | `Data/Abilities/Passives` | `SlipperyPassiveSO` | `Abilities/Passives/SlipperyPassiveSO.cs` | `Slippery.asset` (registered) |
 | `Data/Abilities/Passives` | `SpoilerPassiveSO` | `Abilities/Passives/SpoilerPassiveSO.cs` | `Spoiler.asset` (registered) |
 | `Data/Abilities/Passives` | `ThiefPassiveSO` | `Abilities/Passives/ThiefPassiveSO.cs` | `Thief.asset` (registered) |
 | `Data/Balance` | `OracleMapSO` | `Balance/OracleMapSO.cs` | `OracleMap.asset` |
 | `Data/Balance` | `OracleReferenceSO` | `Balance/OracleReferenceSO.cs` | `OracleReference.asset` |
 | `Data/Classes` | `ChickenStatsSO` | `Gameplay/ChickenStatsSO.cs` | `Assassin.asset`, `Fatty.asset`, `Speedy.asset`, `Warrior.asset` |
-| `Data/Simulator` | `EnforcerPassiveSO` | `Abilities/Passives/EnforcerPassiveSO.cs` | `Enforcer.asset` |
 
-Ability assets: 19 registered, 19 retired.
+Ability assets: 19 registered, 20 retired.
 <!-- END GENERATED: data -->
 
 `OracleReference.asset` holds the accepted route entries and `KillTargets`, and since match simulator slice 7 also `MatchRecords` (`MatchRecord` with `AcceptedOn`, `Note`, `BalanceHash`, `Design`, `Population`, `RunSeed` and `Lines` of `MatchRecordLine`): the accepted match reports the drift line compares with. It also holds the Thief's loot target rows. `Thief.asset` holds loot fields that only the match simulator reads today: the mechanic ships off (`LootBounty` 0). `Spoiler.asset` and `Thief.asset` also hold a `MinimumCapacity` floor, read through `ModifyCargoCapacity` like the Hoarder's (Spoiler 25, Thief 0 today).
@@ -499,7 +499,7 @@ Shared helpers (all in `Assets/_Game/Scripts/Editor/Tests/`):
 | `MatchTestKit.cs` | Shared inputs and map for the match simulator tests (releases them in `TearDown`) | 2 |
 | `IconStrokeMetrics.cs` | Pixel metrics on shipped icon PNGs (used by `AbilityIconArtTests`, `StateGlyphArtTests`) | - |
 
-Test classes for the bot sight rule and the match simulator: `BotSightTests`, `BotLootRulesTests`, `BotWarriorRulesTests`, `HitStealRulesTests`, `BiteRulesTests`, `DebtRulesTests`, `BotEngageRulesTests`, `WarriorPassiveDataTests`, `OracleRosterTests`, `WhatIfSpecTests`, `MatchWarriorTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
+Test classes for the bot sight rule and the match simulator: `BotSightTests`, `BotLootRulesTests`, `BotWarriorRulesTests`, `BotWarriorOrderTests`, `HitStealRulesTests`, `HitAffectRulesTests`, `HitStealLedgerTests`, `BiteRulesTests`, `DebtRulesTests`, `DebtBookTests`, `PeckFreshStateTests`, `WarriorGameRulesTests`, `BotEngageRulesTests`, `WarriorPassiveDataTests`, `OracleRosterTests`, `WhatIfSpecTests`, `MatchWarriorTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
 
 Recording fakes are not shared: each test file declares its own private nested class (`RecordingLog` in 9 files, e.g.
 `SelfInjectTests.cs` and `MissingSfxTests.cs`; `FakeAudio`, `FakeInput`, `FakeDevice`, `FakeClock`, `FakePresenter`,

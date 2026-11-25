@@ -107,6 +107,8 @@ ChickenController (NetworkBehaviour)
 ├── ChickenMovement                    Pure C# helper; CharacterController.Move
 ├── ChickenCombat                      [Networked] HP / IsStunned / StunTimer / AttackTimer / AttackEpoch
 ├── ChickenCargo                       [Networked] Cargo; collect/deposit/death-drop/steal
+├── ChickenHitSteal                    [Networked] HitStealEventId; the Bully's take on a Stun/Shove/Slow that affected a rival
+├── EnforcerDebts                      [Networked] per-rival debt arrays + event ids; the Enforcer's debts and fresh hit
 ├── AbilityController                  [Networked] ActiveMask / ActiveTimer0..3 / Cooldown0..3 / LastCastSlot
 ├── ChickenAnimator                    Local; Speed/AbilityCast/Hit/Stunned animator params
 │                                      + procedural lean/bank on the model child

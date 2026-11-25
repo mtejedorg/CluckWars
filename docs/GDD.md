@@ -510,8 +510,8 @@ current, shipped state.
 
 | Class | Specialization | Passive | Kit (slot order) |
 |---|---|---|---|
-| **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Steal 3 s, Stun 5.25 s, Jump 1.5 s) | Peck, **Jump**, **Stun**, **Steal** |
-| | The Relentless | Your stuns and slows last 30% longer (`OutgoingDurationMultiplier` 1.3: Stun 1.69 s, the Slow aura runs 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner (`DurationMultiplier` 0.75, no knockback cut) | Peck, **Speed**, **Slow**, **Steal** |
+| **Warrior** | The Brute (Bully) | Every move except Peck recharges 25% faster (`CooldownMultiplier` 0.75: Stun 5.25 s, Jump 1.5 s), and the Peck is 40% slower (`PeckCooldownMultiplier` 1.4); a Stun that lands takes 2 food from that rival and a Shove that moves it takes 2 (`HitStealStun`, `HitStealShove`), the same rival only once every 3 s (`HitStealLockSeconds`); `Bully.asset` | Peck, **Jump**, **Stun**, **Shove** |
+| | The Enforcer | Every Stun or Shove that lands makes that rival owe one debt; a hit on a rival that is pecking, or pecked food up in the last 1.5 s (`FreshSeconds`), adds one more and takes no food; each debt makes your Steal take 2 more food (`DebtSteal`), up to 3 debts (`DebtCap`), all gone after 6 s with no new one (`DebtSeconds`); the Peck is 20% slower (`PeckCooldownMultiplier` 1.2); `Enforcer.asset` | Peck, **Stun**, **Shove**, **Steal** |
 | **Speedy** | The Anxious (Featherfoot) | You bank food 10% faster (`DepositRateMultiplier` 1.1, permanent); immune to the pile-slow and the collision slow | Peck, **Speed**, **Slow**, **Shove** |
 | | The Agile (Slippery) | Ability slows on you are 40% weaker and end 40% sooner (`Resist` 0.6); stuns, getting stuck, pile and bump slows land in full | Peck, **Speed**, **Slow**, **Shove** |
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Egg Shell**, **Shove** |
@@ -534,20 +534,16 @@ scaled by 0.6 (factor' = 1 - (1 - factor) x 0.6, so the 55% Slow aura holds a Sl
 slow lasts x0.6, and a slow zone or aura, which has no duration, slows it at the weaker strength for as long as it
 stands inside (the first-60%-of-the-zone's-life window was removed the same day; the zone rule is open, BL-123). The pile slow and the bump slow are not resisted.
 
-**The Warrior is the all-rounder (Maestro, 2026-11-05, later).** Both Warrior kits carry Peck, Steal, one
-crowd control and one mobility move; the old "defend a pile" identity is gone. **Bully** is the cooldown spammer
-(every move except Peck recharges 25% faster; the old steal x1.4 and +2 cargo were removed, and its declared
-Solo Clear Time exception with them, so it farms like the naked Warrior: Oracle 34.98 s / 3 trips on every seat).
-**Warrior numbers today (2026-11-25, Maestro):** Move Speed 10.8, cargo 20, Peck cooldown 0.71 s and cast 0.4 s (`Warrior.asset`; they were 10.125, 14, 0.79 s and 0.5 s until 2026-11-25). **Simulator only, off in the game (BL-222, 2026-11-25):** two experimental Warrior kits exist in the match simulator and nowhere else. The Bully's hit-steal (a stun or shove takes food from the victim into the Bully's cargo; every amount is 0 in `Bully.asset`, so it does nothing) and the **Enforcer** (`EnforcerPassiveSO`, `Data/Simulator/Enforcer.asset`, unregistered: a hit on a rival that pecked within the fresh window takes no food and adds one extra debt, debts are per enemy and inflate its Steal; run only through the what-if roster swap; shipped off) cannot be met in a match. **Relentless is still the shipped second Warrior kit.** Spec: `docs/superpowers/specs/2026-11-25-warrior-identity-design.md`.
-**Relentless** is tenacity plus stronger crowd control, and it stays the Warrior's signature. Two multipliers
+**The Warrior is the all-rounder (Maestro, 2026-11-05, later), and since 2026-11-25 (BL-222, BL-226) its two kits are about hitting.** Both carry Peck and two hits or a hit and a Steal; the old "defend a pile" identity is gone, and `Enforcer` took the seat of Relentless in the registry. **Bully** is the cooldown spammer: every move except Peck recharges 25% faster, the Peck is slower, its Steal left the kit, and each Stun or Shove that really affects a rival takes food from it into the Bully's cargo (once per rival per lock; the food moves through the ordinary authority-confirmed steal). Its numbers are in `Assets/_Game/Data/Abilities/Passives/Bully.asset` and the table above. The **Enforcer** keeps its Steal and plays debts: each landed Stun or Shove is a debt on that rival, a hit on a rival that is pecking (or just pecked food) adds one more and takes no food, and each debt inflates the Steal on that rival; its numbers are in `Assets/_Game/Data/Abilities/Passives/Enforcer.asset` (`FreshBiteShare`, a simulator-only knob for a food bite on a fresh hit, is 0 and denied to a balance delta). A wrong "this hit affected the rival" prediction can move food once per lock (accepted race, ARCH-NET-07). **Warrior numbers today (2026-11-25, Maestro):** Move Speed 10.8, cargo 20, Peck cooldown 0.71 s and cast 0.4 s (`Warrior.asset`; they were 10.125, 14, 0.79 s and 0.5 s until 2026-11-25). Spec: `docs/superpowers/specs/2026-11-25-warrior-identity-design.md`.
+**Relentless** (parked, `Retired`, out of the registry; the asset and its text are kept for a possible return) was tenacity plus stronger crowd control. Two multipliers
 on one passive: `DurationMultiplier` 0.75 shortens the stuns, getting-stuck and timed slows that land on it (the same
 `ModifyControlDuration` mechanism as Bulwark, no knockback cut), and `OutgoingDurationMultiplier`
 1.3 lengthens the stuns and slows it applies. The caster's factor is applied first, then the victim's: a Relentless
 stun on a Bulwark bird lasts 1.3 x 1.3 x 0.65 = 1.10 s; on a Slippery bird the full 1.69 s (Slippery leaves stuns
 whole since the later 2026-11-05 rework). The Slow aura's run time is its crowd control, so it
-runs 3.9 s (cooldown 6 s, from the cast). Roots and placed zones are not lengthened. Because receivers
-check claims against a ceiling, the stun and slow ceilings are multiplied by the strongest outgoing factor among
-the shipped passives (stun ceiling 1.3 x 1.3 = 1.69 s). Relentless's Oracle result is 34.98 s / 3 trips.
+runs 3.9 s (cooldown 6 s, from the cast). Roots and placed zones are not lengthened. Receivers
+check claims against a ceiling, which is multiplied by the strongest outgoing factor among
+the registered passives; with Relentless out of the registry the ceiling no longer carries its 1.3 factor.
 **Featherfoot** (Speedy) lost Quick Drop and gained a permanent banking rate instead. It shipped at 1.5x (Oracle 28.54 s / 4 trips,
 1.46 s under the Speedy target 30 s); Maestro had it tuned to **1.1x** the same day, which lands on the target
 (29.62 s / 4 trips on all seats, inside +-0.5 s), so Featherfoot needed no exception (the SCT gate that asked for one was removed on 2026-11-20). The naked Speedy
@@ -881,7 +877,7 @@ governed by the SCT axiom, not a tiered move.
 
 Exact per-ability values (steal amounts, stun/slow durations, radii, cooldowns) are tuned
 against the Oracle and playtests. Class passives scale cooldowns at runtime (Bully
-x0.75, every move but Peck), so a Bully Warrior's Steal is 3 s, Stun 5.25 s and Jump 1.5 s; Relentless leaves cooldowns alone (its Slow aura just runs 3.9 s).
+x0.75, every move but Peck), so a Bully Warrior's Stun is 5.25 s and Jump 1.5 s; the Enforcer leaves cooldowns alone.
 
 ### 7.4 Several moves at once (Phase 6)
 
