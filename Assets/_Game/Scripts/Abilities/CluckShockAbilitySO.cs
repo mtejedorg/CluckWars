@@ -56,8 +56,9 @@ namespace CluckWars.Abilities
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
+                bool moves = caster.PredictShoveMoves(_scratch[i], KnockbackForce);   // before the shove: it reads the victim's state as it was
                 caster.KnockAway(_scratch[i], KnockbackForce);
-                ReportHit(caster, _scratch[i], AbilityJob.Shove, caster.PredictShoveMoves(_scratch[i], KnockbackForce));   // the hit-steal prices a shove that moved him
+                ReportHit(caster, _scratch[i], AbilityJob.Shove, moves);   // the hit-steal prices a shove that moved him
             }
         }
     }

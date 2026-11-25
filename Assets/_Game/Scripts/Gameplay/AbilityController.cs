@@ -144,13 +144,13 @@ namespace CluckWars.Gameplay
         public bool FreshBitten => BittenStateId == FreshStateId;
 
         /// <summary>A Peck cast just started: a new fresh state opens. Authority only (it runs inside the cast).</summary>
-        internal void NoteFreshStart() { if (HasStateAuthority) FreshStateId++; }
+        internal void NoteFreshStart() { if (HasStateAuthority) FreshStateId = BiteRules.NextFreshState(FreshStateId, BittenStateId); }
 
         /// <summary>A Peck landed food in the cargo (<c>ChickenCargo.RPC_SettlePeck</c>, only when something was credited): a new fresh state opens as "just landed". Authority only.</summary>
         internal void NotePeckFed()
         {
             if (!HasStateAuthority || Runner == null) return;
-            FreshStateId++;
+            FreshStateId = BiteRules.NextFreshState(FreshStateId, BittenStateId);
             FedStateId = FreshStateId;
             FedTick = Runner.Tick.Raw;
         }

@@ -31,16 +31,28 @@ namespace CluckWars.Tests
         private static string Body(string path, string signature) => AssassinExecuteCreditTests.MethodBody(path, signature);
         private static string Code(string path) => RuntimeSourceGuardTests.Code(path);
 
-        // ---- the three hit abilities report every victim, after the effect is sent ----
+        // ---- the three hit abilities report every victim: predict, then send, then report ----
+        // The prediction reads the victim's replicated state. A victim this peer also owns applies the effect INSIDE the send (RPC_ApplyStun runs locally),
+        // so a prediction made after it reads the new StunRemaining and a strict-greater "does it extend" test is false: the stun would never count.
+
+        private static void AssertPredictSendReport(string body, string predict, string send)
+        {
+            int p = body.IndexOf(predict, StringComparison.Ordinal);
+            int s = body.IndexOf(send, StringComparison.Ordinal);
+            int r = body.IndexOf("ReportHit(", StringComparison.Ordinal);
+            Assert.Greater(p, 0, "the prediction is made");
+            Assert.Less(p, s, "predicted BEFORE the effect is sent, while the victim's state is still the pre-hit one");
+            Assert.Less(s, r, "the report comes last");
+            Assert.AreEqual(1, Regex.Matches(body, Regex.Escape(predict)).Count, "predicted once, never again after the send");
+        }
 
         [Test]
         public void StunBurst_ReportsEveryVictim_AfterSendControl()
         {
             string body = Body(StunBurstPath, "public override void OnActivate(");
             Assert.AreEqual(1, Regex.Matches(body, @"ReportHit\(").Count, "one report per victim of the loop");
-            Assert.Less(body.IndexOf("SendControl(", StringComparison.Ordinal), body.IndexOf("ReportHit(", StringComparison.Ordinal), "the effect is sent first");
+            AssertPredictSendReport(body, "caster.PredictStunLands(", "SendControl(");
             StringAssert.Contains("AbilityJob.Stun", body);
-            StringAssert.Contains("caster.PredictStunLands(", body);
         }
 
         [Test]
@@ -48,16 +60,15 @@ namespace CluckWars.Tests
         {
             string body = Body(ShockPath, "public override void OnActivate(");
             Assert.AreEqual(1, Regex.Matches(body, @"ReportHit\(").Count);
-            Assert.Less(body.IndexOf("KnockAway(", StringComparison.Ordinal), body.IndexOf("ReportHit(", StringComparison.Ordinal));
+            AssertPredictSendReport(body, "caster.PredictShoveMoves(", "KnockAway(");
             StringAssert.Contains("AbilityJob.Shove", body);
-            StringAssert.Contains("caster.PredictShoveMoves(", body);
         }
 
         [Test]
         public void Slow_ReportsEveryVictim_AfterSendControl_ForTheInstantSlowOnly()
         {
             string body = Body(SlowPath, "public override void OnActivate(");
-            Assert.Less(body.IndexOf("SendControl(", StringComparison.Ordinal), body.IndexOf("ReportHit(", StringComparison.Ordinal));
+            AssertPredictSendReport(body, "caster.PredictSlowLands(", "SendControl(");
             StringAssert.Contains("AbilityJob.Slow", body);
             StringAssert.DoesNotContain("ReportHit(", Code(Scripts + "Gameplay/AbilityZone.cs"), "the Slow Area aura never reports a hit (design section 3)");
         }
@@ -298,13 +309,13 @@ namespace CluckWars.Tests
         public void DebtEvents_WriteTheirFieldsBeforeTheirIds()
         {
             string hit = Body(DebtsPath, "public void OnHit(");
-            Assert.Less(hit.IndexOf("LastDebtVictim = victim.Id;", StringComparison.Ordinal), hit.IndexOf("FreshHitEventId++", StringComparison.Ordinal), "ARCH-EVT-02: the payload first");
+            Assert.Less(hit.IndexOf("FreshHitVictim = victim.Id;", StringComparison.Ordinal), hit.IndexOf("FreshHitEventId++", StringComparison.Ordinal), "ARCH-EVT-02: the payload first");
             string gain = Body(DebtsPath, "private void Gain(");
-            Assert.Less(gain.IndexOf("LastDebtVictim = victim.Id;", StringComparison.Ordinal), gain.IndexOf("DebtEventId++", StringComparison.Ordinal));
+            Assert.Less(gain.IndexOf("DebtGainedVictim = victim.Id;", StringComparison.Ordinal), gain.IndexOf("DebtEventId++", StringComparison.Ordinal));
             string settled = Body(DebtsPath, "internal void OnStealSettled(");
             int bump = settled.IndexOf("DebtCashEventId++", StringComparison.Ordinal);
             Assert.Greater(bump, 0);
-            Assert.Less(settled.IndexOf("LastDebtVictim = victimId;", StringComparison.Ordinal), bump);
+            Assert.Less(settled.IndexOf("DebtCashedVictim = victimId;", StringComparison.Ordinal), bump);
             Assert.Less(settled.IndexOf("LastCashBonus =", StringComparison.Ordinal), bump);
             Assert.Less(settled.IndexOf("if (!(credited > 0f)) return;", StringComparison.Ordinal), settled.IndexOf("DebtBook.Cash(", StringComparison.Ordinal), "only a positive answer cashes");
             string events = Code(Scripts + "Gameplay/ChickenLocalEvents.cs");
@@ -342,5 +353,103 @@ namespace CluckWars.Tests
             Assert.IsNotNull(inherited, "the decoy variant inherits it (CODE-ASSET-06)");
             AssertListed(variant, inherited, "the variant's own NetworkedBehaviours list must be baked with the new component");
         }
-    }
+
+        // ---- review fixes (BL-226) ----
+
+        [Test]
+        public void EachDebtEvent_HasItsOwnVictimField_SoTwoRivalsInOneTickCannotCrossOver()
+        {
+            string src = Code(DebtsPath);
+            StringAssert.DoesNotContain("LastDebtVictim", src, "one shared victim field mis-attributes two events of one tick");
+            foreach (var field in new[] { "FreshHitVictim", "DebtGainedVictim", "DebtCashedVictim" })
+                Assert.AreEqual(1, Regex.Matches(src, @"\[Networked\] public NetworkBehaviourId " + field + @"\b").Count, $"{field} is networked, once");
+            string events = Code(Scripts + "Gameplay/ChickenLocalEvents.cs");
+            StringAssert.DoesNotContain("DebtVictim", events.Replace("FreshHitVictim", "").Replace("DebtGainedVictim", "").Replace("DebtCashedVictim", ""), "the observer reads the three fields, no shared one");
+            StringAssert.Contains("new FreshHitEvent(s.FreshHitVictim)", events);
+            StringAssert.Contains("new DebtGainedEvent(s.DebtGainedVictim)", events);
+            StringAssert.Contains("new DebtCashedEvent(s.DebtCashedVictim,", events);
+        }
+
+        [Test]
+        public void FreshHit_SpendsTheStateInTheAuthorityLocalBook_BeforeStacking()
+        {
+            string hit = Body(DebtsPath, "public void OnHit(");
+            int fresh = hit.IndexOf("IsFreshFor(", StringComparison.Ordinal);
+            int spend = hit.IndexOf("_spentFresh.TrySpend(victim.Id, rival.FreshStateId)", StringComparison.Ordinal);
+            int gain = hit.IndexOf("Gain(victim, facts);", StringComparison.Ordinal);
+            Assert.Greater(spend, fresh, "the book is consulted next to the replicated fresh test");
+            Assert.Less(spend, gain, "and decides before the extra stack");
+            string src = Code(DebtsPath);
+            Assert.GreaterOrEqual(Regex.Matches(src, @"_spentFresh\.Clear\(\)").Count, 2, "cleared at spawn and wherever the debts are cleared");
+            StringAssert.Contains("_spentFresh.Clear();", Body(DebtsPath, "private void ClearAll()"));
+            StringAssert.Contains("_spentFresh.Forget(victimId)", Body(DebtsPath, "public override void FixedUpdateNetwork()"), "a rival that left is forgotten");
+        }
+
+        [Test]
+        public void FreshSpendBook_SpendsAStateOnce_PerVictim()
+        {
+            var book = new FreshSpendBook<int>();
+            Assert.IsTrue(book.TrySpend(1, 7), "first hit on the state spends it");
+            Assert.IsFalse(book.TrySpend(1, 7), "a second hit before RPC_MarkBitten came back finds it spent");
+            Assert.IsTrue(book.TrySpend(2, 7), "another rival's state with the same id is its own");
+            Assert.IsTrue(book.TrySpend(1, 8), "a newer state is fresh again");
+            Assert.IsFalse(book.TrySpend(1, 8));
+            book.Forget(1);
+            Assert.IsTrue(book.TrySpend(1, 8), "a forgotten rival starts clean");
+            book.Clear();
+            Assert.IsTrue(book.TrySpend(2, 7), "Clear drops every record");
+        }
+
+        [Test]
+        public void NextFreshState_NeverLandsOnTheBittenId_EvenAcrossTheWrap()
+        {
+            Assert.AreEqual(6, BiteRules.NextFreshState(5, 5), "plain step");
+            Assert.AreEqual(1, BiteRules.NextFreshState(0, 9));
+            Assert.AreEqual(0, BiteRules.NextFreshState(255, 9), "byte wrap");
+            Assert.AreEqual(2, BiteRules.NextFreshState(0, 1), "the step that would equal the bitten id skips it");
+            Assert.AreEqual(1, BiteRules.NextFreshState(255, 0), "wrap onto the bitten id skips it too");
+            for (int bitten = 0; bitten < 256; bitten++)
+                for (int cur = 0; cur < 256; cur++)
+                    Assert.AreNotEqual(bitten, BiteRules.NextFreshState((byte)cur, (byte)bitten), $"fresh {cur}, bitten {bitten}");
+        }
+
+        [Test]
+        public void DebtBook_PendingExpired_OnlyAfterTheWindow()
+        {
+            Assert.IsFalse(DebtBook.PendingExpired(10f, 10f, 5f));
+            Assert.IsFalse(DebtBook.PendingExpired(10f, 15f, 5f), "exactly the window is still open");
+            Assert.IsTrue(DebtBook.PendingExpired(10f, 15.01f, 5f));
+        }
+
+        [Test]
+        public void Debts_ClearTheirPendingAsks_WhenOffOrStale()
+        {
+            string clear = Body(DebtsPath, "private void ClearAll()");
+            StringAssert.Contains("System.Array.Clear(_pending", clear, "the debts-off branch drops every open ask");
+            string tick = Body(DebtsPath, "public override void FixedUpdateNetwork()");
+            StringAssert.Contains("DebtBook.PendingExpired(", tick);
+            StringAssert.Contains("FoodTransferRules.SettleWindowSeconds", tick, "an ask lives for the cargo's own settle window");
+            StringAssert.DoesNotContain("out ushort)", File.ReadAllText(DebtsPath), "the removed StealFrom overload is not referenced, not even in a cref");
+        }
+
+        [Test]
+        public void FreshState_IncrementsGoThroughTheSkipRule()
+        {
+            string src = Code(AbilityControllerPath);
+            StringAssert.DoesNotContain("FreshStateId++", src, "a bare increment can wrap onto BittenStateId");
+            Assert.AreEqual(2, Regex.Matches(src, Regex.Escape("FreshStateId = BiteRules.NextFreshState(FreshStateId, BittenStateId)")).Count, "the cast start and the landing");
+        }
+
+        [Test]
+        public void TheAffectedPredictionComments_AdmitTheAcceptedRace()
+        {
+            string hitSteal = RuntimeSourceGuardTests.Code(HitStealPath);
+            string raw = File.ReadAllText(HitStealPath) + File.ReadAllText(ControllerPath);
+            StringAssert.DoesNotContain("can move no food", raw, "a wrong prediction can move food: at most one hit amount per lock");
+            StringAssert.DoesNotContain("a miss moves no food", raw);
+            StringAssert.Contains("ARCH-NET-05", File.ReadAllText(HitStealPath));
+            Assert.IsNotEmpty(hitSteal);
+        }
+
+}
 }

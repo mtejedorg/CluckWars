@@ -54,8 +54,10 @@ namespace CluckWars.Abilities
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
+                // Predict BEFORE the send: a victim this peer also owns applies the stun inside SendControl, and the prediction would then read his new stun left.
+                bool lands = caster.PredictStunLands(_scratch[i], EmittedControl);
                 SendControl(caster, _scratch[i]);
-                ReportHit(caster, _scratch[i], AbilityJob.Stun, caster.PredictStunLands(_scratch[i], EmittedControl));   // the hit-steal prices what the stun really did
+                ReportHit(caster, _scratch[i], AbilityJob.Stun, lands);   // the hit-steal prices what the stun really did
             }
         }
     }

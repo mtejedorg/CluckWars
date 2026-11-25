@@ -39,6 +39,9 @@ namespace CluckWars.Gameplay
             return slot;
         }
 
+        /// <summary>An ask made at <paramref name="asked"/> that nobody answered by <paramref name="now"/> is dead once <paramref name="window"/> seconds passed.</summary>
+        public static bool PendingExpired(float asked, float now, float window) => now - asked > window;
+
         /// <summary>
         /// A Steal that <paramref name="consumed"/> debts was answered with <paramref name="credited"/>: only a positive answer cashes them (the count falls by
         /// what the Steal used, never below 0, so a debt a Stun added inside the round trip is kept); an answer of 0 leaves the count untouched.

@@ -12,7 +12,7 @@ namespace CluckWars.Gameplay
     /// The Enforcer's per-rival debts in the game (design 2026-11-25, 16.2, BL-226): each Stun or Shove that affected a rival is a debt on it, a hit on a
     /// fresh rival (mid Peck-cast, or just after a Peck that landed food) stacks one more and spends that fresh state, and every debt inflates the
     /// Enforcer's Steal on that rival by <see cref="DebtFacts.Steal"/> food. A fresh hit moves no food (Maestro, 2026-11-25): all the food an Enforcer
-    /// takes from a rival comes through its Steal, through <see cref="ChickenCargo.StealFrom(ChickenController, float, out ushort)"/>, authority-confirmed.
+    /// takes from a rival comes through its Steal, through <see cref="ChickenCargo.StealFrom(ChickenController, float)"/>, authority-confirmed.
     /// Sibling of <see cref="ChickenHitSteal"/>; every chicken carries one and only a passive with debt facts (<see cref="Facts"/>) runs it.
     /// </summary>
     /// <remarks>
@@ -35,14 +35,19 @@ namespace CluckWars.Gameplay
         [Networked, Capacity(Slots)] private NetworkArray<byte> DebtCounts => default;
         [Networked, Capacity(Slots)] private NetworkArray<TickTimer> DebtTimers => default;
 
-        /// <summary>Bumped on the Enforcer's authority when a hit on a fresh rival stacked its extra debt (ARCH-EVT-02); <see cref="LastDebtVictim"/> is written first.</summary>
+        /// <summary>Bumped on the Enforcer's authority when a hit on a fresh rival stacked its extra debt (ARCH-EVT-02); <see cref="FreshHitVictim"/> is written first.</summary>
         [Networked] public byte FreshHitEventId { get; private set; }
-        /// <summary>Bumped when a debt was gained on <see cref="LastDebtVictim"/> (the count went up).</summary>
+        /// <summary>Bumped when a debt was gained on <see cref="DebtGainedVictim"/> (the count went up).</summary>
         [Networked] public byte DebtEventId { get; private set; }
-        /// <summary>Bumped when a Steal cashed debts on <see cref="LastDebtVictim"/>; <see cref="LastCashBonus"/> is written first.</summary>
+        /// <summary>Bumped when a Steal cashed debts on <see cref="DebtCashedVictim"/>; <see cref="LastCashBonus"/> is written first.</summary>
         [Networked] public byte DebtCashEventId { get; private set; }
-        /// <summary>The rival the last fresh hit, gain or cash was about.</summary>
-        [Networked] public NetworkBehaviourId LastDebtVictim { get; private set; }
+        // One victim field per event id, so two events of one tick on two rivals never share a payload.
+        /// <summary>The rival the last fresh hit was about.</summary>
+        [Networked] public NetworkBehaviourId FreshHitVictim { get; private set; }
+        /// <summary>The rival the last debt gain was about.</summary>
+        [Networked] public NetworkBehaviourId DebtGainedVictim { get; private set; }
+        /// <summary>The rival the last cash was about.</summary>
+        [Networked] public NetworkBehaviourId DebtCashedVictim { get; private set; }
         /// <summary>The food the last cash added on top of the Steal's own amount (what fitted).</summary>
         [Networked] public float LastCashBonus { get; private set; }
 
@@ -59,8 +64,11 @@ namespace CluckWars.Gameplay
             public int Consumed;
             public float Bonus;
             public bool Live;
+            public float Asked;
         }
         private readonly Pending[] _pending = new Pending[8];
+        // Authority-local: the last fresh state of each rival this Enforcer already bit (FreshSpendBook).
+        private readonly FreshSpendBook<NetworkBehaviourId> _spentFresh = new FreshSpendBook<NetworkBehaviourId>();
         private int _nextPending;
 
         [Inject]
@@ -73,6 +81,7 @@ namespace CluckWars.Gameplay
             _abilities = GetComponent<AbilityController>();
             _combat = GetComponent<ChickenCombat>();
             System.Array.Clear(_pending, 0, _pending.Length);
+            _spentFresh.Clear();
             _stagedConsumed = 0;
         }
 
@@ -89,6 +98,9 @@ namespace CluckWars.Gameplay
             }
 
             float now = (float)Runner.SimulationTime;
+            // An ask the victim never answered closes after the cargo's own settle window.
+            for (int p = 0; p < _pending.Length; p++)
+                if (_pending[p].Live && DebtBook.PendingExpired(_pending[p].Asked, now, FoodTransferRules.SettleWindowSeconds)) _pending[p].Live = false;
             for (int i = 0; i < Slots; i++)
             {
                 if (DebtCounts[i] <= 0) continue;
@@ -98,6 +110,7 @@ namespace CluckWars.Gameplay
                     (victim.Combat != null && victim.Combat.IsRemoved))
                 {
                     WriteSlot(i, default, default, false, 0f);
+                    _spentFresh.Forget(victimId);
                     continue;
                 }
                 var decayed = DebtBook.Decay(ReadSlot(i, now), now, out int lost);
@@ -153,11 +166,12 @@ namespace CluckWars.Gameplay
             if (job != AbilityJob.Stun && job != AbilityJob.Shove && job != AbilityJob.Steal) return;
 
             var rival = victim.Abilities;
-            if (rival != null && rival.IsFreshFor(_abilities.Passive.Bite.FreshSeconds))
+            // The replicated BittenStateId only moves after RPC_MarkBitten came back, so this authority also remembers the state it already bit.
+            if (rival != null && rival.IsFreshFor(_abilities.Passive.Bite.FreshSeconds) && _spentFresh.TrySpend(victim.Id, rival.FreshStateId))
             {
                 Gain(victim, facts);                                       // the extra stack of a hit on a fresh rival
                 rival.RPC_MarkBitten(rival.FreshStateId, _controller.Id);   // the state is spent, whoever hits next
-                LastDebtVictim = victim.Id;
+                FreshHitVictim = victim.Id;
                 FreshHitEventId++;
             }
             if (job == AbilityJob.Stun || job == AbilityJob.Shove) Gain(victim, facts);
@@ -180,7 +194,7 @@ namespace CluckWars.Gameplay
         internal void OnStealOpened(NetworkBehaviourId victim, ushort requestId)
         {
             if (_stagedConsumed <= 0 || !HasStateAuthority) return;
-            _pending[_nextPending] = new Pending { Victim = victim, RequestId = requestId, Consumed = _stagedConsumed, Bonus = _stagedConsumed * Facts.Steal, Live = true };
+            _pending[_nextPending] = new Pending { Victim = victim, RequestId = requestId, Consumed = _stagedConsumed, Bonus = _stagedConsumed * Facts.Steal, Live = true, Asked = Runner != null ? (float)Runner.SimulationTime : 0f };
             _nextPending = (_nextPending + 1) % _pending.Length;
         }
 
@@ -204,7 +218,7 @@ namespace CluckWars.Gameplay
                     float now = (float)Runner.SimulationTime;
                     WriteSlot(i, victimId, DebtBook.Cash(ReadSlot(i, now), pending.Consumed, credited), false, 0f);
                 }
-                LastDebtVictim = victimId;
+                DebtCashedVictim = victimId;
                 LastCashBonus = Mathf.Min(pending.Bonus, credited);
                 DebtCashEventId++;
                 _log?.Info(Source, $"{name}: cashed {pending.Consumed} debt(s) for +{credited:0.##} (bonus {LastCashBonus:0.##}).");
@@ -217,7 +231,6 @@ namespace CluckWars.Gameplay
         {
             if (!HasStateAuthority) return;
             ClearAll();
-            System.Array.Clear(_pending, 0, _pending.Length);
         }
 
         // ---- the arrays ----
@@ -263,6 +276,8 @@ namespace CluckWars.Gameplay
         {
             for (int i = 0; i < Slots; i++)
                 if (DebtCounts[i] > 0) WriteSlot(i, default, default, false, 0f);
+            _spentFresh.Clear();
+            System.Array.Clear(_pending, 0, _pending.Length);   // no ask outlives the debts it would cash
         }
 
         private void Gain(ChickenController victim, in DebtFacts facts)
@@ -279,7 +294,7 @@ namespace CluckWars.Gameplay
             var after = DebtBook.Gain(before, facts.Cap, now, facts.Seconds);
             WriteSlot(i, victim.Id, after, true, facts.Seconds);
             if (after.Count <= before.Count) return;
-            LastDebtVictim = victim.Id;
+            DebtGainedVictim = victim.Id;
             DebtEventId++;   // wraps at 255 by design (ARCH-EVT-02); the victim is written first
         }
     }

@@ -73,8 +73,9 @@ namespace CluckWars.Abilities
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
+                bool lands = caster.PredictSlowLands(_scratch[i], EmittedControl);   // before the send: a victim this peer owns applies it inside SendControl
                 SendControl(caster, _scratch[i]);
-                ReportHit(caster, _scratch[i], AbilityJob.Slow, caster.PredictSlowLands(_scratch[i], EmittedControl));   // priced only where a passive sets HitStealSlow (shipped 0)
+                ReportHit(caster, _scratch[i], AbilityJob.Slow, lands);   // priced only where a passive sets HitStealSlow (shipped 0)
             }
         }
     }

@@ -1211,7 +1211,7 @@ namespace CluckWars.Gameplay
         /// <summary>
         /// Will a Stun <paramref name="emission"/> sent now affect <paramref name="victim"/>? <see cref="HitAffectRules.StunAffects"/> over what this peer
         /// sees of him (his stun left, his control immunity, his passive's shortening of the incoming seconds, a base wall between), the same primitives
-        /// his own <see cref="RPC_ApplyStun"/> runs. A prediction: a miss moves no food (every transfer is authority-confirmed).
+        /// his own <see cref="RPC_ApplyStun"/> runs. A prediction over replicated state: a wrong one can still let a priced hit ask for food (the victim's drain does not check that the stun landed), at most one hit amount per lock, inside the ARCH-NET-05 bound; accepted as a sub-round-trip race.
         /// </summary>
         public bool PredictStunLands(ChickenController victim, in ControlEmission emission)
         {

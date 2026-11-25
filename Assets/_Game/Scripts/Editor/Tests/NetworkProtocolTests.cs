@@ -17,7 +17,7 @@ namespace CluckWars.Tests
         // The fingerprint of the networked members as of NetworkProtocol.Version below. To update: change the layout, bump NetworkProtocol.Version,
         // run this test, and paste the value it prints into ExpectedFingerprint together with the new version in ExpectedVersion.
         private const int ExpectedVersion = 3;
-        private const string ExpectedFingerprint = "994246d1";
+        private const string ExpectedFingerprint = "3333cbdd";
 
         private static readonly Regex TypeDecl = new Regex(@"\b(?:class|struct)\s+(\w+)", RegexOptions.Compiled);
         private static readonly Regex Networked = new Regex(@"\[Networked(?:\([^\]]*\))?\]\s*(?:\[[^\]]*\]\s*)*([^{;=]+?)\s*(?:\{|;|=)", RegexOptions.Compiled);

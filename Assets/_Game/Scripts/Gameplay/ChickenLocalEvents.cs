@@ -153,7 +153,9 @@ namespace CluckWars.Gameplay
         public byte FreshHitEventId;
         public byte DebtEventId;
         public byte DebtCashEventId;
-        public NetworkBehaviourId DebtVictim;
+        public NetworkBehaviourId FreshHitVictim;
+        public NetworkBehaviourId DebtGainedVictim;
+        public NetworkBehaviourId DebtCashedVictim;
         public float DebtCashBonus;
     }
 
@@ -383,9 +385,11 @@ namespace CluckWars.Gameplay
                 s.FreshHitEventId = _debts.FreshHitEventId;
                 s.DebtEventId = _debts.DebtEventId;
                 s.DebtCashEventId = _debts.DebtCashEventId;
-                if (_freshHit.WouldFire(s.FreshHitEventId) || _debtGained.WouldFire(s.DebtEventId) || _debtCashed.WouldFire(s.DebtCashEventId))
+                if (_freshHit.WouldFire(s.FreshHitEventId)) s.FreshHitVictim = _debts.FreshHitVictim;
+                if (_debtGained.WouldFire(s.DebtEventId)) s.DebtGainedVictim = _debts.DebtGainedVictim;
+                if (_debtCashed.WouldFire(s.DebtCashEventId))
                 {
-                    s.DebtVictim = _debts.LastDebtVictim;
+                    s.DebtCashedVictim = _debts.DebtCashedVictim;
                     s.DebtCashBonus = _debts.LastCashBonus;
                 }
             }
@@ -439,11 +443,11 @@ namespace CluckWars.Gameplay
                 if (s.HasDebts)
                 {
                     if (_freshHit.Observe(s.FreshHitEventId))
-                        LocalRaise.Invoke(_freshHitListeners, nameof(FreshHit), Log, _controller, new FreshHitEvent(s.DebtVictim));
+                        LocalRaise.Invoke(_freshHitListeners, nameof(FreshHit), Log, _controller, new FreshHitEvent(s.FreshHitVictim));
                     if (_debtGained.Observe(s.DebtEventId))
-                        LocalRaise.Invoke(_debtGainedListeners, nameof(DebtGained), Log, _controller, new DebtGainedEvent(s.DebtVictim));
+                        LocalRaise.Invoke(_debtGainedListeners, nameof(DebtGained), Log, _controller, new DebtGainedEvent(s.DebtGainedVictim));
                     if (_debtCashed.Observe(s.DebtCashEventId))
-                        LocalRaise.Invoke(_debtCashedListeners, nameof(DebtCashed), Log, _controller, new DebtCashedEvent(s.DebtVictim, s.DebtCashBonus));
+                        LocalRaise.Invoke(_debtCashedListeners, nameof(DebtCashed), Log, _controller, new DebtCashedEvent(s.DebtCashedVictim, s.DebtCashBonus));
                 }
             }
             finally

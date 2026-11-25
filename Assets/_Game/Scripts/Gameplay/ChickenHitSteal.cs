@@ -10,7 +10,9 @@ namespace CluckWars.Gameplay
     /// <summary>
     /// The Bully's hit-steal in the game (design 2026-11-25, 16.2, BL-226): a Stun, Shove or instant Slow that really affects a rival asks the rival for
     /// the passive's food, into this chicken's ordinary cargo, once per victim per lock. The food moves only through <see cref="ChickenCargo.StealFrom(ChickenController, float)"/>
-    /// (authority-confirmed: the victim drains, this chicken credits what the victim reports), so a wrong "affected" prediction can move no food.
+    /// (authority-confirmed: the victim drains, this chicken credits what the victim reports). The "affected" prediction is the caster's, over replicated state,
+    /// and the victim's drain does not check whether the stun or shove landed (it checks bound, reach, shell, wall and load), so a wrong prediction can move food: at most one hit amount per lock,
+    /// inside the ARCH-NET-05 bound. Accepted as a sub-round-trip race (BL-226).
     /// Sibling of <see cref="ThiefLoot"/> and built the same way. Every chicken carries one; only a chicken whose passive holds hit-steal facts
     /// (<see cref="Facts"/>) does anything, the others return at the first line of <see cref="OnHit"/>.
     /// </summary>

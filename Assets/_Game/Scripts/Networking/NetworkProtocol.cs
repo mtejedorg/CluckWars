@@ -10,7 +10,7 @@ namespace CluckWars.Networking
     {
         /// <summary>
         /// 1: every build before the loot mark (its app version was empty). 2: <c>ThiefLoot</c> on the chicken, seven new networked properties and the
-        /// marked-steal RPCs (BL-217). 3: the Peck's fresh state on every chicken (<c>AbilityController.FedTick</c>, <c>FedStateId</c>, <c>FreshStateId</c>, <c>BittenStateId</c>, <c>RPC_MarkBitten</c>) for the Enforcer and its hit-steal sibling (BL-226). Bump it, then update the fingerprint in <c>NetworkProtocolTests</c> (the failing test prints the new value).
+        /// marked-steal RPCs (BL-217). 3: the Peck's fresh state on every chicken (<c>AbilityController.FedTick</c>, <c>FedStateId</c>, <c>FreshStateId</c>, <c>BittenStateId</c>, <c>RPC_MarkBitten</c>) for the Enforcer and its hit-steal sibling, plus the state of <c>ChickenHitSteal</c> (<c>HitStealEventId</c>, <c>LastHitVictim</c>, <c>LastHitTake</c>) and <c>EnforcerDebts</c> (the debt arrays, the three event ids, one victim field per event id, <c>LastCashBonus</c>) (BL-226). Bump it, then update the fingerprint in <c>NetworkProtocolTests</c> (the failing test prints the new value).
         /// </summary>
         public const int Version = 3;
 

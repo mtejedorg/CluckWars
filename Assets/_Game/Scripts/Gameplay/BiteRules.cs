@@ -34,6 +34,16 @@ namespace CluckWars.Gameplay
         public static bool LandedWithFood(int fedTick, byte fedStateId, byte freshStateId) =>
             fedTick != 0 && fedStateId == freshStateId;
 
+        /// <summary>
+        /// The fresh state id that follows <paramref name="current"/> (byte, wraps): never the value equal to <paramref name="bitten"/>, which would read as an
+        /// already-spent state (<c>BittenStateId == FreshStateId</c>) the moment the counter wrapped onto it.
+        /// </summary>
+        public static byte NextFreshState(byte current, byte bitten)
+        {
+            byte next = unchecked((byte)(current + 1));
+            return next == bitten ? unchecked((byte)(next + 1)) : next;
+        }
+
         /// <summary>The bite from a casting rival's pile: the rival's own Peck amount, held to the food in the pile and to the Enforcer's free room.</summary>
         public static float FromCast(float victimPeckAmount, float pileFood, float freeRoom)
         {

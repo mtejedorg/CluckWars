@@ -36,10 +36,10 @@ namespace CluckWars.Tests
         {
             StringAssert.Contains("chicken.Abilities.NoteFreshStart();", Body(PeckPath, "public override void OnActivate("));
             string note = Body(ControllerPath, "internal void NoteFreshStart()");
-            StringAssert.Contains("if (HasStateAuthority) FreshStateId++;", note, "only the chicken's own authority writes the id");
+            StringAssert.Contains("if (HasStateAuthority) FreshStateId = BiteRules.NextFreshState(FreshStateId, BittenStateId);", note, "only the chicken's own authority writes the id, never onto the bitten one");
             string fed = Body(ControllerPath, "internal void NotePeckFed()");
-            Assert.Less(fed.IndexOf("if (!HasStateAuthority", StringComparison.Ordinal), fed.IndexOf("FreshStateId++", StringComparison.Ordinal), "the authority gate comes first");
-            Assert.Less(fed.IndexOf("FreshStateId++", StringComparison.Ordinal), fed.IndexOf("FedStateId = FreshStateId", StringComparison.Ordinal), "the landing opens a new state and names it");
+            Assert.Less(fed.IndexOf("if (!HasStateAuthority", StringComparison.Ordinal), fed.IndexOf("FreshStateId = BiteRules.NextFreshState(", StringComparison.Ordinal), "the authority gate comes first");
+            Assert.Less(fed.IndexOf("FreshStateId = BiteRules.NextFreshState(", StringComparison.Ordinal), fed.IndexOf("FedStateId = FreshStateId", StringComparison.Ordinal), "the landing opens a new state and names it");
             StringAssert.Contains("FedTick = Runner.Tick.Raw", fed);
         }
 
