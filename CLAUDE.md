@@ -75,7 +75,7 @@ skill (commit, MemPalace wing `cluckwars`, graphify flag).
 
 **Models: Fable is an escalation, never a default.** The policy has one home, the "Model
 policy" paragraph of `~/.claude/CLAUDE.md` (tracked copy of the rule: CODE-PROC-03). In short:
-every agent here has its model in its frontmatter (`opus` for `code-architect`, `qa-reviewer`,
+every agent here has its model in its frontmatter (`opus` for `code-architect`, `qa-reviewer`, `oracle`,
 `mechanics-designer`; `sonnet` for the rest), and `fable` is passed per call only for (1) a
 problem `opus` already got wrong or stuck on, (2) a cross-system decision that is costly to
 reverse, or (3) the final verdict of a high-stakes synthesis. Never for implementation, lookups,
@@ -108,7 +108,8 @@ for design/triage.
 | Test plan, regression check, QA scenario | `tester` |
 | Feel, input timing, juice, hit reactions | `ux-designer` |
 | UI Canvas, HUD, UXML/USS, menus | `ui-designer` |
-| Mechanic design, ability spec, balance values | `mechanics-designer` |
+| Mechanic design, ability spec, the rule behind a balance change | `mechanics-designer` |
+| Measuring a proposal, simulator and what-if runs, why a result came out as it did, value check before a build, tag or delta | `oracle` |
 | Scene layout, food pile placement, map pacing | `level-designer` |
 | 2D sprites, icons, UI textures | `artist-2d` |
 | 3D meshes, chicken models, .fbx/.glb | `artist-3d` |
