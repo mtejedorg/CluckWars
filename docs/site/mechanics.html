@@ -116,8 +116,10 @@
       <table>
         <thead><tr><th>Class</th><th>Specialization</th><th>Passive</th><th>Kit</th></tr></thead>
         <tbody>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Steal 3 s, Stun 5.25 s, Jump 1.5 s)</td><td>Peck, Jump, Stun, Steal</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Relentless</td><td>Your stuns and slows last 30% longer (Stun 1.69 s, Slow 3.9 s); stuns, getting stuck and timed slows on you end 25% sooner</td><td>Peck, Speed, Slow, Steal</td></tr>
+          <!-- Source: Assets/_Game/Data/Abilities/Passives/Bully.asset (CooldownMultiplier 0.75, PeckCooldownMultiplier 1.4, HitStealStun 2, HitStealShove 2, HitStealLockSeconds 3, Kit: Peck, Jump, Stun, Shove); cooldowns 7/5/2 s from WingSlam/CluckShock/Shadowstep.asset: 7 x 0.75 = 5.25, 5 x 0.75 = 3.75, 2 x 0.75 = 1.5 -->
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Bully</td><td>Every move except Peck recharges 25% faster (Stun 5.25 s, Shove 3.75 s, Jump 1.5 s); Peck is 40% slower. A stun that lands takes 2 food from that rival, a shove that moves it takes 2, then that rival cannot be hit for food again for 3 s. No Steal move</td><td>Peck, Jump, Stun, Shove</td></tr>
+          <!-- Source: Assets/_Game/Data/Abilities/Passives/Enforcer.asset (DebtSteal 2, DebtCap 3, DebtSeconds 6, FreshSeconds 1.5, FreshBiteShare 0, PeckCooldownMultiplier 1.2, Kit: Peck, Stun, Shove, Steal); text: perk.enforcer.* in Assets/_Game/Resources/Text/UiText.csv; Steal 5 from Snatch.asset, 5 + 2 x 3 = 11 by Scripts/Gameplay/DebtRules.cs StealAmount -->
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td>Enforcer</td><td>Every stun or shove that lands makes that rival owe you a debt; hitting a rival that is pecking, or pecked food up in the last 1.5 s, adds one more (that hit takes no food). Each debt makes your Steal on that rival take 2 more food, up to 3 debts (a Steal of up to 11). Debts go away after 6 s with no new one. Peck is 20% slower</td><td>Peck, Stun, Shove, Steal</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Featherfoot</td><td>You bank food 10% faster; immune to the pile slow and the collision slow</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td>Slippery</td><td>Ability slows on you are 40% weaker and end 40% sooner (Slow Area holds you at 73% while you stand in it). Stuns, pile and bump slows still land in full</td><td>Peck, Speed, Slow, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Egg Shell, Shove</td></tr>
@@ -173,7 +175,8 @@
         </tbody>
       </table>
     </div>
-    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. The Egg Shell egg is immune to the whole ladder, while the Egg Shell walk is immune to ability slows only; steal-proofing is separate and only stops cargo being taken. A Relentless caster lengthens the stuns and slows it applies by 30% (a Relentless stun lasts 1.69 s), applied before the victim's own shortening; roots and placed zones are not lengthened.</p>
+    <!-- Source: Assets/_Game/Data/Abilities/Passives/Relentless.asset (Retired: 1, the only OutgoingDurationMultiplier 1.3 passive); the Enforcer and Bully assets carry no duration multipliers -->
+    <p>Stun is the only state that locks casting. That is exactly why it is the qualifier for the Assassin's execute. The Egg Shell egg is immune to the whole ladder, while the Egg Shell walk is immune to ability slows only; steal-proofing is separate and only stops cargo being taken. No passive lengthens the stuns and slows a caster applies any more (Relentless did, and is retired); a victim's own passive can still shorten them.</p>
   </section>
 
   <section id="deathmark">
