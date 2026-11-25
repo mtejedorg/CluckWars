@@ -220,8 +220,10 @@ details[open] > summary .avsum{display:none}
 <script>
 (function(){
 var G=/*KITLAB_DATA*/{};
+// A retired passive (Relentless since 2026-11-25: off the roster, asset kept) is not a specialization any more: no card, no picker entry.
+G.passives=G.passives.filter(function(p){return !p.retired;});
 var SUBS=G.passives.map(function(p){return {id:p.id,cls:p.cls,name:p.name,passive:p.id,kit:p.kit.slice()};});
-var ORDER=['Relentless','Bully','Slippery','Featherfoot','Hoarder','Bulwark','Spoiler','Thief'];
+var ORDER=['Enforcer','Bully','Slippery','Featherfoot','Hoarder','Bulwark','Spoiler','Thief'];
 SUBS.sort(function(a,b){return ORDER.indexOf(a.id)-ORDER.indexOf(b.id);});
 var AB={}; G.abilities.forEach(function(a){AB[a.id]=a;});
 var LABEL={Warrior:'Warrior',Speedy:'Speedy',Fatty:'Fatty',Assassin:'Sneaky'};
@@ -338,13 +340,21 @@ var STD=[
  {k:'peckAmt',label:'Peck amount',unit:'',std:3,better:'up',dec:1,why:'Shared by every class'},
  {k:'peckCd',label:'Peck cooldown',unit:' s',std:0.71,better:'down',dec:2,why:'Shared by Speedy and Fatty'},
  {k:'peckCast',label:'Peck cast',unit:' s',std:0.5,better:'down',dec:2,why:'Placeholder per class; Fatty longest'},
- {k:'cdr',label:'Cooldown reduction',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Relentless'},
+ {k:'cdr',label:'Cooldown reduction',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Bully'},
  {k:'steal',label:'Steal bonus',unit:'%',std:0,better:'up',dec:0,pct:true,why:'Every passive except Bully and Thief'},
- {k:'cc',label:'Stun/slow taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Relentless and Bulwark'},
+ {k:'cc',label:'Stun/slow taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Bulwark (the retired Relentless had 75)'},
  {k:'slowIn',label:'Ability slows taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Slippery (shorter and weaker; pile and bump slows still apply)'},
  {k:'kb',label:'Knockback taken',unit:'%',std:100,better:'down',dec:0,why:'Every passive except Bulwark'},
  {k:'bank',label:'Banking speed',unit:'%',std:100,better:'up',dec:0,why:'Every passive except Featherfoot'},
- {k:'ccOut',label:'Stun/slow applied',unit:'%',std:100,better:'up',dec:0,why:'Every passive except Relentless'},
+ {k:'ccOut',label:'Stun/slow applied',unit:'%',std:100,better:'up',dec:0,why:'No passive on the roster (the retired Relentless had 130)'},
+ {k:'peckSlow',label:'Peck slowdown',unit:'%',std:0,better:'down',dec:0,pct:true,only:'Warrior',why:'Only the Warrior kits slow their Peck: the Bully and the Enforcer forage less and earn the difference by hitting'},
+ {k:'hitStun',label:'Food per Stun hit',unit:'',std:0,better:'up',dec:1,only:'Warrior',why:'Only the Bully takes food from a Stun that lands'},
+ {k:'hitShove',label:'Food per Shove hit',unit:'',std:0,better:'up',dec:1,only:'Warrior',why:'Only the Bully takes food from a Shove that moves a rival'},
+ {k:'hitLock',label:'Same-rival lock',unit:' s',std:0,better:'down',dec:1,only:'Warrior',why:'Only the Bully: seconds before the same rival can be hit for food again'},
+ {k:'fresh',label:'Fresh window',unit:' s',std:0,better:'up',dec:1,only:'Warrior',why:'Only the Enforcer: seconds a rival stays fresh after its Peck landed (a hit on a fresh rival adds one more debt)'},
+ {k:'debtSteal',label:'Food per debt',unit:'',std:0,better:'up',dec:1,only:'Warrior',why:'Only the Enforcer: food each debt on a rival adds to its Steal on that rival'},
+ {k:'debtCap',label:'Debt cap',unit:'',std:0,better:'up',dec:0,only:'Warrior',why:'Only the Enforcer: most debts held on one rival'},
+ {k:'debtSecs',label:'Debt lifetime',unit:' s',std:0,better:'up',dec:1,only:'Warrior',why:'Only the Enforcer: seconds with no new debt after which a rival\u2019s debts go'},
  {k:'turn',label:'Turn speed',unit:'\u00b0/s',std:720,better:'up',dec:0,why:'Shared by every class'},
  {k:'size',label:'Body size',unit:'\u00d7',std:1,better:'none',dec:2,why:'No two classes share a size; Warrior is 1.0'}
 ];
@@ -367,7 +377,10 @@ function statsOf(s,k){
     slowIn:pn.Resist?Math.round(pn.Resist*100):100,
     kb:pn.KnockbackMultiplier?Math.round(pn.KnockbackMultiplier*100):100,
     bank:pn.DepositRateMultiplier?Math.round(pn.DepositRateMultiplier*100):100,
-    ccOut:pn.OutgoingDurationMultiplier?Math.round(pn.OutgoingDurationMultiplier*100):100};
+    ccOut:pn.OutgoingDurationMultiplier?Math.round(pn.OutgoingDurationMultiplier*100):100,
+    peckSlow:pn.PeckCooldownMultiplier?Math.round((pn.PeckCooldownMultiplier-1)*100):0,
+    hitStun:pn.HitStealStun||0,hitShove:pn.HitStealShove||0,hitLock:pn.HitStealLockSeconds||0,
+    fresh:pn.FreshSeconds||0,debtSteal:pn.DebtSteal||0,debtCap:pn.DebtCap||0,debtSecs:pn.DebtSeconds||0};
   var v={move:b.MoveSpeed,carry:carry,peckAmt:hasPeck?(num(b.PeckAmount)?b.PeckAmount:3):null,peckCd:hasPeck?(num(b.PeckCooldown)?b.PeckCooldown:1):null,peckCast:hasPeck?(num(b.PeckCastSeconds)?b.PeckCastSeconds:0.4):null,turn:b.TurnSpeed,size:b.Scale};
   Object.keys(raw).forEach(function(x){v[x]=num(k.stats[x])?k.stats[x]:raw[x];});
   return {custom:custom,hasPeck:hasPeck,v:v,raw:raw,base:b,baseCarry:baseCarry};}
@@ -400,13 +413,14 @@ function statsPanel(s,k){
   d.appendChild(el('summary',{text:'Stats vs standard (centre line)'}));
   var anyMod=false;
   STD.forEach(function(r){
+    if(r.only&&r.only!==s.cls)return;
     var v=st.v[r.k], row=el('div',{'class':'srow'}), sd=stdOf(r), abs=(sd===0);
     row.appendChild(el('span',{text:r.label+(BASEKEY[r.k]?'':' · kit')}));
     var wrap=el('div',{'class':'swrap'}), bar=el('div',{'class':'sbar'}), fill=el('i'), sm;
     var cell=el('div',{'class':'sv'});
     if(v===null||v===undefined){fill.style.width='0';cell.appendChild(document.createTextNode('—'));sm=el('small',{'class':'eq',text:'no Peck'});}
     else{
-      var rg=rangeOf(r), frac=rg.frac(v), delta=abs?Math.round(v):Math.round((v/sd-1)*100);
+      var rg=rangeOf(r), frac=rg.frac(v), delta=abs?(r.pct?Math.round(v):Math.round(v*10)/10):Math.round((v/sd-1)*100);
       fill.style.width=(frac*100).toFixed(1)+'%';
       var dir=delta===0||r.better==='none'?'eq':((delta>0)===(r.better==='up')?'up':'down');
       if(dir!=='eq')fill.className=dir;
@@ -425,7 +439,7 @@ function statsPanel(s,k){
         setStat(s,k,st,r.k,x);};
       cell.appendChild(inp);
       var extra=(r.k==='carry'&&v!==ev)?' · '+fmtV(r,v)+' total':'';
-      sm=el('small',{'class':dir,text:(delta===0?'standard':(delta>0?'+':'')+delta+'%'+(abs&&r.pct?' pts':''))+extra});
+      sm=el('small',{'class':dir,text:(delta===0?'standard':(delta>0?'+':'')+delta+(abs&&!r.pct?r.unit:'%')+(abs&&r.pct?' pts':''))+extra});
       wrap.appendChild(bar);
       wrap.appendChild(el('div',{'class':'sends','aria-hidden':'true'},[el('span',{text:fmtEnd(rg.lo)}),el('span',{text:fmtEnd(sd)}),el('span',{text:fmtEnd(rg.hi)})]));
     }
@@ -446,7 +460,7 @@ function statsPanel(s,k){
 
 // Built-in class rules (shipped behaviour, from GDD 5.2 and the class assets): not passives, they apply to both specializations.
 var CLASS_RULES={
- Warrior:['The all-rounder: a bit of everything, weaker than the specialists. Both specializations carry Peck, Steal, one crowd control and one mobility move (Maestro, 2026-11-05).','10.125 m/s, carries 14, pecks every 0.79 s (the slowest Peck).','Target: clears the map alone in 35 s over 3 trips.'],
+ Warrior:['The all-rounder: a bit of everything, weaker than the specialists. Two kits (Maestro, 2026-11-25): the Bully takes food when its Stun or Shove lands, the Enforcer stacks debts on rivals that make its Steal bigger; both forage slower. Relentless is retired, kept as a possible future idea.','Base numbers (speed, carry, Peck) are in the stats panel, read from the shipped assets.','Target: clears the map alone in 35 s over 3 trips.'],
  Speedy:['Never gets terrain traversal: no Jump or vault over walls (Maestro, 2026-08-21). Speed and control are its escape.','Fastest forager: 12.15 m/s, pecks every 0.71 s, but carries only 10.','Target: 30 s over 4 trips.'],
  Fatty:['Biggest body (1.35\u00d7) and biggest beak: carries 35.','Slow (10.125 m/s) but pecks fast (0.71 s). Target: 30 s over 2 trips.'],
  Assassin:['Cannot forage: neither kit has Peck, so all of its food comes from stealing and executes.','Exempt from the solo-clear target (40 s), because it is meant to deny, not collect.','Fast (11.1 m/s) and carries 10; the only class with a hard removal (Death Mark).','Shown as Sneaky; in code it is ChickenClass.Assassin.']
@@ -547,7 +561,10 @@ function fromLocal(){try{state.kits=JSON.parse(localStorage.getItem('kitlab.kits
 // asset = SO asset name, only values that differ from shipped, deny-listed fields never included, whole delta only if it is valid.
 var DP_PASSIVE={cdr:['CooldownMultiplier',function(v){return 1-v/100;}],steal:['StealMultiplier',function(v){return 1+v/100;}],
   cc:['DurationMultiplier',function(v){return v/100;}],slowIn:['Resist',function(v){return v/100;}],kb:['KnockbackMultiplier',function(v){return v/100;}],
-  bank:['DepositRateMultiplier',function(v){return v/100;}],ccOut:['OutgoingDurationMultiplier',function(v){return v/100;}]};
+  bank:['DepositRateMultiplier',function(v){return v/100;}],ccOut:['OutgoingDurationMultiplier',function(v){return v/100;}],
+  peckSlow:['PeckCooldownMultiplier',function(v){return 1+v/100;}],hitStun:['HitStealStun',function(v){return v;}],hitShove:['HitStealShove',function(v){return v;}],
+  hitLock:['HitStealLockSeconds',function(v){return v;}],fresh:['FreshSeconds',function(v){return v;}],debtSteal:['DebtSteal',function(v){return v;}],
+  debtCap:['DebtCap',function(v){return v;}],debtSecs:['DebtSeconds',function(v){return v;}]};
 var DP_DENY={AllowedClasses:1,PeckSlotPreEquippedBy:1,SignaturePreEquippedBy:1,Category:1,BotRole:1,AccentKey:1,TerrainTraversal:1,JumpTier:1,CastMotion:1,Retired:1,Subclass:1,FreshBiteShare:1,MaxPlayers:1,TargetingMode:1,LoadoutMode:1};
 function r4(v){return Math.round(v*10000)/10000;}
 function buildDelta(){

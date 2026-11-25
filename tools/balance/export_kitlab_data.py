@@ -3,7 +3,7 @@
 
 Usage:  python -I tools/balance/export_kitlab_data.py > g.json
 
-Output: {"classes","abilities","passives","lim","ints"}. `lim` = {asset: {field: [min|null, max|null]}} and `ints` =
+Output: {"classes","abilities","passives","lim","ints"} (a passive carries `retired`; the page leaves a retired one out). `lim` = {asset: {field: [min|null, max|null]}} and `ints` =
 {asset: [whole-number fields]} come from the [Range]/[Min] attributes and field types (schema.py), so the page can
 refuse the values BalanceBook would refuse. Abilities: every non-passive ability asset, `inRegistry` says whether
 AbilityRegistry.asset lists it; `trav` is its TerrainTraversal. Reads only; never writes.
@@ -28,8 +28,9 @@ def num(v):
 
 def field(text, name):
     import re
-    m = re.search(rf"^  {name}: (.*)$", text, re.M)
-    v = m.group(1).strip() if m else ""
+    # Unity folds a long scalar over indented continuation lines: join them, or a long Description reads cut off.
+    m = re.search(rf"^  {name}: (.*(?:\n    .*)*)$", text, re.M)
+    v = " ".join(part.strip() for part in m.group(1).split("\n")).strip() if m else ""
     if v[:1] in "\"'" and v[-1:] == v[:1]:
         v = v[1:-1].replace('\\"', '"')
     return v
@@ -57,6 +58,7 @@ def main():
         if a.is_passive:
             passives.append({"id": name, "name": field(a.text, "DisplayName"), "desc": field(a.text, "Description"),
                              "cls": cls[0] if cls else "", "subclass": int(sc.get("Subclass", 0)), "nums": nums,
+                             "retired": bool(int(sc.get("Retired", 0))),   # Relentless since 2026-11-25: the page shows no card for it
                              "kit": schema.kit_of(a, g)})
         else:
             abilities.append({"id": name, "name": field(a.text, "DisplayName"), "desc": field(a.text, "Description"),

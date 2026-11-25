@@ -32,6 +32,7 @@ ENUM_DECL = re.compile(r"\benum\s+(\w+)")
 NUM = r"(-?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)f?"
 RANGE = re.compile(r"Range\(\s*" + NUM + r"\s*,\s*" + NUM + r"\s*\)")
 MIN = re.compile(r"\bMin\(\s*" + NUM + r"\s*\)")
+MIN_CONST = re.compile(r"\bMin\(\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\)")   # [Min(PeckCastRules.MinCooldownMultiplier)]: a named constant
 PRIMS = {"float": "float", "int": "int", "bool": "bool", "byte": "int", "short": "int"}
 
 
@@ -53,6 +54,18 @@ def _scan_sources():
 
 
 _CLASSES = _ENUMS = None
+
+
+def _const_value(owner, name):
+    """The number of `const float|int name = N` declared in the class `owner` (a [Min(Owner.Name)] limit), or None when it is not a plain literal."""
+    for p in SCRIPTS.rglob("*.cs"):
+        t = p.read_text(encoding="utf-8", errors="replace")
+        if not re.search(r"\b(?:class|struct)\s+" + re.escape(owner) + r"\b", t):
+            continue
+        m = re.search(r"\bconst\s+(?:float|int|double)\s+" + re.escape(name) + r"\s*=\s*" + NUM, t)
+        if m:
+            return float(m.group(1))
+    return None
 
 
 def class_fields(cls):
@@ -79,6 +92,9 @@ def class_fields(cls):
             m = MIN.search(attrs)
             if m:
                 lo = float(m.group(1))
+            c = MIN_CONST.search(attrs)
+            if c:
+                lo = _const_value(c.group(1), c.group(2))
             out[name] = Field(kind, lo, hi)
         cls = base
     return out

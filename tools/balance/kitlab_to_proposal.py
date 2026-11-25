@@ -11,7 +11,10 @@ Output: {"note", "assets", "kits", "needsBuild": [...], "leftOut": [...]}; make_
 the rest. Same mapping as the page's buildDelta (kitlab_map.py): class base stats move/carry/peckAmt/peckCd/peckCast/turn/size ->
 MoveSpeed/CargoCapacity/PeckAmount/PeckCooldown/PeckCastSeconds/TurnSpeed/Scale; passive percentages cdr/steal/cc/slowIn/kb/bank/ccOut ->
 CooldownMultiplier=1-v/100, StealMultiplier=1+v/100, DurationMultiplier, Resist, KnockbackMultiplier,
-DepositRateMultiplier, OutgoingDurationMultiplier = v/100; a slot swap with an unchanged passive -> `kits`.
+DepositRateMultiplier, OutgoingDurationMultiplier = v/100, peckSlow -> PeckCooldownMultiplier=1+v/100; the Warrior kits' plain numbers
+hitStun/hitShove/hitLock/fresh/debtSteal/debtCap/debtSecs -> HitStealStun/HitStealShove/HitStealLockSeconds/FreshSeconds/DebtSteal/
+DebtCap/DebtSeconds; a slot swap with an unchanged passive -> `kits`. A passive that is not in the registry (the retired Relentless) goes to
+"needsBuild".
 "needsBuild": passive swaps, NEW (custom:) abilities and retired moves, which a delta cannot carry. Deviation from the page:
 the page silently leaves out a value that fails a limit; here make_delta.py refuses the whole proposal and says why.
 """
@@ -59,6 +62,9 @@ def convert(dump, assets=None, note=None):
         label = f"{pid}"
         if doc.get("passive", pid) != pid:
             build.append(f"{label}: passive swapped to {doc.get('passive')} (needs a build)")
+            continue
+        if pid not in live:
+            build.append(f"{label} is retired or not in the registry (Relentless since 2026-11-25): its edits cannot be set from a delta")
             continue
         slots = doc.get("slots")
         if slots and slots != schema.kit_of(p, g):
