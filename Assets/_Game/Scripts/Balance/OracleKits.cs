@@ -46,10 +46,23 @@ namespace CluckWars.Balance
                 {
                     if (shipped == null) continue;
                     var kit = ResolveKit(inputs, shipped);
-                    kits.Add(Build(scope, inputs, shipped.Subclass.ToString(), shipped.Subclass.ClassOf(), scope.Of(shipped), kit, match, peck));
+                    kits.Add(Build(scope, inputs, LabelOf(shipped), shipped.Subclass.ClassOf(), scope.Of(shipped), kit, match, peck));
                 }
             }
             return kits.ToArray();
+        }
+
+        /// <summary>
+        /// A passive's kit label: its <see cref="ChickenSubclass"/> name when the asset is named like the subclass's suffix (every shipped passive:
+        /// <c>Fatty_Hoarder</c>), else <c>&lt;Class&gt;_&lt;asset name&gt;</c>, so a passive seated by a what-if roster swap reads <c>Warrior_TrophyHunter</c>.
+        /// </summary>
+        public static string LabelOf(PassiveAbilitySO passive)
+        {
+            if (passive == null) throw new ArgumentNullException(nameof(passive));
+            string subclass = passive.Subclass.ToString();
+            int cut = subclass.IndexOf('_');
+            string suffix = cut >= 0 ? subclass.Substring(cut + 1) : subclass;
+            return passive.name == suffix ? subclass : passive.Subclass.ClassOf() + "_" + passive.name;
         }
 
         /// <summary>The naked Warrior: its class stats, no passive, no abilities beyond the Peck, no burst, no jump.</summary>

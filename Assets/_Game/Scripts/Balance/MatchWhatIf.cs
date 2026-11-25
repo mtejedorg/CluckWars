@@ -22,6 +22,11 @@ namespace CluckWars.Balance
         public const string BaselineName = "baseline";
         public double ReplicateScale = 1.0;
         public List<WhatIfScenario> Scenarios = new List<WhatIfScenario>();
+        /// <summary>
+        /// The roster swap (<c>"roster":{"Relentless":"TrophyHunter"}</c>, asset names): the passive named by the key gives its seat to the one named by the
+        /// value for the whole run, baseline included (<see cref="OracleRoster"/>). Empty for no swap.
+        /// </summary>
+        public List<KeyValuePair<string, string>> Roster = new List<KeyValuePair<string, string>>();
 
         public static bool TryParse(string text, out WhatIfSpec spec, out string error)
         {
@@ -36,6 +41,16 @@ namespace CluckWars.Balance
                     case "replicateScale":
                         if (member.Value.Kind != JsonKind.Number || !(member.Value.Number > 0.0)) { error = "\"replicateScale\" must be a number above zero"; return false; }
                         result.ReplicateScale = member.Value.Number;
+                        break;
+                    case "roster":
+                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"TrophyHunter\"}"; return false; }
+                        foreach (var swap in member.Value.Members)
+                        {
+                            if (swap.Value.Kind != JsonKind.String || string.IsNullOrWhiteSpace(swap.Value.Text) || string.IsNullOrWhiteSpace(swap.Key))
+                            { error = $"\"roster\" entry \"{swap.Key}\" must name a passive asset as a string"; return false; }
+                            if (result.Roster.Any(r => r.Key == swap.Key)) { error = $"\"roster\" names \"{swap.Key}\" twice"; return false; }
+                            result.Roster.Add(new KeyValuePair<string, string>(swap.Key, swap.Value.Text));
+                        }
                         break;
                     case "scenarios":
                         if (member.Value.Kind != JsonKind.Array) { error = "\"scenarios\" must be an array"; return false; }
@@ -122,6 +137,8 @@ namespace CluckWars.Balance
         public int MatchesPlayed;
         public double ElapsedSeconds;
         public string SpoilerKit, ThiefKit;
+        /// <summary>The roster swap this run played under, as "Relentless -> TrophyHunter" lines; null for none.</summary>
+        public string Roster;
         public string[] KitLabels;
         public WhatIfResult Baseline;
         public List<WhatIfResult> Scenarios = new List<WhatIfResult>();
@@ -180,6 +197,7 @@ namespace CluckWars.Balance
             {
                 BalanceHash = baseContext.BalanceHash, MapFingerprint = baseContext.Map != null ? baseContext.Map.SceneFingerprint : string.Empty,
                 RunSeed = seed, ReplicateScale = spec.ReplicateScale, Threads = threads,
+                Roster = spec.Roster.Count > 0 ? string.Join(", ", spec.Roster.Select(r => r.Key + " -> " + r.Value)) : null,
                 KitLabels = baseContext.Kits.Select(k => k.Label).ToArray(),
                 SpoilerKit = baseContext.Kits.FirstOrDefault(k => k.Passive.MatchEndBonusFood > 0f)?.Label,
                 ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Loot.IsThief || k.Passive.StealFactor > 1f)?.Label,
@@ -362,6 +380,11 @@ namespace CluckWars.Balance
             sb.AppendLine("# Match what-if report (Balance Oracle v2, part 2)");
             sb.AppendLine();
             sb.AppendLine($"Balance `bal={o.BalanceHash}` (the shipped game), map `{o.MapFingerprint}`, run seed `0x{o.RunSeed:x16}`. {o.Scenarios.Count} scenarios ({o.Scenarios.Count(s => s.Refused)} refused), {o.MatchesPlayed} matches in {o.ElapsedSeconds / 60.0:0.0} min on {o.Threads} threads.");
+            if (o.Roster != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Roster swap for the whole run, baseline included (simulator only; the game's registry is untouched): {o.Roster}.");
+            }
             sb.AppendLine();
             sb.AppendLine("## How to read this");
             sb.AppendLine();
@@ -589,7 +612,7 @@ namespace CluckWars.Balance
         public static string Json(WhatIfOutput o)
         {
             var sb = new StringBuilder();
-            sb.Append($"{{\"schema\":1,\"balanceHash\":{S(o.BalanceHash)},\"mapFingerprint\":{S(o.MapFingerprint)},\"runSeed\":{S("0x" + o.RunSeed.ToString("x16"))},\"replicateScale\":{N((float)o.ReplicateScale)},\"threads\":{o.Threads},\"matchesPlayed\":{o.MatchesPlayed},\"elapsedSeconds\":{N((float)o.ElapsedSeconds)},\"spoilerKit\":{S(o.SpoilerKit)},\"thiefKit\":{S(o.ThiefKit)}");
+            sb.Append($"{{\"schema\":1,\"balanceHash\":{S(o.BalanceHash)},\"mapFingerprint\":{S(o.MapFingerprint)},\"runSeed\":{S("0x" + o.RunSeed.ToString("x16"))},\"replicateScale\":{N((float)o.ReplicateScale)},\"threads\":{o.Threads},\"matchesPlayed\":{o.MatchesPlayed},\"elapsedSeconds\":{N((float)o.ElapsedSeconds)},\"spoilerKit\":{S(o.SpoilerKit)},\"thiefKit\":{S(o.ThiefKit)},\"roster\":{S(o.Roster)}");
             sb.Append(",\"kits\":[" + string.Join(",", o.KitLabels.Select(S)) + "]");
             sb.Append(",\"baseline\":[" + string.Join(",", Compare(o.Baseline.Numbers, o.Baseline.Numbers).Select(LineJson)) + "]");
             sb.Append(",\"scenarios\":[" + string.Join(",", o.Scenarios.Select(s =>

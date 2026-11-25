@@ -224,5 +224,14 @@ namespace CluckWars.Tests
             Assert.Greater(rules.TickSeconds, 0f);
             Assert.IsFalse(OracleKits.Rules(Inputs(), false, FarmFoodEvent.None).StopAtTarget);
         }
+
+        [Test]
+        public void LabelOf_ShippedPassivesKeepTheirSubclassName_TheSwapReadsWarriorTrophyHunter()
+        {
+            foreach (var passive in _abilities.Passives)
+                Assert.AreEqual(passive.Subclass.ToString(), OracleKits.LabelOf(passive), $"{passive.name} keeps the label the reports already use");
+            var hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/TrophyHunter.asset");
+            Assert.AreEqual("Warrior_TrophyHunter", OracleKits.LabelOf(hunter), "an asset not named like its subclass's suffix reads <Class>_<asset>");
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CluckWars.Abilities;
@@ -229,10 +230,23 @@ namespace CluckWars.EditorTools
 
             var inputs = Inputs();
             WhatIfOutput output;
-            using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
+            AbilityRegistrySO swapped = null;
+            try
             {
-                inputs.Book = book;
-                output = MatchWhatIf.Run(inputs, OracleMapBaker.ArenaHalf(), BotArrivalRadius(), spec, seed, threads, LoadReference(), line => log.Info(Source, line));
+                if (spec.Roster.Count > 0)
+                {
+                    swapped = SwapRoster(inputs.Abilities, spec.Roster, log);
+                    inputs.Abilities = swapped;
+                }
+                using (var book = new BalanceBook(log, inputs.Abilities, inputs.Classes, inputs.Match, inputs.Map))
+                {
+                    inputs.Book = book;
+                    output = MatchWhatIf.Run(inputs, OracleMapBaker.ArenaHalf(), BotArrivalRadius(), spec, seed, threads, LoadReference(), line => log.Info(Source, line));
+                }
+            }
+            finally
+            {
+                if (swapped != null) UnityEngine.Object.DestroyImmediate(swapped);
             }
 
             string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
@@ -242,6 +256,39 @@ namespace CluckWars.EditorTools
             File.WriteAllText(md, MatchWhatIf.Markdown(output));
             log.Info(Source, $"Match what-if written: {md} and {json} ({output.Scenarios.Count} scenarios, {output.Scenarios.Count(s => s.Refused)} refused, {output.MatchesPlayed} matches in {output.ElapsedSeconds / 60.0:0.0} min).");
             return (json, md);
+        }
+
+        /// <summary>
+        /// The what-if roster swap: a copy of <paramref name="shipped"/> with each named passive replaced by the passive asset of the other name (found
+        /// anywhere under <c>Assets/_Game/Data</c>, so one outside the registry such as the Trophy Hunter qualifies). The caller destroys the returned copy.
+        /// </summary>
+        private static AbilityRegistrySO SwapRoster(AbilityRegistrySO shipped, IReadOnlyList<KeyValuePair<string, string>> roster, ILogService log)
+        {
+            var current = shipped;
+            try
+            {
+                foreach (var swap in roster)
+                {
+                    var outgoing = current.Passives.FirstOrDefault(p => p.name == swap.Key);
+                    if (outgoing == null) throw new InvalidOperationException($"The what-if roster names '{swap.Key}', which is not a passive of the ability registry.");
+                    var matches = AssetDatabase.FindAssets("t:PassiveAbilitySO " + swap.Value, new[] { TestAssets.DataRoot })
+                        .Select(AssetDatabase.GUIDToAssetPath)
+                        .Where(path => Path.GetFileNameWithoutExtension(path) == swap.Value)
+                        .ToList();
+                    if (matches.Count != 1)
+                        throw new InvalidOperationException($"The what-if roster names '{swap.Value}': {matches.Count} passive assets of that name under {TestAssets.DataRoot} (need exactly one).");
+                    var next = OracleRoster.Swap(current, outgoing, AssetDatabase.LoadAssetAtPath<PassiveAbilitySO>(matches[0]));
+                    if (current != shipped) UnityEngine.Object.DestroyImmediate(current);
+                    current = next;
+                    log.Info(Source, $"What-if roster swap: {swap.Key} gives its seat to {swap.Value} ({matches[0]}).");
+                }
+            }
+            catch
+            {
+                if (current != shipped) UnityEngine.Object.DestroyImmediate(current);
+                throw;
+            }
+            return current;
         }
 
         private static (ulong seed, int threads) MatchArguments()
