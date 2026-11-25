@@ -101,7 +101,7 @@
           <!-- Source: docs/GDD.md §5.2 roster table; Peck cast: Assets/_Game/Data/Classes/{Fatty,Speedy,Warrior}.asset PeckCastSeconds -->
           <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td class="num">0.7 s</td><td>"Slow, but it all fits in the beak."</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.125</td><td class="num">14</td><td class="num">0.79 s</td><td class="num">0.5 s</td><td>"The farm is a battlefield."</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.8</td><td class="num">20</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"The farm is a battlefield."</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">11.1</td><td class="num">10</td><td class="num">cannot forage</td><td class="num">n/a</td><td>"Blink and your food is gone."</td></tr>
         </tbody>
       </table>
@@ -123,7 +123,7 @@
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Bulwark</td><td>Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner</td><td>Peck, Stun, Egg Shell, Shove</td></tr>
           <tr><td><span class="tag t-fatty">Fatty</span></td><td>Hoarder</td><td>Carries at least 40 food, a full win's worth</td><td>Peck, Slow Area, Egg Shell, Steal</td></tr>
           <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Spoiler</td><td>His Hunt picks the leader (most food banked) twice as often; carries at least 30 food</td><td>Hunt, Jump, Hide, Stun</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>A steal on his marked rival adds 10 new food; carries at least 15 food; banks 20 bonus food if the clock expires with no winner</td><td>Steal, Jump, Hide, Slow Area</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td>Thief</td><td>A steal on his marked rival adds 8 new food; his steals take 8; carries at least 16 food; banks 20 bonus food if the clock expires with no winner</td><td>Steal, Jump, Hide, Slow Area</td></tr>
         </tbody>
       </table>
     </div>
@@ -138,7 +138,7 @@
     <p>All chicken-to-chicken interaction is steal or control. There is no basic attack. A steal moves cargo directly from victim to thief; nothing drops on the floor. The amount is capped three ways:</p>
     <pre><code>stolen = min(steal value, free space, defender cargo)   // never negative</code></pre>
     <p>A loaded thief has no free space, so it cannot steal. Theft is a rhythm of steal, bank, return, not a drain. A steal-proof bird (an Egg Shell egg) refuses every steal, so the formula never runs against it.</p>
-    <p>The Thief has one more rule, his loot mark. While a round runs, one rival at a time carries it, drawn by lottery (more likely the more food he has banked or carries, with a plus above 25). A steal that reaches that rival takes its food as usual and then adds 10 new food, both into the Thief's ordinary cargo and each held to its free room; what does not fit is lost. A shell or a base wall refuses it and the mark stays. The next mark appears a second before Steal is ready again, and a mark older than 12 s moves on while Steal is on cooldown. Only the Thief has a mark; a Steal cast by any other kit is unchanged. At the clock, with nobody at the target, the Thief banks 20 bonus food before the winner is picked (the Spoiler no longer does).</p>
+    <p>The Thief has one more rule, his loot mark. While a round runs, one rival at a time carries it, drawn by lottery (more likely the more food he has banked or carries, with a plus above 25). A steal that reaches that rival takes its food as usual (8 for the Thief, whose steals are 1.6 times the usual 5) and then adds 8 new food, both into the Thief's ordinary cargo and each held to its free room; what does not fit is lost. A shell or a base wall refuses it and the mark stays. The next mark appears a second before Steal is ready again, and a mark older than 12 s moves on while Steal is on cooldown. Only the Thief has a mark; a Steal cast by any other kit is unchanged. At the clock, with nobody at the target, the Thief banks 20 bonus food before the winner is picked (the Spoiler no longer does).</p>
     <p>What each player sees of the loot mark: only the Thief and the marked rival see anything, and the picture is a bag of coins, never a crown. The Thief gets a coin-bag marker on the marked rival (on that rival's arrow while it is outside the circle of arrows round his bird, over its head inside the circle), gold brackets on the ground while the rival is inside Steal's reach (grey when a base wall or an egg shell stops the steal), a dot on the Steal button that fills while the next mark is coming and turns solid gold a second before Steal is ready, and a LOOT +10 pop with a strong buzz when a marked steal pays. A hidden rival hides the bag. The marked rival gets a coin-bag badge reading LOOT over its own name, a MARKED! pop with a short buzz when the mark lands, and a bag on the Thief's arrow. Everyone else sees nothing, and the clock prize has no effect of its own. The bag is a placeholder drawing until the 2D artist makes one.</p>
 
     <form class="calc" id="calc" hidden aria-label="Steal calculator">
@@ -221,7 +221,7 @@
           <tr data-c="everyone"><td>Hide <span class="tag t-shared">Everyone</span></td><td class="num">4.5 s</td><td>Fades you to a ghostly outline for 2 s. Using a move breaks it.</td></tr>
 
           <tr data-c="limited"><td>Jump <span class="tag t-shared">Not Speedy</span></td><td class="num">2 s</td><td>A quick dash forward, straight over walls (3&times; speed for 0.18 s: about 6 m for Sneaky, 5.5 m for Warrior).</td></tr>
-          <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>A cast of 0.4 to 0.7 s by class (Speedy 0.4, Warrior 0.5, Fatty 0.7): you are rooted, and the beakful is taken when it ends. A stun, a shove, an execution or your own next move cuts it and takes nothing; a slow or being robbed does not. Forced for every forager.</td></tr>
+          <tr data-c="limited"><td>Peck <span class="tag t-shared">Pre-equipped</span></td><td class="num">0.8 s</td><td>A cast of 0.4 to 0.7 s by class (Speedy and Warrior 0.4, Fatty 0.7): you are rooted, and the beakful is taken when it ends. A stun, a shove, an execution or your own next move cuts it and takes nothing; a slow or being robbed does not. Forced for every forager.</td></tr>
           <tr data-c="limited"><td>Hunt <span class="tag t-assassin">Spoiler</span></td><td class="num">4 / 8 s</td><td>The execute. Marks a rival anywhere for 5 s, likelier far from home and from you; it goes live after 3 s, so the Kill is in the last 2 seconds. Cooldown 4 s after a miss, 8 s after a kill. Within 6.2 m, stun them, then press again to take everything they carry. Starts each round on a 4 s cooldown.</td></tr>
         </tbody>
       </table>
@@ -257,7 +257,7 @@
       <li><b>Keyboard, scheme B:</b> the arrows move; Q, W, R and E fire slots 1 to 4. The choice is a Settings row.</li>
       <li>Digits 1 to 4 fire the slots in both schemes. Esc or the right mouse button cancels.</li>
       <li><b>Peck is the exception to hold-and-release.</b> A tap pecks. Holding the Peck slot for 0.5 s toggles Auto-Peck, and an AUTO tag shows on the hex while it is on.</li>
-      <li><b>Peck is a cast.</b> A tap starts a cast of 0.4 s (Speedy), 0.5 s (Warrior) or 0.7 s (Fatty) and roots you; the food is taken when it ends. A stun, a shove, an execution or your own next move cuts it and nothing is taken, while the cooldown is still spent; so does a pile another chicken empties before your cast ends. A slow or being robbed does not cut it. <!-- Source: docs/GDD.md section 5.2 (BL-206); PeckCastSeconds in Assets/_Game/Data/Classes/*.asset --></li>
+      <li><b>Peck is a cast.</b> A tap starts a cast of 0.4 s (Speedy, Warrior) or 0.7 s (Fatty) and roots you; the food is taken when it ends. A stun, a shove, an execution or your own next move cuts it and nothing is taken, while the cooldown is still spent; so does a pile another chicken empties before your cast ends. A slow or being robbed does not cut it. <!-- Source: docs/GDD.md section 5.2 (BL-206); PeckCastSeconds in Assets/_Game/Data/Classes/*.asset --></li>
       <li><b>Superseded design (design note, 2026-11-21).</b> Peck used to take its food at the press and then lock movement for 0.4 s. That rule is gone: the food now comes at the end of the cast.</li>
     </ul>
     <figure>
