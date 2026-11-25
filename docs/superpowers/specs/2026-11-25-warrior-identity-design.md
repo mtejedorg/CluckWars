@@ -755,3 +755,341 @@ K kit only (fresh 0, debt steal 0), H hits only (debt steal 2, fresh 0), A ancho
 - **The old bite is worth a few points, not a different kit.** B against A: +2.4 / +4.3 / +2.4 at 1.0, +4.3 / +3.5 / +3.7 at 1.5 (P0 / P1 / mixed), and 2 more food a match of identity; with the food off the Enforcer keeps most of it.
 - **Gap against the other kits.** The shipped Steal kits keep a wide P0 / P1 gap (Relentless 10.2 / 32.3, the Enforcer kit only 8.7 / 31.9): P0, the game's bot, plays a plain Steal kit badly, and BL-225 lifted P1 for every Steal holder. Where P0 plays a rule that fights (H, A, T1, T3) the Enforcer's gap is 5 to 6 points. That is a bot question, not a number to tune.
 - **Neighbours.** At multipliers up to 1.25 no non-Warrior kit moves more than about 4 points; at 1.5 Slippery, Featherfoot and Fatty_Bulwark gain 5 to 6 in P1 because a slow Enforcer leaves them the piles.
+
+## 16. Game build (planned 2026-11-25, after Maestro's go)
+
+Maestro, 2026-11-25: both kits go into the game now ("Haz todo, da igual el orden"); Relentless leaves the roster and stays on the shelf ("vamos a
+guardar al Relentless como idea posible futura"). This section is the build plan; it supersedes section 11 and, for the shipped game, the "simulator
+only, not registered" lines of sections 4.4 and 5 and of the `EnforcerPassiveSO` and `Enforcer.asset` comments. Read on `develop` at `f53cec54`.
+
+### 16.1 What ships
+
+Measured in `Captures/oracle/match-whatif-20261125-145655.md` (Bully) and `-145019.md` (Enforcer, roster swap), seed `0x1352902`, the shipped game
+as baseline; win rates P0 / P1 / mixed.
+
+| Kit | Kit slots | Passive values | Measured |
+|---|---|---|---|
+| Bully (`Bully.asset`) | Peck, Shadowstep (Jump), WingSlam (Stun), CluckShock (Shove); no Steal | `CooldownMultiplier` 0.75 (kept), `HitStealStun` 2, `HitStealShove` 2, `HitStealSlow` 0, `HitStealLockSeconds` 3, `PeckCooldownMultiplier` 1.4 | 26.9 / 27.1 / 22.4; worst 5 s loss for a victim 2.19 mean, 4 at p95 |
+| Enforcer (`Enforcer.asset`) | Peck, WingSlam (Stun), CluckShock (Shove), Snatch (Steal) | `FreshSeconds` 1.5, `FreshBiteShare` 0, `DebtSteal` 2, `DebtCap` 3, `DebtSeconds` 6, `PeckCooldownMultiplier` 1.2 | 23.5 / 22.5 / 21.2; 0.90 fresh hits a match; worst 5 s loss 6.73 mean, 14 at p95 (above the go limit of 6, open question 16.9-5) |
+| Relentless (`Relentless.asset`) | unchanged | unchanged | leaves the registry; asset and `RelentlessPassiveSO` stay (ARCH-DATA-13, CODE-DESIGN-18), `Retired` true |
+
+The values go into the `.asset` files in a build (ARCH-DATA-11), not as a balance delta: a kit change and a new registered passive need a build anyway
+(`Subclass`, the registry and the deny list, CLAUDE.md "What a delta cannot change"). The food bite (`FreshBiteShare` above 0) is **not** built in the
+game: Maestro ruled the fresh hit takes no food (section 1), the mid-cast half has no authority-confirmed path (the Enforcer is not in the victim's pile
+reach, so `RPC_SettlePeck` would refuse him), and a delta must not switch on a rule the game does not play, so `FreshBiteShare` joins the deny list
+(slice G7; open question 16.9-4).
+
+### 16.2 Authority and networked state (decisions)
+
+The game runs Shared Mode: each chicken's state authority is its owner (bots: the master). The simulator decides "affected" (section 3, section 4.2)
+inside one tick; in the game only the **victim's** authority applies a stun or a shove (`ChickenController.RPC_ApplyStun`,
+`RPC_ApplyKnockbackFrom` then `ApplyKnockback`). Rather than adding a receipt round trip, the **caster predicts** "affected" from the victim's
+replicated state with the same primitives the victim's RPC uses, and every food transfer stays authority-confirmed through the existing steal path.
+
+| State | Lives on | Written by | Read by | Rules |
+|---|---|---|---|---|
+| "Affected" verdict of one Stun / Shove | nowhere (computed per hit) | the caster's authority, `HitAffectRules` over the victim's replicated `StunRemaining`, `IsControlImmune`, its passive's `ModifyControlDuration` / `ModifyKnockback`, `PlayerBase.WallBetween` | `ChickenHitSteal`, `EnforcerDebts` | ARCH-NET-10, ARCH-DATA-05 |
+| Bully lock per victim | `ChickenHitSteal` on the Bully, authority-local (`HitStealLedger<NetworkBehaviourId>`, plain C#, like `ChickenController._stealLocks`) | the Bully's authority: locked at the ask (take above 0), released if the settle credits 0 | the Bully's bot, the Bully's lock ring (the local human is the authority) | ARCH-NET-02 |
+| Hit-steal food | the victim's `ChickenCargo.Cargo` | the victim's authority drains (`RPC_DrainStolen`), the Bully's authority credits on `RPC_SettleSteal` | everyone | ARCH-NET-07, ARCH-NET-05, CODE-DESIGN-10 |
+| Pecker's fresh state: `FedTick`, `FedStateId`, `FreshStateId`, `BittenStateId` (`[Networked]` on `AbilityController`) | every chicken | its own authority: `FreshStateId++` at a Peck cast start (`PeckAbilitySO.OnActivate`) and at a fed settle; `FedTick`/`FedStateId` in `ChickenCargo.RPC_SettlePeck` when `ToCargo > 0`; `BittenStateId` by `RPC_MarkBitten` | every peer through `BiteRules` | ARCH-NET-02, ARCH-NET-03, ARCH-NET-15 (see note) |
+| Mid-cast | already replicated (`AbilityController.ActiveMask` + `ActiveTimer*` of the Peck slot) | the pecker's authority | new reads `IsPeckCasting`, `PeckCastLeft` | none new |
+| Debts per rival (count and decay timer) | `EnforcerDebts` on the Enforcer: `[Networked, Capacity(4)]` `NetworkArray<NetworkBehaviourId> DebtVictims`, `NetworkArray<byte> DebtCounts`, `NetworkArray<TickTimer> DebtTimers` | the Enforcer's authority | the Enforcer (HUD, pips, bot) and each victim ("you owe" pips) | ARCH-NET-02, ARCH-NET-15 (`EffectWindow`), ARCH-NET-13, CODE-DESIGN-19 by analogy |
+| Inflated Steal | the victim's cargo | Snatch asks `DebtRules.StealAmount(...)` through `ChickenCargo.StealFrom`; the victim drains; the Enforcer credits and cashes on the settle | everyone | ARCH-NET-07, ARCH-NET-05 |
+| One-shot moments: hit-steal take, fresh hit, debt gained, debt cashed | `[Networked] byte` event ids on `ChickenHitSteal` / `EnforcerDebts` with their payload fields written first | the hitter's authority | `ChickenLocalEvents` (one observer per chicken) | ARCH-EVT-02, ARCH-EVT-03, ARCH-EVT-04 |
+
+Decisions in the table, each overrulable:
+
+- **Freshness is judged on the hitter's view.** The Enforcer's authority reads the victim's replicated state at the hit, through
+  `BiteRules.Fresh`. What he sees is what counts; since a fresh hit moves no food, no victim-side check or lag allowance is needed (this closes open
+  question 2 of section 13 with "no allowance"). The read happens before the victim's own cut, which lands one relay hop later, so the order of
+  section 4.2 step 1 holds by itself.
+- **The bitten flag is the victim's.** `AbilityController.RPC_MarkBitten(byte stateId, NetworkBehaviourId hitterId, RpcInfo info)` sets
+  `BittenStateId = stateId` when `stateId == FreshStateId`; it is accepted only when `RpcClaim.SenderSpeaksFor(hitter)` and the hitter's passive
+  has `Debt.IsEnforcer`, else one rate-limited Warn with the prefix `rejected RPC_MarkBitten` (ARCH-NET-03, ARCH-NET-04, ARCH-ERR-06). Two Enforcers
+  hitting one fresh rival inside one round trip can both stack (16.9-7).
+- **ARCH-NET-15 note.** The fresh state is a tick stamp plus state ids, not a `TickTimer`, because the window length is the hitter's
+  `FreshSeconds`, not the pecker's. `librarian` records this as a named exception under ARCH-NET-15. The debt timers are windows on the Enforcer
+  and go through `EffectWindow`.
+- **"Landed with food" is the settle, not the cast end.** `PeckLandedEventId` bumps when the cast ends naturally, before the pile has answered;
+  the fresh "just landed" state opens only in `RPC_SettlePeck` when `settled.ToCargo > 0` (section 4.1: a landing that took 0 opens none).
+- **Debts cash by what the Steal consumed.** Snatch records the count it used at the ask; a settle crediting above 0 subtracts that number
+  (`max(0, count - consumed)`); a settle of 0 leaves the count. Equal to the simulator's "count to 0" unless a Stun lands inside the round trip,
+  which then keeps its debt.
+- **Prediction misses are tolerated, not trusted.** A shell that goes up inside the round trip refuses the drain on the victim (`DrainForThief`),
+  so no food moves on a wrong "affected"; a debt granted on a wrong prediction moves no food either.
+- **Decoys.** A hit on a Doppelganger decoy (`IsDecoy`) is no take and no debt (the simulator has no decoys).
+- **Protocol.** The first slice that adds networked members bumps `NetworkProtocol.Version` 2 to 3 and refreshes `NetworkProtocolTests`'
+  fingerprint (ARCH-NET-21); later slices in this plan only refresh the fingerprint, unless a build was cut on 3 in between, then they bump again.
+
+### 16.3 Hook points in the game today
+
+| Moment | Where it is resolved now | What the build adds |
+|---|---|---|
+| Stun lands | `StunBurstAbilitySO.OnActivate` (WingSlam and Ambush) loops `GatherTargets` and calls `SendControl(caster, victim)`; the victim applies it in `ChickenController.RPC_ApplyStun` (`ControlReapplyRules.IncomingExtends`) | after each `SendControl`: `ReportHit(caster, victim, AbilityJob.Stun, caster.PredictStunLands(victim, EmittedControl))` |
+| Shove lands | `CluckShockAbilitySO.OnActivate` loops `GatherTargets` and calls `caster.KnockAway(victim, KnockbackForce)`; the victim applies `ApplyKnockback` (`IsControlImmune`, `ModifyKnockback`) | after each `KnockAway`: `ReportHit(caster, victim, AbilityJob.Shove, caster.PredictShoveMoves(victim, KnockbackForce))` |
+| Steal lands | `SnatchAbilitySO.OnActivate`: the Thief's marked rival first, then `StealFrom(thief, victim, StealAmount)` for each carrier `GatherTargets` found (the target filter keeps carriers only, as the simulator's) | before each plain `StealFrom`: `ReportHit(thief, victim, AbilityJob.Steal, true)` (the fresh stack counts toward this Steal, section 4.2 step 3 before 4), then the debt-inflated amount |
+| Instant Slow | `SlowAbilitySO` sends `ControlEmission` through `SendControl` | `ReportHit(..., AbilityJob.Slow, ...)` for `HitStealSlow` (0 shipped and designed); Slow Area aura ticks never report (section 3) |
+| Peck cast start / cut / landing | `PeckAbilitySO.OnActivate` / `OnDeactivate` (cut: no food, ARCH-NET-07), `ChickenCargo.RPC_SettlePeck` credits | `FreshStateId++` at `OnActivate`; `NotePeckFed()` from `RPC_SettlePeck` |
+| Food transfer | `ChickenCargo.StealFrom` → `RequestSteal` → `RPC_DrainStolen` → `DrainForThief` → `RPC_SettleSteal` | a `StealFrom(victim, amount, out ushort requestId)` overload; `RPC_SettleSteal` tells `ChickenHitSteal` and `EnforcerDebts` what a request credited |
+| Receiver bounds | `StealRules.MaxSingleSteal(pool)` (largest nominal steal times largest steal multiplier), `StealRules.MaxReach(pool)` (steal abilities only) | the hit-steal amounts and the full debt bonus in the magnitude bound; the reach of every hitter of a hit-steal passive in the range bound (WingSlam and CluckShock reach 5.4 m, Snatch 5.16 m: without this an honest hit-steal at the edge is refused) |
+| Peck cooldown per kit | `PeckAbilitySO.ResolveCooldown` already calls `PeckCastRules.Cooldown(class, passive.PeckCooldownMultiplier)` (BL-223) | nothing: the 1.4 and 1.2 values work as soon as they are in the assets |
+| Bot | `BotController.MayEngage` already calls `BotEngageRules.HitPays` / `MayEngage` | the P0 branches `HitForFood`, `WorthAHit`, `WorthAFight`, `EnforcerOverlay` (`ScriptedPolicy.cs`) mirrored in `BotController.Think` |
+
+The game calls the same pure functions as `MatchSim`: `HitStealRules.Take`, `HitStealRules.Locked`, `BiteRules.Fresh`, `DebtRules.Add`,
+`DebtRules.StealAmount`, `DebtRules.Decayed`, the new `HitAffectRules`, and the bot rules. No copy. Drift guards: `MatchWarriorTests.Sim_CallsTheSharedRules_NotCopies`
+and `_Enforcer` (simulator side, extended in G2), the new `WarriorGameRulesTests.Game_CallsTheSharedRules_NotCopies` (game side, G4 and G5),
+`ScriptedPolicyTests.P0_CallsTheGamesOwnFunctions_NotCopiesOfThem` (bot side, G6). Every scan proves it saw its pattern (CODE-TEST-13).
+
+### 16.4 Slices
+
+Common to every slice, as in section 10: other sessions share the tree, so `git status` first, stage by explicit path, never `git add -A`, stash,
+reset or broad checkout, never stage `BUILD_NUMBER`; gate = compile clean (`EditorUtility.scriptCompilationFailed` false), the slice's tests, then
+the full EditMode suite through `TestRunnerApi` from `script-execute` with the polled result file, or batch mode when no Editor is open, never both
+(CODE-BUILD-02, CODE-BUILD-03, CODE-TEST-15). One concern per commit, the why in the body (CODE-PROC-11), every message names its BL id. Briefs follow
+CODE-PROC-07 and CODE-PROC-08; `senior-dev` implements G1 to G8, `code-architect` reviews, `qa-reviewer` reviews G3 to G5 (networked, CODE-PROC-09).
+Slices G1 to G6 ship nothing a player sees: every game value stays off until G7. **No build is cut between G7 and G9** (G7 turns the rules on before
+the HUD can show them).
+
+**G1. Simulator counters the oracle asked for** (simulator only; BL-228).
+Files: `Balance/MatchCombat.cs` (`SeatCounters.PeckCasts`, `int`); `Balance/MatchSim.cs` (`StartPeck` counts every start, cut or landed);
+`Balance/MatchReport.cs` (`EconomyShareLine` gains `Banked`, `Trips`, `PeckCasts`, per appearance, filled in the same loop as `Foraged`, with
+`run.Results[i].Banked[s]` and `c.Trips`; the "Economy per kit" markdown table and the JSON `economy` array carry them); `Balance/MatchWhatIf.cs`
+(`Numbers` gains group `economy`: per kit label, "foraged per match", "stolen per match", "banked per match", "trips home per match", "Peck casts per
+match", for each population, from `MatchReportSection.Economy`).
+Interface: `public sealed class EconomyShareLine { string Label; float Foraged, Stolen, Bounty, Banked, Trips, PeckCasts; }`.
+Tests: `MatchWarriorTests.PeckCasts_CountsEveryStart_CutOrLanded` (one cast cut by a Stun, one landed: 2); `MatchReportTests.Economy_CarriesBankedTripsAndPeckCasts`
+(a two-match hand-built run: the means per appearance); `MatchWhatIfTests.Numbers_CarryTheEconomyGroupPerKit` (every kit label, five lines per
+population). Done when: a what-if report lists the five economy lines for every kit. Commit: `feat(balance): banked, trips and Peck casts per kit in the match report and what-if (BL-228)`.
+
+**G2. Shared rules for the game** (pure; BL-226).
+Files: new `Gameplay/HitAffectRules.cs`; `Gameplay/StealRules.cs`; `Balance/MatchSim.cs` (its "affected" tests call `HitAffectRules`).
+Interfaces:
+- `public static class HitAffectRules { static bool StunAffects(bool victimControlImmune, float victimStunLeft, float incomingSeconds); static bool ShoveMoves(bool victimControlImmune, float strength, float victimKnockbackFactor); }`
+  (`StunAffects` = not immune, incoming above 0 and `ControlReapplyRules.IncomingExtends(left, incoming)`; `ShoveMoves` = not immune and
+  `strength * max(0, factor) > 0`).
+- `StealRules.MaxSingleSteal(pool)` = the larger of (largest nominal steal x largest steal multiplier + largest `Debt.Steal x Debt.Cap`) and the
+  largest hit-steal amount of any passive (`HitStealFacts.Stun`, `Shove`, `Slow`); still a conservative superset, still derived (ARCH-NET-05).
+- `StealRules.MaxReach(pool)` = the larger of today's value and, for each passive with `HitSteal.Active`, `HitReach(a)` of every pool ability whose
+  `Job` has an amount above 0; `public static float HitReach(AbilityBaseSO ability)` = `AimRadius + AimForwardOffset` (the same shape reach `Reach` uses).
+Tests: `HitAffectRulesTests.Stun_AffectsOnlyWhenItExtends_NeverAnImmuneVictim`, `Shove_MovesOnlyAboveZeroAfterTheFactor`,
+`AgreesWithTheVictimsRpcPrimitives` (table: for each case the prediction equals `IncomingExtends` after the passive's `ModifyControlDuration`, and the
+immune early return of `ApplyKnockback`); `StealRulesTests.MaxSingleSteal_CoversTheHitStealAndTheFullDebtBonus`,
+`MaxSingleSteal_WithNoHitStealOrDebt_IsTheOldBound`, `MaxReach_CoversEveryHitterOfAHitStealPassive`, `MaxReach_IgnoresHittersWhenHitStealIsOff`;
+`MatchWarriorTests.Sim_CallsTheSharedRules_NotCopies` finds `HitAffectRules.StunAffects` and `HitAffectRules.ShoveMoves`. Done when: shipped play is
+unchanged (the shipped passives are still off, so both bounds equal today's). Commit: `feat(gameplay): hit-affect prediction and steal bounds that cover hit-steal and debts (BL-226)`.
+
+**G3. The Peck's fresh state on every chicken** (networked, inert; BL-226).
+Files: `Gameplay/AbilityController.cs`, `Gameplay/ChickenCargo.cs` (`RPC_SettlePeck`), `Abilities/PeckAbilitySO.cs` (`OnActivate`),
+`Gameplay/BiteRules.cs`, `Networking/NetworkProtocol.cs`, `Editor/Tests/NetworkProtocolTests.cs`.
+Interfaces on `AbilityController`: `[Networked] public int FedTick { get; private set; }`, `[Networked] public byte FedStateId`,
+`[Networked] public byte FreshStateId`, `[Networked] public byte BittenStateId` (private set); `public bool IsPeckCasting`, `public float PeckCastLeft`,
+`public float SecondsSinceFed` (infinity with no fed landing); `internal void NoteFreshStart()`, `internal void NotePeckFed()` (authority only);
+`public bool IsFreshFor(float freshSeconds)`; `RPC_MarkBitten` as in 16.2. On `BiteRules`:
+`public static bool LandedWithFood(int fedTick, byte fedStateId, byte freshStateId)` (`fedTick != 0 && fedStateId == freshStateId`: a newer cast ends
+the "just landed" state) and `IsFreshFor` composes `Fresh(IsPeckCasting, SecondsSinceFed, LandedWithFood(...), BittenStateId == FreshStateId, freshSeconds)`.
+Round reset leaves the ids alone (byte counters are never reset, ARCH-EVT-02) and sets `FedTick` 0.
+Tests: `BiteRulesTests.LandedWithFood_OnlyForTheCurrentState`; `PeckFreshStateTests.SettlePeck_NotesFed_OnlyWhenFoodWasCredited` (source scan,
+inside the `ToCargo > 0` branch), `PeckOnActivate_StartsANewFreshState`, `MarkBitten_ChecksTheSenderBeforeAnyWrite` (ARCH-NET-03 scan),
+`IsFreshFor_GoesThroughBiteRulesFresh`; `NetworkProtocolTests` fingerprint and version 3. Done when: no reader yet, the suite is green, version 3.
+Commit: `feat(gameplay): replicate a chicken's Peck fresh state for the Enforcer (BL-226)`.
+
+**G4. The Bully's hit-steal in the game** (shipped off; BL-226).
+Files: new `Gameplay/HitStealLedger.cs` (pure, generic over the victim key, like `PendingStealLedger`); new `Gameplay/ChickenHitSteal.cs`
+(`NetworkBehaviour`, sibling of `ThiefLoot`, built the same way: `SelfInject.Ensure(this, _log != null)` in `Spawned`, ARCH-DI-03); `Gameplay/ChickenController.cs`
+(`ReportHit`, `PredictStunLands`, `PredictShoveMoves`, the `Hits` accessor; no other change, ARCH-LAY-14); `Abilities/AbilityBaseSO.cs`
+(`protected static void ReportHit(...)`); `Abilities/StunBurstAbilitySO.cs`, `Abilities/CluckShockAbilitySO.cs`, `Abilities/SlowAbilitySO.cs`;
+`Gameplay/ChickenCargo.cs` (`StealFrom` overload, settle notice); `Gameplay/ChickenLocalEvents.cs` (`HitStealTaken`); `Chicken.prefab` gains the
+component (CODE-ASSET-11; check the Doppelganger variant, CODE-ASSET-06); `ProjectConfigTests` component list.
+Interfaces:
+- `HitStealLedger<TKey>`: `bool Locked(TKey victim, float now)`, `void Ask(TKey victim, ushort requestId, float now, float lockSeconds)`,
+  `void Settled(TKey victim, ushort requestId, float credited)` (0 releases the lock started by that ask), `float LockLeft(TKey victim, float now)`, `void Clear()`.
+- `ChickenController`: `public void ReportHit(ChickenController victim, AbilityJob job, bool affected)` (forwards to `ChickenHitSteal.OnHit`
+  and, from G5, `EnforcerDebts.OnHit`; no-op on a decoy victim); `public bool PredictStunLands(ChickenController victim, in ControlEmission e)`
+  (`HitAffectRules.StunAffects` over the victim's replicated state and `ControlClaimRules.OutgoingSeconds` then the victim passive's
+  `ModifyControlDuration`); `public bool PredictShoveMoves(ChickenController victim, float strength)`; `public ChickenHitSteal Hits`.
+- `ChickenHitSteal`: `public void OnHit(ChickenController victim, AbilityJob job, bool affected)` (state authority only; no-op unless
+  `Passive.HitSteal.Active`; refused by a wall or a shell exactly as `StealFrom`); amount `HitStealRules.Take(facts.AmountFor(job), free room, victim stealable, locked)`;
+  asks through `ChickenCargo.StealFrom(victim, take, out requestId)`; `public float LockLeftOn(ChickenController victim)`;
+  `internal void OnStealSettled(NetworkBehaviourId victim, ushort requestId, float credited)`; `[Networked] byte HitStealEventId`,
+  `NetworkBehaviourId LastHitVictim`, `float LastHitTake` (payload first, then the id); the ledger clears at round start and when this chicken is removed.
+- `ChickenCargo`: `public float StealFrom(ChickenController victim, float amount, out ushort requestId)` (the old overload calls it).
+Tests: `HitStealLedgerTests.AskLocks_EveryHitterOfTheCaster`, `ZeroSettle_ReleasesTheLock_PositiveSettleKeepsIt`, `Lock_EndsAfterItsSeconds`,
+`Clear_EmptiesEveryLock`; `WarriorGameRulesTests.StunBurst_ReportsEveryVictim_AfterSendControl`, `CluckShock_ReportsEveryVictim_AfterKnockAway`,
+`HitSteal_MovesFoodOnlyThroughChickenCargoStealFrom` (scan: no `Cargo` write and no `RPC_DrainStolen` in `ChickenHitSteal`),
+`Game_CallsTheSharedRules_NotCopies` (Bully half: `HitStealRules.Take`, `HitStealRules.Locked`, `HitAffectRules.StunAffects`,
+`HitAffectRules.ShoveMoves`), `ReportHit_IsANoOpForAPassiveWithoutFacts`, `ChickenHitSteal_FixedUpdateNetwork_OpensWithTheAuthorityGate` (ARCH-NET-01);
+`StealRulesTests` drain range: an honest 5.4 m hit-steal is inside `MaxReach` once a hit-steal passive is in the pool. Done when: the shipped Bully
+(amounts 0) plays as before; a test registry with amounts 2 drains and credits through the one steal path. Commit:
+`feat(gameplay): the Bully's hit-steal through the authority-confirmed steal path, shipped off (BL-226)`.
+
+**G5. The Enforcer's debts in the game** (shipped off; BL-226).
+Files: new `Gameplay/DebtBook.cs` (pure); new `Gameplay/EnforcerDebts.cs` (`NetworkBehaviour`, sibling of `ChickenHitSteal`);
+`Gameplay/ChickenController.cs` (`Debts` accessor; `ReportHit` forwards); `Abilities/AbilityBaseSO.cs` (a `StealFrom` overload taking the debt
+term); `Abilities/SnatchAbilitySO.cs`; `Gameplay/ChickenCargo.cs` (settle notice); `Gameplay/ChickenLocalEvents.cs` (`FreshHit`, `DebtGained`,
+`DebtCashed`); `Chicken.prefab`; `Networking/NetworkProtocol.cs` and the fingerprint.
+Interfaces:
+- `DebtBook`: `struct DebtSlot { int Count; float Until; }`; `static DebtSlot Gain(DebtSlot s, int cap, float now, float seconds)` (`DebtRules.Add`,
+  a gain at the cap restarts the timer); `static DebtSlot Decay(DebtSlot s, float now, out int lost)` (`DebtRules.Decayed`, all at once);
+  `static DebtSlot Cash(DebtSlot s, int consumed, float credited)`.
+- `EnforcerDebts`: the networked arrays of 16.2 plus `[Networked] byte FreshHitEventId, DebtEventId, DebtCashEventId`, `NetworkBehaviourId LastDebtVictim`,
+  `float LastCashBonus`; `public int CountOn(ChickenController victim)`, `public float DecayLeftOn(ChickenController victim)`;
+  `public void OnHit(ChickenController victim, AbilityJob job, bool affected)` (authority only; no-op unless `Passive.Debt.IsEnforcer`; fresh read
+  `victim.Abilities.IsFreshFor(Passive.Bite.FreshSeconds)`; a fresh hit: one `Gain`, `FreshHitEventId++`, `victim.Abilities.RPC_MarkBitten(...)`; an
+  affected Stun or Shove: one more `Gain`); `public float StealAmountOn(ChickenController victim, float resolvedSteal)` =
+  `DebtRules.StealAmount(resolvedSteal, 1f, Debt.Steal, CountOn(victim))`; `internal void OnStealAsked(victim, requestId, int consumed)`;
+  `internal void OnStealSettled(victimId, requestId, float credited)`. `FixedUpdateNetwork`: authority gate, decay, a removed victim's slot to 0, all
+  slots 0 when this chicken is removed or the round is not running (as `ThiefLoot`'s `Off`).
+- Capacity 4 covers `MatchConfigSO.MaxPlayers - 1` rivals; a test pins it.
+Tests: `DebtBookTests.Gain_StopsAtTheCap_AndRestartsTheTimer`, `Decay_PutsTheCountToZeroAtOnce`, `Cash_SubtractsWhatTheStealConsumed_OnlyOnAPositiveSettle`;
+`WarriorGameRulesTests.Snatch_ReportsTheHitBeforeItsSteal_AndAsksTheInflatedAmount` (scan order), `Game_CallsTheSharedRules_NotCopies` (Enforcer half:
+`BiteRules.Fresh`, `DebtRules.Add`, `DebtRules.StealAmount`, `DebtRules.Decayed`), `EnforcerDebts_FixedUpdateNetwork_OpensWithTheAuthorityGate`,
+`DebtCapacity_HoldsEveryRivalOfMaxPlayers`, `DebtTimers_AreReadThroughEffectWindow`; `StealRulesTests.MaxSingleSteal_CoversTheFullyInflatedSteal`.
+Done when: the shipped Enforcer asset (off) changes nothing; a test passive with `DebtSteal` 2 asks 5 + 2 x count. Commit:
+`feat(gameplay): the Enforcer's per-rival debts and the inflated Steal, shipped off (BL-226)`.
+
+**G6. The game bot plays both kits** (BL-226).
+Files: `Gameplay/BotController.cs` (mirrors of `ScriptedPolicy.HitForFood`, `WorthAHit`, `WorthAFight`, `EnforcerOverlay`, in the same place of
+`Think` as P0's; rival facts from `ChickenHitSteal.LockLeftOn`, `EnforcerDebts.CountOn` / `DecayLeftOn`, the rival's `IsPeckCasting`,
+`PeckCastLeft`, `SecondsSinceFed`, `FreshBitten`; a rival is only considered when `BotSightRules` sees it, ARCH-DATA-15); `Editor/Tests/ScriptedPolicyTests.cs`.
+Tests: `P0_CallsTheGamesOwnFunctions_NotCopiesOfThem`: the bot list gains `BotHitStealRules.Gain(`, `CastForFood(`, `PickHitter(`, `WorthHunting(`,
+`BotEnforcerRules.FreshLeft(`, `HitFresh(`, `PickBuilder(`, `Cash(`, `StealGain(`, `Fight(`; `BotWarriorOrderTests.BotController_WarriorBranches_RunInP0sOrder`
+(scan: the four branches appear in `Think` in the order `ScriptedPolicy.Think` calls them). Done when: the guard is green; no new tunable without a
+P0 mirror (`BotController_Tunables_StillMatchP0sMirrors`). Commit: `feat(bot): the game bot casts the Bully's hits for food and plays the Enforcer's debts, as P0 (BL-226)`.
+
+**G7. Roster and data: the kits go live** (BL-226).
+Data (in the Editor or by `git mv`, each with its `.meta`, CODE-ASSET-05):
+- `git mv Assets/_Game/Data/Simulator/Enforcer.asset(.meta) Assets/_Game/Data/Abilities/Passives/` (guid kept); delete the empty
+  `Data/Simulator/` folder and its `.meta`.
+- `AbilityRegistry.asset`: Enforcer in Relentless's place; Relentless out. `Relentless.asset`: `Retired` true (its kit stays, so a what-if can swap it back).
+- `ChickenSubclass` / `ChickenSubclassFlags`: member 1 renamed `Warrior_Relentless` to `Warrior_Enforcer` (value and bit unchanged, so
+  `CluckShock.asset SignaturePreEquippedBy: 1` now names the Enforcer, which holds CluckShock); `ClassOf` updated; ARCH-NET-13 pin in
+  `ContractsAndEnumsTests` updated (open question 16.9-3). `Enforcer.asset` keeps `Subclass: 1`; `Relentless.asset` keeps `Subclass: 1` (unregistered, read by nobody).
+- `Bully.asset`: kit Peck, Shadowstep, WingSlam, CluckShock (`079c14ab0b344ca898f4be63fbf58374` in place of Snatch `4c026dfa…`); the values of 16.1.
+- `Enforcer.asset`: the values of 16.1, `PeckCooldownMultiplier` 1.2 serialized.
+Code: `EnforcerPassiveSO` (`IsSignature => true`, open question 16.9-2; perk text keys and `PerkArgs` from `FreshSeconds`, `DebtSteal`, `DebtCap`,
+`DebtSeconds`, `PeckCooldownMultiplier`; the "simulator only" remarks rewritten); `BullyPassiveSO` (perk args gain the takes, the lock and the Peck
+slowdown; the remarks "farms exactly like a naked Warrior" and "Applies to every move except Peck" rewritten: the 0.75 still skips Peck, the 1.4 slows it);
+`Localization/UiKeys.cs` and `Resources/Text/UiText.csv` (`perk.enforcer.line`, `perk.enforcer.detail`, new `perk.bully.*` args with `[UiArgs]`, words from
+`narrative-designer`, CODE-TEXT-01/05/06/08); `Balance/BalanceBook.cs` `DeniedFields` and `tools/balance/schema.py` `DENIED` and the Kit Lab page's
+`DP_DENY` gain `FreshBiteShare` in the same commit (ARCH-DATA-14; the CLAUDE.md deny list line is proposed to Maestro, not edited, CODE-PROC-20);
+`Diagnostics/AutoTestConfig.cs` needs nothing (it reads the enum names), but `tools/test-session/scenario-bots.ps1`, `scenario-pc.ps1` and their
+fixtures pass `-cw_perk Warrior_Enforcer`; `Data/Balance/OracleReference.asset` re-recorded (`Cluck Wars / Oracle / Record`), so the reference
+holds `Warrior_Enforcer` and the new Bully.
+Tests changed, not weakened (CODE-TEST-12): `WarriorPassiveDataTests.Enforcer_IsRegistered_RelentlessIsShelved` (was `Enforcer_IsNotRegistered...`),
+`ShippedBully_HitStealIsOn_AndItsKitHoldsNoSteal`, `ShippedEnforcer_FreshAndDebtsOn_NoFoodBite` (relations, not restated numbers);
+`MatchWarriorTests.ShippedOff_PlaysExactlyAsBefore` becomes `OffFacts_PlayExactlyAsTheNakedKit` (it builds the off facts by hand; the shipped assets
+are on now); `OracleRosterTests` and `WhatIfSpecTests` swap Enforcer for Relentless (`{"Enforcer":"Relentless"}`), `OracleKitsTests.LabelOf_...`
+reads `Warrior_Relentless` for the swapped-in shelf kit; every test under `Editor/Tests` that reads Relentless from the registry or by
+`Warrior_Relentless` (grep: `BotEngageRulesTests`, `CasterStunCountdownTests`, `CooldownsKitsSlipperyTests`, `DataIntegrityTests`, `FixedKitTests`,
+`MarkPickTests`, `PerkTextTests`, `PlayAgainFlowTests`, `PreEquippedLoadoutTests`, `SimplifiedAbilitiesTests`, `SlowAbilityTests`,
+`WarriorSpecializationTests`) either loads `Relentless.asset` by path or moves to the Enforcer; `BalanceBookTests.DeniedFields_MirrorSchemaPy`
+(or its existing equivalent) and `tools/balance/tests/test_kitlab.py` see `FreshBiteShare`; `OracleReferenceTests` green on the new record;
+`FixedKit.ValidateRoster` and `PreEquippedLoadout.ValidateRoster` over the shipped registry stay empty. Done when: character select offers
+Bully and Enforcer for the Warrior, the fixed-kit lineup seats both, the suite is green. Commit:
+`feat(roster): the Enforcer replaces Relentless and the Bully takes Stun and Shove, with their measured values (BL-226)`.
+
+**G8. Balance tools and the Kit Lab** (BL-226).
+Files: `tools/balance/kitlab_map.py` (`PASSIVE` gains `peckSlow` = `PeckCooldownMultiplier` as a percentage, `1 + v / 100`; plain-number keys for
+`HitStealStun`, `HitStealShove`, `HitStealLockSeconds`, `FreshSeconds`, `DebtSteal`, `DebtCap`, `DebtSeconds`); `tools/balance/kitlab/kitlab.template.html`
+(`DP_PASSIVE` mirror, the fields shown on the Bully and Enforcer cards; `DP_DENY` from G7); `tools/balance/export_kitlab_data.py` (nothing if the
+scalars already export; check `lim` reads `[Min]` and `[Range]` of the new fields); `tools/balance/tests/test_kitlab.py`. `schema.py` already reads
+fields from the C# source and the registry, so the new fields become addressable when G7 registers the Enforcer. Then `/balance kitlab` rebuilds the
+Kit Lab artifact `https://claude.ai/artifact/BfxAferJSCtfC7qPi6Gagb` (same URL, capabilities `db` + `user` unchanged). No delta is published.
+Tests: `test_kitlab.py` round trip for every new key (Kit Lab to delta to Kit Lab), `make_delta` refuses `FreshBiteShare`. Done when: a Kit Lab
+edit of the Bully's take or the Enforcer's `DebtSteal` turns into a valid delta. Commit: `feat(balance): the Kit Lab edits the Warrior kits' new fields (BL-226)`.
+
+**G9. Feedback, text and icons** (specialist sub-slices, BL-227; each briefed by `code-architect`, built by the named agent, screenshot before done, CODE-UI-02).
+Animation and VFX are local, read from the event ids and the replicated state through `ChickenLocalEvents` and `ChangeDetector` + `Render()`,
+never RPC'd (ARCH-EVT-01, ARCH-EVT-06); colours and timings get names in `FeedbackPaletteSO` / `FeedbackTuning` (ARCH-LAY-15, CODE-UI-08), and a new
+palette field re-authors the shipped palette asset (CODE-ASSET-13).
+- **G9a Fresh-window marker** (`vfx-artist` with `ui-designer`). A rival is marked for the local Enforcer only while `IsFreshFor(FreshSeconds)` is
+  true on his own view: from its Peck cast start (so it shows mid-Peck), through the cast, and for `FreshSeconds` after a Peck that landed food, with a
+  ring that drains over those seconds and goes out the moment the state is bitten (`BittenStateId`) or ends. Bright, readable at phone size, never on
+  the local player's own chicken, never for non-Enforcers; a short pop when the local Enforcer's hit spends it (`FreshHitEventId`). Maestro asked for
+  "como 1 segundo, feedback visual"; the shipped window is 1.5 s.
+- **G9b Debt pips and "you owe"** (`ui-designer`, words `narrative-designer`). Over each rival the local Enforcer has a count on: 0 to `DebtCap` pips
+  and a thin ring that drains over `DecayLeftOn`; a gain pops one in, decay pops all off together, a cash flies them into the Steal. The victim sees the
+  same pips over his own head with a small cue naming the Enforcer's colour; other players see nothing (CODE-DESIGN-19 by analogy, C10). The local
+  stack draws on top (CODE-UI-09).
+- **G9c Bully take and lock** (`vfx-artist`, `audio-designer`). On `HitStealEventId`: `+n` pop over the Bully (n from `LastHitTake`), food chunks from
+  victim to Bully (`FoodChunkFlight`), the existing Steal hit sound (by `SfxId`, CODE-AUD-01); victim: `-n` pop on his cargo bar and the existing
+  short haptic. A locked rival shows a faint lock ring to the Bully only, draining over `LockLeftOn`, so a child sees why a hit took nothing.
+- **G9d Ability and HUD numbers** (`ui-designer`, `narrative-designer`). The Enforcer's Steal hex shows the amount it would take from the nearest
+  carrier in reach, `StealAmountOn(victim, ...)` (5, 7, 9, 11 with these values), never a typed number; perk lines and the character-select cards
+  read every number from the fields (ARCH-DATA-12, CODE-TEXT-06, CODE-TEXT-10); a bigger `+n` pop on a cash. Kid wording, no jargon (CODE-TEXT-08).
+- **G9e Icons** (`artist-2d`). `Icon_EnforcerPassiveSO.png` is a placeholder: it is byte-identical to `Icon_RelentlessPassiveSO.png` (same md5),
+  and `AbilityIconStyle` says it shares Relentless's art. A new icon in the locked style, past the readability sheet (CODE-ASSET-18); the Bully icon
+  stays. The pips and the fresh marker use simple shapes, not new icons, unless the readability sheet says otherwise.
+- **G9f Feedback check** (the `audit` skill, feedback specialization, on both kits): captured frames on PC clients, verified against these briefs.
+
+**G10. Docs, live check and close** (BL-226).
+- A four-client session (`tools/run-clients.ps1`, `shared4`), one client `-cw_perk Warrior_Enforcer`, one `-cw_perk Warrior_Bully`, at log level
+  Debug (CODE-BUILD-16, CODE-TEST-06): hit-steals and inflated Steals happen, zero `rejected RPC_DrainStolen` / `rejected RPC_MarkBitten` from honest
+  clients (CODE-TEST-10), the world hash agrees on every client. Then `/backlog` marks BL-226 untested-to-tested only after Maestro's playtest (CODE-TEST-19).
+- Docs upkeep (16.7), then the `housekeeping` skill.
+
+### 16.5 Tests: what they never do
+
+No test asserts a win rate or another oracle output: the oracle is a guide (CODE-DESIGN-01). No test restates a shipped number as a literal; the
+data tests assert relations (on or off, a Steal in the kit or not, a bound covering a derived maximum). `OracleReferenceTests.Measured_EqualsTheAcceptedReference`
+is a drift guard on the economy oracle and is re-recorded in G7, not loosened.
+
+### 16.6 The balance hash
+
+`bal=` is the hash of the **delta** JSON (`BalanceBook.BaselineHash = HashOf("{}")`), not of the shipped assets: after G7 a build with no delta
+still prints `bal=5465b825`. Two builds with different shipped values are told apart by the build number and `NetworkProtocol.Version`, not by
+`bal=`. What pins the old numbers: `Data/Balance/OracleReference.asset` (records stamped `BalanceHash: 5465b825` and the label
+`Warrior_Relentless`), re-recorded in G7; the docs that quote "the shipped numbers" (`docs/TESTING.md` "Publishing a balance delta", the compendium)
+get the new kit values, not a new hash.
+
+### 16.7 Docs upkeep (for `librarian`, `docs/STATE.md`, the backlog and the site)
+
+- `librarian` (the only editor of the rules docs and the file map, ruling D13): `docs/FILE_STRUCTURE.md` (new `HitAffectRules.cs`,
+  `HitStealLedger.cs`, `ChickenHitSteal.cs`, `DebtBook.cs`, `EnforcerDebts.cs`; `Enforcer.asset` under `Data/Abilities/Passives/`; `Data/Simulator/`
+  gone; `python -I tools/docs/file_structure.py check` green); `docs/ARCHITECTURE_RULES.md`: ARCH-NET-05 (the bound now covers hit-steal and the
+  debt bonus, and the reach of hit-steal hitters; enforced by the G2 tests), ARCH-NET-07 (hit-steal and the inflated Steal in the food-transfer list),
+  ARCH-NET-15 (the fresh-state tick stamp as a named exception), ARCH-EVT-02 (the new event ids), ARCH-DATA-14 (deny list gains `FreshBiteShare`),
+  ARCH-NET-21 (version 3); `docs/CODE_RULES.md`: CODE-DESIGN-10 (the steal minimum also governs hit-steal), CODE-TEXT-06 (the new perk args);
+  Appendix A for the stale lines of sections 4.4, 5 and 11 of this spec.
+- `docs/STATE.md`: the two kits live, Relentless shelved, protocol 3, the open questions of 16.9.
+- `docs/ARCHITECTURE.md`: the chicken's component list gains `ChickenHitSteal` and `EnforcerDebts`; the fresh state on `AbilityController`.
+- `docs/GDD.md` Warrior section, `docs/FEEDBACK.md` (G9), `docs/TESTING.md` (`-cw_perk` names, the G10 session recipe).
+- The compendium `docs/site/index.html` (CODE-PROC-13), numbers read from the shipped assets after G7: the Warrior's two kits (Bully: Peck,
+  Shadowstep, WingSlam, CluckShock, cooldowns x0.75 except Peck, Peck x1.4, take 2 per Stun or Shove, lock 3 s; Enforcer: Peck, WingSlam, CluckShock,
+  Snatch, fresh window 1.5 s, +2 Steal food per debt, cap 3, debts last 6 s, Peck x1.2), Relentless off the roster; republished to its Artifact URL.
+- CLAUDE.md "What a delta cannot change" gains `FreshBiteShare`: proposed to Maestro as a line, not edited by an agent (CODE-PROC-20).
+- Backlog (next free numbers; added with `/backlog`): **BL-226** P1 task, game build of the Bully hit-steal and the Enforcer (G2 to G8, G10);
+  **BL-227** P1 task, Warrior kit feedback, text and the Enforcer icon (G9); **BL-228** P2 task, banked, trips and Peck casts per kit in the what-if
+  (G1); **BL-229** P3 idea, the fresh bite as food in the game (`FreshBiteShare` above 0), parked until Maestro asks, needs a pile path for a hitter
+  outside the pile's reach. BL-222 closes when G7 lands.
+
+### 16.8 Where the code disagrees with this spec (found while planning)
+
+1. `bal=` does not change when the shipped assets change (16.6); the brief's "the balance hash changes" holds only for a published delta.
+2. The game resolves "affected" on the victim's authority only; the simulator resolves it in one tick. Section 16.2 settles it with a caster-side
+   prediction on the same primitives.
+3. `StealRules.MaxReach` counts only steal abilities: Snatch's 5.16 m is below WingSlam's and CluckShock's 5.4 m, so an honest hit-steal at the edge
+   would be refused by `RPC_DrainStolen` (fixed in G2).
+4. `PeckLandedEventId` bumps at the cast end, before the pile confirms food; "landed with food" needs the settle (G3).
+5. `Icon_EnforcerPassiveSO.png` is a byte copy of Relentless's (placeholder, G9e).
+6. Relentless is the Warrior's `IsSignature` (the default pick); with it shelved the Warrior has no signature until G7 gives it to the Enforcer.
+7. `BullyPassiveSO`'s remarks ("farms exactly like a naked Warrior") and the perk detail "Applies to every move except Peck" are false once
+   `PeckCooldownMultiplier` is 1.4 (G7).
+8. `Snatch.asset SignaturePreEquippedBy: 130` still names the Bully (bit 2): Free mode only, harmless in Fixed mode; left as is (16.9-6).
+9. Section 11 said `tools/balance/schema.py` `DENIED` stays unchanged; this plan adds `FreshBiteShare` (16.1).
+10. Section 15.3 recommended debt Steal 1 near Peck x1.1; the shipped pick is the later measurement (debt Steal 2, fresh 1.5 s, Peck x1.2), whose
+    worst 5 s loss mean (6.73) is above the go limit of 6 (16.9-5).
+
+### 16.9 Open questions for Maestro (the build uses the default and does not wait)
+
+1. **Who sees the fresh marker?** Today's brief: the Enforcer only. Section 6 and C10 also showed it to the pecking chicken ("mind the
+   Enforcer"). Default: the Enforcer only.
+2. **Which Warrior kit is the default pick** (`IsSignature`, Relentless's role)? Default: the Enforcer, which takes Relentless's seat.
+3. **Subclass identity:** rename enum value 1 to `Warrior_Enforcer` (default: no new value, `ValidateRoster` stays as it is), or append value 9
+   and teach the roster checks about shelved subclasses.
+4. **The food bite in the game:** default no (shipped 0, deny-listed, BL-229 parked); the simulator can still measure it only by a build that lifts the deny.
+5. **The Enforcer's worst 5 s loss:** debt Steal 2 measures a mean of 6.7 (go limit 6, a combo takes up to 11 from one victim). Default: ship 2 as
+   chosen and watch the playtest; the fallback is debt Steal 1 (5.5 mean in section 15), a delta, no build.
+6. **The Bully's Free-mode signature** stays Snatch, which his fixed kit no longer holds. Default: leave it (Free mode is not shipped).
+7. **Two Enforcers on one fresh rival inside one round trip** can both stack the fresh debt. Default: accept (no food moves; the simulator's
+   "first bites, second does not" holds whenever the hits are further apart than a round trip).
