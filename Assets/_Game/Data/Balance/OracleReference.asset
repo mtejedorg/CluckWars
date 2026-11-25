@@ -12,17 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f1c0b7e9d3a4e58b2a47c10d5e8f391, type: 3}
   m_Name: OracleReference
   m_EditorClassIdentifier: 
-  AcceptedOn: 2026-11-23
-  Note: 'Hunt lasts 5 s with a 2 s kill window, execute bounty 15 (Maestro 2026-11-23,
-    BL-217): part 1 re-recorded, prices kept'
+  AcceptedOn: 2026-11-25
+  Note: Warrior 10.8 speed, cargo 20, Peck 0.71/0.4 (2026-11-25)
   MapFingerprint: be5e5449aca95e44
   Origin: 1
   Entries:
   - Label: Speedy_Slippery
-    BestSeconds: 24.627785
+    BestSeconds: 60.000076
     OffsetSeconds: 0
   - Label: Speedy_Featherfoot
-    BestSeconds: 24.026766
+    BestSeconds: 60
     OffsetSeconds: 0
   - Label: Fatty_Hoarder
     BestSeconds: 19.44445
@@ -31,10 +30,10 @@ MonoBehaviour:
     BestSeconds: 20.022224
     OffsetSeconds: 0
   - Label: Warrior_Relentless
-    BestSeconds: 27.116676
+    BestSeconds: 21.49723
     OffsetSeconds: 5
   - Label: Warrior_Bully
-    BestSeconds: 27.566675
+    BestSeconds: 48.64871
     OffsetSeconds: 5
   KillTargets:
   - Kills: 4

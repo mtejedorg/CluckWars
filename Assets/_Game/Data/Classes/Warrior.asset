@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Warrior
   MaxHP: 100
-  MoveSpeed: 10.125
+  MoveSpeed: 10.8
   TurnSpeed: 720
-  CargoCapacity: 14
+  CargoCapacity: 20
   PeckAmount: 3
-  PeckCooldown: 0.79
-  PeckCastSeconds: 0.5
+  PeckCooldown: 0.71
+  PeckCastSeconds: 0.4
   Scale: 1

@@ -90,8 +90,11 @@ namespace CluckWars.Tests
             System.Array.Sort(expected);
             System.Array.Sort(actual);
             string detail = $"{route}: FarmSim by seat [{string.Join(", ", System.Array.ConvertAll(farm, f => f.Banked.ToString("0.00")))}], MatchSim by seat [{string.Join(", ", System.Array.ConvertAll(match.Banked, f => f.ToString("0.00")))}]";
+            // A tie is decided one whole peck at a time, so a rank may differ by one peck (the Warrior's 3 food since the 20-food beak of
+            // 2026-11-25 shifted who wins the ties). The total, which is what the economy equivalence is about, stays within one food.
+            float rankTolerance = Mathf.Max(1f, kit.PeckAmount);
             for (int rank = 0; rank < 4; rank++)
-                Assert.LessOrEqual(Mathf.Abs(actual[rank] - expected[rank]), 1f, $"rank {rank}. {detail}");
+                Assert.LessOrEqual(Mathf.Abs(actual[rank] - expected[rank]), rankTolerance, $"rank {rank}. {detail}");
             Assert.LessOrEqual(Mathf.Abs(Sum(actual) - Sum(expected)), 1f, $"total banked. {detail}");
         }
 

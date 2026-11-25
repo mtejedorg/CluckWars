@@ -21,7 +21,7 @@ namespace CluckWars.Tests
         [TestCase("Assassin", 70, 10, 0.9f)]
         [TestCase("Fatty", 120, 35, 1.35f)]
         [TestCase("Speedy", 80, 10, 0.85f)]
-        [TestCase("Warrior", 100, 14, 1f)]
+        [TestCase("Warrior", 100, 20, 1f)]
         public void ClassStats_MatchTheShippedAssets(string cls, int maxHp, int cargo, float scale)
         {
             var s = Stats(cls);
