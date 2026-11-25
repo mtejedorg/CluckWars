@@ -26,6 +26,8 @@ namespace CluckWars.Diagnostics
         public const string PerkKey = "cw_perk", BotPerksKey = "cw_botperks";
         /// <summary>Dev tools: see <c>AutoTestDriver.Mark.cs</c>.</summary>
         public const string MarkShotsKey = "cw_markshots";
+        /// <summary>Dev tools: see <c>AutoTestDriver.Warrior.cs</c> (the Warrior kit feedback, BL-227).</summary>
+        public const string WarriorShotsKey = "cw_warriorshots";
         /// <summary><c>cw_shotsuper 2</c>: the Death Mark captures render at this multiple of the window (a 540x1200 window
         /// gives the 1080x2400 phone's exact panel layout at full resolution; the monitor cannot open a 2400 px window).</summary>
         public const string ShotSuperKey = "cw_shotsuper";
@@ -38,7 +40,7 @@ namespace CluckWars.Diagnostics
         public const string SeedKey = DevSeed.Key;
 
         public static readonly string[] Keys =
-            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, ShotSuperKey, TimeScaleKey, PersonalityKey, SeedKey };
+            { AutoHostKey, AutoJoinKey, ClassKey, AutoStartKey, AutoStartTimeoutKey, AutoLoopKey, AutoPlayKey, DevModeKey, HudKey, ProfileKey, AutoSoloKey, AutoDisconnectKey, AutoZoneKey, ShotsKey, ShotTagKey, BandKey, ZonesKey, FloorArrowsKey, EdgeArrowsKey, AutoAuraKey, PerkKey, BotPerksKey, MarkShotsKey, WarriorShotsKey, ShotSuperKey, TimeScaleKey, PersonalityKey, SeedKey };
 
         public const ChickenClass DefaultClass = ChickenClass.Warrior;
         public const float DefaultAutoStartTimeout = 90f;
@@ -58,6 +60,8 @@ namespace CluckWars.Diagnostics
         public ChickenSubclass[] BotPerks = new ChickenSubclass[0];
         /// <summary><c>cw_markshots</c>: photograph the Death Mark feedback (<c>AutoTestDriver.Mark.cs</c>). Needs <c>cw_autoplay</c>.</summary>
         public bool MarkShots;
+        /// <summary><c>cw_warriorshots</c>: photograph the Warrior kits' feedback, one shot per state (<c>AutoTestDriver.Warrior.cs</c>).</summary>
+        public bool WarriorShots;
         /// <summary>
         /// <c>cw_timescale</c>: simulation speed of a solo match (<c>GameMode.Single</c>, dev tools only), clamped to
         /// <see cref="MinTimeScale"/>..<see cref="MaxTimeScale"/>; 1 = real time. Shared matches ignore it.
@@ -240,6 +244,7 @@ namespace CluckWars.Diagnostics
                         else cfg.Problems.Add($"{key} '{value}' is not a specialization ({SubclassNames}); using the class's default perk");
                         break;
                     case MarkShotsKey: cfg.MarkShots = cfg.ParseBool(key, value); break;
+                    case WarriorShotsKey: cfg.WarriorShots = cfg.ParseBool(key, value); break;
                     case TimeScaleKey:
                         if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float scale) && !float.IsNaN(scale))
                             cfg.TimeScale = Math.Min(MaxTimeScale, Math.Max(MinTimeScale, scale));
