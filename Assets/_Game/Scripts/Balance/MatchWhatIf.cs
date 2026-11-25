@@ -259,6 +259,14 @@ namespace CluckWars.Balance
             {
                 string pop = PopName(s.Population);
                 foreach (var k in s.Kits) AddRate("kit", k.Label, pop, k.Win);
+                foreach (var e in s.Economy)
+                {
+                    Add("economy", e.Label + ": foraged per match", pop, e.Foraged);
+                    Add("economy", e.Label + ": stolen per match", pop, e.Stolen);
+                    Add("economy", e.Label + ": banked per match", pop, e.Banked);
+                    Add("economy", e.Label + ": trips home per match", pop, e.Trips);
+                    Add("economy", e.Label + ": Peck casts per match", pop, e.PeckCasts);
+                }
                 foreach (var c in s.Classes)
                 {
                     AddRate("class", c.Class + " (one per class)", pop, c.Headline);

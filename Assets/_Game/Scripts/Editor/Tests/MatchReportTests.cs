@@ -215,6 +215,23 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Economy_CarriesBankedTripsAndPeckCasts()
+        {
+            // Two matches of kit0 in seat 0 (mixed design): banked 10 and 20, trips 2 and 4, Peck casts 6 and 10; the means are per appearance.
+            var a = Result(0, banked: new[] { 10f, 0f, 0f, 0f });
+            a.Counters[0].Trips = 2; a.Counters[0].PeckCasts = 6;
+            var b = Result(0, banked: new[] { 20f, 0f, 0f, 0f });
+            b.Counters[0].Trips = 4; b.Counters[0].PeckCasts = 10;
+            var report = MatchReports.Build(Context(), new[] { Output(MatchDesignKind.Mixed, new[] { Cell(0, 0, 2, 4, 6), Cell(1, 0, 2, 4, 6) }, new[] { a, b }) }, Reference());
+
+            var line = report.Economy.Single(e => e.Label == "kit0");
+            Assert.AreEqual(15f, line.Banked, 1e-4f);
+            Assert.AreEqual(3f, line.Trips, 1e-4f);
+            Assert.AreEqual(8f, line.PeckCasts, 1e-4f);
+            StringAssert.Contains("\"peckCasts\":8", MatchReports.Json(report), "the JSON economy array carries them too");
+        }
+
+        [Test]
         public void KitRates_AndClassRates_CountSeatsThatWon()
         {
             // Kit 0 wins the first match, kit 1 the second (both class Warrior), so the class wins both of the two seats it sat in; one-per-class gives the class headline.

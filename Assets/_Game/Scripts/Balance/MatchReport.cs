@@ -95,6 +95,12 @@ namespace CluckWars.Balance
         public float Foraged;
         public float Stolen;
         public float Bounty;
+        /// <summary>Food banked per appearance (BL-228).</summary>
+        public float Banked;
+        /// <summary>Deposit visits that emptied the beak, per appearance.</summary>
+        public float Trips;
+        /// <summary>Peck casts started per appearance, landed or cut.</summary>
+        public float PeckCasts;
     }
 
     public sealed class SeatLine
@@ -659,6 +665,9 @@ namespace CluckWars.Balance
             var foraged = new double[kits];
             var stolen = new double[kits];
             var bounty = new double[kits];
+            var banked = new double[kits];
+            var trips = new double[kits];
+            var peckCasts = new double[kits];
             var contacts = new List<float>();
             var contactsNoAssassin = new List<float>();
             var cutExposed = new Dictionary<(ChickenClass, CutCause), int>();
@@ -683,6 +692,7 @@ namespace CluckWars.Balance
                     if (r.Winner == s) { wins[k]++; Bump(classWins, cls, 1); }
                     var c = r.Counters[s];
                     foraged[k] += c.Foraged; stolen[k] += c.Stolen; bounty[k] += c.Bounty;
+                    banked[k] += r.Banked[s]; trips[k] += c.Trips; peckCasts[k] += c.PeckCasts;
                     if (c.FirstContact >= 0f) contact = Math.Max(contact, c.FirstContact);
                     foreach (var cause in Causes)
                     {
@@ -712,7 +722,8 @@ namespace CluckWars.Balance
                     Reason = "provisional, one population: " + Provisional(win) + "; final only when P0, P1 and the mixed population agree (missing populations: P1, the mixed population).",
                 });
                 int n = Math.Max(1, appear[k]);
-                section.Economy.Add(new EconomyShareLine { Label = context.Kits[k].Label, Foraged = (float)(foraged[k] / n), Stolen = (float)(stolen[k] / n), Bounty = (float)(bounty[k] / n) });
+                section.Economy.Add(new EconomyShareLine { Label = context.Kits[k].Label, Foraged = (float)(foraged[k] / n), Stolen = (float)(stolen[k] / n), Bounty = (float)(bounty[k] / n),
+                    Banked = (float)(banked[k] / n), Trips = (float)(trips[k] / n), PeckCasts = (float)(peckCasts[k] / n) });
             }
 
             section.FirstContact = Contact(contacts);
@@ -1337,14 +1348,14 @@ namespace CluckWars.Balance
 
             sb.AppendLine("## Economy per kit (food per appearance)");
             sb.AppendLine();
-            sb.AppendLine("| Kit | " + string.Join(" | ", pops.Select(p => Name(p.Population) + " foraged / stolen / bounty")) + " |");
+            sb.AppendLine("| Kit | " + string.Join(" | ", pops.Select(p => Name(p.Population) + " foraged / stolen / bounty / banked / trips / Peck casts")) + " |");
             sb.AppendLine("|---|" + string.Concat(pops.Select(p => "---|")));
             foreach (var e in r.Economy)
             {
                 var cells = pops.Select(p =>
                 {
                     var line = p.Economy.FirstOrDefault(x => x.Label == e.Label);
-                    return line == null ? "n/a" : $"{Num(line.Foraged, "0.0")} / {Num(line.Stolen, "0.0")} / {Num(line.Bounty, "0.0")}";
+                    return line == null ? "n/a" : $"{Num(line.Foraged, "0.0")} / {Num(line.Stolen, "0.0")} / {Num(line.Bounty, "0.0")} / {Num(line.Banked, "0.0")} / {Num(line.Trips, "0.0")} / {Num(line.PeckCasts, "0.0")}";
                 });
                 sb.AppendLine($"| {e.Label} | {string.Join(" | ", cells)} |");
             }
@@ -1517,7 +1528,7 @@ namespace CluckWars.Balance
             if (r.FirstContact != null)
                 sb.Append($",\"firstContact\":{{\"median\":{N(r.FirstContact.Median)},\"q1\":{N(r.FirstContact.Q1)},\"q3\":{N(r.FirstContact.Q3)},\"never\":{r.FirstContact.Never},\"matches\":{r.FirstContact.Matches}}}");
             sb.Append(",\"economy\":[" + string.Join(",", r.Economy.Select(e =>
-                $"{{\"label\":{S(e.Label)},\"foraged\":{N(e.Foraged)},\"stolen\":{N(e.Stolen)},\"bounty\":{N(e.Bounty)}}}")) + "]");
+                $"{{\"label\":{S(e.Label)},\"foraged\":{N(e.Foraged)},\"stolen\":{N(e.Stolen)},\"bounty\":{N(e.Bounty)},\"banked\":{N(e.Banked)},\"trips\":{N(e.Trips)},\"peckCasts\":{N(e.PeckCasts)}}}")) + "]");
             sb.Append($",\"cornerDecided\":{r.CornerDecided},\"mixedMatches\":{r.MixedMatches}");
             sb.Append(",\"mixedSeats\":[" + string.Join(",", r.MixedSeats.Select(x => $"{{\"seat\":{x.Seat},\"win\":{W(x.Win)}}}")) + "]");
             sb.Append(",\"seatCheck\":[" + string.Join(",", r.SeatCheck.Select(s =>

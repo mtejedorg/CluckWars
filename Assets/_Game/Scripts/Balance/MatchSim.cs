@@ -1705,6 +1705,7 @@ namespace CluckWars.Balance
                 ch.PeckDoneAt = _time + kit.PeckCastSeconds;
                 ch.NextPeckAt = _time + Math.Max(kit.PeckCooldown, kit.PeckCastSeconds);
                 ch.FreshBitten = false;                                           // a new cast is a new fresh state
+                _result.Counters[s].PeckCasts++;
                 ch.ExposedMask = 0;
                 NoteExposure(s);
                 Record(MatchEventKind.CastStart, s, ch.PeckPile, 0f, CutCause.None);

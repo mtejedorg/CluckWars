@@ -179,6 +179,8 @@ namespace CluckWars.Balance
         public int MaxMarksPerTrip;
         /// <summary>Seconds a Thief's loot mark sat on the same bird as a Spoiler's Hunt mark (counted on the Thief's seat).</summary>
         public float LootHuntOverlapSeconds;
+        /// <summary>Peck casts this seat started, landed or cut (BL-228: how much of a match a kit spends foraging).</summary>
+        public int PeckCasts;
         public int Casts;
         public int Steals;
         /// <summary>Hits of this seat's Stun, Shove or Slow that took food (the Bully's hit-steal).</summary>

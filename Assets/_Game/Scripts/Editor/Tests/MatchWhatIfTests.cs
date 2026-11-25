@@ -177,6 +177,25 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Numbers_CarryTheEconomyGroupPerKit()
+        {
+            var report = new MatchReportSection { Population = PolicyPopulation.P1 };
+            report.Economy.Add(new EconomyShareLine { Label = "Warrior_Bully", Foraged = 20f, Stolen = 5f, Banked = 22f, Trips = 3f, PeckCasts = 9f });
+            report.Economy.Add(new EconomyShareLine { Label = "Thief_Loot", Foraged = 10f, Stolen = 15f, Banked = 18f, Trips = 4f, PeckCasts = 4f });
+
+            var numbers = MatchWhatIf.Numbers(report).Where(n => n.Group == "economy").ToList();
+
+            Assert.AreEqual(10, numbers.Count, "five lines for each of the two kits in the one population");
+            float Value(string label) => numbers.Single(n => n.Label == label && n.Population == "P1").Value;
+            Assert.AreEqual(20f, Value("Warrior_Bully: foraged per match"));
+            Assert.AreEqual(5f, Value("Warrior_Bully: stolen per match"));
+            Assert.AreEqual(22f, Value("Warrior_Bully: banked per match"));
+            Assert.AreEqual(3f, Value("Warrior_Bully: trips home per match"));
+            Assert.AreEqual(9f, Value("Warrior_Bully: Peck casts per match"));
+            Assert.AreEqual(4f, Value("Thief_Loot: trips home per match"));
+        }
+
+        [Test]
         public void Numbers_CarryTheWarriorGroup()
         {
             var report = new MatchReportSection { Population = PolicyPopulation.P0 };

@@ -325,6 +325,17 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void PeckCasts_CountsEveryStart_CutOrLanded()
+        {
+            // The victim's first 1 s cast is cut by a Stun at its start; its next cast starts when the 2 s cycle is up and lands before the clock: two starts.
+            var r = MatchSim.Run(Duo(Champ(fresh: 0f, abilities: MatchTestKit.Stun(Big, 1f, 5f)), Pecker("victim", 3f, 1f, cooldown: 2f), Steps((VictimCasting(), 0)), 3.5f), 1);
+            Assert.AreEqual(1, r.Counters[1].CutsByCause[(int)CutCause.Stun], "one cast was cut");
+            Assert.AreEqual(3f, r.Counters[1].Foraged, 1e-4f, "and one landed");
+            Assert.AreEqual(2, r.Counters[1].PeckCasts, "the cut cast and the landed one both count");
+            Assert.AreEqual(0, r.Counters[0].PeckCasts, "a seat that never pecks counts none");
+        }
+
+        [Test]
         public void BiteOn_MidCast_CutsTheCast_TakesFromThePile_RestStaysInThePile()
         {
             // The victim's bite is 6 from a pile of 10; the Enforcer's beak holds 4: it takes 4, the other 2 of the bite stay in the pile.
