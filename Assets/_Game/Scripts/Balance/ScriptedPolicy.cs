@@ -60,6 +60,7 @@ namespace CluckWars.Balance
         private BiteFacts _bite;
         private TrophyFacts _trophy;
         private float _fightReach;
+        private bool _mayEngage;
 
         public ScriptedPolicy(int seat, PolicyParams p)
         {
@@ -81,6 +82,7 @@ namespace CluckWars.Balance
             _bite = kit.Passive.Bite;
             _trophy = kit.Passive.Trophy;
             var abilities = kit.Abilities ?? Array.Empty<MatchAbility>();
+            _mayEngage = MayEngage(abilities);
             Vector2 home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
             float arrival = v.Rules.SightArrivalRadius;
 
@@ -185,6 +187,13 @@ namespace CluckWars.Balance
 
         // ---- the profile ----
 
+        private bool MayEngage(MatchAbility[] abilities)
+        {
+            bool Holds(AbilityJob job) => SlotOf(abilities, job) >= 0;
+            bool pays = BotEngageRules.HitPays(_hit, _bite, Holds(AbilityJob.Stun), Holds(AbilityJob.Shove), Holds(AbilityJob.Slow), Holds(AbilityJob.Steal));
+            return BotEngageRules.MayEngage(_profile.Strategy == BotStrategy.Brawler, Holds(AbilityJob.Steal), pays);
+        }
+
         private static BotProfile Overridden(BotProfile b, PolicyParams p) => new BotProfile(
             b.Strategy,
             float.IsNaN(p.ReturnThreshold) ? b.ReturnThreshold : p.ReturnThreshold,
@@ -219,7 +228,8 @@ namespace CluckWars.Balance
             _preyCargo = 0f;
 
             float winTarget = Mathf.Max(1f, v.Rules.Farm.WinTarget);
-            float preyRadius = Mathf.Max(_profile.HuntRadius, _profile.EngageRadius);
+            // A Brawler with no Steal and no hit that pays has nothing to cast at a rival: it forages (BotEngageRules, BL-224).
+            float preyRadius = _mayEngage ? Mathf.Max(_profile.HuntRadius, _profile.EngageRadius) : 0f;
             float bestScore = float.NegativeInfinity;
             var rule = _params.Target;
 

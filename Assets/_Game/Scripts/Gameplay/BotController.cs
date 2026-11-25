@@ -461,6 +461,25 @@ namespace CluckWars.Gameplay
             return true;
         }
 
+        /// <summary>Whether this bot may leave its work to chase a rival: the kit holds a Steal or a hit that pays (<see cref="BotEngageRules"/>).</summary>
+        private bool MayEngage()
+        {
+            if (_abilities == null) return true;
+            bool stun = false, shove = false, slow = false, steal = false;
+            for (int i = 0; i < _abilities.EquippedSlotCount; i++)
+            {
+                var ability = _abilities.GetSlot(i);
+                if (ability == null) continue;
+                stun |= ability.Is(AbilityJob.Stun);
+                shove |= ability.Is(AbilityJob.Shove);
+                slow |= ability.Is(AbilityJob.Slow);
+                steal |= ability.Is(AbilityJob.Steal);
+            }
+            var passive = _abilities.Passive;
+            bool pays = passive != null && BotEngageRules.HitPays(passive.HitSteal, passive.Bite, stun, shove, slow, steal);
+            return BotEngageRules.MayEngage(_profile.Strategy == BotStrategy.Brawler, steal, pays);
+        }
+
         /// <summary>
         /// Distance a stalking Predator holds: a fraction of the reach of the longest steal
         /// tool it owns, so the pounce is one step away. 0 when it owns no steal at all, in
@@ -1018,7 +1037,8 @@ namespace CluckWars.Gameplay
 
             // The radius prey is scored against: the hunt band for a chaser, else the engage
             // band. Guarding-only strategies score nobody as prey and rely on the overlay.
-            float preyRadius = Mathf.Max(_profile.HuntRadius, _profile.EngageRadius);
+            // A Brawler with no Steal and no hit that pays has nothing to cast at a rival: it forages (BotEngageRules, BL-224).
+            float preyRadius = MayEngage() ? Mathf.Max(_profile.HuntRadius, _profile.EngageRadius) : 0f;
 
             for (int i = 0; i < all.Count; i++)
             {

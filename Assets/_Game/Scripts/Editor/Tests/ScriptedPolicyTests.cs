@@ -380,13 +380,14 @@ namespace CluckWars.Tests
                 "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(",
                 "BotHitStealRules.Gain(", "BotHitStealRules.CastForFood(", "BotHitStealRules.PickHitter(", "BotHitStealRules.WorthHunting(",
                 "BotChampionRules.FreshLeft(", "BotChampionRules.HitFresh(", "BotChampionRules.PickBuilder(", "BotChampionRules.Cash(", "BotChampionRules.StealGain(",
-                "BotChampionRules.Fight(",
+                "BotChampionRules.Fight(", "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(",
             })
                 StringAssert.Contains(call, source, "P0 must call the game's own decision, not restate it.");
 
             // And the game's bot calls the same ones (BL-217 slice A): P0 mirrors the bot's priority list, so a drift is a bot that no longer plays what P0 measures.
             string bot = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Gameplay/BotController.cs"));
-            foreach (var call in new[] { "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(" })
+            foreach (var call in new[] { "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(",
+                "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(" })
                 StringAssert.Contains(call, bot, "the game's bot must call the decision P0 calls.");
             StringAssert.DoesNotContain("BotSightRules", source, "Sight goes through MatchSight, the only caller of the rule.");
             StringAssert.DoesNotContain("BotBreakRules", source, "the Peck break is gone from the design.");
@@ -418,6 +419,52 @@ namespace CluckWars.Tests
             view.Seats[0].HitLockLeft[1] = 2f;
             Assert.AreEqual(-1, Think(view).CastSlot, "a locked rival gives nothing either");
 
+        }
+
+        // A Brawler (the Warrior's strategy) that hunts and engages, with the kit given: the defect case of BL-224.
+        private static MatchKit Brawler(params MatchAbility[] abilities)
+        {
+            var kit = MatchTestKit.Fighter("brawler", 6f, abilities, capacity: 20);
+            kit.Bot = Profile;
+            return kit;
+        }
+
+        private MatchIntent BrawlerThink(MatchKit kit)
+        {
+            var view = View(Four(kit, Kit("rival")));
+            view.Seats[0].Pos = new Vector2(30f, 30f);
+            view.Seats[1].Pos = new Vector2(38f, 30f);   // 8 m: inside the engage band of the profile
+            view.Seats[1].Cargo = 0f;                     // an empty rival: only the engage band applies
+            return Think(view);
+        }
+
+        [Test]
+        public void P0Brawler_WithNoStealAndNoHitThatPays_ForagesInsteadOfChasing()
+        {
+            var stun = Make(MatchTestKit.Stun(5f, 1.3f, 7f), BotRole.Control, 5f, true);
+            var shove = Make(MatchTestKit.Shove(5f, 5f, 5f), BotRole.Control, 5f, true);
+            var intent = BrawlerThink(Brawler(stun, shove));
+            Assert.GreaterOrEqual(intent.PeckPile, 0, "nothing to take from a rival: it goes to a pile");
+            Assert.AreNotEqual(new Vector2(38f, 30f), intent.Goal);
+        }
+
+        [Test]
+        public void P0Brawler_WithAStealOrAHitThatPays_StillChases()
+        {
+            var stun = Make(MatchTestKit.Stun(5f, 1.3f, 7f), BotRole.Control, 5f, true);
+            var steal = Make(MatchTestKit.Steal(5f, 5f, 4f), BotRole.Steal, 5f, true);
+            var withSteal = BrawlerThink(Brawler(stun, steal));
+            Assert.AreEqual(-1, withSteal.PeckPile, "a Steal in the kit: the shipped Bully and Relentless behave exactly as before");
+            Assert.AreEqual(new Vector2(38f, 30f), withSteal.Goal);
+
+            var hitKit = Brawler(stun);
+            hitKit.Passive.HitSteal = new HitStealFacts { Stun = 2f, LockSeconds = 3f };
+            hitKit.Passive.Bite = BiteFacts.None;
+            var view = View(Four(hitKit, Kit("rival")));
+            view.Seats[0].Pos = new Vector2(30f, 30f);
+            view.Seats[1].Pos = new Vector2(38f, 30f);
+            view.Seats[1].Cargo = 20f;
+            Assert.AreEqual(-1, Think(view).PeckPile, "an active hit-steal on a held Stun pays: it chases a loaded rival");
         }
 
         // A Champion with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
