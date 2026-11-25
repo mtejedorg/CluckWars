@@ -193,36 +193,41 @@ namespace CluckWars.Balance
         public int HitRefusedRoom;
         /// <summary>Food hit-steals took from this seat (victim side; also in <see cref="LostToSteals"/>).</summary>
         public float HitLostFood;
-        /// <summary>Peck breaks this seat landed (the Champion's).</summary>
-        public int Breaks;
-        /// <summary>Food breaks took from the victims' piles into this seat's cargo (not counted as foraged).</summary>
-        public float BreakFood;
-        /// <summary>Food of the victim's bite that did not fit this seat's beak and stayed in the pile.</summary>
-        public float BreakLeftInPile;
-        /// <summary>Break presses whose cast was already over and that became an ordinary pile Peck.</summary>
-        public int BreakFallbacks;
-        /// <summary>Break presses with no cast to break and no pile Peck to fall back to: a visible cancel that spent nothing.</summary>
-        public int BreakCancels;
-        /// <summary>Break presses that could not be made (stunned, dashing, mid Peck, break not ready) or met a wall, an egg or an immune rival.</summary>
-        public int BreakRefused;
-        /// <summary>This seat's Peck casts that were broken by a rival (victim side; also in <see cref="CutsByCause"/>).</summary>
-        public int PecksBroken;
+        /// <summary>Hits of this seat on a fresh rival that stacked the extra trophy (a fresh state is spent by its first hit).</summary>
+        public int FreshHits;
+        /// <summary>Bites this seat took from a casting rival's pile (the Champion's; includes a bite that fitted 0).</summary>
+        public int BitesFromCast;
+        /// <summary>Bites this seat took from the cargo of a rival whose Peck had just landed.</summary>
+        public int BitesFromCargo;
+        /// <summary>Food bites took from casting rivals' piles into this seat's cargo (not counted as foraged).</summary>
+        public float BiteFoodFromCast;
+        /// <summary>Food bites took from rivals' cargo into this seat's cargo (also in <see cref="Stolen"/> and the victim's <see cref="LostToSteals"/>).</summary>
+        public float BiteFoodFromCargo;
+        /// <summary>Food of a mid-cast bite that did not fit this seat's beak and stayed in the pile.</summary>
+        public float BiteLeftInPile;
+        /// <summary>Food of a just-landed bite that did not fit this seat's beak or the rival's cargo and stayed with the rival.</summary>
+        public float BiteLeftWithVictim;
+        /// <summary>Hits on a rival whose fresh state had already been bitten (no second bite).</summary>
+        public int BitesSpent;
+        /// <summary>This seat's Peck casts cut by a bite (victim side; also in <see cref="CutsByCause"/>).</summary>
+        public int PecksBitten;
+        /// <summary>Food bites took from this seat's cargo (victim side; also in <see cref="LostToSteals"/>).</summary>
+        public float BiteLostFood;
+        /// <summary>Trophies this seat gained on rivals (a gain at the cap earns nothing and is not counted).</summary>
         public int TrophiesEarned;
-        /// <summary>Trophies a rival's take or an execution cost this seat.</summary>
-        public int TrophiesLost;
-        /// <summary>Trophies cleared because this seat banked (<c>TrophiesClearOnBank</c>).</summary>
+        /// <summary>Trophies that went when a count decayed with no gain.</summary>
+        public int TrophiesDecayed;
+        /// <summary>Trophies that went because this seat, or the rival they counted on, was executed.</summary>
         public int TrophiesCleared;
-        public int TrophyPeak;
-        /// <summary>Trophy seconds: the trophies held, summed over every tick and multiplied by the tick, for the mean held.</summary>
-        public float TrophySeconds;
-        public int TrophiesAtEnd;
-        /// <summary>Beak room the held trophies added at each trip home that began with trophies held, summed.</summary>
-        public float TrophyRoomOffered;
-        /// <summary>Of that room, the food the trip carried above the class capacity (the room actually used), summed.</summary>
-        public float TrophyRoomFilled;
-        /// <summary>Food that left this seat's beak for the centre pile because its capacity fell below its cargo.</summary>
-        public float OverflowToCentre;
-        /// <summary>The most one victim lost to this seat's hit-steals, Steals and breaks inside any <see cref="MatchReports.LossWindowSeconds"/> window.</summary>
+        /// <summary>Steals of this seat that took food while holding a count on the victim.</summary>
+        public int TrophyCashes;
+        /// <summary>The trophies those Steals consumed, summed.</summary>
+        public int TrophiesCashed;
+        /// <summary>The part of those Steals' food that the trophies added and that fitted (food above the nominal Steal).</summary>
+        public float TrophyBonusFood;
+        /// <summary>Food this seat's Steal casts took (marked and ordinary), so the mean Steal size is this over <see cref="Steals"/>.</summary>
+        public float StealFood;
+        /// <summary>The most one victim lost to this seat's hit-steals, Steals and bites inside any <see cref="MatchReports.LossWindowSeconds"/> window.</summary>
         public float WorstVictimLoss5s;
         public float FirstContact;
         /// <summary>Food this seat took from each seat (index = victim).</summary>

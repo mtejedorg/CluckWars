@@ -46,17 +46,11 @@ namespace CluckWars.Balance
         public int PeckPile;
         public int CastSlot;
         public int CastTarget;
-        /// <summary>
-        /// Press the Champion's Peck break on <see cref="BreakTarget"/>: a one-off like a cast. A bool flag, so an object initializer that leaves it
-        /// out never means "break seat 0". If the rival's cast is already over when the press resolves, the press falls back to a pile Peck, else it cancels.
-        /// </summary>
-        public bool Break;
-        public int BreakTarget;
 
-        public static MatchIntent Idle(Vector2 at) => new MatchIntent { Goal = at, PeckPile = -1, CastSlot = -1, CastTarget = -1, BreakTarget = -1 };
+        public static MatchIntent Idle(Vector2 at) => new MatchIntent { Goal = at, PeckPile = -1, CastSlot = -1, CastTarget = -1 };
 
         public bool SameAs(in MatchIntent o) =>
-            Goal == o.Goal && PeckPile == o.PeckPile && CastSlot == o.CastSlot && CastTarget == o.CastTarget && Break == o.Break && BreakTarget == o.BreakTarget;
+            Goal == o.Goal && PeckPile == o.PeckPile && CastSlot == o.CastSlot && CastTarget == o.CastTarget;
     }
 
     /// <summary>
@@ -93,16 +87,20 @@ namespace CluckWars.Balance
         public int LootMarkedBy;
         /// <summary>Seconds until each slot is ready. Index 0 is the Peck, index 1 + i is <c>MatchKit.Abilities[i]</c>.</summary>
         public float[] CooldownLeft;
-        /// <summary>Beak capacity now: the class capacity through the passive, plus the room the held trophies add. Policies read this, never the kit.</summary>
+        /// <summary>Beak capacity now. Policies read this, never the kit: it is the one capacity the simulator computes.</summary>
         public float Capacity;
-        /// <summary>Trophies held (the Champion's; 0 for every other kit).</summary>
-        public int Trophies;
         /// <summary>Seconds until this seat's Peck cast ends; 0 unless it is pecking. A rival's is read only while it is seen.</summary>
         public float PeckCastLeft;
-        /// <summary>Seconds this seat cannot be broken any more (after a break); 0 when it can be.</summary>
-        public float BreakImmuneLeft;
-        /// <summary>Seconds until this seat may press another break (0 for a kit with no break, which never presses one).</summary>
-        public float BreakLeft;
+        /// <summary>Seconds since this seat's own Peck last landed (a large number before the first landing).</summary>
+        public float SinceLanded;
+        /// <summary>That landing took food (a landing that took 0 opens no fresh state).</summary>
+        public bool LandedWithFood;
+        /// <summary>The seat's current fresh state has been bitten already (cleared by its next cast start or landing).</summary>
+        public bool FreshBitten;
+        /// <summary>Trophies this seat holds on each rival, by rival seat (the Champion's; zeros for every other kit). Meaningful for the policy's own seat.</summary>
+        public int[] TrophyOn;
+        /// <summary>Seconds until each of those counts decays, by rival seat (0 with no count).</summary>
+        public float[] TrophyLeft;
         /// <summary>Seconds each rival stays locked against this seat's hit-steal, by rival seat. Meaningful for the policy's own seat.</summary>
         public float[] HitLockLeft;
 
@@ -128,24 +126,11 @@ namespace CluckWars.Balance
         public OracleNav Nav;
         public MatchRules Rules;
 
-        /// <summary>
-        /// The food the seat's own Peck would take if it pressed one now: 0 unless it may start one (ready, not stunned, room left) at a pile with
-        /// food inside its reach. The break rules ask it: a press is either a break or a pile Peck.
-        /// </summary>
-        public float OwnPileBite(int seat)
+        /// <summary>Trophies <paramref name="seat"/> holds on <paramref name="rival"/>.</summary>
+        public int TrophiesOn(int seat, int rival)
         {
-            var me = Seats[seat];
-            float free = me.Capacity - me.Cargo;
-            if (me.Stunned || me.Pecking || free <= 0f || me.CooldownLeft == null || me.CooldownLeft[0] > 1e-4f) return 0f;
-            float bite = Kits[seat].Farm.PeckAmount;
-            for (int p = 0; p < OracleMapSO.PileCount; p++)
-                if (PileFood[p] > 1e-4f && MatchGeometry.InReach(Map, p, me.Pos)) return Mathf.Min(bite, Mathf.Min(free, PileFood[p]));
-            if (GoldenActive && GoldenFood > 1e-4f)
-            {
-                var golden = new OraclePlace { Kind = OraclePlaceKind.Centre, Seat = -1, Pos = GoldenPos, Footprint = Map.GoldenFootprint, Yaw = 0f };
-                if (MatchGeometry.InReach(Map, golden, me.Pos)) return Mathf.Min(bite, Mathf.Min(free, GoldenFood));
-            }
-            return 0f;
+            var on = Seats[seat].TrophyOn;
+            return on != null && rival >= 0 && rival < on.Length ? on[rival] : 0;
         }
     }
 

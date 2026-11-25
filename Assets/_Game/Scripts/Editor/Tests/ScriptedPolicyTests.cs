@@ -379,7 +379,8 @@ namespace CluckWars.Tests
                 "BotTactics.PileCost(", "BotTactics.TargetPriority(", "BotTactics.ShouldStealGuard(", "BotTactics.ScoreCastCandidate(",
                 "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(",
                 "BotHitStealRules.Gain(", "BotHitStealRules.CastForFood(", "BotHitStealRules.PickHitter(", "BotHitStealRules.WorthHunting(",
-                "BotBreakRules.Candidate(", "BotBreakRules.Approach(", "BotBreakRules.ShouldBreak(", "BotBreakRules.ReturnFraction(",
+                "BotChampionRules.FreshLeft(", "BotChampionRules.HitFresh(", "BotChampionRules.PickBuilder(", "BotChampionRules.Cash(", "BotChampionRules.StealGain(",
+                "BotChampionRules.Fight(",
             })
                 StringAssert.Contains(call, source, "P0 must call the game's own decision, not restate it.");
 
@@ -388,6 +389,7 @@ namespace CluckWars.Tests
             foreach (var call in new[] { "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(" })
                 StringAssert.Contains(call, bot, "the game's bot must call the decision P0 calls.");
             StringAssert.DoesNotContain("BotSightRules", source, "Sight goes through MatchSight, the only caller of the rule.");
+            StringAssert.DoesNotContain("BotBreakRules", source, "the Peck break is gone from the design.");
         }
 
         // A Warrior kit under test: a profile that neither hunts, engages nor guards, so only the kit's own rule can make it cast or press.
@@ -418,41 +420,100 @@ namespace CluckWars.Tests
 
         }
 
-        [Test]
-        public void P0Champion_BreaksARivalCastingInReach()
+        // A Champion with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
+        private static MatchKit Champion(float peckCooldown = 0.71f, BotProfile? profile = null)
         {
-            var hunter = MatchTestKit.Fighter("hunter", 6f, new MatchAbility[0], capacity: 20);
-            hunter.Bot = QuietWarrior;
-            hunter.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-            hunter.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
-            var view = View(Four(hunter, Kit("rival")));
-            view.Seats[0].Pos = Vector2.zero;                        // inside the centre pile's reach: the bot could peck it itself
-            view.Seats[1].Pos = new Vector2(2f, 0f);
-            view.Seats[1].Pecking = true;
-            view.Seats[1].PeckCastLeft = 0.4f;                       // longer than the 0.3 s reaction
+            var stun = Make(MatchTestKit.Stun(5f, 1.3f, 7f), BotRole.Control, 5f, true);
+            var steal = Make(MatchTestKit.Steal(5f, 5f, 4f), BotRole.Steal, 5f, true);
+            var kit = MatchTestKit.Fighter("champion", 6f, new[] { stun, steal }, peckAmount: 3f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
+            kit.Bot = profile ?? QuietWarrior;
+            kit.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
+            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
+            return kit;
+        }
 
-            var intent = Think(view);
-            Assert.IsTrue(intent.Break, "a trophy is still to win: break even at a pile");
-            Assert.AreEqual(1, intent.BreakTarget);
-
-            view.Seats[0].Trophies = 3;
-            Assert.IsFalse(Think(view).Break, "at a pile with the cap held it pecks instead");
-
-            view.Seats[0].Pos = new Vector2(30f, 30f);               // away from a pile: nothing to peck, so break
+        private static MatchView AwayFromPiles(MatchView view)
+        {
+            view.Seats[0].Pos = new Vector2(30f, 30f);
             view.Seats[1].Pos = new Vector2(32f, 30f);
-            view.Seats[0].Trophies = 3;
-            Assert.IsTrue(Think(view).Break);
+            for (int p = 0; p < view.PileFood.Length; p++) view.PileFood[p] = 0f;
+            view.Seats[0].TrophyOn = new int[4];
+            view.Seats[0].TrophyLeft = new float[4];
+            return view;
+        }
 
-            view.Seats[1].PeckCastLeft = 0.2f;                       // the cast ends before the press can land
-            Assert.IsFalse(Think(view).Break, "the cast will not outlast the reaction");
-
+        [Test]
+        public void P0Champion_HitsAFreshRivalInReach_NotAStaleOne()
+        {
+            var view = AwayFromPiles(View(Four(Champion(), Kit("rival"))));
+            view.Seats[1].Pecking = true;
             view.Seats[1].PeckCastLeft = 0.4f;
-            view.Seats[1].BreakImmuneLeft = 1f;
-            Assert.IsFalse(Think(view).Break, "a rival just broken cannot be broken again");
+            Assert.AreEqual(0, Think(view).CastSlot, "a rival mid-cast in reach: the builder (the Stun is the only one ready)");
 
-            view.Seats[1].BreakImmuneLeft = 0f;
-            view.Seats[0].BreakLeft = 1f;
-            Assert.IsFalse(Think(view).Break, "the hunter's own break is not ready");
+            view.Seats[1].Pecking = false;
+            view.Seats[1].PeckCastLeft = 0f;
+            view.Seats[1].LandedWithFood = true;
+            view.Seats[1].SinceLanded = 0.5f;
+            Assert.AreEqual(0, Think(view).CastSlot, "landed half a second ago with food: still fresh");
+
+            view.Seats[1].SinceLanded = 1.5f;
+            Assert.AreEqual(-1, Think(view).CastSlot, "past the window: nothing to bite, no cast");
+
+            view.Seats[1].SinceLanded = 0.5f;
+            view.Seats[1].FreshBitten = true;
+            Assert.AreEqual(-1, Think(view).CastSlot, "the state was already bitten");
+
+            view.Seats[1].FreshBitten = false;
+            view.Seats[1].Shelled = true;
+            Assert.AreEqual(-1, Think(view).CastSlot, "an egg refuses the hit");
+
+            // With the bite off the Champion is a plain kit: the same fresh rival gets no cast.
+            var off = Champion();
+            off.Passive.Bite = BiteFacts.None;
+            off.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 0f, Cap = 3, Seconds = 6f };
+            var offView = AwayFromPiles(View(Four(off, Kit("rival"))));
+            offView.Seats[1].Pecking = true;
+            offView.Seats[1].PeckCastLeft = 0.4f;
+            Assert.AreEqual(-1, Think(offView).CastSlot, "shipped off: the plain kit by the ordinary rules");
+        }
+
+        [Test]
+        public void P0Champion_CashesAtTheCap_AndBeforeTheDecay()
+        {
+            var view = AwayFromPiles(View(Four(Champion(), Kit("rival"))));
+            view.Seats[1].Cargo = 20f;
+            view.Seats[0].TrophyOn[1] = 3;
+            view.Seats[0].TrophyLeft[1] = 5f;
+            Assert.AreEqual(1, Think(view).CastSlot, "at the cap: cash the Steal");
+
+            view.Seats[0].TrophyOn[1] = 2;
+            Assert.AreEqual(-1, Think(view).CastSlot, "a builder is ready before the count decays: build first, not cash");
+
+            view.Seats[0].CooldownLeft[1] = 6f;   // the Stun is back only after the count decays
+            Assert.AreEqual(1, Think(view).CastSlot, "no builder is back in time: cash now");
+
+            view.Seats[0].TrophyOn[1] = 0;
+            Assert.AreEqual(-1, Think(view).CastSlot, "count 0 is the ordinary Steal rule, and the quiet profile never engages");
+        }
+
+        [Test]
+        public void P0Champion_KeepsPeckingWhenNoFightBeatsThePeck()
+        {
+            // The same rival, the same layout: at the shipped Peck the pile wins; with a Peck slowed to 5 s the fight pays and the Champion goes for him.
+            MatchIntent Run(float peckCooldown)
+            {
+                var view = View(Four(Champion(peckCooldown, Profile), Kit("rival")));
+                view.Seats[0].Pos = new Vector2(30f, 30f);
+                view.Seats[1].Pos = new Vector2(38f, 30f);
+                view.Seats[1].Cargo = 2f;
+                view.Seats[0].TrophyOn = new int[4];
+                view.Seats[0].TrophyLeft = new float[4];
+                return Think(view);
+            }
+            Assert.GreaterOrEqual(Run(0.71f).PeckPile, 0, "a 2-food take is worth less than the Peck's rate: collect");
+            var fight = Run(5f);
+            Assert.AreEqual(-1, fight.PeckPile, "the slow Peck makes the fight worth it");
+            Assert.AreEqual(new Vector2(38f, 30f), fight.Goal);
         }
 
     }

@@ -3,52 +3,33 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The Champion's trophy rules (design 2026-11-25): pure functions over facts.</summary>
+    /// <summary>The Champion's per-enemy trophy rules (design 2026-11-25, redesign): pure functions over facts.</summary>
     public sealed class TrophyRulesTests
     {
         [Test]
-        public void Earn_StopsAtTheCap()
+        public void Add_StopsAtTheCap()
         {
-            Assert.AreEqual(1, TrophyRules.Earn(0, 3));
-            Assert.AreEqual(3, TrophyRules.Earn(2, 3));
-            Assert.AreEqual(3, TrophyRules.Earn(3, 3), "at the cap a gain does nothing");
-            Assert.AreEqual(0, TrophyRules.Earn(0, 0), "a cap of 0 earns none");
+            Assert.AreEqual(1, TrophyRules.Add(0, 3));
+            Assert.AreEqual(3, TrophyRules.Add(2, 3));
+            Assert.AreEqual(3, TrophyRules.Add(3, 3), "at the cap a gain adds nothing");
+            Assert.AreEqual(0, TrophyRules.Add(0, 0), "a cap of 0 earns none");
         }
 
         [Test]
-        public void LoseOne_NeverBelowZero()
+        public void StealAmount_IsBaseTimesFactorPlusPerTrophyTimesCount()
         {
-            Assert.AreEqual(2, TrophyRules.LoseOne(3));
-            Assert.AreEqual(0, TrophyRules.LoseOne(1));
-            Assert.AreEqual(0, TrophyRules.LoseOne(0));
+            Assert.AreEqual(11f, TrophyRules.StealAmount(5f, 1f, 2f, 3), 1e-6f);
+            Assert.AreEqual(5f, TrophyRules.StealAmount(5f, 1f, 2f, -1), 1e-6f, "a negative count is no count");
+            Assert.AreEqual(5f, TrophyRules.StealAmount(5f, 1f, 0f, 3), 1e-6f, "shipped: trophies add nothing");
+            Assert.AreEqual(8f, TrophyRules.StealAmount(5f, 1.6f, 0f, 0), 1e-6f, "the thief's factor scales the base only");
         }
 
         [Test]
-        public void Room_IsTrophiesTimesRoom()
+        public void Decayed_AfterTheUntilOnly()
         {
-            var f = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
-            Assert.AreEqual(0f, TrophyRules.Room(0, f));
-            Assert.AreEqual(6f, TrophyRules.Room(3, f));
-            Assert.AreEqual(0f, TrophyRules.Room(3, new TrophyFacts { IsChampion = true, Room = 0, Cap = 3 }), "room 0: trophies add nothing");
-            Assert.AreEqual(0f, TrophyRules.Room(3, TrophyFacts.None), "not the Champion's kit");
-        }
-
-        [Test]
-        public void StealEarns_AtOneFood_NotBelow()
-        {
-            Assert.IsTrue(TrophyRules.StealEarns(1f));
-            Assert.IsTrue(TrophyRules.StealEarns(5f));
-            Assert.IsFalse(TrophyRules.StealEarns(0.99f));
-            Assert.IsFalse(TrophyRules.StealEarns(0f));
-        }
-
-        [Test]
-        public void Overflow_IsTheExcessOnly()
-        {
-            Assert.AreEqual(0f, TrophyRules.Overflow(10f, 20f));
-            Assert.AreEqual(0f, TrophyRules.Overflow(20f, 20f));
-            Assert.AreEqual(3f, TrophyRules.Overflow(23f, 20f));
-            Assert.AreEqual(0f, TrophyRules.Overflow(0f, 0f));
+            Assert.IsFalse(TrophyRules.Decayed(5.9f, 6f));
+            Assert.IsFalse(TrophyRules.Decayed(6f, 6f), "at the moment itself the count still stands");
+            Assert.IsTrue(TrophyRules.Decayed(6.01f, 6f));
         }
     }
 }

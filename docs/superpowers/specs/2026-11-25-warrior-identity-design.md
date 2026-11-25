@@ -1,6 +1,9 @@
 # Warrior identity: the Bully's hit-steal and the Champion (design and simulator plan)
 
-Date: 2026-11-25. Status: design; the simulator slices S1 to S6 are built (results in section 14) (amended by Maestro's ruling on `BreakCooldown`, section 12 item 14). Inputs: Maestro's decisions of 2026-11-25 (section 1, closed), the code read on
+Date: 2026-11-25. Status: design; the simulator slices S1 to S6 are built (results in section 14). **Amended 2026-11-25 (afternoon):** the Champion is
+redesigned by Maestro after run B (section 14.2): fresh rivals, per-enemy trophies that inflate the Steal (section 4); the rework
+is planned as slices R1 to R4 (section 10.1). **Amended again (evening):** a hit on a fresh rival takes no food, it only stacks one more trophy
+(section 1, last Champion bullet); the old bite stays as data (`FreshBiteShare`) so both readings can be measured. The Bully is unchanged. Inputs: Maestro's decisions of 2026-11-25 (section 1, closed), the code read on
 `develop` at `0230d380` plus the uncommitted BL-221 work of another session (`BotController`, `ScriptedPolicy`, `BotTactics`, `Warrior.asset`).
 Method, as in `2026-11-23-thief-loot-mark-design.md`: simulator first, every number on the passive SO, shipped off, the game built only after
 Maestro approves the measured rule.
@@ -16,6 +19,19 @@ Maestro approves the measured rule.
   not in Bully-specific code.
 - **Champion** (named by Maestro; replaces Relentless, which is shelved, not deleted). "Integremos las dos en una: el 2 extra de cortar un peck es otro
   trophy. No entiendo en qué afecta el tamaño, va a ser confuso." Kit Peck, Speed, Steal, Slow. The break and the trophies are section 4.
+- **Champion, redesign (Maestro, 2026-11-25, after run B; supersedes the break and the capacity trophies).** The bite: "más simple aún: si le da
+  un mamporrazo a un pollo que acaba de hacer peck (como 1 segundo, feedback visual), le roba el bocata (incluyendo mientras hace el propio peck)."
+  The trophies: "El trofeo es por enemigo, y crece por cada habilidad acertada (y corte de peck), inflando el steal." The base: "Mantenemos la carga
+  a 20 pero bajamos la capacidad de farmeo. Los cooldowns le obligan a compaginar pelea con farmeo." Closed: no Peck-press break and no timing
+  window on the Champion's side; a rival is fresh mid Peck-cast and about 1 s after its own Peck landed, and both it and the Champion see it; any
+  of his hits on a fresh rival takes the bite; trophies are per enemy, +1 per landed ability and per bite, and inflate his Steal on that enemy;
+  cargo stays 20, the Warrior's foraging goes down (lever measured, section 9); no capacity trophies, no size change.
+- **Champion, the bite takes no food (Maestro, 2026-11-25, evening; supersedes the bite food above).** "El champion no se lleva nada de cortar un peck, solo
+  una stack para el robo." So a hit on a fresh rival (mid Peck-cast, or within `FreshSeconds` after its Peck landed) takes no food: it adds the extra
+  trophy to that rival's count, on top of the +1 the hit itself gives. A mid-cast Stun or Shove cuts the cast as it does today; nothing moves from the
+  pile or the victim's cargo, and all the food the Champion gets from a rival comes through the Steal, inflated by the count. The bite food stays as
+  data, not a deletion: `FreshBiteShare` on the Champion passive (the share of the victim's `PeckAmount` taken, shipped 0 and 0 in the what-if anchor;
+  1 is the old reading), so both can be measured.
 - Overflow goes to the centre pile (ruled earlier today; the game path is a separate item; the simulator models it for these two kits).
 - The Thief gets no Peck interplay change. `RelentlessPassiveSO` and `Relentless.asset` stay in the repo.
 
@@ -35,6 +51,9 @@ Maestro approves the measured rule.
 | The game's Peck asks the pile only when its cast ends naturally; a cut cast asks nothing (ARCH-NET-07). | `PeckAbilitySO.OnDeactivate`, `PeckCastTests` |
 | A pecking chicken never holds a live Shield (`CanStartPeck` refuses one, a Shield cast cuts the Peck). | `MatchSim.CanStartPeck`, `BeginCast` |
 | The Warrior bot banks at 12 food whatever its beak (`BotProfile.ReturnAmount` 12, BL-221, in flight). | `BotTactics.ReturnThreshold(profile, phase, leading, capacity)` |
+| (rework) In the sim a landed Stun cuts the victim's Peck **before** the hit hook runs (`Control`: `Cut(victim, CutCause.Stun)` then `HitSteal`); `Shove` cuts only above `ShoveCounts`; the Steal branch never cuts and only targets a carrier (`Stealable > 0`), egg refused, shield walk refuses only Slow, Hide is no refusal in `RivalCanBeHit`. | `MatchSim.Control`, `Shove`, `Cast` (Steal case), `MatchCombat.Refused` |
+| (rework) Snatch: `StealAmount` 5, `Cooldown` 4, `SnatchRange` 5.16; WingSlam: `Cooldown` 7, `StunRadius` 5.4; CluckShock: `Cooldown` 5, `ShockRadius` 5.4. Every foraging class: `PeckAmount` 3, `PeckCooldown` 0.71. | `Data/Abilities/*.asset`, `Data/Classes/*.asset` |
+| (rework) `Champion.asset` lives in `Data/Simulator/` (not `Passives/`), kit guids Peck `2b6f2fba…`, SpeedBurst `56e7e5a4…`, Slow `eca28bb3…`, Snatch `4c026dfa…`; WingSlam is `6bbb9c61252f875408fde062c994669c`, CluckShock `079c14ab0b344ca898f4be63fbf58374`. | `Data/Simulator/Champion.asset`, the `.meta` files |
 
 ## 3. Rule 1: the Bully's hit-steal
 
@@ -75,61 +94,125 @@ Fields on `BullyPassiveSO` (served to every reader through `PassiveAbilitySO.Hit
 
 Off means every amount 0: the shipped Bully plays exactly as today.
 
-## 4. Rule 2: the Champion
+## 4. Rule 2: the Champion (redesigned 2026-11-25)
 
-**In one line (for a child):** catch a bird while it pecks and you steal its bite; every catch and every steal is a trophy, and each trophy makes your
-beak bigger. Get robbed and you lose one.
+**In one line (for a child):** hit a bird that has just pecked and you stack an extra trophy on it; every hit on the same bird is a trophy, and your
+Steal on that bird takes 2 more food for each trophy.
 
-### 4.1 The break
+**Kit:** Peck, WingSlam (Stun), CluckShock (Shove), Snatch (Steal); no cooldown multiplier, no other multiplier. Legal under `FixedKit.Problems`:
+four slots, a Peck (the Warrior forages), no ability twice, no passive in a slot, `AllowedClasses` exactly Warrior, no Hunt. It is the old Bully
+kit with Shove in place of Jump, so every ability is already a registered pool asset.
+
+### 4.1 Fresh
+
+A rival is **fresh** while either holds, and its current fresh state has not been bitten yet:
+
+| State | Starts | Ends |
+|---|---|---|
+| Mid-cast | its Peck cast starts (`Pecking`, `_time < PeckDoneAt`) | the cast lands or is cut (by anyone, the bite included) |
+| Just landed | its own Peck **landed with food** (take above 0) at time L | `_time > L + FreshSeconds`, or its next Peck cast starts (a new state) |
+
+- A Peck cut by someone else opens no "just landed" state; a landing that took 0 (full beak, empty pile) opens none either.
+- A bite consumes the state: one bite per victim per fresh state, whoever bites. A new cast start or a new landing opens a new, unbitten state.
+- Fresh is a fact of the victim, not of a Champion: two Champions see the same state, and the first to bite spends it.
+- Assassins never peck, so they are never fresh. A rival that is fresh and in its egg cannot be hit, so it cannot be bitten.
+- `FreshSeconds` 0 is the switch: no rival is ever fresh, mid-cast included (shipped).
+
+### 4.2 The fresh hit and the bite
+
+**Amended (Maestro, evening): the shipped rule takes no food.** A hit on a fresh rival adds the extra trophy of 4.3 and spends the fresh state; it
+takes nothing from the pile or the cargo. A Stun or Shove still cuts a casting Peck as its own effect (a Steal never cuts). The food rules below are
+the **bite**: they apply only when `FreshBiteShare` is above 0, with the bite amount = `FreshBiteShare` x the victim's `PeckAmount` (1 = the old
+reading). In the tables, "the bite" and "bite trophy" read as: the extra fresh-hit trophy always; the food only with the share.
+
+A **hit** is one of the Champion's Stun, Shove or Steal affecting a rival, with the "affected" test the Bully's hit-steal uses:
+
+| Hitter | Affected when |
+|---|---|
+| Stun | the victim's stun is set or extended (`ControlReapplyRules.IncomingExtends` true) |
+| Shove | the impulse after the victim's `KnockbackFactor` is above 0 |
+| Steal | the Steal reaches him: in reach, no base wall, not in his egg, and he carries food (`StealRules.Stealable` above 0, Snatch's own target filter) |
+| Peck | never a hit |
+
+Any hit on a fresh rival stacks the fresh-hit trophy and, with `FreshBiteShare` above 0, takes the **bite**, `FreshBiteShare` x the victim's own `PeckAmount` (3 today at share 1):
 
 | Case | Result |
 |---|---|
-| Press Peck with a rival mid Peck-cast within `BreakReach` (centre to centre, `MatchCombat.InRange`), no wall between, rival not break-immune | the press previews that rival; a rival beats a pile; the nearest casting rival is the one previewed |
-| Release with the previewed rival still casting and still breakable | the break lands at once: his cast is cut (`CutCause.Break`), nothing lands for him, his Peck cooldown stays spent |
-| What the Champion gains | `min(victim's PeckAmount, food in the victim's pile, his free room)` from that pile; what does not fit **stays in the pile** (never the centre); no bonus food |
-| After a break | only another break has to wait `BreakCooldown`; his next pile Peck runs on his normal Peck cycle (a break is never a sacrifice of his own foraging); the victim is immune to breaks for `BreakImmuneSeconds` |
-| Release with the cast already over (landed, cut by someone else, pile empty) | a pile Peck if a pile with food is in reach (normal Peck, normal cooldown); else a visible cancel that spends nothing |
-| No retarget | the release acts on the previewed rival only; another rival casting at release is not taken |
-| Egg | refused (cannot happen today: a pecking chicken holds no live Shield; kept in the rule so a later change cannot open it) |
-| Base wall between them | refused |
-| Champion stunned, dashing or removed | the press does nothing (as any Peck) |
-| Champion hidden or with a live Shield | the break is a move: it ends Hide and cancels the egg like any cast |
-| Two Champions on one victim in one tick | the first in the rotating order breaks; the second meets an ended cast and falls back |
-| Assassins | never victims (they do not peck) |
+| Victim mid-cast | his cast is cut and nothing lands for him; his Peck cooldown stays spent (as any cut). The Champion takes `min(victim's PeckAmount, food in the victim's pile, his free room)` **from that pile**; what does not fit stays in the pile. The victim's cargo is untouched. Cut cause: the hit's own (`Stun`, or `Shove` when knocked above `ShoveCounts`), else the new `CutCause.Bite` (a Steal, or a shove too weak to cut by itself) |
+| Victim just landed | the Champion takes `StealMath.Clamp(victim's PeckAmount, his free room, victim's stealable)` **from the victim's cargo** through the existing authority-confirmed steal path; what does not fit stays with the victim |
+| Food that fits is 0 (Champion full, pile empty), or the share is 0 | the fresh hit still happens: the state is spent and the extra trophy is earned (the catch is the feat; as the old break, decision C3); with the share at 0 nothing is taken and a Steal's hit cuts nothing |
+| Fresh state already bitten | no bite; the hit still lands and still earns its own hit trophy |
+| Egg | the hit is refused, so no bite and no trophy |
+| Shield walk phase | Stun, Shove and Steal land (the walk refuses only Slow), so the bite lands |
+| Base wall between them | the hit is refused (`RivalCanBeHit`) |
+| Victim hidden | Hide is no refusal: if the hit lands, the bite lands |
+| Champion stunned, dashing or removed | he cannot cast: no hit, no bite; his trophy counts keep decaying |
+| Champion hidden | his kit has no Hide; a cast ends any Hide as for every chicken |
+| Two Champions on one victim | resolved in the rotating cast order of `ResolveCasts`: the first bites, the second's hit lands with its own hit trophy and no bite |
+| Victim executed | the killer drains him as today; every Champion's count on him goes to 0; his fresh state ends with his removal |
+| What the victim keeps | everything not taken: the rest of the pile, the rest of his cargo, and, if he is a Champion himself, his own trophies (being robbed no longer costs a trophy) |
+| A Bully's hit on a Champion | unchanged (section 3) |
 
-### 4.2 Trophies
+**Order inside one cast.** The cast walks its victims in the seat loop of `Cast` (`v = 0 .. Seats-1`, as today). Each victim is resolved
+completely before the next, and every take is clamped to the room left after the previous ones:
+
+1. Freshness is read **before** the hit's own effect (a landed Stun cuts the cast first; the snapshot keeps it mid-cast for the bite).
+2. The hit's own effect (stun set, shove impulse); a Steal's take waits for step 4.
+3. Fresh hit (if fresh): the food bite only when `FreshBiteShare` is above 0; then trophies on that victim: +1 for the fresh hit (the extra stack), +1 for
+   a Stun or Shove hit, each capped at `TrophyCap`, each restarting that victim's decay timer.
+4. Steal only: take `StealMath.Clamp(StealAmount x StealFactor + TrophySteal x count, free room, stealable)`, where `count` already holds the bite
+   stack of step 3; when the take is above 0 that victim's count goes to 0 (the Steal adds no trophy); a take of 0 leaves the count.
+
+### 4.3 Trophies (per enemy)
 
 | Case | Result |
 |---|---|
-| A break lands | +1, food or not (the cut is the feat) |
-| A Steal cast whose takes add up to 1 or more | +1, once per cast however many birds it robbed |
-| Cap | `TrophyCap`; at the cap a gain does nothing |
-| Room | capacity = class capacity (after passive hooks) + `trophies x TrophyRoom`; no size change |
-| A rival takes food from him (Steal, marked steal, hit-steal; take above 0) | -1, once per take event |
-| Executed | all lost (after the killer drained his cargo, so nothing overflows) |
-| Banking | `TrophiesClearOnBank` false (shipped): kept through banking (slow growth). true: all trophies cleared when he banks (a streak); the room they added leaves with them. Maestro, 2026-11-25: the lifetime is a measured choice |
-| Capacity below cargo after a loss | the excess goes to the centre pile at once |
-| Round reset | 0 |
+| Count | one number per Champion per rival, 0 to `TrophyCap` |
+| +1 | a Stun or Shove that affected that rival; one more for any hit (Stun, Shove or Steal) on that rival while it is fresh, once per fresh state |
+| At the cap | a gain adds nothing but restarts the decay timer |
+| Decay | the count goes to 0 when `TrophySeconds` pass with no +1 on that rival (all at once, not one by one) |
+| Cash | his Steal on that rival (section 4.2 step 4) |
+| Champion executed | all his counts 0 |
+| Victim executed | every count on that victim 0 |
+| Banking | no effect (counts live on rivals, not in his beak) |
+| Capacity | never changes: class capacity 20 |
+| Round reset | all counts 0, every fresh state cleared |
 
-Fields on the new `ChampionPassiveSO` (`TrophyFacts.ClearOnBank` carries the bank rule) (served through `PassiveAbilitySO.PeckBreak` and `PassiveAbilitySO.Trophy`):
+### 4.4 Fields
+
+On `ChampionPassiveSO` (served through `PassiveAbilitySO.Bite`, a `BiteFacts`, and `PassiveAbilitySO.Trophy`, a reshaped `TrophyFacts`; no code
+asks "is this the Champion"):
 
 | Field | Type | Shipped (off) | Designed | Sweep |
 |---|---|---|---|---|
-| `BreakReach` | float `[Min(0)]`, 0 = no break | 0 | 2.5 | 2.0, 2.5, 3.0 |
-| `BreakCooldown` | float `[Min(0)]` | 2.5 | 2.5 | 1.5, 2.5, 3.5 (gates breaks only) |
-| `BreakImmuneSeconds` | float `[Min(0)]` | 2.5 | 2.5 | none |
-| `TrophyRoom` | int `[Min(0)]`, 0 = trophies add nothing | 0 | 2 | 1, 2, 3 |
-| `TrophyCap` | int `[Min(0)]` | 3 | 3 | 3, 4, 6 |
-| `TrophiesClearOnBank` | bool | false | measured both ways | streak (true) against slow growth (false) |
+| `FreshSeconds` | float `[Min(0)]`, 0 = no rival is ever fresh | 0 | 1.0 | 0.6, 1.0, 1.5 |
+| `FreshBiteShare` | float `[Range(0,1)]`, share of the victim's `PeckAmount` a fresh hit takes as food; 0 = none (Maestro, evening) | 0 | 0 | 0, 1 |
+| `TrophySteal` | float `[Min(0)]`, 0 = trophies add nothing | 0 | 2 | 1, 2, 3 |
+| `TrophyCap` | int `[Min(0)]` | 3 | 3 | 2, 3, 4 |
+| `TrophySeconds` | float `[Min(0.5)]` | 6 | 6 | 4, 6, 9 |
+| `Kit` | asset | Peck, WingSlam, CluckShock, Snatch | same | none |
 
-The asset `Passives/Champion.asset`: `Subclass` Warrior_Relentless (1), `AllowedClasses` Warrior, `Kit` Relentless's four assets, no
-multipliers. It is **not registered**: the game cannot pick it, so it is off whatever its numbers.
+**Foraging lever** (class, not passive): `Warrior.asset` `PeckCooldown` 0.71 and `PeckAmount` 3, a plain delta (`"assets":{"Warrior":{...}}`), swept
+as levels F0 to F2 in section 9; the exact values come from the measurement running now. It is class-wide on purpose (no new code), so it also
+moves the Bully and shrinks the bite taken **from** a Warrior; the grid reports both.
 
-### 4.3 Arithmetic to watch (estimate)
+Off means `FreshSeconds` 0 and `TrophySteal` 0: the Champion plays as a plain Peck, Stun, Shove, Steal kit. `Champion.asset` stays in
+`Data/Simulator/`, **not registered**, seated only by the what-if roster swap (section 5); the game cannot pick it.
 
-`BreakCooldown` gates breaks only (Maestro, 2026-11-25): a break does not touch the Peck cycle, so it never costs him pecking he could do himself.
-A break is free to the Champion except for the walk to the rival and the press itself; what it costs is that a break is also a Peck press he did not
-make at a pile (the press is either a break or a pile Peck, never both). The `BreakCooldown` sweep measures how often breaks come and what they add.
+### 4.5 Arithmetic to watch (shipped Steal 5, starting values)
+
+A full combo on one carrier with the shipped no-food rule: Stun on a just-landed rival (count 2: the Stun and the fresh stack), Shove (count 3, the
+cap), Steal 5 + 2 x 3 = 11. The victim loses **11** from his cargo inside about 2 s (needs 11 room in the Champion's 20 and 11 food on the victim).
+With `FreshBiteShare` 1 the old reading adds the 3-food bite (14 in all; mid-cast 11 from cargo and 3 from the pile). Ceiling in one 5 s window: the
+Steal is ready again 4 s later, so about 11 + 7 = 18 without the bite (24 with it). Both are above the go limit of 6 (section 9); the mean is what
+the run measures, and `TrophySteal` 1 gives 8 (combo) and 13 (ceiling).
+
+### 4.6 Superseded 2026-11-25
+
+The Peck-press break (`BreakReach`, `BreakCooldown`, `BreakImmuneSeconds`, the press preview, fallback and cancel, `CutCause.Break`) and the
+capacity trophies (`TrophyRoom`, `TrophiesClearOnBank`, one trophy lost when robbed, overflow of the room to the centre pile) are retired from the
+design. Why: section 14.2 (the break fired 0.24 to 0.33 times a match because a 0.4 s cast leaves the bot about 0.1 s to press; the room was
+8 to 11 % used because the bot banks at 12 in a beak of 20). Slices S1, S4 and S5 built them; R1 to R4 (section 10.1) remove them.
 
 ## 5. How a what-if reaches each kit (the deny list)
 
@@ -150,10 +233,21 @@ make at a pile (the press is either a break or a pile Peck, never both). The `Br
 Bully, on a take: `+2` pop over the Bully, three food chunks from victim to Bully (`FoodChunkFlight`), the existing Steal hit sound; locked rivals
 show a faint lock ring to the Bully only (so a child sees why a hit took nothing). Victim: `-2` pop on his cargo bar, a short buzz (existing haptic).
 
-Champion, Warrior: the press preview brackets the casting rival (gold brackets, H1a reuse) instead of the pile; on a break `BREAK!` pop, the bite
-flies pile to beak, a crack sound; trophy pips (0 to cap) beside the cargo bar, each pip adds its room segment to the bar; a lost pip pops off; overflow
-food arcs to the centre pile; a release on nothing flashes the Peck hex (the visible cancel). Victim: his cast bar shatters with `BROKEN`, a shimmer
-for the immunity seconds, a short buzz. Words by `narrative-designer`; colours in `FeedbackPaletteSO` (ARCH-LAY-15).
+Champion (redesign):
+- **Fresh marker.** A fresh rival wears a bright sandwich glint over its head from its cast start to `FreshSeconds` after a landing that took
+  food, with a ring that drains over the just-landed seconds; it goes out the moment the state is bitten or ends. Seen by every Champion in the
+  match and by the fresh chicken itself (its own glint plus a pulse on its Peck hex: "you just pecked, mind the Champion"); other players do not
+  see it. Only shown while a Champion is in the match.
+- **Bite.** `BITE!` pop over the Champion; the food flies from the pile (mid-cast) or from the victim (just landed) to his beak; a crunch sound.
+  Victim: mid-cast, his cast bar shatters; just landed, a `-3` pop on his cargo bar; a short buzz.
+- **Trophy pips, per enemy.** Over each rival the Champion has a count on: 0 to `TrophyCap` small trophy pips with a thin ring that drains over
+  `TrophySeconds`; a +1 pops a pip in, decay pops them all off together, a cash flies them into the Steal. The victim sees the same pips over
+  his own head ("the Champion has 2 on you"); other players do not.
+- **Inflated Steal.** The Champion's Steal hex shows the amount for the rival it would take from (the nearest carrier in reach), `5`, `7`,
+  `9`, `11` with starting values, growing with each pip, read from `StealAmount`, `StealFactor` and `TrophySteal` (ARCH-DATA-12, no number
+  in text). On the cash: a bigger `+11` pop and the pips flying in.
+- Words by `narrative-designer`; colours in `FeedbackPaletteSO` (ARCH-LAY-15). The superseded break feedback (brackets, `BREAK!`, `BROKEN`,
+  room segments, overflow arc) is dropped.
 
 ## 7. Bot rules (pure, `Assets/_Game/Scripts/Gameplay/`, facts in, decision out)
 
@@ -166,14 +260,26 @@ Called by `ScriptedPolicy` (P0) now and by `BotController` in the game slice; `U
 - `bool WorthHunting(float gainIfUnlocked, float lockLeft, float walkSeconds)`: hunt a prey only if it would give at least 1 and its lock ends before the walk does.
 - No new bank rule: at `ReturnAmount` 12 in a beak of 20 the Bully always has room for a take.
 
-`BotBreakRules` (Champion):
-- `bool Candidate(bool rivalCasting, float castLeft, float dist, float reach, bool walled, bool immune, float reaction)`: breakable now and still casting after the bot's reaction.
-- `bool Approach(float dist, float reach, float castLeft, float moveSpeed, float reaction)`: outside reach, but walking the gap plus the reaction ends before the cast does.
-- `bool ShouldBreak(bool candidate, float ownPileBite, int trophies, int cap)`: break when he cannot peck a pile himself now (`ownPileBite` 0), or while a trophy is still to win (`trophies < cap`).
-- `float ReturnFraction(float profileFraction, float returnAmount, int trophies, int room, float capacity)`: `min(profileFraction, (returnAmount + trophies x room) / capacity)` when `returnAmount > 0`, else `profileFraction`. Without it the bot banks at 12 and the trophy room is never used.
+`BotChampionRules` (Champion; replaces `BotBreakRules`):
+- `float FreshLeft(bool casting, float castLeft, float sinceLanded, bool landedWithFood, bool bitten, float freshSeconds)`: how long the rival stays
+  fresh (a hit on it stacks the extra trophy): `castLeft + freshSeconds` mid-cast (assuming the cast lands), `freshSeconds - sinceLanded` just landed, 0 when bitten, not fresh or
+  `freshSeconds` 0. Built on `BiteRules.Fresh`.
+- `bool HitFresh(float freshLeft, float reaction)`: a fresh rival in a ready hitter's reach is worth a hit now when `freshLeft > reaction`.
+- `int PickBuilder(bool stunReady, bool shoveReady, float stunCooldown, float shoveCooldown)`: the hitter that builds a trophy: Stun or Shove,
+  the shorter cooldown first (Shove), -1 when neither is ready.
+- `bool Cash(int count, int cap, float decayLeft, float nextBuilderReadyIn, float stealGain)`: Steal that rival when `stealGain >= 1` and
+  `count >= 1` and either `count >= cap` or no builder is back before the count decays (`nextBuilderReadyIn >= decayLeft`). A Steal at count 0
+  stays the existing Steal rule.
+- `float StealGain(float stealAmount, float stealFactor, float perTrophy, int count, float freeRoom, float victimStealable)` =
+  `StealMath.Clamp(TrophyRules.StealAmount(...), freeRoom, victimStealable)`.
+- `bool Fight(float fightGain, float fightSeconds, float peckAmount, float peckCycleSeconds)`: leave the pile when the fight's food per second
+  (bite food, which is 0 at `FreshBiteShare` 0, plus the Steal gain on the count the fresh stack raised, over walk plus casts) beats the Peck's (`peckAmount / peckCycleSeconds`, cycle = `PeckCooldown + PeckCastSeconds`). This is
+  where the foraging lever of section 9 bites: a slower or smaller Peck makes more fights worth it.
+- No bank rule: the Champion banks at `ReturnAmount` 12 like every Warrior; the capacity never grows, so `ReturnFraction` goes.
 
-P1 (simulator only): `PeckCut` gains a break option (gate `BotBreakRules.Candidate`, value bite + denial bite minus the own-peck loss of section 4.3);
-`BestSteal`'s sibling `BestHit` rates Bully prey by `Gain / walk seconds`; capacity from `SeatView.Capacity`.
+P0 order each think: a fresh rival in a builder's reach with `HitFresh` true gets the builder (`PickBuilder`), or the Steal when no builder is
+ready and he carries; else a due `Cash`; else forage. P1 (simulator only): `BestHit` rates Champion targets by `Fight`'s value (bite + the
+inflated Steal it builds toward) with the same gates; `PeckCut` loses its break option; capacity from `SeatView.Capacity`.
 
 ## 8. The simulator model
 
@@ -183,62 +289,81 @@ P1 (simulator only): `PeckCut` gains a break option (gate `BotBreakRules.Candida
 (`AmountFor` is 0 for every job but Stun, Shove, Slow); `static float Take(float amount, float freeRoom, float victimStealable, bool locked)`
 through `StealMath.Clamp`; `static bool Locked(float now, float lockUntil)`.
 
-`PeckBreakRules.cs`: `struct PeckBreakFacts { float Reach, Cooldown, ImmuneSeconds; bool Active => Reach > 0 }`;
-`enum BreakOutcome : byte { None, Break, FallbackPeck, Cancel }`; `static bool CanBreak(bool casting, float dist, float reach, bool walled, bool egg, bool immune)`;
-`static float Bite(float victimPeckAmount, float pileFood, float freeRoom)`; `static BreakOutcome Resolve(bool canBreak, bool pileInReach)`;
-`static int Nearest(IReadOnlyList<float> distances)` (-1 for none).
+`BiteRules.cs` (replaces `PeckBreakRules.cs`): `struct BiteFacts { float FreshSeconds; float FoodShare; bool Active => FreshSeconds > 0; static None }`
+(`FoodShare` is the passive's `FreshBiteShare`; the callers multiply the victim's `PeckAmount` by it before `FromCast` / `FromCargo`);
+`static bool Fresh(bool casting, float sinceLanded, bool landedWithFood, bool bitten, float freshSeconds)` (`freshSeconds > 0 && !bitten &&
+(casting || (landedWithFood && sinceLanded <= freshSeconds))`); `static float FromCast(float victimPeckAmount, float pileFood, float freeRoom)`
+(the old `Bite`); `static float FromCargo(float victimPeckAmount, float freeRoom, float victimStealable)` through `StealMath.Clamp`.
 
-`TrophyRules.cs`: `struct TrophyFacts { bool IsChampion; int Room, Cap; static None }`; `static int Earn(int held, int cap)`, `static int LoseOne(int held)`,
-`static float Room(int held, in TrophyFacts f)`, `static bool StealEarns(float takenThisCast)` (at least 1), `static float Overflow(float cargo, float capacity)`.
+`TrophyRules.cs` (reshaped): `struct TrophyFacts { bool IsChampion; float Steal; int Cap; float Seconds; static None }`;
+`static int Add(int count, int cap)` (the old `Earn`); `static float StealAmount(float stealAmount, float stealFactor, float perTrophy, int count)`
+= `stealAmount x stealFactor + perTrophy x max(count, 0)`; `static bool Decayed(float now, float until)`. `LoseOne`, `Room`, `StealEarns`,
+`Overflow` are deleted.
 
-`PassiveAbilitySO`: `virtual HitStealFacts HitSteal => HitStealFacts.None`, `virtual PeckBreakFacts PeckBreak => default`, `virtual TrophyFacts Trophy => TrophyFacts.None`.
+`PassiveAbilitySO`: `virtual HitStealFacts HitSteal => HitStealFacts.None`, `virtual BiteFacts Bite => BiteFacts.None` (replaces `PeckBreak`),
+`virtual TrophyFacts Trophy => TrophyFacts.None`.
 
 ### 8.2 Simulator types and call sites (`Assets/_Game/Scripts/Balance/`)
 
-- `MatchPassive` (`MatchKit.cs`): `HitStealFacts HitSteal; PeckBreakFacts Break; TrophyFacts Trophy;` read in `MatchKits.ReadPassive`.
-- `MatchIntent`: `bool Break; int BreakTarget;` (a bool flag, so an object initializer that leaves it out never means "break seat 0"); `Idle` and `SameAs` updated.
-- `SeatView`: `float Capacity; int Trophies; float PeckCastLeft` (0 unless pecking); `float BreakImmuneLeft`; `float[] HitLockLeft` (own seat only, by rival).
-- `Chick`: `int Trophies; float TrophySecondsAcc; float BreakImmuneUntil; float[] HitLockUntil` (by victim).
-- `CutCause.Break` appended; `CauseName` gives `"break"`. `MatchEventKind` (sim enum in `MatchSim.cs`) gains `HitSteal, PeckBreak, Trophy, Overflow` at the end.
-- `CapacityOf(int s)` = `Farm.CargoCapacity + TrophyRules.Room(...)`: the only reader of `Farm.CargoCapacity` in `MatchSim` (`Land`, `CanStartPeck`, `DoSteal`, `TakeLoot`, `Execute`, `BuildView`).
-- `Control` (stun branch after `v.StunUntil` is set; slow branch after `ApplySlow`) and `Shove` (after the impulse, when above 0) call `HitSteal(caster, victim, job)`.
-- `HitSteal(c, v, job)`: amount from `PassiveOf(c).HitSteal.AmountFor(job)`; take via `HitStealRules.Take`; moves cargo, `TakeLootShare` for a loot-carrying victim, sets the lock, counters, `Record(HitSteal)`, then `Robbed(v)`.
-- `Robbed(v)`: `TrophyRules.LoseOne`, then `SpillOverflow(v)`; called from `DoSteal`, `TakeLoot` (take above 0) and `HitSteal`. `Execute` sets trophies to 0 after the drain.
-- `SpillOverflow(s)`: `TrophyRules.Overflow(cargo, CapacityOf(s))` leaves the cargo into `_pile[OracleMapSO.CentreIndex]` (its max is not raised); counted.
-- Steal branch of `Cast`: sums the takes of the cast; `TrophyRules.StealEarns` gives +1 when the caster's `Trophy.IsChampion`.
-- Break: `Apply` turns `Intent.Break` into a `CastRequest { Break = true, Target }` resolved in the rotating pass of `ResolveCasts` with the casts.
-  `ResolveBreak(s, target)`: gates as `CanCast` minus the slot (stun, dash, removed) plus `NextBreakAt` (the new per-seat break clock; `NextPeckAt` is
-  neither required nor touched by a landed break, and a break is refused while his own Peck cast is running); `PeckBreakRules.CanBreak` on the target's
-  `Pecking && _time < PeckDoneAt`, `InRange(BreakReach)`, `KeepOutBlocks`, `_egg`, `BreakImmuneUntil`; `Resolve` then either cuts the victim
-  (`Cut(v, CutCause.Break)`), takes `Bite` from his pile into the caster, sets `NextBreakAt = _time + Break.Cooldown` and the victim's immunity,
-  +1 trophy; or starts an ordinary pile Peck (its usual `NextPeckAt`, room and reach gates) on the nearest pile with food in reach (the intent's `PeckPile` first); or counts a cancel. A landed break runs
-  the "own move" rules of `BeginCast` (Hide ends, egg cancelled) without spending an ability slot.
-- Each tick: `TrophySecondsAcc += Trophies x tick` for the mean held.
+Kept from S3 (Bully): `MatchPassive.HitSteal`; `Chick.HitLockUntil`; `SeatView.HitLockLeft`; `HitSteal(c, v, job)` from `Control` and `Shove`;
+`CapacityOf(int s)` as the only reader of `Farm.CargoCapacity` (now just `Farm.CargoCapacity`, the trophy term goes).
+
+Removed (S4/S5 break and room): `MatchPassive.Break`; `MatchIntent.Break/BreakTarget`; `CastRequest.Break` and its branch in `ResolveCasts`/`Cast`;
+`ResolveBreak`; `Chick.Trophies`, `NextBreakAt`, `BreakImmuneUntil`; `SeatView.Trophies`, `BreakImmuneLeft`, `BreakLeft`; `Robbed` and its three
+calls (`DoSteal`, `TakeLoot`, `HitSteal`; it only did the trophy loss and the spill); `SpillOverflow`; `BankTrophies`; `EarnTrophy` (replaced);
+the trophy drain in `Execute`; `TrophySecondsAcc`; the Steal branch's `StealEarns` line. `CutCause.Break` is renamed `CutCause.Bite` (`"bite"`);
+`MatchEventKind.PeckBreak` and `Overflow` become `Bite` and `TrophyCash` (sim-only enums, appended order kept).
+
+Added:
+- `MatchPassive.Bite` (`BiteFacts`), `MatchPassive.Trophy` (reshaped), read in `MatchKits.ReadPassive`.
+- `Chick`: `float LandedAt` (`-inf` until a landing), `bool LandedWithFood`, `bool FreshBitten`; `int[] TrophyOn` and `float[] TrophyUntil` (by
+  victim, sized `Seats`). `StartPeck` clears `FreshBitten`; `Land` sets `LandedAt`, `LandedWithFood = take > 0` and clears `FreshBitten`.
+- `bool IsFresh(int v, in BiteFacts f)` = `BiteRules.Fresh(ch.Pecking && _time < ch.PeckDoneAt, _time - ch.LandedAt, ch.LandedWithFood, ch.FreshBitten, f.FreshSeconds)`.
+- `ChampionHit(int c, int v, AbilityJob job, bool castingBefore, bool freshBefore)`: no-op unless `PassiveOf(c).Trophy.IsChampion`. On
+  `freshBefore`: `FreshHits++`, the state is spent (`FreshBitten`), and the fresh stack is added; the food bite below runs only when
+  `Bite.FoodShare` is above 0: mid-cast (`castingBefore`) cuts the cast if it is still running (`Cut(v, CutCause.Bite)`), takes `BiteRules.FromCast` from
+  `_pile[v.PeckPile]`; else `BiteRules.FromCargo` from the cargo (with `TakeLootShare`, `NoteLoss`, `LostToSteals`, as `HitSteal` does); sets
+  `FreshBitten`, `Record(Bite)`. Then `AddTrophy(c, v)` for the bite and, for Stun or Shove, once more for the hit.
+- Call sites: `Control` stun branch reads `castingBefore`/`freshBefore` **before** `Cut(victim, CutCause.Stun)` and calls `ChampionHit` after
+  `HitSteal`; `Shove` the same around its cut; the Steal case of `Cast` (non-marked branch) calls `ChampionHit` after the target filter and before
+  `DoSteal`, which gains a `bonus` argument: `TrophyRules.StealAmount(ab.StealAmount, factor, Trophy.Steal, c.TrophyOn[v])`, then the count is
+  zeroed when the take is above 0 (counted as a cash).
+- Each tick: a count whose `TrophyUntil` has passed goes to 0 (`TrophyRules.Decayed`, counted). `Execute`: the victim's row and column of every
+  Champion's counts go to 0. Round reset: counts and fresh state cleared.
+- `SeatView`: `float SinceLanded`, `bool LandedWithFood`, `bool FreshBitten` (every seat); `int[] TrophyOn`, `float[] TrophyLeft` (own seat only).
+  The policies call `BiteRules.Fresh` with their own `FreshSeconds`; they never re-derive it.
 
 ### 8.3 Counters (`SeatCounters`) and report rows
 
-Per seat: `HitTakes`, `HitFood`, `HitRefusedLock`, `HitRefusedNoFood`, `HitRefusedRoom`, `HitLostFood` (victim side); `Breaks`, `BreakFood`, `BreakLeftInPile`,
-`BreakFallbacks`, `BreakCancels`, `BreakRefused`, `PecksBroken` (victim side); `TrophiesEarned`, `TrophiesLost`, `TrophyPeak`, `TrophySeconds`, `TrophiesAtEnd`;
-`OverflowToCentre`; `WorstVictimLoss5s` (the most one victim lost to this seat's hit-steals, Steals and breaks inside any 5 s window, from a small
-`SlidingWindowSum` per victim; the 5 s is a report constant `MatchReport.LossWindowSeconds`, not a game number). Hit-steal food also adds to
-`Stolen`, `StolenFromSeat` and the victim's `LostToSteals` (it is a steal in the game), not to `Steals` (Steal casts).
+Bully (kept): `HitTakes`, `HitFood`, `HitRefusedLock`, `HitRefusedNoFood`, `HitRefusedRoom`, `HitLostFood` (victim side). Hit-steal food also adds
+to `Stolen`, `StolenFromSeat` and the victim's `LostToSteals`, not to `Steals`.
 
-`MatchReport` gets a "Warrior kits" block per population: per Warrior kit, win rate, hit takes and food per match, breaks, fallbacks and cancels per
-match, mean and peak trophies, trophies lost, overflow per match, worst 5 s window (mean and 95th percentile over matches). `MatchWhatIf.Numbers`
-adds them as group `warrior`; `WhatIfOutput` gains `BullyKit` (first kit with `HitSteal.Active` or holding the Bully asset) and `TrophyKit`
-(`Trophy.IsChampion`).
+Champion (new `FreshHits`: hits on a fresh rival that stacked the extra trophy, whatever the food; then replace `Breaks`, `BreakFood`, `BreakLeftInPile`, `BreakFallbacks`, `BreakCancels`, `BreakRefused`, `PecksBroken`, `TrophiesLost`, `TrophyPeak`,
+`TrophySeconds`, `TrophiesAtEnd`, `TrophyRoomFilled`, `TrophiesCleared`, `OverflowToCentre`):
+`BitesFromCast`, `BitesFromCargo` (only at a bite share above 0), `BiteFoodFromCast`, `BiteFoodFromCargo`, `BiteLeftInPile`, `BiteLeftWithVictim`, `BitesSpent` (hits on a fresh
+state already bitten), `PecksBitten` and `BiteLostFood` (victim side); `TrophiesEarned`, `TrophiesDecayed`, `TrophiesCleared` (executions);
+`TrophyCashes` (Steals with a count above 0), `TrophiesCashed` (sum of counts consumed), `TrophyBonusFood` (the `TrophySteal x count` part that
+fitted); `StealFood` (food from Steal casts, so mean Steal size = `StealFood / Steals`). Identity food = `BiteFoodFromCast + BiteFoodFromCargo +
+TrophyBonusFood`. `WorstVictimLoss5s` stays (cargo bites and Steals feed `NoteLoss`; a mid-cast bite is not the victim's cargo, so it is reported
+apart as `BiteFoodFromCast`).
+
+`MatchReport` "Warrior kits" block, Champion row: win rate; bites per match from cast and from cargo, and their food; trophies earned and decayed
+per match; trophies consumed per cash (`TrophiesCashed / TrophyCashes`); mean Steal size; identity food per match; worst 5 s window (mean, 95th
+percentile). The break, trophies-held, room-used and overflow columns go. `MatchWhatIf.Numbers` group `warrior` follows; `WhatIfOutput.TrophyKit`
+stays (`Trophy.IsChampion`).
 
 ### 8.4 Drift guards
 
-- `MatchWarriorTests.Sim_CallsTheSharedRules_NotCopies`: source scan of `MatchSim.cs` finds `HitStealRules.Take`, `PeckBreakRules.CanBreak`,
-  `PeckBreakRules.Bite`, `TrophyRules.Overflow`, and proves it saw them (CODE-TEST-13).
-- `MatchWarriorTests.EveryCapacityRead_GoesThroughCapacityOf`: `Farm.CargoCapacity` occurs once in `MatchSim.cs`, inside `CapacityOf`; and zero times in
-  `ScriptedPolicy.cs` and `UtilityPolicy.cs` (both read `SeatView.Capacity`).
-- `ScriptedPolicyTests.P0_CallsTheGamesOwnFunctions_NotCopiesOfThem` extended to the `BotHitStealRules` and `BotBreakRules` calls (the game-slice
-  `BotController` must then make the same calls; the test lists both files).
-- `MatchWarriorTests.ShippedOff_PlaysExactlyAsBefore`: the shipped Bully facts (amounts 0) against `HitStealFacts.None`, and the Champion facts as
-  shipped against `TrophyFacts.None`: same seed, identical winners, end times and food counters.
-- The "affected" test of a stun reuses `ControlReapplyRules.IncomingExtends`, the game's rule; no new mirror.
+- `MatchWarriorTests.Sim_CallsTheSharedRules_NotCopies`: source scan of `MatchSim.cs` finds `HitStealRules.Take`, `BiteRules.Fresh`,
+  `BiteRules.FromCast`, `BiteRules.FromCargo`, `TrophyRules.Add`, `TrophyRules.StealAmount`, and proves it saw them (CODE-TEST-13); and finds no
+  `PeckBreakRules`, `ResolveBreak`, `SpillOverflow`.
+- `MatchWarriorTests.EveryCapacityRead_GoesThroughCapacityOf`: unchanged.
+- `ScriptedPolicyTests.P0_CallsTheGamesOwnFunctions_NotCopiesOfThem` lists the `BotHitStealRules` and `BotChampionRules` calls (and no
+  `BotBreakRules`).
+- `MatchWarriorTests.ShippedOff_PlaysExactlyAsBefore`: the shipped Bully facts against `HitStealFacts.None`; the Champion as shipped
+  (`FreshSeconds` 0, `TrophySteal` 0) against `BiteFacts.None` and `TrophyFacts.None` on the same kit: same seed, identical winners, end times and
+  food counters.
+- The "affected" tests reuse `ControlReapplyRules.IncomingExtends` and the shove impulse, as the Bully does; no new mirror.
 
 ## 9. What-if grids, trimmed
 
@@ -252,20 +377,45 @@ two hitters come back 3.75 and 5.25 s apart, so the lock only matters when both 
 anchor and, in a second run only if the anchor is close, at the best amount cell. The baseline of this run is the shipped game (Relentless and the
 old Bully): it is the reference for run B too.
 
-**Run B, Champion** (`"roster":{"Relentless":"Champion"}`; the baseline is the kit with no passive; the Thief values of Maestro's 2026-11-25
-note, bounty 8, steal x1.6, capacity 16, are in every baseline), 15 scenarios: the 3 x 3 reach x cooldown grid at room 2, cap 3, kept through banking
-(9; the cooldown axis spaces breaks only, it never slows his Peck); then the trophy lifetime, all at reach 2.5, cooldown 2.5 (Maestro, 2026-11-25: "la
-racha deberia desaparecer al backear, o crecer lentamente para que sea bueno en late"): **streak** (cleared on bank) room 2 and 3 at cap 3 (2); **slow
-growth** (kept) room 1 at cap 4 and 6 (2) and the original room 2 at cap 3 (the grid's centre, no extra run); break only, room 0 (1). That is 14; the
-fifteenth, if budget allows, is trophies from steals only (reach 0, room 2). The room x cap corners of the earlier plan are dropped for the two readings.
-Why: the break numbers decide how many trophies come; lifetime, room and cap decide what one is worth. The report adds per scenario: trophies held on
-average and at match end, and the share of the added room that was actually filled when he banked (`TrophyRoomUsed`).
+**Run B, Champion (superseded, results in 14.2).** The reach x cooldown and trophy-lifetime grid of the break design; kept only as the record of
+section 14.2.
 
-Example delta: `{"schema":1,"assets":{"Champion":{"BreakReach":2.5,"TrophyRoom":2}}}`.
+**Run C amended (Maestro, evening):** the foraging levels are `PeckCooldownMultiplier` 1.0, 1.25, 1.5 on the Champion passive (BL for step B), not the class-wide
+`Warrior` Peck values; every cell uses `FreshBiteShare` 0 except the two bite-on scenarios (anchor with share 1 at multipliers 1.0 and 1.5). About 15 scenarios.
+
+**Run C, the reworked Champion** (`whatif-warrior-champion.json`, `"roster":{"Relentless":"Champion"}`; the Thief values of Maestro's 2026-11-25
+note, bounty 8, steal x1.6, capacity 16, in every baseline). Baseline: the Champion as shipped (kit Peck, WingSlam, CluckShock, Snatch;
+`FreshSeconds` 0, `TrophySteal` 0) at the shipped foraging F0. Foraging levels (class `Warrior`, placeholders until the running measurement names
+the lever; replace F1 and F2 with its two best values, keep F0):
+
+| Level | `Warrior.PeckCooldown` | `Warrior.PeckAmount` |
+|---|---|---|
+| F0 shipped | 0.71 | 3 |
+| F1 slower Peck | 0.95 | 3 |
+| F2 smaller bite | 0.71 | 2 |
+
+Champion cells, crossed with the three levels:
+
+| Cell | `FreshSeconds` | `TrophySteal` | `TrophyCap` | `TrophySeconds` | Why |
+|---|---|---|---|---|---|
+| K kit only | 0 | 0 | 3 | 6 | the kit and the foraging alone (at F0 it is the baseline itself) |
+| B bite on | 1.0 | 2 | 3 | 6 | the anchor with `FreshBiteShare` 1 (the old reading: the victim's `PeckAmount` as food); all the other cells use share 0 |
+| H hits only | 0 | 2 | 3 | 6 | trophies from hits, no bite: what the bite adds |
+| A anchor | 1.0 | 2 | 3 | 6 | the design |
+| T1 | 1.0 | 1 | 3 | 6 | a gentler cash (worst combo 11, section 4.5) |
+| T3 | 1.0 | 3 | 3 | 6 | a harder cash |
+
+That is 14 scenarios plus the baseline (F0 x K), about 6 min. A second run (6 scenarios) only if a cell is within 5 points of the band: at that cell
+and level, `FreshSeconds` 0.6 and 1.5, `TrophyCap` 2 and 4, `TrophySeconds` 4 and 9. The report adds per scenario the section 8.3 Champion row,
+and the Bully's row too, because F1 and F2 change the Warrior class.
+
+Example delta: `{"schema":1,"assets":{"Champion":{"FreshSeconds":1.0,"TrophySteal":2},"Warrior":{"PeckCooldown":0.95}}}`.
 
 Go when all hold (the oracle is a guide; Maestro decides): each Warrior kit 20 to 30 % under P0, P1 and mixed; no non-Warrior kit moves more than 5
 points; clock share at most 12 %; worst 5 s window mean at most 6 food (a forgiving children's game, CODE-DESIGN-05); P0 and P1 within 10 points of
-each other for each Warrior kit. Shipped references (match report 2026-11-24): Bully 19.9 / 13.7 / 15.3, Relentless 6.1 / 7.1 / 8.9.
+each other for each Warrior kit. Shipped references (match report 2026-11-24): Bully 19.9 / 13.7 / 15.3, Relentless 6.1 / 7.1 / 8.9. For the
+Champion also: bites at least 2 a match under mixed (the break managed 0.3), and identity food at least a fifth of his banked food, or the rule is
+not his identity.
 
 ## 10. Build plan: simulator slices
 
@@ -324,6 +474,79 @@ files in `Captures/oracle/` (not committed). Tests `MatchReportTests.WarriorBloc
 Then run A and run B (`-executeMethod CluckWars.EditorTools.OracleMenu.MatchWhatIfBatch -oracleWhatIf <file>`), and write the results into this spec
 as a new section 14 (results). Commit (code and spec only): `feat(balance): Warrior kit rows in the match report and what-if (BL-xxx)`.
 
+### 10.1 Rework slices R1 to R4 (the redesigned Champion, section 4)
+
+For an implementer who has not seen the design talk: read sections 4, 7 and 8 of this spec first; the Bully (section 3, slice S3, `HitStealRules`,
+`BotHitStealRules`) is **not touched**. Simulator only: `Champion.asset` stays unregistered, every new number ships off, the game plays exactly as
+before. Same rules, gate and git discipline as the S slices above (the common paragraph of section 10); another session may be running Unity in
+batch mode, so check for the project lock before any run and never start a second one. Backlog id: take one with `/backlog` (the S slices used
+BL-222) and put it in every message. Each slice compiles and passes the full suite on its own.
+
+**R1. Pure rules, bot rules and the passive (additive: nothing is deleted yet).**
+Files: new `Gameplay/BiteRules.cs` (section 8.1); `Gameplay/TrophyRules.cs` gains `Add`, `StealAmount`, `Decayed` and `TrophyFacts` gains
+`Steal`, `Seconds` (the old members stay until R2); new `Gameplay/BotChampionRules.cs` (every function of section 7); `Abilities/PassiveAbilitySO.cs`
+gains `virtual BiteFacts Bite => BiteFacts.None`; `Abilities/Passives/ChampionPassiveSO.cs` gains `FreshSeconds` 0, `TrophySteal` 0,
+`TrophySeconds` 6 (`TrophyCap` 3 stays) with tooltips, overrides `Bite` and fills the new `TrophyFacts` fields; `Data/Simulator/Champion.asset`:
+kit Peck `2b6f2fba609676f439ec424dfd05e5f6`, WingSlam `6bbb9c61252f875408fde062c994669c`, CluckShock `079c14ab0b344ca898f4be63fbf58374`,
+Snatch `4c026dfa11fd40cd9914aa8fb37090b6`, and the new fields at their shipped values (in the Editor; the class summary and its remarks name the new
+kit and rule).
+Tests: `BiteRulesTests.Fresh_MidCastOrJustLandedWithFood_NotBitten` (casting true; landed 0.9 s ago with food at window 1.0 true, 1.1 false; landed
+with no food false; bitten false), `Fresh_FreshSecondsZero_IsNeverFresh_EvenMidCast`, `FromCast_IsTheSmallestOfBitePileAndRoom` (3 / 2 / 10 is 2;
+3 / 10 / 1 is 1; any negative is 0), `FromCargo_IsClampedToRoomAndVictim` (3, room 2, cargo 10 is 2; cargo 1 is 1);
+`TrophyRulesTests.Add_StopsAtTheCap`, `StealAmount_IsBaseTimesFactorPlusPerTrophyTimesCount` (5, 1, 2, 3 is 11; count -1 is 5), `Decayed_AfterTheUntilOnly`;
+`BotChampionRulesTests.FreshLeft_IsCastLeftPlusWindow_OrWindowMinusSinceLanded_ZeroWhenBitten`, `HitFresh_NeedsTheWindowToOutlastTheReaction`,
+`PickBuilder_ShoveFirst_MinusOneWhenNoneReady`, `Cash_AtTheCap_OrWhenNoBuilderBeatsTheDecay_NeverAtCountZero`, `StealGain_IsTheInflatedAmountClamped`,
+`Fight_OnlyWhenTheFightBeatsThePeckRate` (a slower Peck flips the same fight from false to true); `WarriorPassiveDataTests.Champion_IsNotRegistered_AndItsKitIsLegal`
+updated (the four assets above, `FixedKit.Problems` empty), `ShippedChampion_BiteAndTrophyStealAreOff` (`Bite.Active` false, `Trophy.Steal` 0),
+`Delta_CanSetEveryNewField` (`FreshSeconds`, `TrophySteal`, `TrophyCap`, `TrophySeconds` through the roster swap as the existing test does, and
+`Warrior.PeckCooldown` / `PeckAmount`; `BalanceBook.Evaluate` accepts, nothing ignored). An S4 test that depended on the old kit (Speed, Slow) is
+fixed or left to R2, which rewrites it. Commit: `feat(balance): Champion bite and per-enemy trophy rules, kit Peck Stun Shove Steal, shipped off (BL-xxx)`.
+
+**R2. The simulator swap: the bite and the counts in, the break and the room out.**
+Delete: `Gameplay/PeckBreakRules.cs` and `Editor/Tests/PeckBreakRulesTests.cs`; `Gameplay/BotBreakRules.cs` and its four tests in
+`BotWarriorRulesTests` (`Candidate_*`, `Approach_*`, `ShouldBreak_*`, `ReturnFraction_*`); `PassiveAbilitySO.PeckBreak`; `ChampionPassiveSO`
+`BreakReach`, `BreakCooldown`, `BreakImmuneSeconds`, `TrophyRoom`, `TrophiesClearOnBank` (reserialize `Champion.asset` so the stale keys go);
+`TrophyFacts.Room`, `ClearOnBank`; `TrophyRules.Earn`, `LoseOne`, `Room`, `StealEarns`, `Overflow`; everything listed as removed in section 8.2;
+the break branches of `ScriptedPolicy` (`_candidate`, `_approachDist`, `_breakTarget`, `_approach`, the `ReturnFraction` call) and `UtilityPolicy`
+(`PeckCut`'s break option), so the Champion bot plays its plain kit until R3; in `MatchWarriorTests` every `Break_*` test,
+`TwoBreakersOneVictim_TheSecondFallsBack`, `BreakWithoutTheKit_IsARejectedIntent`, `Trophies_FromBreaksAndSteals_OnePerCast_CappedAtTheCap`,
+`Robbed_LosesOne_AndTheExcessGoesToTheCentrePile`, `Executed_LosesAll_NothingOverflows`, `Banking_KeepsTrophies`, `Banking_ClearsTrophies_WhenThePassiveSaysSo`;
+`ScriptedPolicyTests.P0Champion_BreaksARivalCastingInReach`; `UtilityPolicyTests.P1_BreaksOnlyWhenTheValueBeatsItsOwnPeck`.
+Add: section 8.2 "Added" in `MatchKit.cs`, `MatchKits.cs`, `MatchPolicy.cs` (`SeatView`), `MatchSim.cs`; the section 8.3 counters in
+`MatchCombat.cs`; the Champion row of the "Warrior kits" block in `MatchReport.cs` and the `warrior` group of `MatchWhatIf.Numbers`.
+Tests (`MatchWarriorTests`, each on a hand-built seat layout with fixed positions):
+- `Bite_MidCast_CutsTheCast_TakesFromThePile_RestStaysInThePile`: victim pecking a pile of 2, Champion's Shove lands: victim `Pecking` false,
+  cargo unchanged, `NextPeckAt` unchanged; Champion +2; pile 0; `BitesFromCast` 1.
+- `Bite_StunCutsFirst_TheSnapshotStillBites`: the Stun's own `Cut(Stun)` runs and the bite still comes from the pile (guards step 1 of 4.2).
+- `Bite_JustLanded_TakesFromTheCargo_ClampedToRoom`: landed 0.5 s ago with food, Champion room 2: Champion +2, victim -2, `BiteLeftWithVictim` 1.
+- `Bite_AfterTheWindow_OrAfterALandingWithNoFood_TakesNothing`: 1.1 s after a landing at window 1.0; a landing that took 0: no bite, hit trophy only.
+- `Bite_OncePerFreshState_TheSecondHitOnlyEarnsItsTrophy`: Stun then Shove inside the window: one bite, count 3 (bite, Stun, Shove), `BitesSpent` 1.
+- `Bite_EggRefuses_ShieldWalkLands`: egg: no bite, no trophy; walk phase: bite and trophies.
+- `Steal_OnAFreshCarrier_BitesFirst_ThenTakesTheInflatedAmount`: count 2, fresh just-landed victim with 20 cargo, Champion empty: bite 3, count 3,
+  Steal takes 5 + 2 x 3 = 11, count 0, `TrophyBonusFood` 6, victim -14.
+- `Steal_ThatTakesNothing_LeavesTheCount`: Champion full: take 0, count kept.
+- `Trophies_PerEnemy_CappedAndDecayAllAtOnce`: two rivals counted apart; the cap holds; a hit at the cap restarts the timer; `TrophySeconds` with no
+  hit puts the count to 0 in one step (`TrophiesDecayed` = the count).
+- `OneStun_ThreeFreshVictims_InSeatOrder_ClampedToTheRoomLeft`: room 5, three fresh victims: bites 3, 2, 0 in seat order, three counts of 2.
+- `TwoChampions_OneFreshVictim_TheFirstBites_BothEarnTheHitTrophy`.
+- `Executed_ClearsEveryCountOnAndOfTheDead`.
+- `ShippedOff_PlaysExactlyAsBefore` (Champion half rewritten as in 8.4), `Sim_CallsTheSharedRules_NotCopies` (as in 8.4, including the "finds no
+  `PeckBreakRules`" half), `EveryCapacityRead_GoesThroughCapacityOf` kept.
+- `MatchReportTests.WarriorBlock_ShowsEveryCounterOfSection8` and `MatchWhatIfTests.Numbers_CarryTheWarriorGroup` updated to the 8.3 Champion row.
+Commit: `refactor(balance): Champion bite and per-enemy trophies replace the peck break and the trophy room in the match simulator (BL-xxx)`.
+
+**R3. Bot rules in P0 and P1.**
+Files: `Balance/ScriptedPolicy.cs` (the P0 order of section 7), `Balance/UtilityPolicy.cs` (`BestHit` for the Champion), `MatchSim.BuildView`
+(the 8.2 `SeatView` fields). Tests: `ScriptedPolicyTests.P0Champion_HitsAFreshRivalInReach_NotAStaleOne`, `P0Champion_CashesAtTheCap_AndBeforeTheDecay`,
+`P0Champion_KeepsPeckingWhenNoFightBeatsThePeck`, `P0_CallsTheGamesOwnFunctions_NotCopiesOfThem` (lists `BotChampionRules`, no `BotBreakRules`);
+`UtilityPolicyTests.P1Champion_PrefersAFreshRivalOverThePile_OnlyWhenThePeckIsSlower` (same layout at F0 and F1, the choice flips).
+Commit: `feat(balance): Champion bot rules for fresh rivals and trophy cashing in P0 and P1 (BL-xxx)`.
+
+**R4. Run C and its results.** Write `Captures/oracle/whatif-warrior-champion.json` (section 9 run C; not committed), run it
+(`-executeMethod CluckWars.EditorTools.OracleMenu.MatchWhatIfBatch -oracleWhatIf <file>`, only when no other Unity holds the project), and add the
+results as a new section 15 of this spec in the shape of section 14.2 (one table, the 8.3 Champion columns plus the Bully's win rates). Commit (spec
+only): `docs(spec): run C results for the reworked Champion (BL-xxx)`.
+
 ## 11. Game slices (after Maestro approves; not planned here)
 
 - **Bully hit-steal:** the take through `ChickenCargo.StealFrom` / the steal RPC from the Stun and Shove landing sites (ARCH-DATA-05, ARCH-NET-07); the
@@ -331,18 +554,21 @@ as a new section 14 (results). Commit (code and spec only): `feat(balance): Warr
   lock on the Bully's authority, per victim (`TargetCooldowns<NetworkBehaviourId>` fits, which the loot-mark spec section 10 plans to delete: keep it);
   a hit-steal event id (ARCH-EVT-02) for the pops; the "affected" test of a stun must use the same `IncomingExtends` the simulator uses. Kit change in
   `Bully.asset`.
-- **Champion:** a Peck press that previews a casting rival (CODE-DESIGN-08); a break request to the victim's authority, which checks it is still
-  casting, in reach, not immune, cuts its cast and reports; then the Warrior asks the pile for the bite (pile authority debits and reports,
-  ARCH-NET-07; the late-report cap `ChickenCargo.MaxPeck` is the Warrior's own bite, equal to every class's today). `[Networked]` trophies (byte),
-  the victim's break-immunity `TickTimer` (ARCH-NET-15), a break event id; capacity from `ModifyCargoCapacity` reading trophies; overflow as a new
-  cargo-to-centre-pile transfer, allow-listed in `FoodTransferRulesTests`. `NetworkProtocol.Version` 2 to 3 (ARCH-NET-21).
+- **Champion (rework):** the hit sites of Stun, Shove and Steal on the caster's authority read the victim's fresh state (cast running, or a
+  `[Networked]` landing tick and a bitten flag on the victim, ARCH-NET-15) and send a bite claim: mid-cast to the victim's authority, which cuts the
+  cast and lets the pile authority debit the bite (ARCH-NET-07; `ChickenCargo.MaxPeck` bounds it); just landed through the steal path
+  (`StealRules.MaxSingleSteal` must cover the bite and the inflated Steal, `StealAmount + TrophySteal x TrophyCap`, ARCH-NET-05). Per-enemy counts
+  on the Champion's authority (a small `[Networked]` array of bytes with their timers), a bite and a cash event id (ARCH-EVT-02); no capacity
+  change and no overflow transfer. `NetworkProtocol.Version` 2 to 3 (ARCH-NET-21).
 - **Roster:** Champion registered in place of Relentless; `ChickenSubclass` value 1 renamed (or a new value with `ChickenSubclassFlags`,
   `ContractsAndEnumsTests`, `ValidateRoster`); Relentless stays as an unregistered asset.
-- **Bots:** `BotController` calls `BotHitStealRules` and `BotBreakRules` (the drift guard of 8.4).
+- **Bots:** `BotController` calls `BotHitStealRules` and `BotChampionRules` (the drift guard of 8.4).
 - **Text and feedback:** perk lines with numbers from the fields (ARCH-DATA-12), `UiKeys`/`UiText.csv`, section 6, `docs/FEEDBACK.md`, the site
   (`docs/site/index.html`), GDD; `librarian` for `docs/FILE_STRUCTURE.md` and the rules docs. `tools/balance/schema.py` `DENIED` unchanged (no new denied field).
 
 ## 12. Decisions taken without Maestro
+
+Items 3, 7, 8, 9, 12 (the Champion half) and 14 concern the superseded break and capacity trophies (section 4.6) and are kept as the record only.
 
 1. Champion's slow ability: Slow (from the designer), as the brief said.
 2. Trophy cap 3; reset each round. Banking: kept (shipped) or cleared by `TrophiesClearOnBank`, both measured (Maestro, 2026-11-25, replaces "kept through banking").
@@ -362,15 +588,44 @@ as a new section 14 (results). Commit (code and spec only): `feat(balance): Warr
     normal Peck cycle (`NextPeckAt` is not touched by a landed break); only another break waits `BreakCooldown`. A break must not be a sacrifice of his own
     foraging. A break press that falls back to a pile Peck is an ordinary Peck and starts the ordinary cycle.
 
+15. **Maestro, 2026-11-25, evening (supersedes C3 and the bite food of C5):** a hit on a fresh rival takes no food, only the extra stack; the old bite is the
+    data `FreshBiteShare` (shipped 0). Taken without him: the field is a share of the victim's `PeckAmount` (0 to 1, so 1 is exactly the old reading, no new
+    amount to invent); the extra stack goes to a Steal's hit too (any hit on a fresh rival), once per fresh state; a Steal's hit never cuts a cast.
+
+**Rework (2026-11-25, afternoon), taken where Maestro left a gap; each can be overruled:**
+
+- C1. Kit Peck, WingSlam (Stun), CluckShock (Shove), Snatch (Steal), the three of his example; legal under `FixedKit.Problems`. Speed and Slow leave.
+- C2. "A hit" is his Stun, Shove or Steal affecting the rival, with the Bully's "affected" test; for the Steal, reaching a carrier (Snatch's own
+  target filter). Peck is not a hit. So a Steal on an **empty** fresh rival does nothing, not even the bite; Stun and Shove bite him.
+- C3. The bite is the victim's `PeckAmount`: from the pile when mid-cast (the cast is cut, the rest stays in the pile), from the cargo when just
+  landed (the rest stays with the victim). One bite per fresh state, whoever bites; a bite that fits 0 food still spends the state, cuts the cast
+  and earns its trophy.
+- C4. "Just landed" opens only on a landing that took food; a Peck cut by someone else opens nothing.
+- C5. Freshness is read before the hit's own effect, so a Stun that cuts the cast still bites from the pile.
+- C6. Trophy count: +1 per hit that affected that rival (Stun, Shove; the Steal that consumes them adds none), +1 per bite; the bite of a Steal
+  counts toward that same Steal. Steal takes `StealAmount x StealFactor + TrophySteal x count` (the bonus is not multiplied), then the count is 0
+  if the take was above 0. Cap `TrophyCap`; a hit at the cap restarts the timer; the count decays to 0 at once after `TrophySeconds` without a
+  +1; all counts clear when the Champion is executed, and the counts on a victim clear when the victim is executed. Starting values:
+  `FreshSeconds` 1.0, `TrophySteal` 2, `TrophyCap` 3, `TrophySeconds` 6.
+- C7. Being robbed no longer costs a Champion a trophy (the "lose one" rule leaves with the room).
+- C8. Multi-victim casts resolve victim by victim in the seat loop order already used, each take clamped to the room left.
+- C9. The foraging lever is class-wide (`Warrior.asset`, a plain delta, no code), so it also moves the Bully and the bite taken from a Warrior.
+- C10. The fresh glint and the trophy pips are seen by the Champions and by the chicken concerned, not by the other players.
+- C11. The Bully and the Champion both exist; the Bully's hit-steal rule is unchanged by this amendment.
+
 ## 13. Open questions (real forks)
 
 1. ~~Is a break meant to cost food?~~ **Closed by Maestro, 2026-11-25:** `BreakCooldown` gates breaks only; after a break his next pile Peck runs on the
    normal Peck cycle (sections 4.1, 4.3, 9, 12 item 14).
-2. **Online timing of the break.** The victim's cast lasts 0.4 s (Warrior, Speedy); the break needs one round trip to the victim's authority before
-   that cast lands. On the cloud relay a share of breaks will arrive late and turn into fallbacks. Acceptable, or should the victim's authority judge
-   the break against the cast state at the Warrior's press tick (a lag allowance, as `ChickenCombat.SenderLatency` gives other claims)?
-</content>
-</invoke>
+2. ~~Online timing of the break.~~ **Superseded** with the break. Its successor: the fresh window online. The window is the cast plus about 1 s, so a
+   hit's round trip fits it on the relay, but a hit landing in the last tens of milliseconds will be judged after the state ended. Should the victim's
+   authority judge freshness at the hit's sender tick (a lag allowance, as `ChickenCombat.SenderLatency` gives other claims)? Proposed: yes.
+3. **The combo against the forgiving limit.** One full combo takes 14 food from one victim in about 2 s (section 4.5), 24 at the ceiling of a 5 s
+   window, against the go limit of 6 for the mean. Is a rare 14 acceptable if the mean stays under 6, or should `TrophySteal` or `TrophyCap` be held
+   so a combo never exceeds a number Maestro names (with `TrophySteal` 1: 11)?
+4. **Whose foraging goes down.** The lever is written class-wide (C9), which also slows the Bully and makes Warrior victims give a smaller bite. If
+   only the Champion should forage less, the lever moves to the passive (a Peck cooldown factor on `ChampionPassiveSO`, one new field and one hook);
+   say which.
 
 ## 14. Results of the simulator runs (2026-11-25)
 

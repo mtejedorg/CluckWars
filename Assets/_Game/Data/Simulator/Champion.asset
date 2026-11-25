@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ChampionPassiveSO
   DisplayName: Champion
   ShortLabel: CHMP
-  Description: Catch a rival mid Peck and the bite is yours. Every catch is a trophy, and each trophy makes your beak bigger.
+  Description: Hit a bird that has just pecked and you stack one more trophy on it. Every hit on the same bird is a trophy, and each trophy makes your Steal on that bird bigger.
   Icon: 
   AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
   Category: 3
@@ -29,15 +29,14 @@ MonoBehaviour:
   CastMotion: 8
     serializedVersion: 2
     m_Bits: 256
-  BreakReach: 0
-  BreakCooldown: 2.5
-  BreakImmuneSeconds: 2.5
-  TrophyRoom: 0
+  FreshSeconds: 0
+  FreshBiteShare: 0
+  TrophySteal: 0
   TrophyCap: 3
-  TrophiesClearOnBank: 0
+  TrophySeconds: 6
   Subclass: 1
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
-  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
-  - {fileID: 11400000, guid: eca28bb35594446b9dd8b6016f5493fe, type: 2}
+  - {fileID: 11400000, guid: 6bbb9c61252f875408fde062c994669c, type: 2}
+  - {fileID: 11400000, guid: 079c14ab0b344ca898f4be63fbf58374, type: 2}
   - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}

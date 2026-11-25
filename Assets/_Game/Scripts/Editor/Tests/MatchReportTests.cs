@@ -258,8 +258,8 @@ namespace CluckWars.Tests
             var kit = context.Kits[0];
             kit.Class = ChickenClass.Warrior;
             kit.Passive.HitSteal = new HitStealFacts { Stun = 2f, Shove = 2f, LockSeconds = 3f };
-            kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
+            kit.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
+            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
 
             var results = new MatchResult[2];
             for (int i = 0; i < results.Length; i++)
@@ -279,23 +279,26 @@ namespace CluckWars.Tests
             Assert.AreEqual(2f, line.HitRefusedNoFoodPerMatch, 1e-4f);
             Assert.AreEqual(3f, line.HitRefusedRoomPerMatch, 1e-4f);
             Assert.AreEqual(5f, line.HitLostFoodPerMatch, 1e-4f);
-            Assert.AreEqual(3f, line.BreaksPerMatch, 1e-4f);
-            Assert.AreEqual(9f, line.BreakFoodPerMatch, 1e-4f);
-            Assert.AreEqual(4f, line.BreakLeftInPilePerMatch, 1e-4f);
-            Assert.AreEqual(1f, line.BreakFallbacksPerMatch, 1e-4f);
-            Assert.AreEqual(2f, line.BreakCancelsPerMatch, 1e-4f);
-            Assert.AreEqual(3f, line.BreakRefusedPerMatch, 1e-4f);
-            Assert.AreEqual(2f, line.PecksBrokenPerMatch, 1e-4f);
-            Assert.AreEqual(3f, line.TrophiesEarnedPerMatch, 1e-4f);
-            Assert.AreEqual(1f, line.TrophiesLostPerMatch, 1e-4f);
+            Assert.AreEqual(7f, line.FreshHitsPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.BitesFromCastPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.BitesFromCargoPerMatch, 1e-4f);
+            Assert.AreEqual(7f, line.BiteFoodFromCastPerMatch, 1e-4f);
+            Assert.AreEqual(5f, line.BiteFoodFromCargoPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.BiteLeftInPilePerMatch, 1e-4f);
+            Assert.AreEqual(1f, line.BiteLeftWithVictimPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.BitesSpentPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.PecksBittenPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.BiteLostFoodPerMatch, 1e-4f);
+            Assert.AreEqual(6f, line.TrophiesEarnedPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.TrophiesDecayedPerMatch, 1e-4f);
             Assert.AreEqual(2f, line.TrophiesClearedPerMatch, 1e-4f);
-            Assert.AreEqual(90f / 45f, line.MeanTrophiesHeld, 1e-4f, "trophy seconds over the match's seconds");
-            Assert.AreEqual(3f, line.TrophyPeakMean, 1e-4f);
-            Assert.AreEqual(1f, line.TrophiesAtEndMean, 1e-4f);
-            Assert.AreEqual(10f, line.RoomOfferedPerMatch, 1e-4f);
-            Assert.AreEqual(0.5f, line.RoomFilledShare, 1e-4f);
-            Assert.AreEqual(3f, line.OverflowPerMatch, 1e-4f);
-            Assert.AreEqual(8f + 9f, line.IdentityFoodPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.TrophyCashesPerMatch, 1e-4f);
+            Assert.AreEqual(2.5f, line.TrophiesPerCash, 1e-4f, "trophies cashed over cashes");
+            Assert.AreEqual(6f, line.TrophyBonusFoodPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.StealsPerMatch, 1e-4f);
+            Assert.AreEqual(30f / 4f, line.MeanStealSize, 1e-4f, "Steal food over Steal casts");
+            Assert.AreEqual(2f, line.MeanHitSize, 1e-4f, "hit food over hit takes");
+            Assert.AreEqual(8f + 7f + 5f + 6f, line.IdentityFoodPerMatch, 1e-4f, "hit food, bite food and the trophies' food");
             Assert.AreEqual(4f, line.WorstLossMean, 1e-4f);
             Assert.AreEqual(5.8f, line.WorstLossP95, 1e-3f, "linear interpolation between 2 and 6");
 
@@ -303,15 +306,15 @@ namespace CluckWars.Tests
             StringAssert.Contains("## Warrior kits", md);
             foreach (var heading in new[]
             {
-                "Hit takes", "Hit food", "Refused: lock / empty / full", "Hit food lost", "Breaks", "Break food", "Left in pile", "Fallbacks", "Cancels", "Refused",
-                "Pecks broken", "Trophies earned", "Lost", "Cleared", "Held (mean)", "Peak", "At end", "Room added", "Room used", "Overflow", "Identity food",
+                "Hit takes", "Hit food", "Refused: lock / empty / full", "Hit food lost", "Fresh hits", "Bites cast / cargo", "Bite food cast / cargo", "Bites spent", "Pecks bitten",
+                "Bite food lost", "Trophies earned", "Decayed", "Cleared", "Cashes", "Trophies per cash", "Trophy food", "Steals", "Mean Steal size", "Identity food",
                 "Worst loss mean", "Worst loss p95",
             })
                 StringAssert.Contains(heading, md);
             StringAssert.Contains("kit0", md);
             string json = report.ToJson();
             Assert.DoesNotThrow(() => JsonUtility.FromJson<JsonProbe>(json));
-            foreach (var key in new[] { "\"warriors\"", "\"hitTakes\"", "\"breakLeftInPile\"", "\"trophiesCleared\"", "\"roomFilledShare\"", "\"worstLossP95\"" })
+            foreach (var key in new[] { "\"warriors\"", "\"hitTakes\"", "\"biteLeftInPile\"", "\"trophiesCleared\"", "\"meanStealSize\"", "\"worstLossP95\"" })
                 StringAssert.Contains(key, json);
         }
 
@@ -319,9 +322,10 @@ namespace CluckWars.Tests
         private static SeatCounters WarriorCounters(SeatCounters c, float worst)
         {
             c.HitTakes = 4; c.HitFood = 8f; c.HitRefusedLock = 1; c.HitRefusedNoFood = 2; c.HitRefusedRoom = 3; c.HitLostFood = 5f;
-            c.Breaks = 3; c.BreakFood = 9f; c.BreakLeftInPile = 4f; c.BreakFallbacks = 1; c.BreakCancels = 2; c.BreakRefused = 3; c.PecksBroken = 2;
-            c.TrophiesEarned = 3; c.TrophiesLost = 1; c.TrophiesCleared = 2; c.TrophyPeak = 3; c.TrophySeconds = 90f; c.TrophiesAtEnd = 1;
-            c.TrophyRoomOffered = 10f; c.TrophyRoomFilled = 5f; c.OverflowToCentre = 3f; c.WorstVictimLoss5s = worst;
+            c.FreshHits = 7; c.BitesFromCast = 3; c.BitesFromCargo = 2; c.BiteFoodFromCast = 7f; c.BiteFoodFromCargo = 5f; c.BiteLeftInPile = 4f; c.BiteLeftWithVictim = 1f;
+            c.BitesSpent = 2; c.PecksBitten = 2; c.BiteLostFood = 3f;
+            c.TrophiesEarned = 6; c.TrophiesDecayed = 4; c.TrophiesCleared = 2; c.TrophyCashes = 2; c.TrophiesCashed = 5; c.TrophyBonusFood = 6f;
+            c.Steals = 4; c.StealFood = 30f; c.WorstVictimLoss5s = worst;
             return c;
         }
 

@@ -74,7 +74,6 @@ namespace CluckWars.Balance
         private Vector2 _home;
         private float _speed, _dep, _capacity, _all, _tHome;
         private int _cast;
-        private int _break;
         private Vector2[] _baseCentres;
         private readonly bool[] _ok = new bool[Seats];
         private readonly float[] _dist = new float[Seats];
@@ -98,7 +97,6 @@ namespace CluckWars.Balance
             _kit = v.Kits[_seat];
             _ab = _kit.Abilities ?? Array.Empty<MatchAbility>();
             _cast = -1;
-            _break = -1;
             _home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
             _speed = Mathf.Max(0.1f, _kit.Farm.MoveSpeed);
             _dep = Mathf.Max(0.5f, _kit.Farm.DepositRate);
@@ -248,7 +246,7 @@ namespace CluckWars.Balance
         // ---- intents ----
 
         private MatchIntent Finish(Vector2 goal, int pile) =>
-            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1, Break = _break >= 0, BreakTarget = _break };
+            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1 };
 
         // The bot counts as arrived inside its arrival radius: stand where it is instead of walking to the exact point.
         private static Vector2 Reach(Vector2 from, Vector2 to, float arrival) =>
@@ -366,40 +364,12 @@ namespace CluckWars.Balance
         private void PeckCut(MatchView v)
         {
             if (_cast >= 0 || _me.Stunned || _me.Pecking) return;
-            if (BreakFor(v)) return;
             for (int r = 0; r < Seats; r++)
             {
                 if (!_ok[r] || !v.Seats[r].Pecking || v.Seats[r].Hidden || v.Seats[r].Shelled) continue;
                 if (!v.Kits[r].Farm.Forages) continue;
                 if (CastOn(v, r, AbilityJob.Shove, false) || CastOn(v, r, AbilityJob.Stun, true)) return;
             }
-        }
-
-        // The Champion's break: the press is either a break or a pile Peck, so it is made when what it gains (the bite, the bite the rival does
-        // not get, and the trophy's room while a trophy is still to win) is more than the Peck the press would have been.
-        private bool BreakFor(MatchView v)
-        {
-            var facts = _kit.Passive.Break;
-            if (!facts.Active || _me.BreakLeft > Eps) return false;
-            var trophy = _kit.Passive.Trophy;
-            float reaction = float.IsNaN(_p.ReactionDelay) ? 0f : Mathf.Max(0f, _p.ReactionDelay);
-            float reach = facts.Reach * BotTactics.CommitReachFraction;
-            float free = Mathf.Max(0f, _capacity - _me.Cargo);
-            int best = -1;
-            float bestValue = 0f;
-            for (int r = 0; r < Seats; r++)
-            {
-                var rival = v.Seats[r];
-                if (!_ok[r] || rival.Hidden || rival.Shelled) continue;
-                bool walled = MatchCombat.KeepOutBlocks(_me.Pos, rival.Pos, BaseCentres(v), v.Rules.KeepOutRadius);
-                if (!BotBreakRules.Candidate(rival.Pecking, rival.PeckCastLeft, _dist[r], reach, walled, rival.BreakImmuneLeft > 0f, reaction)) continue;
-                float bite = v.Kits[r].Farm.PeckAmount;
-                float value = PeckBreakRules.Bite(bite, bite, free) + bite + (_me.Trophies < trophy.Cap ? trophy.Room : 0);
-                if (value > bestValue) { bestValue = value; best = r; }
-            }
-            if (best < 0 || bestValue <= v.OwnPileBite(_seat)) return false;
-            _break = best;
-            return true;
         }
 
         // ---- the Bully's hit-steal ----
@@ -419,7 +389,8 @@ namespace CluckWars.Balance
         private bool HitForFood(MatchView v)
         {
             var facts = _kit.Passive.HitSteal;
-            if (!facts.Active || _cast >= 0 || _me.Stunned) return false;
+            if (!facts.Active) return ChampionBuild(v);
+            if (_cast >= 0 || _me.Stunned) return false;
             int stun = -1, shove = -1;
             float stunGain = 0f, shoveGain = 0f;
             for (int s = 0; s < _ab.Length; s++)
@@ -490,6 +461,57 @@ namespace CluckWars.Balance
             return true;
         }
 
+        // ---- the Champion (design 2026-11-25, section 7) ----
+
+        // The bite or the trophy Steal is on: with both off the Champion plays its plain kit by the ordinary rules.
+        private bool ChampionOn => _kit.Passive.Trophy.IsChampion && (_kit.Passive.Bite.Active || _kit.Passive.Trophy.Steal > 0f);
+
+        private float Reaction => float.IsNaN(_p.ReactionDelay) ? 0f : Mathf.Max(0f, _p.ReactionDelay);
+
+        private float FreshLeftOf(MatchView v, int r) =>
+            BotChampionRules.FreshLeft(v.Seats[r].Pecking, v.Seats[r].PeckCastLeft, v.Seats[r].SinceLanded, v.Seats[r].LandedWithFood, v.Seats[r].FreshBitten,
+                _kit.Passive.Bite.FreshSeconds);
+
+        // What one Steal cast on that rival would really take once it is in reach: the bite when the rival is still fresh on arrival (from its cargo, or
+        // from its pile when it is casting), then the Steal on the trophies the bite would have added, each held to the room and to what is there.
+        private float ChampionTake(MatchView v, int r, in MatchAbility steal, float free)
+        {
+            var trophy = _kit.Passive.Trophy;
+            var rival = v.Seats[r];
+            float walk = Mathf.Max(0f, _dist[r] - steal.Radius * BotTactics.CommitReachFraction) / _speed;
+            bool fresh = BotChampionRules.HitFresh(FreshLeftOf(v, r) - walk, Reaction);
+            float stealable = StealRules.Stealable(rival.Cargo);
+            float bite = 0f;
+            int count = _me.TrophyOn != null ? _me.TrophyOn[r] : 0;
+            if (fresh)
+            {
+                float peck = v.Kits[r].Farm.PeckAmount * _kit.Passive.Bite.FoodShare;
+                bite = peck <= 0f ? 0f : rival.Pecking ? Mathf.Min(peck, free) : BiteRules.FromCargo(peck, free, stealable);
+                count = Mathf.Min(trophy.Cap, count + 1);
+            }
+            float left = rival.Pecking ? stealable : Mathf.Max(0f, stealable - bite);
+            return bite + BotChampionRules.StealGain(steal.StealAmount, _kit.Passive.StealFactor, trophy.Steal, count, free - bite, left);
+        }
+
+        // A free builder: Stun or Shove on a fresh rival in reach, so the bite and a trophy land (the shorter cooldown first). Never moves the chicken.
+        private bool ChampionBuild(MatchView v)
+        {
+            if (!ChampionOn || _cast >= 0 || _me.Stunned) return false;
+            int stun = Slot(AbilityJob.Stun, true), shove = Slot(AbilityJob.Shove, true);
+            if (stun < 0 && shove < 0) return false;
+            for (int r = 0; r < Seats; r++)
+            {
+                if (!_ok[r] || v.Seats[r].Shelled || v.Seats[r].Hidden) continue;
+                if (!BotChampionRules.HitFresh(FreshLeftOf(v, r), Reaction)) continue;
+                bool stunOk = stun >= 0 && !StunReserved(stun) && Hits(v, r, _ab[stun].Radius * BotTactics.CommitReachFraction);
+                bool shoveOk = shove >= 0 && Hits(v, r, _ab[shove].Radius * BotTactics.CommitReachFraction);
+                int pick = BotChampionRules.PickBuilder(stunOk, shoveOk, stun >= 0 ? _ab[stun].Cooldown : float.MaxValue, shove >= 0 ? _ab[shove].Cooldown : float.MaxValue);
+                if (pick == BotChampionRules.Stun) { _cast = stun; return true; }
+                if (pick == BotChampionRules.Shove) { _cast = shove; return true; }
+            }
+            return false;
+        }
+
         private void SprintTo(MatchView v, Vector2 goal)
         {
             if (_cast >= 0 || _me.Stunned || Vector2.Distance(_me.Pos, goal) < SprintMetres) return;
@@ -529,7 +551,7 @@ namespace CluckWars.Balance
                 }
                 else
                 {
-                    take = MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo);
+                    take = ChampionOn ? ChampionTake(v, r, a, free) : MatchCombat.StealTake(a.StealAmount, _kit.Passive.StealFactor, free, v.Seats[r].Cargo);
                     if (take < 1f) continue;
                 }
 

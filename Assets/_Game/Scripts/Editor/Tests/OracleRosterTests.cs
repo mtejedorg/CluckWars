@@ -84,14 +84,15 @@ namespace CluckWars.Tests
             var match = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
             using (var book = new BalanceBook(new QuietLog(), _copy, classes, match))
             {
-                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"BreakReach\":2.5,\"TrophyRoom\":2,\"TrophiesClearOnBank\":true}}}", "test");
+                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"FreshSeconds\":1,\"FreshBiteShare\":0.5,\"TrophySteal\":2,\"TrophyCap\":4,\"TrophySeconds\":9},\"Warrior\":{\"PeckCooldown\":0.95,\"PeckAmount\":2}}}", "test");
                 Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
                 CollectionAssert.IsEmpty(verdict.Ignored);
-                Assert.AreEqual(3, verdict.Changes.Count(c => c.Contains("Champion.")));
+                Assert.AreEqual(5, verdict.Changes.Count(c => c.Contains("Champion.")), "every new Champion field is overridable");
+                Assert.AreEqual(2, verdict.Changes.Count(c => c.Contains("Warrior.")), "and the Warrior's foraging is a plain class delta");
             }
             using (var book = new BalanceBook(new QuietLog(), _shipped, classes, match))
             {
-                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"BreakReach\":2.5}}}", "test");
+                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"FreshSeconds\":1}}}", "test");
                 Assert.IsNotEmpty(verdict.Ignored, "over the shipped registry the Champion is not addressable");
             }
         }

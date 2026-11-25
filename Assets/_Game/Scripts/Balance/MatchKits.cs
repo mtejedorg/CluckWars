@@ -106,7 +106,7 @@ namespace CluckWars.Balance
                 MatchEndBonusFood = passive.MatchEndBonusFood(null),
                 Loot = passive.LootMark,
                 HitSteal = passive.HitSteal,
-                Break = passive.PeckBreak,
+                Bite = passive.Bite,
                 Trophy = passive.Trophy,
                 SlowFactorsEmitted = (float[])emittedSlowFactors.Clone(),
                 SlowFactorsReceived = received,

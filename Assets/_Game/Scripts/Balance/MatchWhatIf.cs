@@ -325,22 +325,24 @@ namespace CluckWars.Balance
                         Add("warrior", who + "hit food per match", pop, w.HitFoodPerMatch, trials: w.Matches);
                         Add("warrior", who + "hits that met the lock per match", pop, w.HitRefusedLockPerMatch, trials: w.Matches);
                     }
-                    if (w.BreakActive || w.TrophyKit)
+                    if (w.BiteActive || w.TrophyKit)
                     {
-                        Add("warrior", who + "breaks per match", pop, w.BreaksPerMatch, trials: w.Matches);
-                        Add("warrior", who + "break food per match", pop, w.BreakFoodPerMatch, trials: w.Matches);
-                        Add("warrior", who + "break presses that fell back to a Peck per match", pop, w.BreakFallbacksPerMatch, trials: w.Matches);
-                        Add("warrior", who + "break presses cancelled per match", pop, w.BreakCancelsPerMatch, trials: w.Matches);
-                        Add("warrior", who + "Pecks broken per match", pop, w.PecksBrokenPerMatch, trials: w.Matches);
+                        Add("warrior", who + "fresh hits per match", pop, w.FreshHitsPerMatch, trials: w.Matches);
+                        Add("warrior", who + "bites from a casting rival per match", pop, w.BitesFromCastPerMatch, trials: w.Matches);
+                        Add("warrior", who + "bites from a rival's cargo per match", pop, w.BitesFromCargoPerMatch, trials: w.Matches);
+                        Add("warrior", who + "bites per match", pop, w.BitesFromCastPerMatch + w.BitesFromCargoPerMatch, trials: w.Matches);
+                        Add("warrior", who + "bite food per match", pop, w.BiteFoodFromCastPerMatch + w.BiteFoodFromCargoPerMatch, trials: w.Matches);
+                        Add("warrior", who + "bites spent (a second hit on a bitten state) per match", pop, w.BitesSpentPerMatch, trials: w.Matches);
+                        Add("warrior", who + "Pecks bitten per match", pop, w.PecksBittenPerMatch, trials: w.Matches);
                         Add("warrior", who + "trophies earned per match", pop, w.TrophiesEarnedPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies lost per match", pop, w.TrophiesLostPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies cleared by banking per match", pop, w.TrophiesClearedPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies held (mean over the match)", pop, w.MeanTrophiesHeld, trials: w.Matches);
-                        Add("warrior", who + "trophies at the end of the match (mean)", pop, w.TrophiesAtEndMean, trials: w.Matches);
-                        Add("warrior", who + "trophy room added per match", pop, w.RoomOfferedPerMatch, trials: w.Matches);
-                        Add("warrior", who + "share of the trophy room used when banking (%)", pop, w.RoomFilledShare * 100f, trials: w.Matches);
-                        Add("warrior", who + "overflow to the centre pile per match", pop, w.OverflowPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies decayed per match", pop, w.TrophiesDecayedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies consumed per cash", pop, w.TrophiesPerCash, trials: w.Matches);
+                        Add("warrior", who + "trophy cashes per match", pop, w.TrophyCashesPerMatch, trials: w.Matches);
+                        Add("warrior", who + "food the trophies added per match", pop, w.TrophyBonusFoodPerMatch, trials: w.Matches);
                     }
+                    Add("warrior", who + "Steals per match", pop, w.StealsPerMatch, trials: w.Matches);
+                    Add("warrior", who + "mean Steal size", pop, w.MeanStealSize, trials: w.Matches);
+                    Add("warrior", who + "mean hit-steal take", pop, w.MeanHitSize, trials: w.Matches);
                     Add("warrior", who + "identity food per match", pop, w.IdentityFoodPerMatch, trials: w.Matches);
                     Add("warrior", who + "worst loss for a victim in 5 s (mean)", pop, w.WorstLossMean, trials: w.Matches);
                     Add("warrior", who + "worst loss for a victim in 5 s (95th percentile)", pop, w.WorstLossP95, trials: w.Matches);
@@ -490,16 +492,15 @@ namespace CluckWars.Balance
             foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Champion", o.TrophyKit) })
             {
                 if (kit == null || !(title == "the Bully" ? played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": hit")))
-                                                          : played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": breaks")))))
+                                                          : played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": fresh hits per match")))))
                     continue;
                 bool bully = title == "the Bully";
                 sb.AppendLine($"## Overview: {title} ({kit}), per match in the mixed population unless said");
                 sb.AppendLine();
                 string[] cols = bully
-                    ? new[] { "hit takes per match", "hit food per match", "hits that met the lock per match", "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" }
-                    : new[] { "breaks per match", "break food per match", "break presses that fell back to a Peck per match", "break presses cancelled per match", "trophies earned per match", "trophies held (mean over the match)",
-                              "trophies at the end of the match (mean)", "share of the trophy room used when banking (%)", "overflow to the centre pile per match", "identity food per match",
-                              "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" };
+                    ? new[] { "hit takes per match", "hit food per match", "mean hit-steal take", "hits that met the lock per match", "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" }
+                    : new[] { "fresh hits per match", "bites per match", "bite food per match", "Pecks bitten per match", "trophies earned per match", "trophies consumed per cash", "Steals per match", "mean Steal size",
+                              "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" };
                 sb.AppendLine("| Scenario | P0 | P1 | mixed | " + string.Join(" | ", cols) + " |");
                 sb.AppendLine("|---|---|---|---|" + string.Concat(cols.Select(_ => "---|")));
                 void WarriorRow(string name, List<WhatIfLine> ls, bool isBase)

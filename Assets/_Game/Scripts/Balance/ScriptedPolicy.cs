@@ -54,13 +54,12 @@ namespace CluckWars.Balance
         private MatchPhase _phase;
         private bool _leading;
         private bool _holdSteal;
-        // The Warrior kits under test (design 2026-11-25): the rival to press a break on and the one to walk toward for a break; the hit-steal facts.
-        private int _breakTarget;
-        private int _approach;
+        // The Warrior kits under test (design 2026-11-25): the hit-steal facts (Bully) and the bite and trophy facts (Champion).
         private HitStealFacts _hit;
         private float _hitReach;
-        private readonly float[] _candidate = new float[Seats];
-        private readonly float[] _approachDist = new float[Seats];
+        private BiteFacts _bite;
+        private TrophyFacts _trophy;
+        private float _fightReach;
 
         public ScriptedPolicy(int seat, PolicyParams p)
         {
@@ -78,8 +77,9 @@ namespace CluckWars.Balance
                 _ready = true;
             }
             _cast = -1;
-            _breakTarget = _approach = -1;
             _hit = kit.Passive.HitSteal;
+            _bite = kit.Passive.Bite;
+            _trophy = kit.Passive.Trophy;
             var abilities = kit.Abilities ?? Array.Empty<MatchAbility>();
             Vector2 home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
             float arrival = v.Rules.SightArrivalRadius;
@@ -91,13 +91,10 @@ namespace CluckWars.Balance
             float cargoFraction = Mathf.Clamp01(cargo / capacity);
             float distHome = Vector2.Distance(me.Pos, home);
             float returnAt = BotTactics.ReturnThreshold(_profile, _phase, _leading, capacity);
-            var trophy = kit.Passive.Trophy;
-            if (trophy.IsChampion)   // the trophies' room is worth carrying: the amount grows with them
-                returnAt = BotBreakRules.ReturnFraction(BotTactics.ReturnThreshold(_profile, _phase, _leading), _profile.ReturnAmount, me.Trophies, trophy.Room, capacity);
 
-            // Free actions of the Warrior kits under test: a hit for food, a break on a rival's Peck. Each sets the cast or the press the intent carries.
+            // Free actions of the Warrior kits under test: a hit for food (Bully), a builder or a cash on a rival (Champion). Each sets the cast the intent carries.
             HitForFood(v, me, abilities, capacity - cargo);
-            BreakOverlay(v, me, kit);
+            ChampionOverlay(v, me, abilities, capacity - cargo);
 
             // Priority 0: BANK OR LOSE IT. A Thief with the loot mark banks by its own rule (the clock, the win, a full beak for the next mark).
             float depositRate = Mathf.Max(0.5f, kit.Farm.DepositRate);
@@ -147,13 +144,6 @@ namespace CluckWars.Balance
 
             // Priority 3: HUNT / STALK.
             if (_prey >= 0 && Engage(v, me, abilities, arrival, out var engageIntent)) return engageIntent;
-
-            // Priority 3b: walk to a rival whose Peck the break can still reach before the cast ends.
-            if (_approach >= 0)
-            {
-                _state = State.Hunt;
-                return Finish(v, Reach(me.Pos, v.Seats[_approach].Pos, arrival), -1);
-            }
 
             // Priority 4: GUARD (the Bunker holds its base).
             if (_profile.Strategy == BotStrategy.Bunker && _profile.GuardRadius > 0f && _nearest >= 0
@@ -208,7 +198,7 @@ namespace CluckWars.Balance
 
         // A goal behind a wall or outside the arena (a stalk standoff point) is made walkable by the simulator, as the bot's navmesh sampling does.
         private MatchIntent Finish(MatchView v, Vector2 goal, int pile) =>
-            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1, Break = _breakTarget >= 0, BreakTarget = _breakTarget };
+            new MatchIntent { Goal = goal, PeckPile = pile, CastSlot = _cast, CastTarget = -1 };
 
         private MatchIntent GoHome(MatchView v, Vector2 home)
         {
@@ -246,6 +236,7 @@ namespace CluckWars.Balance
                 if (preyRadius <= 0f) continue;
 
                 if (_hit.Active && !WorthAHit(v, me, rival, r, dist)) continue;   // the Bully hunts only a rival that would give food by the time he is there
+                if (ChampionOn && !WorthAFight(v, me, rival, r, dist)) continue;  // the Champion leaves the pile only for a fight that beats the Peck
                 float capacity = Mathf.Max(1f, rival.Capacity);
                 float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo) / capacity);
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
@@ -325,35 +316,102 @@ namespace CluckWars.Balance
             return BotHitStealRules.WorthHunting(gain, me.LockLeftOn(r), walk);
         }
 
-        // The Champion's press: break the nearest rival whose Peck is in reach and will still be casting after the reaction, when the bot may
-        // (BotBreakRules.ShouldBreak); else note a rival to walk to (BotBreakRules.Approach).
-        private void BreakOverlay(MatchView v, in SeatView me, MatchKit kit)
+        // ---- the Champion (design 2026-11-25, section 7) ----
+
+        // The bite or the trophy Steal is on: with both off the Champion plays its plain kit by the ordinary rules.
+        private bool ChampionOn => _trophy.IsChampion && (_bite.Active || _trophy.Steal > 0f);
+
+        private float Reaction => float.IsNaN(_params.ReactionDelay) ? 0f : Mathf.Max(0f, _params.ReactionDelay);
+
+        private static int SlotOf(MatchAbility[] abilities, AbilityJob job)
         {
-            var facts = kit.Passive.Break;
-            if (!facts.Active || me.Stunned || me.Pecking || me.BreakLeft > Eps) return;
-            float reaction = float.IsNaN(_params.ReactionDelay) ? 0f : Mathf.Max(0f, _params.ReactionDelay);
-            float reach = facts.Reach * BotTactics.CommitReachFraction;
-            var centres = BaseCentres(v);
-            for (int r = 0; r < Seats; r++)
+            for (int slot = 0; slot < abilities.Length; slot++) if (abilities[slot].Job == job) return slot;
+            return -1;
+        }
+
+        // A rival worth leaving the pile for: the fight's food per second (a bite when it is still fresh on arrival, then the Steal on the trophies the
+        // builder and the bite would have put on it) beats the Peck's (BotChampionRules.Fight).
+        private bool WorthAFight(MatchView v, in SeatView me, in SeatView rival, int r, float dist)
+        {
+            var kit = v.Kits[_seat];
+            var abilities = kit.Abilities ?? Array.Empty<MatchAbility>();
+            if (_fightReach <= 0f)
             {
-                _candidate[r] = _approachDist[r] = float.PositiveInfinity;
-                var rival = v.Seats[r];
-                if (r == _seat || !rival.Present || rival.Removed || !rival.Known || rival.Hidden || rival.Shelled || !rival.Pecking) continue;
-                float dist = Vector2.Distance(me.Pos, rival.Pos);
-                bool walled = MatchCombat.KeepOutBlocks(me.Pos, rival.Pos, centres, v.Rules.KeepOutRadius);
-                if (BotBreakRules.Candidate(true, rival.PeckCastLeft, dist, reach, walled, rival.BreakImmuneLeft > 0f, reaction)) _candidate[r] = dist;
-                else if (!walled && rival.BreakImmuneLeft <= 0f && BotBreakRules.Approach(dist, reach, rival.PeckCastLeft, kit.Farm.MoveSpeed, reaction)) _approachDist[r] = dist;
+                foreach (var ab in abilities)
+                    if ((ab.Job == AbilityJob.Stun || ab.Job == AbilityJob.Shove || ab.Job == AbilityJob.Steal) && !float.IsPositiveInfinity(ab.Reach) && ab.Reach > _fightReach) _fightReach = ab.Reach;
             }
-            float ownBite = v.OwnPileBite(_seat);
-            int target = PeckBreakRules.Nearest(_candidate);
-            if (target >= 0)
+            float walk = Mathf.Max(0f, dist - _fightReach) / Mathf.Max(0.1f, kit.Farm.MoveSpeed);
+            float reaction = Reaction;
+            float freshLeft = BotChampionRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
+            bool fresh = BotChampionRules.HitFresh(freshLeft - walk, reaction);
+            float room = Mathf.Max(0f, me.Capacity - me.Cargo);
+            float rivalCargo = StealRules.Stealable(rival.Cargo);
+            float bite = 0f;
+            if (fresh)
             {
-                if (BotBreakRules.ShouldBreak(true, ownBite, me.Trophies, kit.Passive.Trophy.Cap)) _breakTarget = target;
+                float peck = v.Kits[r].Farm.PeckAmount * _bite.FoodShare;
+                bite = peck <= 0f ? 0f : rival.Pecking ? Mathf.Min(peck, room) : BiteRules.FromCargo(peck, room, rivalCargo);
+            }
+            int steal = SlotOf(abilities, AbilityJob.Steal);
+            float stealGain = 0f;
+            if (steal >= 0)
+            {
+                int count = me.TrophyOn != null ? me.TrophyOn[r] : 0;
+                if (fresh) count = Mathf.Min(_trophy.Cap, count + 2);   // the builder's hit and the bite
+                float left = rival.Pecking ? rivalCargo : Mathf.Max(0f, rivalCargo - bite);
+                stealGain = BotChampionRules.StealGain(abilities[steal].StealAmount, kit.Passive.StealFactor, _trophy.Steal, count, room - bite, left);
+            }
+            float seconds = walk + 2f * Mathf.Max(0.25f, reaction);
+            return BotChampionRules.Fight(bite + stealGain, seconds, kit.Farm.PeckAmount, Mathf.Max(kit.Farm.PeckCooldown, kit.Farm.PeckCastSeconds));
+        }
+
+        // A free cast of the Champion, in the order of the design: a builder on a fresh rival in reach (or the Steal when no builder is ready and
+        // the rival carries), else a due cash of the trophies on a rival in Steal's reach. One cast per think; it never moves the chicken.
+        private void ChampionOverlay(MatchView v, in SeatView me, MatchAbility[] abilities, float room)
+        {
+            if (!ChampionOn || _cast >= 0 || me.Stunned) return;
+            int stun = SlotOf(abilities, AbilityJob.Stun), shove = SlotOf(abilities, AbilityJob.Shove), steal = SlotOf(abilities, AbilityJob.Steal);
+            bool stealReady = steal >= 0 && Ready(me, steal);
+            float reaction = Reaction;
+
+            for (int k = 1; k < Seats; k++)
+            {
+                int r = (_seat + k) % Seats;
+                var rival = v.Seats[r];
+                if (!rival.Present || rival.Removed || !rival.Known || rival.Hidden || rival.Shelled) continue;
+                float freshLeft = BotChampionRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
+                if (!BotChampionRules.HitFresh(freshLeft, reaction)) continue;
+                bool stunOk = stun >= 0 && Ready(me, stun) && CanHit(v, me, abilities[stun], r);
+                bool shoveOk = shove >= 0 && Ready(me, shove) && CanHit(v, me, abilities[shove], r);
+                int pick = BotChampionRules.PickBuilder(stunOk, shoveOk,
+                    stun >= 0 ? abilities[stun].Cooldown : float.MaxValue, shove >= 0 ? abilities[shove].Cooldown : float.MaxValue);
+                if (pick == BotChampionRules.Stun) { _cast = stun; return; }
+                if (pick == BotChampionRules.Shove) { _cast = shove; return; }
+                // No builder in reach: the Steal bites too, when the rival carries and it is in reach.
+                if (stealReady && CanHit(v, me, abilities[steal], r)) { _cast = steal; return; }
+            }
+
+            if (!stealReady) return;
+            float nextBuilder = float.MaxValue;
+            if (stun >= 0) nextBuilder = Mathf.Min(nextBuilder, me.CooldownLeft[1 + stun]);
+            if (shove >= 0) nextBuilder = Mathf.Min(nextBuilder, me.CooldownLeft[1 + shove]);
+            for (int k = 1; k < Seats; k++)
+            {
+                int r = (_seat + k) % Seats;
+                var rival = v.Seats[r];
+                if (!rival.Present || rival.Removed || !rival.Known || rival.Hidden || rival.Shelled) continue;
+                int count = me.TrophyOn != null ? me.TrophyOn[r] : 0;
+                if (count < 1 || !CanHit(v, me, abilities[steal], r)) continue;
+                float gain = BotChampionRules.StealGain(abilities[steal].StealAmount, v.Kits[_seat].Passive.StealFactor, _trophy.Steal, count, room, StealRules.Stealable(rival.Cargo));
+                if (!BotChampionRules.Cash(count, _trophy.Cap, me.TrophyLeft[r], nextBuilder, gain)) continue;
+                _cast = steal;
                 return;
             }
-            int approach = PeckBreakRules.Nearest(_approachDist);
-            if (approach >= 0 && BotBreakRules.ShouldBreak(true, ownBite, me.Trophies, kit.Passive.Trophy.Cap)) _approach = approach;
         }
+
+        // The ability would land on the rival now, at the commit fraction of its reach (range, the base wall, a Steal's food).
+        private bool CanHit(MatchView v, in SeatView me, in MatchAbility ab, int rival) =>
+            Vector2.Distance(me.Pos, v.Seats[rival].Pos) <= ab.Reach * BotTactics.CommitReachFraction && WouldAffect(v, me, ab, rival);
 
         // ---- casting ----
 

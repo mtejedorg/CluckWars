@@ -3,18 +3,19 @@ using UnityEngine;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The Champion's trophies as numbers (design 2026-11-25): each trophy adds <see cref="Room"/> food to his beak. A <see cref="Room"/> of 0
-    /// adds nothing (the shipped value); <see cref="IsChampion"/> is true whatever the numbers, so a report can find the kit.
+    /// The Champion's per-enemy trophies as numbers (design 2026-11-25, redesign): each landed Stun, Shove or bite is a trophy on that rival, and each
+    /// trophy inflates the Champion's Steal on that rival by <see cref="Steal"/> food. A <see cref="Steal"/> of 0 adds nothing (the shipped value);
+    /// <see cref="IsChampion"/> is true whatever the numbers, so a report can find the kit.
     /// </summary>
     public struct TrophyFacts
     {
         public bool IsChampion;
-        /// <summary>Beak capacity one trophy adds.</summary>
-        public int Room;
-        /// <summary>Most trophies held at once.</summary>
+        /// <summary>Food one trophy adds to the Steal on the rival it counts on.</summary>
+        public float Steal;
+        /// <summary>Most trophies held on one rival.</summary>
         public int Cap;
-        /// <summary>Trophies are cleared when the holder banks (a streak), instead of kept through banking (slow growth).</summary>
-        public bool ClearOnBank;
+        /// <summary>Seconds without a gain on a rival after which its count goes to 0, all at once.</summary>
+        public float Seconds;
 
         public static TrophyFacts None => default;
     }
@@ -23,18 +24,13 @@ namespace CluckWars.Gameplay
     public static class TrophyRules
     {
         /// <summary>One more trophy, stopping at the cap (a cap of 0 or less earns none).</summary>
-        public static int Earn(int held, int cap) => held < cap ? held + 1 : Mathf.Max(held, 0);
+        public static int Add(int held, int cap) => held < cap ? held + 1 : Mathf.Max(held, 0);
 
-        /// <summary>One trophy lost to a rival's take, never below zero.</summary>
-        public static int LoseOne(int held) => held > 0 ? held - 1 : 0;
+        /// <summary>A Steal's amount on a rival holding <paramref name="count"/> trophies: the nominal amount times the thief's factor plus the trophies' food.</summary>
+        public static float StealAmount(float stealAmount, float stealFactor, float perTrophy, int count) =>
+            stealAmount * stealFactor + perTrophy * Mathf.Max(count, 0);
 
-        /// <summary>The beak capacity the held trophies add (0 for a kit that is not the Champion's).</summary>
-        public static float Room(int held, in TrophyFacts f) => f.IsChampion ? Mathf.Max(held, 0) * Mathf.Max(f.Room, 0) : 0f;
-
-        /// <summary>A Steal cast earns a trophy when its takes add up to 1 food or more.</summary>
-        public static bool StealEarns(float takenThisCast) => takenThisCast >= 1f;
-
-        /// <summary>The food above the capacity: what leaves the beak when the capacity falls below the cargo.</summary>
-        public static float Overflow(float cargo, float capacity) => Mathf.Max(0f, cargo - capacity);
+        /// <summary>True once <paramref name="now"/> is past <paramref name="until"/>.</summary>
+        public static bool Decayed(float now, float until) => now > until;
     }
 }

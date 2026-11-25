@@ -366,43 +366,31 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void P1_BreaksOnlyWhenTheValueBeatsItsOwnPeck()
+        public void P1Champion_PrefersAFreshRivalOverThePile_OnlyWhenThePeckIsSlower()
         {
-            // The press is a break or a pile Peck. Value of a break: the bite, the bite the rival does not get, and the trophy's room while one is to win.
-            MatchKit Hunter(float peckAmount)
+            // The same scene at a fast and at a slow Peck: the Champion's Steal on a rival mid-cast (the bite plus the Steal) beats the pile only when foraging is slow.
+            MatchIntent Scene(float peckCooldown)
             {
-                var kit = MatchTestKit.Fighter("hunter", 6f, new MatchAbility[0], peckAmount: peckAmount, capacity: 20);
-                kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-                kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
-                return kit;
-            }
-            MatchView Scene(float myPeck, float rivalBite)
-            {
-                var view = View(Four(Hunter(myPeck), MatchTestKit.Fighter("rival", 6f, new MatchAbility[0], peckAmount: rivalBite, capacity: 20)));
+                var me = MatchTestKit.Fighter("champion", 6f, new[] { Steal(5f, 5f, 4f) }, peckAmount: 10f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
+                me.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
+                me.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
+                var view = View(Four(me, Kit("rival")));
                 view.PileFood[OracleMapSO.CentreIndex] = 10f;
                 view.Seats[0].Pos = Vector2.zero;                    // inside the centre pile's reach
-                view.Seats[1].Pos = new Vector2(2f, 0f);
+                view.Seats[0].TrophyOn = new int[4];
+                view.Seats[0].TrophyLeft = new float[4];
+                view.Seats[0].CooldownLeft[1] = 3f;                  // the Steal is 3 s from ready
+                view.Seats[1].Pos = new Vector2(12f, 0f);
+                view.Seats[1].Cargo = 12f;
                 view.Seats[1].Pecking = true;
                 view.Seats[1].PeckCastLeft = 0.5f;
-                return view;
+                return Think(view);
             }
 
-            var intent = Think(Scene(3f, 6f));
-            Assert.IsTrue(intent.Break, "6 + 6 + 2 of value against a Peck of 3");
-            Assert.AreEqual(1, intent.BreakTarget);
-            Assert.IsFalse(Think(Scene(10f, 1f)).Break, "1 + 1 + 2 of value against a Peck of 10: it pecks");
-
-            var capped = Scene(10f, 4f);
-            capped.Seats[0].Trophies = 3;
-            Assert.IsFalse(Think(capped).Break, "4 + 4 against 10, and no trophy left to win");
-
-            var notReady = Scene(3f, 6f);
-            notReady.Seats[0].BreakLeft = 1f;
-            Assert.IsFalse(Think(notReady).Break, "the break is not ready");
-
-            var walled = Scene(3f, 6f);
-            walled.Seats[1].BreakImmuneLeft = 1f;
-            Assert.IsFalse(Think(walled).Break, "the rival was just broken");
+            Assert.AreEqual(OracleMapSO.CentreIndex, Scene(0.2f).PeckPile, "a fast Peck: the pile");
+            var strike = Scene(30f);
+            Assert.AreEqual(-1, strike.PeckPile, "a Peck every 30 s: the strike");
+            Assert.AreEqual(new Vector2(12f, 0f), strike.Goal);
         }
 
     }

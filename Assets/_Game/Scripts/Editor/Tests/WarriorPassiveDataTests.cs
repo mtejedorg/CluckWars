@@ -40,7 +40,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, bully.HitStealSlow);
             Assert.AreEqual(3f, bully.HitStealLockSeconds, "the designed lock is already authored; with every amount 0 it never starts");
             Assert.IsFalse(Passive("Relentless").HitSteal.Active);
-            foreach (var p in Registry.Passives) Assert.IsFalse(p.PeckBreak.Active, $"{p.name} has no break");
+            foreach (var p in Registry.Passives) Assert.IsFalse(p.Bite.Active, $"{p.name} has no bite");
         }
 
         [Test]
@@ -51,16 +51,25 @@ namespace CluckWars.Tests
             Assert.IsFalse(Registry.All.Contains(hunter), "the game cannot pick the Champion");
             Assert.IsFalse(Registry.Passives.Contains(hunter));
             Assert.IsEmpty(FixedKit.Problems(hunter), string.Join(" | ", FixedKit.Problems(hunter)));
-            CollectionAssert.AreEqual(relentless.Kit, hunter.Kit, "the Champion plays Relentless's four abilities");
+            Assert.AreEqual(new[] { "Peck", "WingSlam", "CluckShock", "Snatch" }, hunter.Kit.Select(k => k.name).ToArray(), "Peck, Stun, Shove, Steal");
+            CollectionAssert.AreNotEqual(relentless.Kit, hunter.Kit, "no longer Relentless's kit");
             Assert.AreEqual(relentless.Subclass, hunter.Subclass);
             Assert.AreEqual(ChickenClassFlags.Warrior, hunter.AllowedClasses);
-            Assert.IsFalse(hunter.PeckBreak.Active, "shipped with no break");
-            Assert.IsTrue(hunter.Trophy.IsChampion);
-            Assert.AreEqual(0, hunter.Trophy.Room, "shipped with trophies adding no room");
-            Assert.IsFalse(hunter.Trophy.ClearOnBank, "shipped: trophies are kept through banking");
             Assert.AreEqual(1f, hunter.OutgoingControlMultiplier, "no multipliers");
             Assert.AreEqual(1f, hunter.ModifyControlDuration(1f, ControlKind.Stun, null));
             Assert.AreEqual(1f, hunter.ModifyCooldown(1f, null, null));
+        }
+
+        [Test]
+        public void ShippedChampion_BiteAndTrophyStealAreOff()
+        {
+            var hunter = Champion();
+            Assert.IsFalse(hunter.Bite.Active, "shipped: no rival is ever fresh");
+            Assert.AreEqual(0f, hunter.Trophy.Steal, "shipped: trophies add nothing");
+            Assert.AreEqual(0f, hunter.Bite.FoodShare, "shipped: a fresh hit takes no food (Maestro, 2026-11-25)");
+            Assert.IsTrue(hunter.Trophy.IsChampion);
+            Assert.AreEqual(3, hunter.Trophy.Cap);
+            Assert.AreEqual(6f, hunter.Trophy.Seconds);
         }
 
         [Test]
