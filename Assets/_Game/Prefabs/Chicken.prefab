@@ -39,6 +39,7 @@ GameObject:
   - component: {fileID: 1629746130025582680}
   - component: {fileID: 79884332572380078}
   - component: {fileID: 237660663321332809}
+  - component: {fileID: 7719219532968000706}
   m_Layer: 8
   m_Name: Chicken
   m_TagString: Untagged
@@ -111,6 +112,7 @@ MonoBehaviour:
   - {fileID: 7606116696970456605}
   - {fileID: 5276517656185694567}
   - {fileID: 4410718239650138771}
+  - {fileID: 7719219532968000706}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &6032245462738825523
 CharacterController:
@@ -268,6 +270,7 @@ MonoBehaviour:
       Raw: 0
     Behaviour: 0
   _StealEventId: 0
+  _DepositEventId: 0
 --- !u!114 &101601932164880250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -289,6 +292,12 @@ MonoBehaviour:
   _ChargingSlot: 0
   _LastCastHitCount: 0
   _LastCastEventId: 0
+  _PeckLandedEventId: 0
+  _FedTick: 0
+  _FedStateId: 0
+  _FreshStateId: 0
+  _BittenStateId: 0
+  _PeckCutEventId: 0
   _PeckChainActive:
     _value: 0
 --- !u!114 &9204612626180569764
@@ -427,8 +436,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 76e95ecb22d73074285ff2b102e0ee31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.ChickenStateOverlays
-  _starHeight: 1.62
-  _starOrbitRadius: 0.26
   _starSpinSpeed: 180
 --- !u!114 &4310573928164825946
 MonoBehaviour:
@@ -557,6 +564,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f68b73696f9040cda2ed66d1d59af04f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ThiefLoot
+  _MarkedTarget:
+    Object:
+      Raw: 0
+    Behaviour: 0
+  _State: 0
+  _LootTakenEventId: 0
+  _LastLootVictim:
+    Object:
+      Raw: 0
+    Behaviour: 0
+  _LastLootTake: 0
+  _LastLootBounty: 0
 --- !u!114 &1629746130025582680
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -597,3 +616,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41318de9644ba4c4087aa5231a20fafb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Visuals.HideLocalCue
+--- !u!114 &7719219532968000706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7475174928668115606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e4954cec20de3b479e0a951a39d7d79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CluckWars.Gameplay::CluckWars.Gameplay.ChickenHitSteal
+  _HitStealEventId: 0
+  _LastHitVictim:
+    Object:
+      Raw: 0
+    Behaviour: 0
+  _LastHitTake: 0

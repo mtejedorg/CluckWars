@@ -72,7 +72,10 @@ namespace CluckWars.Abilities
             var caster = ctx.Controller;
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
+            {
                 SendControl(caster, _scratch[i]);
+                ReportHit(caster, _scratch[i], AbilityJob.Slow, caster.PredictSlowLands(_scratch[i], EmittedControl));   // priced only where a passive sets HitStealSlow (shipped 0)
+            }
         }
     }
 }

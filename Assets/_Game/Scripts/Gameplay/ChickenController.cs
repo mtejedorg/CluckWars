@@ -238,6 +238,7 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private AssassinExecute _assassin;
         private ThiefLoot _thiefLoot;
+        private ChickenHitSteal _hitSteal;
         private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
 
@@ -624,6 +625,7 @@ namespace CluckWars.Gameplay
             _abilities = GetComponent<AbilityController>();
             _assassin = GetComponent<AssassinExecute>();
             _thiefLoot = GetComponent<ThiefLoot>();
+            _hitSteal = GetComponent<ChickenHitSteal>();
             BindPresentation();   // presentation caches its indicator / nameplate / badge stack here
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
@@ -1184,6 +1186,54 @@ namespace CluckWars.Gameplay
 
         /// <summary>This chicken's loot-mark state machine (cached; the component is on every chicken but only a Thief's runs it, the others stay <c>Off</c>), or null before <c>Spawned</c>.</summary>
         public ThiefLoot Loot => _thiefLoot;
+
+        /// <summary>This chicken's hit-steal (the Bully's take per Stun or Shove; the component is on every chicken, only a passive with hit-steal facts uses it), or null before <c>Spawned</c>.</summary>
+        public ChickenHitSteal Hits => _hitSteal;
+
+        /// <summary>
+        /// One of this chicken's hitters (Stun, Shove, an instant Slow, a Steal) just went at <paramref name="victim"/>, with the caster's prediction
+        /// <paramref name="affected"/> that it affected him (<see cref="PredictStunLands"/>, <see cref="PredictShoveMoves"/>, <see cref="PredictSlowLands"/>).
+        /// Tells the sibling behaviours that price a hit; each is a no-op unless this chicken's passive carries its facts. Nothing is told for a decoy
+        /// victim (a Doppelganger decoy is no take and no debt) or from a proxy.
+        /// </summary>
+        public void ReportHit(ChickenController victim, AbilityJob job, bool affected)
+        {
+            if (victim == null || victim.IsDecoy || !HasStateAuthority) return;
+            _hitSteal?.OnHit(victim, job, affected);
+        }
+
+        /// <summary>
+        /// Will a Stun <paramref name="emission"/> sent now affect <paramref name="victim"/>? <see cref="HitAffectRules.StunAffects"/> over what this peer
+        /// sees of him (his stun left, his control immunity, his passive's shortening of the incoming seconds, a base wall between), the same primitives
+        /// his own <see cref="RPC_ApplyStun"/> runs. A prediction: a miss moves no food (every transfer is authority-confirmed).
+        /// </summary>
+        public bool PredictStunLands(ChickenController victim, in ControlEmission emission)
+        {
+            if (victim == null || emission.Kind != ControlKind.Stun || PlayerBase.WallBetween(transform.position, victim.transform.position)) return false;
+            float seconds = ControlClaimRules.OutgoingSeconds(emission, Passive);
+            var victimPassive = victim.Passive;
+            bool immune = victim.IsControlImmune;
+            float incoming = immune || victimPassive == null ? seconds : victimPassive.ModifyControlDuration(seconds, ControlKind.Stun, victim);
+            return HitAffectRules.StunAffects(immune, victim.StunRemaining, incoming);
+        }
+
+        /// <summary>Will a shove of <paramref name="strength"/> move <paramref name="victim"/>? <see cref="HitAffectRules.ShoveMoves"/> over his control immunity and his passive's knockback factor, as <see cref="ApplyKnockback"/> reads them.</summary>
+        public bool PredictShoveMoves(ChickenController victim, float strength)
+        {
+            if (victim == null || PlayerBase.WallBetween(transform.position, victim.transform.position)) return false;
+            var victimPassive = victim.Passive;
+            float factor = victimPassive != null ? victimPassive.ModifyKnockback(1f, victim) : 1f;
+            return HitAffectRules.ShoveMoves(victim.IsControlImmune, strength, factor);
+        }
+
+        /// <summary>Will a Slow <paramref name="emission"/> sent now land on <paramref name="victim"/>: not slow-immune, no base wall, and some seconds left after his passive's say (as <see cref="RPC_ApplyAbilitySlow"/>).</summary>
+        public bool PredictSlowLands(ChickenController victim, in ControlEmission emission)
+        {
+            if (victim == null || emission.Kind != ControlKind.Slow || victim.IsSlowImmune || PlayerBase.WallBetween(transform.position, victim.transform.position)) return false;
+            float seconds = ControlClaimRules.OutgoingSeconds(emission, Passive);
+            var victimPassive = victim.Passive;
+            return (victimPassive != null ? victimPassive.ModifyControlDuration(seconds, ControlKind.Slow, victim) : seconds) > 0f;
+        }
 
         private IChickenModelPresenter _presenter;
         private static bool s_presenterMissingReported;
@@ -1860,6 +1910,7 @@ namespace CluckWars.Gameplay
             // and re-arm its cooldown after the clear below (CW-231).
             _assassin?.ResetForNewRound();
             _thiefLoot?.ResetForNewRound();
+            _hitSteal?.ResetForNewRound();
             _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.

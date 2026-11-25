@@ -443,9 +443,11 @@ namespace CluckWars.Tests
             // scan above cannot see. Pinning the set here means a SECOND such caller — which
             // would have no NominalStealAmount backing it and no bound to fit inside — cannot be
             // added without this going red.
+            // ChickenHitSteal.cs joined the set with the Bully's hit-steal (BL-226): its amounts are the passive's own, which StealRules.MaxSingleSteal covers
+            // through the hit-steal term (MaxSingleSteal_CoversTheHitStealAndTheFullDebtBonus pins it), so it has a bound to fit inside.
             var callers = NonAbilityFilesCallingTheDrainRpc();
             CollectionAssert.AreEquivalent(
-                new[] { "ChickenController.cs" }, callers,
+                new[] { "ChickenController.cs", "ChickenHitSteal.cs" }, callers,
                 "The set of non-ability RPC_DrainStolen callers changed: " + string.Join(", ", callers) +
                 ". Every caller's amount must be covered by StealRules.MaxSingleSteal, which is " +
                 "derived from AbilityBaseSO.NominalStealAmount — so a caller with no ability asset " +

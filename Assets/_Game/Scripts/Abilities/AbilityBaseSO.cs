@@ -345,6 +345,13 @@ namespace CluckWars.Abilities
         }
 
         /// <summary>
+        /// Tells the caster's hit-pricing behaviours (the Bully's hit-steal) that this ability just went at <paramref name="victim"/>, with the caster's
+        /// prediction that it affected him (design 2026-11-25, 16.3). Called by the Stun, Shove and Slow abilities right after the effect is sent.
+        /// </summary>
+        protected static void ReportHit(Gameplay.ChickenController caster, Gameplay.ChickenController victim, AbilityJob job, bool affected) =>
+            caster?.ReportHit(victim, job, affected);
+
+        /// <summary>
         /// Sends this ability's declared control effect (<see cref="EmittedControl"/>) from <paramref name="caster"/>
         /// to <paramref name="victim"/> (A20). The caster's passive is applied by the sender itself
         /// (<c>ChickenController.SendControl</c>), and what is sent is what the receiver's ceiling was derived from.

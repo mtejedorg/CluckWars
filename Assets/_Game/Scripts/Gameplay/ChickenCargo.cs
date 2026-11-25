@@ -706,6 +706,10 @@ namespace CluckWars.Gameplay
             // The caller clamped to capacity minus cargo; requests still open hold room too (the other rivals of one
             // multi-target Snatch), so the free room has the last word.
             if (!_requests.AskSteal(victim._controller.Id, amount, Capacity, Cargo, Time.unscaledTime, out float asked, out ushort requestId)) return;
+
+            // Told before the call, like the open request: a victim this peer also owns answers inside it, and the hit-steal's lock (and, from the Enforcer's slice, the debts' pending Steal)
+            // must already hold this request id when the answer comes (RPC_SettleSteal).
+            _controller.Hits?.OnStealOpened(victim._controller.Id, requestId);
             victim.RPC_DrainStolen(asked, _controller.Id, requestId);
         }
 
@@ -865,6 +869,7 @@ namespace CluckWars.Gameplay
                     "(unsolicited, already settled or expired).");
                 return;
             }
+            _controller.Hits?.OnStealSettled(victimId, requestId, settled.Credited);   // a hit-steal's lock: given back on a 0, an event on a take
             if (settled.Credited <= 0f && settled.Overflow <= 0f) return;   // refused, or the load was gone: a legal no-op
 
             if (settled.ToCargo > 0f) Cargo += settled.ToCargo;

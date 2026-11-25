@@ -53,7 +53,10 @@ namespace CluckWars.Abilities
             // The caster's Relentless lengthens the stun in SendControl, on its own authority; the victim's ceiling allows for it.
             GatherTargets(caster, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
+            {
                 SendControl(caster, _scratch[i]);
+                ReportHit(caster, _scratch[i], AbilityJob.Stun, caster.PredictStunLands(_scratch[i], EmittedControl));   // the hit-steal prices what the stun really did
+            }
         }
     }
 }

@@ -58,6 +58,15 @@ namespace CluckWars.Gameplay
         public LootTakenEvent(NetworkBehaviourId victim, float take, float bounty) { Victim = victim; Take = take; Bounty = bounty; }
     }
 
+    /// <summary>A Bully's hit-steal was credited (<c>ChickenHitSteal.HitStealEventId</c>): who was robbed and how much went into the Bully's cargo. Ids and numbers only.</summary>
+    public readonly struct HitStealTakenEvent
+    {
+        public readonly NetworkBehaviourId Victim;
+        /// <summary>The food the hit took from the victim into the hitter's cargo.</summary>
+        public readonly float Take;
+        public HitStealTakenEvent(NetworkBehaviourId victim, float take) { Victim = victim; Take = take; }
+    }
+
     /// <summary>A meaningful change of the food this chicken carries, as <c>ChickenCargo.Render</c> saw it.</summary>
     public readonly struct CargoChangeEvent
     {
@@ -109,6 +118,13 @@ namespace CluckWars.Gameplay
         public NetworkBehaviourId LootVictim;
         public float LootTake;
         public float LootBounty;
+
+        /// <summary>The chicken carries a <c>ChickenHitSteal</c> (every chicken does; only a Bully's passive uses it).</summary>
+        public bool HasHitSteal;
+        /// <summary>The hit-steal counter (BL-226): bumped on the authority when a Bully's hit-steal is credited.</summary>
+        public byte HitStealEventId;
+        public NetworkBehaviourId HitVictim;
+        public float HitTake;
     }
 
     /// <summary>
@@ -148,9 +164,10 @@ namespace CluckWars.Gameplay
         private AbilityController _abilities;
         private ChickenCargo _cargo;
         private ThiefLoot _loot;
+        private ChickenHitSteal _hitSteal;
         private bool _siblingsResolved;
 
-        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit, _peckLanded, _peckCut, _lootTaken;
+        private EventEdge _cast, _knockback, _selfImpulse, _jump, _steal, _deposit, _peckLanded, _peckCut, _lootTaken, _hitStealTaken;
         private AbilityBaseSO _lastCharging;
         private bool _raising;
 
@@ -165,6 +182,7 @@ namespace CluckWars.Gameplay
         private readonly ListenerList<Action<StealEvent>> _stolenListeners = new ListenerList<Action<StealEvent>>();
         private readonly ListenerList<Action> _depositedListeners = new ListenerList<Action>();
         private readonly ListenerList<Action<LootTakenEvent>> _lootTakenListeners = new ListenerList<Action<LootTakenEvent>>();
+        private readonly ListenerList<Action<HitStealTakenEvent>> _hitStealTakenListeners = new ListenerList<Action<HitStealTakenEvent>>();
         private readonly ListenerList<Action<CargoChangeEvent>> _cargoChangedListeners = new ListenerList<Action<CargoChangeEvent>>();
         private readonly ListenerList<Action<Vector3>> _attackerNamedListeners = new ListenerList<Action<Vector3>>();
         private readonly ListenerList<Action> _zoneTriggeredListeners = new ListenerList<Action>();
@@ -210,6 +228,9 @@ namespace CluckWars.Gameplay
 
         /// <summary><c>ThiefLoot.LootTakenEventId</c> moved: this Thief was paid a marked steal (every peer; slice B decides who sees what).</summary>
         public event Action<LootTakenEvent> LootTaken { add => _lootTakenListeners.Add(value); remove => _lootTakenListeners.Remove(value); }
+
+        /// <summary><c>ChickenHitSteal.HitStealEventId</c> moved: this Bully was credited a hit-steal (every peer; the presenters decide who sees what).</summary>
+        public event Action<HitStealTakenEvent> HitStealTaken { add => _hitStealTakenListeners.Add(value); remove => _hitStealTakenListeners.Remove(value); }
 
         // ---- Local moments, raised from Render by the gameplay behaviour that owns the state ----
 
@@ -261,6 +282,7 @@ namespace CluckWars.Gameplay
                 _abilities = _controller.GetComponent<AbilityController>();
                 _cargo = _controller.GetComponent<ChickenCargo>();   // a decoy has none
                 _loot = _controller.GetComponent<ThiefLoot>();
+                _hitSteal = _controller.GetComponent<ChickenHitSteal>();
             }
 
             var s = new ChickenEventSnapshot
@@ -299,6 +321,16 @@ namespace CluckWars.Gameplay
                     s.LootVictim = _loot.LastLootVictim;
                     s.LootTake = _loot.LastLootTake;
                     s.LootBounty = _loot.LastLootBounty;
+                }
+            }
+            if (_hitSteal != null)
+            {
+                s.HasHitSteal = true;
+                s.HitStealEventId = _hitSteal.HitStealEventId;
+                if (_hitStealTaken.WouldFire(s.HitStealEventId))
+                {
+                    s.HitVictim = _hitSteal.LastHitVictim;
+                    s.HitTake = _hitSteal.LastHitTake;
                 }
             }
             Observe(in s);
@@ -344,6 +376,9 @@ namespace CluckWars.Gameplay
 
                 if (s.HasLoot && _lootTaken.Observe(s.LootTakenEventId))
                     LocalRaise.Invoke(_lootTakenListeners, nameof(LootTaken), Log, _controller, new LootTakenEvent(s.LootVictim, s.LootTake, s.LootBounty));
+
+                if (s.HasHitSteal && _hitStealTaken.Observe(s.HitStealEventId))
+                    LocalRaise.Invoke(_hitStealTakenListeners, nameof(HitStealTaken), Log, _controller, new HitStealTakenEvent(s.HitVictim, s.HitTake));
             }
             finally
             {
@@ -364,12 +399,14 @@ namespace CluckWars.Gameplay
             _peckLanded.Reset();
             _peckCut.Reset();
             _lootTaken.Reset();
+            _hitStealTaken.Reset();
             LastPeckLandedTime = float.NegativeInfinity;
             _lastCharging = null;
             _siblingsResolved = false;
             _abilities = null;
             _cargo = null;
             _loot = null;
+            _hitSteal = null;
         }
     }
 }
