@@ -96,6 +96,65 @@ namespace CluckWars.Tests
             Assert.AreEqual(-1, intent.PeckPile);
         }
 
+        private static MatchKit WarriorKit(params MatchAbility[] abilities)
+        {
+            var kit = MatchTestKit.Fighter("warrior", 6f, abilities, capacity: 20);
+            kit.Bot = BotTactics.ProfileFor(ChickenClass.Warrior);
+            return kit;
+        }
+
+        [Test]
+        public void TheWarrior_GoesHomeAtTheReturnAmount_NotAtAFractionOfABigBeak()
+        {
+            var view = View(Four(WarriorKit(), Kit("rival")));
+            view.Seats[0].Pos = Vector2.zero;
+            view.Seats[1].Pos = new Vector2(30f, 0f);
+            float amount = view.Kits[0].Bot.ReturnAmount;
+            Assert.Less(amount, view.Kits[0].Farm.CargoCapacity * view.Kits[0].Bot.ReturnThreshold, "the set-up needs a beak where the amount is the earlier rule");
+
+            view.Seats[0].Cargo = amount - 1f;
+            Assert.AreNotEqual(Home(0), Think(view).Goal, "below the amount it keeps foraging");
+
+            view.Seats[0].Cargo = amount;
+            Assert.AreEqual(Home(0), Think(view).Goal, "at the amount it goes home");
+        }
+
+        [Test]
+        public void TheWarrior_OnTheWayHome_StealsFromALoadedRivalInReach_WithoutLeavingItsPath()
+        {
+            var stun = Make(MatchTestKit.Stun(5f, 2f, 6f), BotRole.Control, 5f, true);
+            var steal = Make(MatchTestKit.Steal(5f, 4f, 3f), BotRole.Steal, 5f, true);
+            var kits = new[] { WarriorKit(stun, steal), Kit("empty"), Kit("loaded"), null };
+            var view = View(kits);
+            var policy = ScriptedPolicy.Factory(0, PolicyParams.Default);
+            var rng = MatchRng.Create(1UL, 0UL);
+
+            view.Seats[0].Pos = Vector2.zero;
+            view.Seats[0].Cargo = view.Kits[0].Bot.ReturnAmount;
+            view.Seats[1].Pos = new Vector2(30f, 0f);
+            view.Seats[2].Pos = new Vector2(30f, 5f);
+            Assert.AreEqual(Home(0), policy.Think(view, ref rng).Goal, "loaded to the amount: home");
+
+            // Now an empty rival is the nearest one and a loaded one is in reach behind it.
+            view.Seats[1].Pos = new Vector2(2f, 0f);
+            view.Seats[2].Pos = new Vector2(0f, 3f);
+            view.Seats[2].Cargo = 8f;
+            var passing = policy.Think(view, ref rng);
+            Assert.AreEqual(1, passing.CastSlot, "Steal goes first, ahead of the guard overlay's stun");
+            Assert.AreEqual(Home(0), passing.Goal, "no detour: the goal is still home");
+
+            view.Seats[0].CooldownLeft[2] = 3f;   // Steal on cooldown
+            Assert.AreNotEqual(1, policy.Think(view, ref rng).CastSlot, "a Steal on cooldown is not cast");
+
+            view.Seats[0].CooldownLeft[2] = 0f;
+            view.Seats[2].Pos = new Vector2(0f, 9f);   // out of Steal's reach
+            Assert.AreNotEqual(1, policy.Think(view, ref rng).CastSlot, "a rival out of reach is not chased");
+
+            view.Seats[2].Pos = new Vector2(0f, 3f);
+            view.Seats[0].Cargo = view.Kits[0].Farm.CargoCapacity;   // beak full
+            Assert.AreNotEqual(1, policy.Think(view, ref rng).CastSlot, "no room: nothing to take");
+        }
+
         [Test]
         public void StealGuard_ShellsUpWhenAStealerIsInRange()
         {

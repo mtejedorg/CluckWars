@@ -81,6 +81,7 @@ namespace CluckWars.Balance
             float capacity = Mathf.Max(1, kit.Farm.CargoCapacity);
             float cargoFraction = Mathf.Clamp01(cargo / capacity);
             float distHome = Vector2.Distance(me.Pos, home);
+            float returnAt = BotTactics.ReturnThreshold(_profile, _phase, _leading, capacity);
 
             // Priority 0: BANK OR LOSE IT. A Thief with the loot mark banks by its own rule (the clock, the win, a full beak for the next mark).
             float depositRate = Mathf.Max(0.5f, kit.Farm.DepositRate);
@@ -100,13 +101,13 @@ namespace CluckWars.Balance
             // A Death Mark in progress owns the bot until it pays or fizzles. An execute's loot is ordinary cargo (no bag since 2026-11-24): a Spoiler
             // that just killed holds at least the bounty, which is above the return threshold of a 25 beak (0.30 of 25 is 7.5), so the deposit rule goes home.
             if (FollowThroughMark(v, me, kit, abilities,
-                    BotTactics.LoadedToBank(cargo, cargoFraction, BotTactics.ReturnThreshold(_profile, _phase, _leading), _state == State.ReturnToBase), arrival, out var markIntent)) return markIntent;
+                    BotTactics.LoadedToBank(cargo, cargoFraction, returnAt, _state == State.ReturnToBase), arrival, out var markIntent)) return markIntent;
 
             // Latch ReturnToBase until all cargo is deposited.
             if (_state == State.ReturnToBase && cargo > 0f)
             {
                 if (distHome <= v.Map.BaseRadius) TryCast(v, me, abilities, BotSituation.Banking, -1);
-                else GuardOverlay(v, me, abilities);
+                else if (!StealInPassing(v, me, abilities, capacity - cargo)) GuardOverlay(v, me, abilities);
                 return Finish(v, home, -1);
             }
 
@@ -123,7 +124,7 @@ namespace CluckWars.Balance
             }
 
             // Priority 2: DEPOSIT (a loot Thief decided at priority 0).
-            if (!lootThief && cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading)) return GoHome(v, home);
+            if (!lootThief && cargoFraction >= returnAt) return GoHome(v, home);
 
             // Priority 2b: THE LOOT MARK. Walk to the marked rival at any distance and keep Steal for it.
             if (lootThief && ChaseMarked(v, me, abilities, arrival, out var lootIntent)) return lootIntent;
@@ -177,7 +178,8 @@ namespace CluckWars.Balance
             b.ProtectCargoThreshold,
             float.IsNaN(p.FleeRadius) ? b.DangerRadius : p.FleeRadius,
             float.IsNaN(p.HuntDetour) ? b.HuntRadius : p.HuntDetour,
-            b.HuntCargoThreshold, b.EngageRadius, b.GuardRadius, b.RoundTripBias, b.LeaderFocus, b.ThinkInterval);
+            b.HuntCargoThreshold, b.EngageRadius, b.GuardRadius, b.RoundTripBias, b.LeaderFocus, b.ThinkInterval,
+            returnAmount: float.IsNaN(p.ReturnThreshold) ? b.ReturnAmount : 0f);   // a swept fraction replaces the amount too
 
         // ---- the intents ----
 
@@ -328,6 +330,29 @@ namespace CluckWars.Balance
         {
             if (_profile.GuardRadius <= 0f || _nearest < 0 || _nearestDist > _profile.GuardRadius) return false;
             return TryCast(v, me, abilities, BotSituation.Guarding, _nearest);
+        }
+
+        // On the way home: Steal at a rival carrying food that is already in reach, with room for it (BotTactics.ShouldStealInPassing). Moves nobody.
+        private bool StealInPassing(MatchView v, in SeatView me, MatchAbility[] abilities, float room)
+        {
+            if (_cast >= 0 || me.Stunned) return false;
+            for (int slot = 0; slot < abilities.Length; slot++)
+            {
+                var ab = abilities[slot];
+                if (ab.Job != AbilityJob.Steal || !Ready(me, slot)) continue;
+                for (int k = 1; k < Seats; k++)
+                {
+                    int r = (_seat + k) % Seats;
+                    var rival = v.Seats[r];
+                    if (!rival.Present || rival.Removed || !rival.Known || rival.Hidden) continue;
+                    if (!BotTactics.ShouldStealInPassing(_profile, room, StealRules.Stealable(rival.Cargo), Vector2.Distance(me.Pos, rival.Pos), ab.Reach)) continue;
+                    if (!WouldAffect(v, me, ab, r)) continue;
+                    _cast = slot;
+                    return true;
+                }
+                return false;
+            }
+            return false;
         }
 
         // Shell up when a loaded bot has a stealer in reach and a shell ready (a Shield under way is left alone).

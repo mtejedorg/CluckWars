@@ -87,6 +87,12 @@ namespace CluckWars.Gameplay
         /// <summary>Cargo fraction at which the bot heads home under normal conditions.</summary>
         public readonly float ReturnThreshold;
 
+        /// <summary>
+        /// Food carried at which the bot heads home whatever its capacity (0 = none: the fraction alone decides). Read through
+        /// <see cref="BotTactics.ReturnThreshold(in BotProfile, MatchPhase, bool, float)"/>; it applies only to a beak at least this big.
+        /// </summary>
+        public readonly float ReturnAmount;
+
         /// <summary>Cargo fraction above which a nearby rival is treated as a threat to the haul.</summary>
         public readonly float ProtectCargoThreshold;
 
@@ -116,7 +122,7 @@ namespace CluckWars.Gameplay
 
         public BotProfile(BotStrategy strategy, float returnThreshold, float protectCargoThreshold,
             float dangerRadius, float huntRadius, float huntCargoThreshold, float engageRadius,
-            float guardRadius, float roundTripBias, float leaderFocus, float thinkInterval)
+            float guardRadius, float roundTripBias, float leaderFocus, float thinkInterval, float returnAmount = 0f)
         {
             Strategy              = strategy;
             ReturnThreshold       = returnThreshold;
@@ -129,6 +135,7 @@ namespace CluckWars.Gameplay
             RoundTripBias         = roundTripBias;
             LeaderFocus           = leaderFocus;
             ThinkInterval         = thinkInterval;
+            ReturnAmount          = returnAmount;
         }
 
         /// <summary>Can this profile chase a rival down? False for the two classes that hold position.</summary>
@@ -567,6 +574,32 @@ namespace CluckWars.Gameplay
             if (phase != MatchPhase.Endgame) return Mathf.Clamp01(t);
             return Mathf.Clamp01(leading ? t * 0.55f : Mathf.Min(1f, t * 1.20f));
         }
+
+        /// <summary>
+        /// The cargo fraction this bot heads home at, for a beak of <paramref name="capacity"/> food: <see cref="ReturnThreshold(in BotProfile, MatchPhase, bool)"/>,
+        /// or the share of the beak that <see cref="BotProfile.ReturnAmount"/> food is, whichever is lower. A profile without an amount, or a beak
+        /// smaller than it, keeps the fraction (Maestro, 2026-11-25: the Warrior banks at 12 food however big its beak, so a bigger beak is
+        /// not more time carrying food that a rival can take).
+        /// </summary>
+        public static float ReturnThreshold(in BotProfile profile, MatchPhase phase, bool leading, float capacity)
+        {
+            float fraction = ReturnThreshold(profile, phase, leading);
+            if (profile.ReturnAmount <= 0f || capacity < profile.ReturnAmount) return fraction;
+            return Mathf.Min(fraction, profile.ReturnAmount / capacity);
+        }
+
+        // ---- Steal in passing ---------------------------------------------------
+
+        /// <summary>
+        /// Does a bot on its way home cast Steal now, where it stands? Only the Brawler (the Warrior) does; the rival must carry something to take, the
+        /// bot must have room for it, and the rival must be inside Steal's commit reach: the cast never moves the bot off its path (no detour, no chase).
+        /// </summary>
+        public static bool ShouldStealInPassing(in BotProfile profile, float ownRoom, float rivalStealable, float rivalDist, float stealReach) =>
+            profile.Strategy == BotStrategy.Brawler && ownRoom >= StealInPassingMinRoom && rivalStealable > 0f
+            && rivalDist <= stealReach * CommitReachFraction;
+
+        /// <summary>Free room below which a steal on the way home is not worth the cooldown (a steal moves whole food).</summary>
+        public const float StealInPassingMinRoom = 1f;
 
         // ---- Death Mark follow-through ------------------------------------------
 

@@ -238,6 +238,7 @@ namespace CluckWars.Gameplay
             float cargo         = _cargo != null ? _cargo.Cargo : 0f;
             float cargoFraction = _cargo != null ? _cargo.Fraction : 0f;
             float distHome      = Planar.Distance(_controller.transform.position, homePos);
+            float returnAt      = BotTactics.ReturnThreshold(_profile, _phase, _leading, _cargo != null ? _cargo.Capacity : 0f);
 
             // Priority 0: BANK OR LOSE IT. Cargo in the beak scores nothing when the timer
             // expires, and on a 45 s match the window to walk home is small. This outranks
@@ -259,7 +260,7 @@ namespace CluckWars.Gameplay
             // A Death Mark in progress owns the bot until it pays or fizzles: see BotTactics.NextMarkStep. An execute's loot is ordinary
             // cargo (no bag since 2026-11-24), so a Spoiler that just killed is a chicken above its return threshold and the deposit
             // rule below sends it home; a bot at or above that threshold banks before it marks again.
-            if (TryFollowThroughMark(BotTactics.LoadedToBank(cargo, cargoFraction, BotTactics.ReturnThreshold(_profile, _phase, _leading),
+            if (TryFollowThroughMark(BotTactics.LoadedToBank(cargo, cargoFraction, returnAt,
                                                              _state == BotState.ReturnToBase))) return;
 
             // Latch ReturnToBase until all cargo is deposited (IP1). Fire the Bank plan
@@ -270,7 +271,7 @@ namespace CluckWars.Gameplay
                 _moveTarget = homePos;
                 if (distHome <= HomeDepositRadius())
                     TryCast(BotSituation.Banking, null);
-                else
+                else if (!TryStealInPassing(cargo))
                     TryGuardOverlay();
                 return;
             }
@@ -297,7 +298,7 @@ namespace CluckWars.Gameplay
             // threshold moves with the clock and the scoreboard: a leader in the endgame
             // banks early and stops being a target, a trailing bot holds a bigger load.
             // (A loot Thief decided at priority 0.)
-            if (!lootThief && cargoFraction >= BotTactics.ReturnThreshold(_profile, _phase, _leading))
+            if (!lootThief && cargoFraction >= returnAt)
             {
                 EnterReturnToBase(homePos, $"cargo={cargoFraction:P0}");
                 return;
@@ -477,6 +478,46 @@ namespace CluckWars.Gameplay
                 if (!float.IsPositiveInfinity(reach) && reach > best) best = reach;
             }
             return best * _stalkStandoffFraction;
+        }
+
+        /// <summary>
+        /// On the way home, casts Steal at a rival carrying food that is already in reach (<see cref="BotTactics.ShouldStealInPassing"/>). Never sets a
+        /// move target or a facing: the bot walks the path it was on. Silent when it cannot fire: no Steal, on cooldown or nobody in reach is ordinary.
+        /// </summary>
+        private bool TryStealInPassing(float cargo)
+        {
+            if (_abilities == null || _cargo == null) return false;
+
+            int slot = AbilityController.InvalidSlot;
+            for (int i = 0; i < _abilities.EquippedSlotCount; i++)
+                if (_abilities.GetSlot(i).Is(AbilityJob.Steal)) { slot = i; break; }
+            if (slot == AbilityController.InvalidSlot || !_abilities.IsReady(slot)) return false;
+
+            var steal = _abilities.GetSlot(slot);
+            if (!steal.IsUsable(_controller)) return false;
+
+            float reach = BotTactics.EffectiveReach(steal);
+            float room  = _cargo.Capacity - cargo;
+            var all = ChickenController.ActiveControllers;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var rival = all[i];
+                if (rival == null || rival == _controller || rival.Cargo == null) continue;
+                if (rival.Combat != null && rival.Combat.IsRemoved) continue;
+
+                var sight = Sight(rival);
+                if (sight.GivenUp || sight.Hidden) continue;   // "would it land" reads the real position, so a hidden rival is left alone
+
+                float dist = Planar.Distance(_controller.transform.position, sight.Position);
+                if (!BotTactics.ShouldStealInPassing(_profile, room, rival.Cargo.Stealable, dist, reach)) continue;
+                if (!steal.WouldAffect(_controller, rival)) continue;
+                if (steal.IsDirectionalAim && !BotTactics.IsAimedWellEnough(steal, _controller.transform.forward, sight.Position - _controller.transform.position)) continue;
+
+                if (!_abilities.BotTryActivate(slot)) return false;
+                _log?.Debug(Source, $"{Who} cast Steal (slot {slot}) in passing on {rival.name} ({dist:0.0} m, {rival.Cargo.Stealable:0.0} to take) on the way home.");
+                return true;
+            }
+            return false;
         }
 
         /// <summary>

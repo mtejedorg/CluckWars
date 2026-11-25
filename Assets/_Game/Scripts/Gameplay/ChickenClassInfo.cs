@@ -64,6 +64,9 @@ namespace CluckWars.Gameplay
         // dangerRadius 4.0 -> 5.5 (2026-10-22, decision A10): 4.0 sat inside the longest
         // steal reaches (Sneaky Steal 5.4 m, Dive Bomb 3.25 + 2.05 = 5.3 m), so a loaded
         // Brawler let a thief stand in range without reacting. 5.5 is just past 5.4.
+        //
+        // returnAmount 12 (2026-11-25, Maestro): banks at 12 food whatever the beak (0.85 of 20 is 17, and every extra
+        // food carried was exposure at flat income); on the way home it steals from a loaded rival in reach (BotTactics.ShouldStealInPassing).
         private static readonly ChickenClassInfo Warrior = new ChickenClassInfo(
             ChickenClass.Warrior, mayForage: true,
             shortNameKey: UiKeys.ClassWarriorShort, roleKey: UiKeys.RoleWarrior,
@@ -73,7 +76,7 @@ namespace CluckWars.Gameplay
                     returnThreshold: 0.85f, protectCargoThreshold: 0.60f, dangerRadius: 5.5f,
                     huntRadius: 11.0f, huntCargoThreshold: 0.10f, engageRadius: 9.0f,
                     guardRadius: 6.0f, roundTripBias: 0.0f, leaderFocus: 0.35f,
-                    thinkInterval: 0.28f));
+                    thinkInterval: 0.28f, returnAmount: 12f));
 
         // Speedy — Runner. The only class that plans a ROUTE: pile choice is a full
         // round-trip cost, not proximity. Banks at 45% because four fast trips beat two

@@ -649,6 +649,52 @@ namespace CluckWars.Tests
             }
         }
 
+        [Test]
+        public void TheWarrior_BanksAtTheReturnAmount_WhateverTheCapacity()
+        {
+            var warrior = BotTactics.ProfileFor(ChickenClass.Warrior);
+            Assert.Greater(warrior.ReturnAmount, 0f, "the Warrior's profile carries a return amount");
+            foreach (float capacity in new[] { 15f, 17f, 20f, 25f })
+                Assert.AreEqual(warrior.ReturnAmount, BotTactics.ReturnThreshold(warrior, MatchPhase.Mid, leading: false, capacity) * capacity, 1e-3f,
+                    $"capacity {capacity}: the bot goes home at the amount, not at {warrior.ReturnThreshold:P0} of the beak");
+
+            float small = warrior.ReturnAmount - 2f;
+            Assert.AreEqual(BotTactics.ReturnThreshold(warrior, MatchPhase.Mid, leading: false), BotTactics.ReturnThreshold(warrior, MatchPhase.Mid, leading: false, small),
+                "a beak smaller than the amount keeps the fraction");
+        }
+
+        [Test]
+        public void TheReturnAmount_NeverMakesABotHoldMore_AndOtherClassesKeepTheirFraction()
+        {
+            foreach (var cls in AllClasses)
+            foreach (MatchPhase phase in Enum.GetValues(typeof(MatchPhase)))
+            foreach (bool leading in new[] { true, false })
+            foreach (float capacity in new[] { 10f, 15f, 20f, 30f })
+            {
+                var p = BotTactics.ProfileFor(cls);
+                float plain = BotTactics.ReturnThreshold(p, phase, leading);
+                float with = BotTactics.ReturnThreshold(p, phase, leading, capacity);
+                Assert.LessOrEqual(with, plain, $"{cls}/{phase}/{leading}/{capacity}");
+                if (p.ReturnAmount <= 0f) Assert.AreEqual(plain, with, $"{cls}: no amount, the fraction alone");
+            }
+        }
+
+        [Test]
+        public void StealInPassing_NeedsABrawler_ARichRival_RoomAndReachWithoutAStep()
+        {
+            var warrior = BotTactics.ProfileFor(ChickenClass.Warrior);
+            const float reach = 5f;
+            float inside = reach * BotTactics.CommitReachFraction;
+
+            Assert.IsTrue(BotTactics.ShouldStealInPassing(warrior, 8f, 6f, inside, reach));
+            Assert.IsFalse(BotTactics.ShouldStealInPassing(warrior, 8f, 6f, inside + 0.1f, reach), "outside the commit reach: no detour, no chase");
+            Assert.IsFalse(BotTactics.ShouldStealInPassing(warrior, 8f, 0f, 1f, reach), "an empty rival has nothing to take");
+            Assert.IsFalse(BotTactics.ShouldStealInPassing(warrior, 0.5f, 6f, 1f, reach), "no room in the beak");
+            foreach (var cls in AllClasses)
+                if (BotTactics.ProfileFor(cls).Strategy != BotStrategy.Brawler)
+                    Assert.IsFalse(BotTactics.ShouldStealInPassing(BotTactics.ProfileFor(cls), 8f, 6f, 1f, reach), $"{cls} does not steal in passing");
+        }
+
         // ---- Cast plans ------------------------------------------------------------------
 
         /// <summary>

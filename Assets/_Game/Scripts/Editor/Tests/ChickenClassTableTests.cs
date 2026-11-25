@@ -138,7 +138,7 @@ namespace CluckWars.Tests
 
         private static readonly (ChickenClass Class, BotProfile Profile)[] OldProfiles =
         {
-            (ChickenClass.Warrior, new BotProfile(BotStrategy.Brawler, 0.85f, 0.60f, 5.5f, 11.0f, 0.10f, 9.0f, 6.0f, 0.0f, 0.35f, 0.28f)),
+            (ChickenClass.Warrior, new BotProfile(BotStrategy.Brawler, 0.85f, 0.60f, 5.5f, 11.0f, 0.10f, 9.0f, 6.0f, 0.0f, 0.35f, 0.28f, returnAmount: 12f)),
             (ChickenClass.Speedy, new BotProfile(BotStrategy.Runner, 0.45f, 0.10f, 7.5f, 0f, 1f, 0f, 0f, 1.0f, 0f, 0.22f)),
             (ChickenClass.Fatty, new BotProfile(BotStrategy.Bunker, 0.90f, 0.35f, 6.0f, 0f, 1f, 0f, 7.0f, 0.6f, 0.15f, 0.30f)),
             (ChickenClass.Assassin, new BotProfile(BotStrategy.Predator, 0.30f, 0.05f, 6.5f, 16.0f, 0.05f, 7.0f, 0f, 0f, 1.0f, 0.25f)),
