@@ -197,6 +197,7 @@ namespace CluckWars.Visuals
             FloorRivalArrows.EnsureForMatch();
             MarkFeedback.EnsureForMatch();
             LootFeedback.EnsureForMatch();
+            WarriorFeedback.EnsureForMatch();
             BuildGeometry();
         }
 

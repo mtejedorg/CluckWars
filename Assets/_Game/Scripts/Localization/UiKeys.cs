@@ -288,6 +288,14 @@ namespace CluckWars.Localization
         public const string HudPopMarked = "hud.pop.marked";
         /// <summary>The Thief's reward pop when a marked steal pays: the bounty that fitted, from the event.</summary>
         [UiArgs("n")] public const string HudPopLootTake = "hud.pop.lootTake";
+        /// <summary>The Bully's own pop when a hit took food: the amount the hit credited, from the event (BL-227).</summary>
+        [UiArgs("n")] public const string HudPopHitTake = "hud.pop.hitTake";
+        /// <summary>The Enforcer's pop over a rival it just put a debt on: the debts it now holds there.</summary>
+        [UiArgs("n")] public const string HudPopDebt = "hud.pop.debt";
+        /// <summary>The Enforcer's pop over a rival whose fresh state its hit spent (the extra debt it stacked). No number: a cash in the same moment can already have spent the count.</summary>
+        public const string HudPopFresh = "hud.pop.fresh";
+        /// <summary>The Enforcer's pop when a Steal cashed debts: the food the debts added.</summary>
+        [UiArgs("n")] public const string HudPopDebtCash = "hud.pop.debtCash";
         public const string HudStatusStun = "hud.status.stun";
         public const string HudStatusStuck = "hud.status.stuck";
         public const string HudStatusSlow = "hud.status.slow";
@@ -298,6 +306,12 @@ namespace CluckWars.Localization
         public const string HudBadgeFast = "hud.badge.fast";
         /// <summary>The coin-bag badge the marked rival wears on its own screen.</summary>
         public const string HudBadgeLoot = "hud.badge.loot";
+        /// <summary>The word on the pill a rival of the local Enforcer wears while it is fresh (only the Enforcer sees it).</summary>
+        public const string HudBadgeFresh = "hud.badge.fresh";
+        /// <summary>The local player's own cue while an Enforcer holds debts on it: the count.</summary>
+        [UiArgs("n")] public const string HudBadgeOwe = "hud.badge.owe";
+        /// <summary>The number on the Enforcer's Steal hex: the food the next Steal would take from the nearest carrier in reach.</summary>
+        [UiArgs("n")] public const string HudHexStealAmount = "hud.hex.stealAmount";
         public const string HudHintHoldTouch = "hud.hint.hold.touch";
         public const string HudHintHoldPad = "hud.hint.hold.pad";
         public const string HudHintHoldKeys = "hud.hint.hold.keys";

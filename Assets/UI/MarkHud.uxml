@@ -62,5 +62,108 @@
         <ui:VisualElement name="LootArrowBag" class="cw-loot-arrowbag" picking-mode="Ignore">
             <ui:VisualElement name="LootArrowBagGlyph" class="cw-loot-arrowbag-glyph" picking-mode="Ignore" />
         </ui:VisualElement>
+
+        <!-- The Warrior kits' rival tags (MarkHudController.Warrior, BL-227): beside each rival's nameplate, shown to the local Enforcer (the FRESH pill while the
+             rival is fresh for it, the debt pips and their decay bar) or the local Bully (the lock while a second hit would take nothing). Four slots: a match has
+             at most three rivals. Nobody else ever sees them. -->
+        <ui:VisualElement name="WarriorTag0" class="cw-wtag" picking-mode="Ignore">
+            <ui:VisualElement class="cw-wtag-fresh" picking-mode="Ignore">
+                <ui:Label text="" class="cw-wtag-fresh-label" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--fresh" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-debt" picking-mode="Ignore">
+                <ui:VisualElement class="cw-wpips" picking-mode="Ignore">
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--debt" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-lock" picking-mode="Ignore">
+                <ui:VisualElement class="cw-mark-lock-glyph" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--lock" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="WarriorTag1" class="cw-wtag" picking-mode="Ignore">
+            <ui:VisualElement class="cw-wtag-fresh" picking-mode="Ignore">
+                <ui:Label text="" class="cw-wtag-fresh-label" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--fresh" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-debt" picking-mode="Ignore">
+                <ui:VisualElement class="cw-wpips" picking-mode="Ignore">
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--debt" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-lock" picking-mode="Ignore">
+                <ui:VisualElement class="cw-mark-lock-glyph" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--lock" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="WarriorTag2" class="cw-wtag" picking-mode="Ignore">
+            <ui:VisualElement class="cw-wtag-fresh" picking-mode="Ignore">
+                <ui:Label text="" class="cw-wtag-fresh-label" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--fresh" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-debt" picking-mode="Ignore">
+                <ui:VisualElement class="cw-wpips" picking-mode="Ignore">
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--debt" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-lock" picking-mode="Ignore">
+                <ui:VisualElement class="cw-mark-lock-glyph" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--lock" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="WarriorTag3" class="cw-wtag" picking-mode="Ignore">
+            <ui:VisualElement class="cw-wtag-fresh" picking-mode="Ignore">
+                <ui:Label text="" class="cw-wtag-fresh-label" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--fresh" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-debt" picking-mode="Ignore">
+                <ui:VisualElement class="cw-wpips" picking-mode="Ignore">
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                    <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--debt" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wtag-lock" picking-mode="Ignore">
+                <ui:VisualElement class="cw-mark-lock-glyph" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement class="cw-wbar-fill cw-wbar-fill--lock" picking-mode="Ignore" /></ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- The local victim's own cue while an Enforcer holds debts on it: the words YOU OWE and the count, the debt pips and their decay, bordered in the Enforcer's
+             colour. Last in the file, so it draws over every rival tag (the local player's stack is on top, CODE-UI-09). -->
+        <ui:VisualElement name="WarriorOwe" class="cw-wowe" picking-mode="Ignore">
+            <ui:Label name="WarriorOweLabel" text="" class="cw-wowe-label" picking-mode="Ignore" />
+            <ui:VisualElement class="cw-wpips" picking-mode="Ignore">
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+                <ui:VisualElement class="cw-wpip" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="cw-wbar-track" picking-mode="Ignore"><ui:VisualElement name="WarriorOweBar" class="cw-wbar-fill cw-wbar-fill--debt" picking-mode="Ignore" /></ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

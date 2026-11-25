@@ -69,6 +69,14 @@ namespace CluckWars.Visuals
         [Tooltip("The Steal-hex dot while the next mark is still coming: a pale, empty bag (cream, dimmed).")]
         public Color LootEmptyColor = new Color(0.80f, 0.74f, 0.62f, 0.85f);
 
+        [Header("Warrior kits")]
+        [Tooltip("The Enforcer's fresh marker: a bright mint, apart from the loot gold, the stun yellow and the hunt red.")]
+        public Color WarriorFreshColor = new Color(0.30f, 0.95f, 0.80f, 1f);
+        [Tooltip("The Enforcer's debts: the pips, their decay bar, the OWES / PAY UP pops and the victim's cue border fallback (a warm orange).")]
+        public Color WarriorDebtColor = new Color(1.00f, 0.52f, 0.12f, 1f);
+        [Tooltip("The Bully's lock on a rival it just took from: a cool blue-grey, faint by design.")]
+        public Color WarriorLockColor = new Color(0.55f, 0.66f, 0.95f, 1f);
+
         /// <summary>The accent for <paramref name="key"/>. <see cref="AccentKey.Custom"/> has no palette colour
         /// (the ability's own literal applies), so asking for it is a caller bug and throws.</summary>
         public Color Accent(AccentKey key) => key switch

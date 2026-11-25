@@ -530,6 +530,7 @@ namespace CluckWars.Input
             if (RefreshHuntDigit(slot, mark)) return;
             if (RefreshCasterStunDigit(slot, equipped, mark)) return;
             if (RefreshEggDigit(slot, equipped, mark)) return;
+            if (RefreshStealAmountDigit(slot, equipped, mark)) return;
 
             // With drawn marks, the label is the seconds readout and nothing else; with
             // the glyph fallback it also carries ⃠ / ✕ (text written in ApplyRefusalState).
@@ -714,6 +715,47 @@ namespace CluckWars.Input
                 _appliedEggTenths[slot] = _eggTenths[slot];
                 label.text = EggPhaseHexRules.Format(_eggTenths[slot]);
             }
+            return true;
+        }
+
+        /// <summary>
+        /// BL-227: while the local Enforcer's Steal is ready and a carrier stands in reach, the layer-9 label owns "+n", the food the next Steal would take from
+        /// that carrier (<see cref="WarriorFeedback"/>: the debts included, clamped as the cargo clamps the ask). It never takes the label from a cooldown
+        /// (<paramref name="mark"/> is <see cref="HexCenterMark.None"/> only when the hex is ready) and hands it back the moment the number goes. The digit wears the
+        /// debt colour (palette), the pips' own. Reformats only when the number moves.
+        /// </summary>
+        private bool RefreshStealAmountDigit(int slot, AbilityBaseSO equipped, HexCenterMark mark)
+        {
+            var label = _slots[slot].CdNum;
+            int amount = WarriorFeedback.Current.StealAmount;
+            // "In reach" is the game's own verdict, the one behind the hex's in-range pip (AbilitySlotOverlay.IsHot), not a second distance test.
+            bool show = amount > 0 && equipped.Is(AbilityJob.Steal) && mark == HexCenterMark.None && _localOverlay != null && _localOverlay.IsHot(slot);
+
+            if (!show)
+            {
+                if (!_stealDigitShown[slot]) return false;
+                _stealDigitShown[slot] = false;
+                StealAmountShownNow = 0;
+                label.style.color = new StyleColor(StyleKeyword.Null);
+                _appliedCdSeconds[slot] = int.MinValue;
+                _appliedCdText[slot] = null;
+                return false;
+            }
+
+            if (!_stealDigitShown[slot])
+            {
+                _stealDigitShown[slot] = true;
+                _appliedStealAmount[slot] = int.MinValue;
+                // The debt colour, the pips' own (captured 2026-11-26: plain cream lost the number against the Steal icon, and the label is the whole hex, so a chip behind it hid the hex).
+                label.style.color = FeedbackTuning.WarriorDebtColor;
+                label.style.display = DisplayStyle.Flex;
+            }
+            if (amount != _appliedStealAmount[slot])
+            {
+                _appliedStealAmount[slot] = amount;
+                label.text = UiText.Format(UiKeys.HudHexStealAmount, ("n", amount));
+            }
+            StealAmountShownNow = amount;
             return true;
         }
 

@@ -109,6 +109,7 @@ namespace CluckWars.UI
             _ring.generateVisualContent += DrawRing;
             _pointer.generateVisualContent += DrawPointer;
             BindLoot(root);   // the Thief's loot-mark elements; a fault there is reported once and leaves the Hunt untouched
+            BindWarrior(root);   // the Warrior kits' tags and the victim's cue (BL-227); same contract
             _bound = true;
             HideAll();
         }
@@ -133,6 +134,7 @@ namespace CluckWars.UI
             UpdateMarker(o, cam, panel);
             UpdateHunterSkull(o, cam, panel);
             UpdateLoot(cam, panel);
+            UpdateWarrior(cam, panel);
             MarkerShownNow = _marker.style.display == DisplayStyle.Flex;
             MarkerOffScreenNow = MarkerShownNow && _markerOffScreen;
             AnchorNow = MarkerShownNow ? _anchor : MarkAnchor.OverHead;
@@ -423,6 +425,7 @@ namespace CluckWars.UI
             UiElements.SetShown(_marker, false);
             UiElements.SetShown(_hunterSkull, false);
             HideLoot();
+            HideWarrior();
             _markerPlaced = false;
         }
 

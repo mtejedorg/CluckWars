@@ -212,6 +212,13 @@ namespace CluckWars.Input
         private readonly int[]  _eggTenths         = new int[SlotCount];
         private readonly bool[] _eggIconShown      = new bool[SlotCount];
         private readonly bool[] _eggDigitShown     = new bool[SlotCount];
+        // BL-227: the Enforcer's Steal hex shows the food its next Steal would take (WarriorFeedback.Current.StealAmount) while the Steal is ready.
+        /// <summary>Diagnostics (the <c>-cw_warriorshots</c> harness): the amount the Steal hex shows this frame; 0 when it shows none.</summary>
+        public static int StealAmountShownNow { get; private set; }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStealAmountShown() => StealAmountShownNow = 0;
+        private readonly bool[] _stealDigitShown   = new bool[SlotCount];
+        private readonly int[]  _appliedStealAmount = new int[SlotCount];
         private readonly int[]  _appliedEggTenths  = new int[SlotCount];
 
         // Death Mark hexes (MarkFeedback.Current): KILL on the Death Mark hex exactly while a press would kill; Ambush lit while

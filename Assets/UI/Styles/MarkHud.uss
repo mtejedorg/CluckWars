@@ -198,3 +198,113 @@
     display: none;
 }
 .cw-loot-arrowbag-glyph { width: 32px; height: 32px; }
+
+/* ============================================================================
+   Warrior kit feedback (MarkHudController.Warrior, BL-227): the rival tags (the Enforcer's FRESH pill and debt pips, the Bully's lock) and the victim's
+   YOU OWE cue. Palette colours (WarriorFreshColor, WarriorDebtColor, WarriorLockColor, the Enforcer's player colour) are written inline by the controller;
+   the values below are the ink and cream of the shared look and the fallback fills. Text is 28 px, the HUD font floor (rule U4).
+   ============================================================================ */
+
+/* One tag: a column beside the rival's nameplate (the controller writes its translate), as wide as its content. */
+.cw-wtag {
+    position: absolute; left: 0; top: 0;
+    flex-direction: column; align-items: center;
+    display: none;
+}
+
+/* The FRESH pill: the word and, under it, the draining window. */
+.cw-wtag-fresh {
+    min-width: 140px;
+    padding: 4px 16px 8px 16px;
+    margin-bottom: 6px;
+    flex-direction: column; align-items: stretch;
+    background-color: rgba(20, 10, 26, 0.92);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224); border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+    display: none;
+}
+.cw-wtag-fresh-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0; margin: 0;
+}
+
+/* The debts: the pips (the cap is drawn, the held ones filled) over the decay bar. */
+.cw-wtag-debt {
+    padding: 8px 14px 8px 14px;
+    flex-direction: column; align-items: stretch;
+    background-color: rgba(20, 10, 26, 0.88);
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
+    display: none;
+}
+.cw-wpips { flex-direction: row; justify-content: center; align-items: center; margin-bottom: 6px; }
+.cw-wpip {
+    width: 26px; height: 26px; margin: 0 3px;
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(254, 245, 224); border-right-color: rgb(254, 245, 224); border-top-color: rgb(254, 245, 224); border-bottom-color: rgb(254, 245, 224);
+    border-top-left-radius: 13px; border-top-right-radius: 13px;
+    border-bottom-left-radius: 13px; border-bottom-right-radius: 13px;
+    background-color: rgba(20, 10, 26, 0.6);
+    display: none;
+}
+
+/* A draining bar: the track is the whole window, the fill is what is left (the controller writes its width in percent). */
+.cw-wbar-track {
+    height: 8px;
+    background-color: rgba(254, 245, 224, 0.25);
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+}
+.cw-wbar-fill {
+    height: 8px; width: 100%;
+    background-color: rgb(254, 245, 224);
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+}
+.cw-wbar-fill--fresh { background-color: rgb(77, 242, 204); }
+.cw-wbar-fill--debt { background-color: rgb(255, 133, 31); }
+.cw-wbar-fill--lock { background-color: rgb(140, 168, 242); }
+
+/* The Bully's lock: the shared lock glyph over the draining bar, faint by design (the lock is information, not an alarm). */
+.cw-wtag-lock {
+    margin-top: 6px;
+    padding: 6px 14px 8px 14px;
+    width: 96px;
+    flex-direction: column; align-items: center;
+    background-color: rgba(20, 10, 26, 0.7);
+    border-top-left-radius: 20px; border-top-right-radius: 20px;
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
+    display: none;
+}
+.cw-wtag-lock .cw-wbar-track { align-self: stretch; margin-top: 4px; }
+
+/* The victim's cue, beside its own nameplate (the stack above it belongs to the status badges, the pops and the loot badge), bordered in the Enforcer's colour (written inline). */
+.cw-wowe {
+    position: absolute; left: 0; top: 0;
+    padding: 6px 18px 8px 18px;
+    flex-direction: column; align-items: stretch;
+    background-color: rgba(20, 10, 26, 0.92);
+    border-left-width: 4px; border-right-width: 4px; border-top-width: 4px; border-bottom-width: 4px;
+    border-left-color: rgb(255, 133, 31); border-right-color: rgb(255, 133, 31); border-top-color: rgb(255, 133, 31); border-bottom-color: rgb(255, 133, 31);
+    border-top-left-radius: 26px; border-top-right-radius: 26px;
+    border-bottom-left-radius: 26px; border-bottom-right-radius: 26px;
+    display: none;
+}
+.cw-wowe-label {
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 28px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 3px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0; margin: 0 0 4px 0;
+}

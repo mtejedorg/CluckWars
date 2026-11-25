@@ -754,6 +754,24 @@ namespace CluckWars.Visuals
         public const float LootBadgeGapPx = 12f;
         public const float LootDotPulseHz = 3f;
 
+        // ---- Warrior kit feedback (WarriorFeedback, MarkHudController.Warrior, the Steal hex; design 2026-11-25 section 16, slice G9, BL-227) ----
+
+        /// <summary>The Enforcer's fresh marker (palette: <c>WarriorFreshColor</c>).</summary>
+        public static Color WarriorFreshColor => FeedbackPalette.Current.WarriorFreshColor;
+        /// <summary>The Enforcer's debts: pips, decay bar and pops (palette: <c>WarriorDebtColor</c>).</summary>
+        public static Color WarriorDebtColor => FeedbackPalette.Current.WarriorDebtColor;
+        /// <summary>The Bully's lock on a victim it just took from (palette: <c>WarriorLockColor</c>).</summary>
+        public static Color WarriorLockColor => FeedbackPalette.Current.WarriorLockColor;
+        /// <summary>Debt pips the HUD can draw on one rival: the cap is drawn, so a cap above this shows this many.</summary>
+        public const int WarriorPipSlotsMax = 6;
+        /// <summary>A rival's tag (fresh pill, pips, lock) sits this many panel px beside its nameplate (the stack above it is the status badges' and the pops').</summary>
+        public const float WarriorTagGapPx = 10f;
+        /// <summary>The Bully's / Enforcer's own food pop and the cargo change it names land in the same Render or the next one (as the loot bounty's).</summary>
+        public const int WarriorPendingFoodFrames = 2;
+        /// <summary>The fresh pill's opacity when the window is nearly out (below this fill), so a child sees it going.</summary>
+        public const float WarriorFreshLowFill = 0.3f;
+        public const float WarriorFreshLowOpacity = 0.55f;
+
         /// <summary>Kill-ready: the hunt marker and the Death Mark hex turn this colour (#FFEB1A).</summary>
         public static Color MarkKillColor => FeedbackPalette.Current.MarkPounceColor;
         /// <summary>The marker's disc and the skull's ink (#140A1A).</summary>

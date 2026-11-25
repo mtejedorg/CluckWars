@@ -388,6 +388,9 @@ namespace CluckWars.Visuals
             {
                 delta = LootPresentationRules.GrabAfterBounty(delta, LootFeedback.TakePendingBounty(_controller));
                 if (delta <= 0f) return;
+                // The Bully's hit take and the Enforcer's cash bonus were named by their own pop (WarriorFeedback): this pop is the rest.
+                delta = WarriorFeedbackRules.GainAfterPopped(delta, WarriorFeedback.TakePendingFood(_controller));
+                if (delta <= 0f) return;
             }
 
             if (delta > 0f && StealGainPopHold.IsStealCredit(e.StealCreditFrame, Time.frameCount) &&
