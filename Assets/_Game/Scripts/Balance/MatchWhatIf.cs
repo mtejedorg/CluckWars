@@ -23,7 +23,7 @@ namespace CluckWars.Balance
         public double ReplicateScale = 1.0;
         public List<WhatIfScenario> Scenarios = new List<WhatIfScenario>();
         /// <summary>
-        /// The roster swap (<c>"roster":{"Relentless":"Champion"}</c>, asset names): the passive named by the key gives its seat to the one named by the
+        /// The roster swap (<c>"roster":{"Relentless":"Enforcer"}</c>, asset names): the passive named by the key gives its seat to the one named by the
         /// value for the whole run, baseline included (<see cref="OracleRoster"/>). Empty for no swap.
         /// </summary>
         public List<KeyValuePair<string, string>> Roster = new List<KeyValuePair<string, string>>();
@@ -43,7 +43,7 @@ namespace CluckWars.Balance
                         result.ReplicateScale = member.Value.Number;
                         break;
                     case "roster":
-                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"Champion\"}"; return false; }
+                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"Enforcer\"}"; return false; }
                         foreach (var swap in member.Value.Members)
                         {
                             if (swap.Value.Kind != JsonKind.String || string.IsNullOrWhiteSpace(swap.Value.Text) || string.IsNullOrWhiteSpace(swap.Key))
@@ -137,9 +137,9 @@ namespace CluckWars.Balance
         public int MatchesPlayed;
         public double ElapsedSeconds;
         public string SpoilerKit, ThiefKit;
-        /// <summary>The kit with a hit-steal (or the Bully's asset) and the Champion's kit, for the Warrior overviews; null when none plays.</summary>
-        public string BullyKit, TrophyKit;
-        /// <summary>The roster swap this run played under, as "Relentless -> Champion" lines; null for none.</summary>
+        /// <summary>The kit with a hit-steal (or the Bully's asset) and the Enforcer's kit, for the Warrior overviews; null when none plays.</summary>
+        public string BullyKit, DebtKit;
+        /// <summary>The roster swap this run played under, as "Relentless -> Enforcer" lines; null for none.</summary>
         public string Roster;
         public string[] KitLabels;
         public WhatIfResult Baseline;
@@ -204,7 +204,7 @@ namespace CluckWars.Balance
                 SpoilerKit = baseContext.Kits.FirstOrDefault(k => k.Passive.MatchEndBonusFood > 0f)?.Label,
                 ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Loot.IsThief || k.Passive.StealFactor > 1f)?.Label,
                 BullyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.HitSteal.Active || k.Passive.Asset == "Bully")?.Label,
-                TrophyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Trophy.IsChampion)?.Label,
+                DebtKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Debt.IsEnforcer)?.Label,
             };
 
             WhatIfResult Play(string name, string delta, MatchContext context, string hash)
@@ -325,7 +325,7 @@ namespace CluckWars.Balance
                         Add("warrior", who + "hit food per match", pop, w.HitFoodPerMatch, trials: w.Matches);
                         Add("warrior", who + "hits that met the lock per match", pop, w.HitRefusedLockPerMatch, trials: w.Matches);
                     }
-                    if (w.BiteActive || w.TrophyKit)
+                    if (w.BiteActive || w.DebtKit)
                     {
                         Add("warrior", who + "fresh hits per match", pop, w.FreshHitsPerMatch, trials: w.Matches);
                         Add("warrior", who + "bites from a casting rival per match", pop, w.BitesFromCastPerMatch, trials: w.Matches);
@@ -334,11 +334,11 @@ namespace CluckWars.Balance
                         Add("warrior", who + "bite food per match", pop, w.BiteFoodFromCastPerMatch + w.BiteFoodFromCargoPerMatch, trials: w.Matches);
                         Add("warrior", who + "bites spent (a second hit on a bitten state) per match", pop, w.BitesSpentPerMatch, trials: w.Matches);
                         Add("warrior", who + "Pecks bitten per match", pop, w.PecksBittenPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies earned per match", pop, w.TrophiesEarnedPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies decayed per match", pop, w.TrophiesDecayedPerMatch, trials: w.Matches);
-                        Add("warrior", who + "trophies consumed per cash", pop, w.TrophiesPerCash, trials: w.Matches);
-                        Add("warrior", who + "trophy cashes per match", pop, w.TrophyCashesPerMatch, trials: w.Matches);
-                        Add("warrior", who + "food the trophies added per match", pop, w.TrophyBonusFoodPerMatch, trials: w.Matches);
+                        Add("warrior", who + "debts earned per match", pop, w.DebtsEarnedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "debts decayed per match", pop, w.DebtsDecayedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "debts consumed per cash", pop, w.DebtsPerCollect, trials: w.Matches);
+                        Add("warrior", who + "debt cashes per match", pop, w.DebtCollectsPerMatch, trials: w.Matches);
+                        Add("warrior", who + "food the debts added per match", pop, w.DebtBonusFoodPerMatch, trials: w.Matches);
                     }
                     Add("warrior", who + "Steals per match", pop, w.StealsPerMatch, trials: w.Matches);
                     Add("warrior", who + "mean Steal size", pop, w.MeanStealSize, trials: w.Matches);
@@ -489,7 +489,7 @@ namespace CluckWars.Balance
                 sb.AppendLine();
             }
 
-            foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Champion", o.TrophyKit) })
+            foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Enforcer", o.DebtKit) })
             {
                 if (kit == null || !(title == "the Bully" ? played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": hit")))
                                                           : played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": fresh hits per match")))))
@@ -499,7 +499,7 @@ namespace CluckWars.Balance
                 sb.AppendLine();
                 string[] cols = bully
                     ? new[] { "hit takes per match", "hit food per match", "mean hit-steal take", "hits that met the lock per match", "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" }
-                    : new[] { "fresh hits per match", "bites per match", "bite food per match", "Pecks bitten per match", "trophies earned per match", "trophies consumed per cash", "Steals per match", "mean Steal size",
+                    : new[] { "fresh hits per match", "bites per match", "bite food per match", "Pecks bitten per match", "debts earned per match", "debts consumed per cash", "Steals per match", "mean Steal size",
                               "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" };
                 sb.AppendLine("| Scenario | P0 | P1 | mixed | " + string.Join(" | ", cols) + " |");
                 sb.AppendLine("|---|---|---|---|" + string.Concat(cols.Select(_ => "---|")));

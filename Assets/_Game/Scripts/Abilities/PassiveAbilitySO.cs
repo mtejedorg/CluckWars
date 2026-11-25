@@ -226,11 +226,11 @@ namespace CluckWars.Abilities
         /// match simulator as a property; nothing in the game reads it yet.</summary>
         public virtual HitStealFacts HitSteal => HitStealFacts.None;
 
-        /// <summary>The Champion's bite as numbers; a fresh window of 0 (the default) is no bite. Read by the match simulator only.</summary>
+        /// <summary>The Enforcer's bite as numbers; a fresh window of 0 (the default) is no bite. Read by the match simulator only.</summary>
         public virtual BiteFacts Bite => BiteFacts.None;
 
-        /// <summary>The Champion's per-enemy trophies as numbers; <see cref="TrophyFacts.None"/> for every other passive. Read by the match simulator only.</summary>
-        public virtual TrophyFacts Trophy => TrophyFacts.None;
+        /// <summary>The Enforcer's per-enemy debts as numbers; <see cref="DebtFacts.None"/> for every other passive. Read by the match simulator only.</summary>
+        public virtual DebtFacts Debt => DebtFacts.None;
 
         /// <summary>
         /// Called on the state authority each tick while a traversal window is open (not while

@@ -8,7 +8,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The shipped data of the two Warrior kits under test (design 2026-11-25): both ship off, the Champion is not in the game's registry.</summary>
+    /// <summary>The shipped data of the two Warrior kits under test (design 2026-11-25): both ship off, the Enforcer is not in the game's registry.</summary>
     public sealed class WarriorPassiveDataTests
     {
         private const string PassivesDir = TestAssets.AbilitiesDir + "/Passives";
@@ -28,7 +28,7 @@ namespace CluckWars.Tests
 
         private static AbilityRegistrySO Registry => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
         private static PassiveAbilitySO Passive(string name) => TestAssets.Load<PassiveAbilitySO>($"{PassivesDir}/{name}.asset");
-        private static PassiveAbilitySO Champion() => TestAssets.Load<PassiveAbilitySO>($"{SimulatorDir}/Champion.asset");
+        private static PassiveAbilitySO Enforcer() => TestAssets.Load<PassiveAbilitySO>($"{SimulatorDir}/Enforcer.asset");
 
         [Test]
         public void ShippedBully_HitStealIsOff()
@@ -44,11 +44,11 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Champion_IsNotRegistered_AndItsKitIsLegal()
+        public void Enforcer_IsNotRegistered_AndItsKitIsLegal()
         {
-            var hunter = Champion();
+            var hunter = Enforcer();
             var relentless = Passive("Relentless");
-            Assert.IsFalse(Registry.All.Contains(hunter), "the game cannot pick the Champion");
+            Assert.IsFalse(Registry.All.Contains(hunter), "the game cannot pick the Enforcer");
             Assert.IsFalse(Registry.Passives.Contains(hunter));
             Assert.IsEmpty(FixedKit.Problems(hunter), string.Join(" | ", FixedKit.Problems(hunter)));
             Assert.AreEqual(new[] { "Peck", "WingSlam", "CluckShock", "Snatch" }, hunter.Kit.Select(k => k.name).ToArray(), "Peck, Stun, Shove, Steal");
@@ -61,15 +61,15 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedChampion_BiteAndTrophyStealAreOff()
+        public void ShippedEnforcer_BiteAndDebtStealAreOff()
         {
-            var hunter = Champion();
+            var hunter = Enforcer();
             Assert.IsFalse(hunter.Bite.Active, "shipped: no rival is ever fresh");
-            Assert.AreEqual(0f, hunter.Trophy.Steal, "shipped: trophies add nothing");
+            Assert.AreEqual(0f, hunter.Debt.Steal, "shipped: debts add nothing");
             Assert.AreEqual(0f, hunter.Bite.FoodShare, "shipped: a fresh hit takes no food (Maestro, 2026-11-25)");
-            Assert.IsTrue(hunter.Trophy.IsChampion);
-            Assert.AreEqual(3, hunter.Trophy.Cap);
-            Assert.AreEqual(6f, hunter.Trophy.Seconds);
+            Assert.IsTrue(hunter.Debt.IsEnforcer);
+            Assert.AreEqual(3, hunter.Debt.Cap);
+            Assert.AreEqual(6f, hunter.Debt.Seconds);
         }
 
         [Test]

@@ -63,7 +63,7 @@ namespace CluckWars.UI
             { "HoarderPassiveSO",     "cw-hex-icon--hoarder" },
             { "BulwarkPassiveSO",     "cw-hex-icon--bulwark" },
             { "RelentlessPassiveSO",  "cw-hex-icon--relentless" },
-            { "ChampionPassiveSO","cw-hex-icon--champion" },   // simulator-only kit; shares Relentless's art until the game slice
+            { "EnforcerPassiveSO","cw-hex-icon--enforcer" },   // simulator-only kit; shares Relentless's art until the game slice
             { "BullyPassiveSO",       "cw-hex-icon--bully" },
             { "SpoilerPassiveSO",     "cw-hex-icon--spoiler" },
             { "ThiefPassiveSO",       "cw-hex-icon--thief" },

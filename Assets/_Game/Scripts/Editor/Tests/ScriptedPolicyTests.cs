@@ -379,8 +379,8 @@ namespace CluckWars.Tests
                 "BotTactics.PileCost(", "BotTactics.TargetPriority(", "BotTactics.ShouldStealGuard(", "BotTactics.ScoreCastCandidate(",
                 "BotTactics.LoadedToBank(", "BotLootRules.BankNow(", "BotLootRules.Pursue(", "BotLootRules.HoldSteal(", "BotLootRules.BehindWall(", "BotLootRules.Retreat(",
                 "BotHitStealRules.Gain(", "BotHitStealRules.CastForFood(", "BotHitStealRules.PickHitter(", "BotHitStealRules.WorthHunting(",
-                "BotChampionRules.FreshLeft(", "BotChampionRules.HitFresh(", "BotChampionRules.PickBuilder(", "BotChampionRules.Cash(", "BotChampionRules.StealGain(",
-                "BotChampionRules.Fight(", "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(",
+                "BotEnforcerRules.FreshLeft(", "BotEnforcerRules.HitFresh(", "BotEnforcerRules.PickBuilder(", "BotEnforcerRules.Cash(", "BotEnforcerRules.StealGain(",
+                "BotEnforcerRules.Fight(", "BotEngageRules.MayEngage(", "BotEngageRules.HitPays(",
             })
                 StringAssert.Contains(call, source, "P0 must call the game's own decision, not restate it.");
 
@@ -467,15 +467,15 @@ namespace CluckWars.Tests
             Assert.AreEqual(-1, Think(view).PeckPile, "an active hit-steal on a held Stun pays: it chases a loaded rival");
         }
 
-        // A Champion with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
-        private static MatchKit Champion(float peckCooldown = 0.71f, BotProfile? profile = null)
+        // A Enforcer with the bite on: Stun (slot 0, 7 s) and Steal (slot 1, 5 m, 5 food); the quiet profile never engages, so only the kit's own rule casts.
+        private static MatchKit Enforcer(float peckCooldown = 0.71f, BotProfile? profile = null)
         {
             var stun = Make(MatchTestKit.Stun(5f, 1.3f, 7f), BotRole.Control, 5f, true);
             var steal = Make(MatchTestKit.Steal(5f, 5f, 4f), BotRole.Steal, 5f, true);
-            var kit = MatchTestKit.Fighter("champion", 6f, new[] { stun, steal }, peckAmount: 3f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
+            var kit = MatchTestKit.Fighter("enforcer", 6f, new[] { stun, steal }, peckAmount: 3f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
             kit.Bot = profile ?? QuietWarrior;
             kit.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
-            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
+            kit.Passive.Debt = new DebtFacts { IsEnforcer = true, Steal = 2f, Cap = 3, Seconds = 6f };
             return kit;
         }
 
@@ -484,15 +484,15 @@ namespace CluckWars.Tests
             view.Seats[0].Pos = new Vector2(30f, 30f);
             view.Seats[1].Pos = new Vector2(32f, 30f);
             for (int p = 0; p < view.PileFood.Length; p++) view.PileFood[p] = 0f;
-            view.Seats[0].TrophyOn = new int[4];
-            view.Seats[0].TrophyLeft = new float[4];
+            view.Seats[0].DebtOn = new int[4];
+            view.Seats[0].DebtLeft = new float[4];
             return view;
         }
 
         [Test]
-        public void P0Champion_HitsAFreshRivalInReach_NotAStaleOne()
+        public void P0Enforcer_HitsAFreshRivalInReach_NotAStaleOne()
         {
-            var view = AwayFromPiles(View(Four(Champion(), Kit("rival"))));
+            var view = AwayFromPiles(View(Four(Enforcer(), Kit("rival"))));
             view.Seats[1].Pecking = true;
             view.Seats[1].PeckCastLeft = 0.4f;
             Assert.AreEqual(0, Think(view).CastSlot, "a rival mid-cast in reach: the builder (the Stun is the only one ready)");
@@ -514,10 +514,10 @@ namespace CluckWars.Tests
             view.Seats[1].Shelled = true;
             Assert.AreEqual(-1, Think(view).CastSlot, "an egg refuses the hit");
 
-            // With the bite off the Champion is a plain kit: the same fresh rival gets no cast.
-            var off = Champion();
+            // With the bite off the Enforcer is a plain kit: the same fresh rival gets no cast.
+            var off = Enforcer();
             off.Passive.Bite = BiteFacts.None;
-            off.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 0f, Cap = 3, Seconds = 6f };
+            off.Passive.Debt = new DebtFacts { IsEnforcer = true, Steal = 0f, Cap = 3, Seconds = 6f };
             var offView = AwayFromPiles(View(Four(off, Kit("rival"))));
             offView.Seats[1].Pecking = true;
             offView.Seats[1].PeckCastLeft = 0.4f;
@@ -525,36 +525,36 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void P0Champion_CashesAtTheCap_AndBeforeTheDecay()
+        public void P0Enforcer_CashesAtTheCap_AndBeforeTheDecay()
         {
-            var view = AwayFromPiles(View(Four(Champion(), Kit("rival"))));
+            var view = AwayFromPiles(View(Four(Enforcer(), Kit("rival"))));
             view.Seats[1].Cargo = 20f;
-            view.Seats[0].TrophyOn[1] = 3;
-            view.Seats[0].TrophyLeft[1] = 5f;
+            view.Seats[0].DebtOn[1] = 3;
+            view.Seats[0].DebtLeft[1] = 5f;
             Assert.AreEqual(1, Think(view).CastSlot, "at the cap: cash the Steal");
 
-            view.Seats[0].TrophyOn[1] = 2;
+            view.Seats[0].DebtOn[1] = 2;
             Assert.AreEqual(-1, Think(view).CastSlot, "a builder is ready before the count decays: build first, not cash");
 
             view.Seats[0].CooldownLeft[1] = 6f;   // the Stun is back only after the count decays
             Assert.AreEqual(1, Think(view).CastSlot, "no builder is back in time: cash now");
 
-            view.Seats[0].TrophyOn[1] = 0;
+            view.Seats[0].DebtOn[1] = 0;
             Assert.AreEqual(-1, Think(view).CastSlot, "count 0 is the ordinary Steal rule, and the quiet profile never engages");
         }
 
         [Test]
-        public void P0Champion_KeepsPeckingWhenNoFightBeatsThePeck()
+        public void P0Enforcer_KeepsPeckingWhenNoFightBeatsThePeck()
         {
-            // The same rival, the same layout: at the shipped Peck the pile wins; with a Peck slowed to 5 s the fight pays and the Champion goes for him.
+            // The same rival, the same layout: at the shipped Peck the pile wins; with a Peck slowed to 5 s the fight pays and the Enforcer goes for him.
             MatchIntent Run(float peckCooldown)
             {
-                var view = View(Four(Champion(peckCooldown, Profile), Kit("rival")));
+                var view = View(Four(Enforcer(peckCooldown, Profile), Kit("rival")));
                 view.Seats[0].Pos = new Vector2(30f, 30f);
                 view.Seats[1].Pos = new Vector2(38f, 30f);
                 view.Seats[1].Cargo = 2f;
-                view.Seats[0].TrophyOn = new int[4];
-                view.Seats[0].TrophyLeft = new float[4];
+                view.Seats[0].DebtOn = new int[4];
+                view.Seats[0].DebtLeft = new float[4];
                 return Think(view);
             }
             Assert.GreaterOrEqual(Run(0.71f).PeckPile, 0, "a 2-food take is worth less than the Peck's rate: collect");

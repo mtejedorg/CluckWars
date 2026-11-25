@@ -11,7 +11,7 @@ namespace CluckWars.Gameplay
     {
         /// <summary>
         /// A hit of this kit pays food now: a Stun, Shove or Slow it holds has an active hit-steal amount, or the bite is on with food (a share above 0) and the
-        /// kit holds a Stun, Shove or Steal to land it. A Champion's fresh stack alone is no food: it pays only through the Steal, which already opens the gate.
+        /// kit holds a Stun, Shove or Steal to land it. A Enforcer's fresh stack alone is no food: it pays only through the Steal, which already opens the gate.
         /// </summary>
         public static bool HitPays(in HitStealFacts hit, in BiteFacts bite, bool holdsStun, bool holdsShove, bool holdsSlow, bool holdsSteal) =>
             (holdsStun && hit.AmountFor(AbilityJob.Stun) > 0f)

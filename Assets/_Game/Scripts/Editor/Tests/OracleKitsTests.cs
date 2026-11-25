@@ -251,12 +251,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void LabelOf_ShippedPassivesKeepTheirSubclassName_TheSwapReadsWarriorChampion()
+        public void LabelOf_ShippedPassivesKeepTheirSubclassName_TheSwapReadsWarriorEnforcer()
         {
             foreach (var passive in _abilities.Passives)
                 Assert.AreEqual(passive.Subclass.ToString(), OracleKits.LabelOf(passive), $"{passive.name} keeps the label the reports already use");
-            var hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/Champion.asset");
-            Assert.AreEqual("Warrior_Champion", OracleKits.LabelOf(hunter), "an asset not named like its subclass's suffix reads <Class>_<asset>");
+            var hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/Enforcer.asset");
+            Assert.AreEqual("Warrior_Enforcer", OracleKits.LabelOf(hunter), "an asset not named like its subclass's suffix reads <Class>_<asset>");
         }
     }
 }

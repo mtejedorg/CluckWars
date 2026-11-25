@@ -193,9 +193,9 @@ namespace CluckWars.Balance
         public int HitRefusedRoom;
         /// <summary>Food hit-steals took from this seat (victim side; also in <see cref="LostToSteals"/>).</summary>
         public float HitLostFood;
-        /// <summary>Hits of this seat on a fresh rival that stacked the extra trophy (a fresh state is spent by its first hit).</summary>
+        /// <summary>Hits of this seat on a fresh rival that stacked the extra debt (a fresh state is spent by its first hit).</summary>
         public int FreshHits;
-        /// <summary>Bites this seat took from a casting rival's pile (the Champion's; includes a bite that fitted 0).</summary>
+        /// <summary>Bites this seat took from a casting rival's pile (the Enforcer's; includes a bite that fitted 0).</summary>
         public int BitesFromCast;
         /// <summary>Bites this seat took from the cargo of a rival whose Peck had just landed.</summary>
         public int BitesFromCargo;
@@ -213,18 +213,18 @@ namespace CluckWars.Balance
         public int PecksBitten;
         /// <summary>Food bites took from this seat's cargo (victim side; also in <see cref="LostToSteals"/>).</summary>
         public float BiteLostFood;
-        /// <summary>Trophies this seat gained on rivals (a gain at the cap earns nothing and is not counted).</summary>
-        public int TrophiesEarned;
-        /// <summary>Trophies that went when a count decayed with no gain.</summary>
-        public int TrophiesDecayed;
-        /// <summary>Trophies that went because this seat, or the rival they counted on, was executed.</summary>
-        public int TrophiesCleared;
+        /// <summary>Debts this seat gained on rivals (a gain at the cap earns nothing and is not counted).</summary>
+        public int DebtsEarned;
+        /// <summary>Debts that went when a count decayed with no gain.</summary>
+        public int DebtsDecayed;
+        /// <summary>Debts that went because this seat, or the rival they counted on, was executed.</summary>
+        public int DebtsCleared;
         /// <summary>Steals of this seat that took food while holding a count on the victim.</summary>
-        public int TrophyCashes;
-        /// <summary>The trophies those Steals consumed, summed.</summary>
-        public int TrophiesCashed;
-        /// <summary>The part of those Steals' food that the trophies added and that fitted (food above the nominal Steal).</summary>
-        public float TrophyBonusFood;
+        public int DebtCollects;
+        /// <summary>The debts those Steals consumed, summed.</summary>
+        public int DebtsCollected;
+        /// <summary>The part of those Steals' food that the debts added and that fitted (food above the nominal Steal).</summary>
+        public float DebtBonusFood;
         /// <summary>Food this seat's Steal casts took (marked and ordinary), so the mean Steal size is this over <see cref="Steals"/>.</summary>
         public float StealFood;
         /// <summary>The most one victim lost to this seat's hit-steals, Steals and bites inside any <see cref="MatchReports.LossWindowSeconds"/> window.</summary>

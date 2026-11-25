@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace CluckWars.Balance
 {
-    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot, HitSteal, Bite, TrophyCash }
+    public enum MatchEventKind : byte { Contact, CastStart, PeckCut, Steal, Kill, Bank, Loot, HitSteal, Bite, DebtCollect }
 
     /// <summary>Why a running Peck was cut. <see cref="OwnMove"/> is the chicken's own doing (it cast another ability).</summary>
     public enum CutCause : byte { None, Stun, Shove, Execution, EmptyPile, OwnMove, Bite }
@@ -359,12 +359,12 @@ namespace CluckWars.Balance
             // hit-steal (the Bully's): when each victim is next open to this chicken's hits, by victim seat
             public readonly float[] HitLockUntil = new float[Seats];
 
-            // the bite and the per-enemy trophies (the Champion's). The fresh state is a fact of the chicken, not of a Champion: whoever bites first spends it.
+            // the bite and the per-enemy debts (the Enforcer's). The fresh state is a fact of the chicken, not of a Enforcer: whoever bites first spends it.
             public float LandedAt = float.NegativeInfinity;
             public bool LandedWithFood;
             public bool FreshBitten;
-            public readonly int[] TrophyOn = new int[Seats];
-            public readonly float[] TrophyUntil = new float[Seats];
+            public readonly int[] DebtOn = new int[Seats];
+            public readonly float[] DebtUntil = new float[Seats];
         }
 
         private sealed class Core
@@ -473,8 +473,8 @@ namespace CluckWars.Balance
                     var abilities = kit != null && kit.Abilities != null ? kit.Abilities : Array.Empty<MatchAbility>();
                     _view.Seats[seat].CooldownLeft = new float[1 + abilities.Length];
                     _view.Seats[seat].HitLockLeft = new float[Seats];
-                    _view.Seats[seat].TrophyOn = new int[Seats];
-                    _view.Seats[seat].TrophyLeft = new float[Seats];
+                    _view.Seats[seat].DebtOn = new int[Seats];
+                    _view.Seats[seat].DebtLeft = new float[Seats];
                     if (kit == null) continue;
 
                     ch.Abilities = abilities;
@@ -553,7 +553,7 @@ namespace CluckWars.Balance
                     ResolveCasts();
                     AuraTick();
                     for (int k = 0; k < Seats; k++) Act((_i + k) % Seats);
-                    DecayTrophies();
+                    DecayDebts();
                 }
                 return Finish();
             }
@@ -821,8 +821,8 @@ namespace CluckWars.Balance
                     for (int r = 0; r < Seats; r++)
                     {
                         v.HitLockLeft[r] = Math.Max(0f, ch.HitLockUntil[r] - _time);
-                        v.TrophyOn[r] = ch.TrophyOn[r];
-                        v.TrophyLeft[r] = ch.TrophyOn[r] > 0 ? Math.Max(0f, ch.TrophyUntil[r] - _time) : 0f;
+                        v.DebtOn[r] = ch.DebtOn[r];
+                        v.DebtLeft[r] = ch.DebtOn[r] > 0 ? Math.Max(0f, ch.DebtUntil[r] - _time) : 0f;
                     }
                     var cd = v.CooldownLeft;
                     cd[0] = Math.Max(0f, ch.NextPeckAt - _time);
@@ -1024,7 +1024,7 @@ namespace CluckWars.Balance
                                 if (StealRules.Stealable(victim.Cargo) <= 0f) continue;     // Snatch only targets a carrier
                                 if (MatchCombat.Refused(IncomingEffect.Steal, _egg[v], _walk[v])) continue;
                                 var fresh = PassiveOf(s).Bite;
-                                ChampionHit(s, v, AbilityJob.Steal, Casting(victim), IsFresh(v, fresh));   // the bite first, then the Steal on what the bite left
+                                EnforcerHit(s, v, AbilityJob.Steal, Casting(victim), IsFresh(v, fresh));   // the bite first, then the Steal on what the bite left
                                 taken += DoSteal(s, v, ab);
                             }
                             if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback, ab.Job);
@@ -1081,10 +1081,10 @@ namespace CluckWars.Balance
                 var t = _c[thief];
                 var v = _c[victim];
                 float room = CapacityOf(thief) - t.Cargo;
-                var trophy = PassiveOf(thief).Trophy;
-                int count = trophy.IsChampion ? t.TrophyOn[victim] : 0;
-                // The Champion's trophies on this rival inflate the Steal; with no count (every other kit, or a Champion with none) it is the plain steal.
-                float take = StealMath.Clamp(TrophyRules.StealAmount(ab.StealAmount, PassiveOf(thief).StealFactor, trophy.Steal, count), room, StealRules.Stealable(v.Cargo));
+                var debt = PassiveOf(thief).Debt;
+                int count = debt.IsEnforcer ? t.DebtOn[victim] : 0;
+                // The Enforcer's debts on this rival inflate the Steal; with no count (every other kit, or a Enforcer with none) it is the plain steal.
+                float take = StealMath.Clamp(DebtRules.StealAmount(ab.StealAmount, PassiveOf(thief).StealFactor, debt.Steal, count), room, StealRules.Stealable(v.Cargo));
                 if (take <= 0f) return 0f;
                 _result.Counters[victim].LootLostToSteals += TakeLootShare(v, take);
                 v.Cargo -= take;
@@ -1098,13 +1098,13 @@ namespace CluckWars.Balance
                 _result.Counters[victim].LostToSteals += take;
                 Record(MatchEventKind.Steal, thief, victim, take, CutCause.None);
                 NoteLoss(thief, victim, take);
-                if (count > 0)   // a Steal that took food cashes the trophies on that rival
+                if (count > 0)   // a Steal that took food cashes the debts on that rival
                 {
-                    tn.TrophyCashes++;
-                    tn.TrophiesCashed += count;
-                    tn.TrophyBonusFood += take - Math.Min(take, ab.StealAmount * PassiveOf(thief).StealFactor);
-                    t.TrophyOn[victim] = 0;
-                    Record(MatchEventKind.TrophyCash, thief, victim, take, CutCause.None);
+                    tn.DebtCollects++;
+                    tn.DebtsCollected += count;
+                    tn.DebtBonusFood += take - Math.Min(take, ab.StealAmount * PassiveOf(thief).StealFactor);
+                    t.DebtOn[victim] = 0;
+                    Record(MatchEventKind.DebtCollect, thief, victim, take, CutCause.None);
                 }
                 return take;
             }
@@ -1251,7 +1251,7 @@ namespace CluckWars.Balance
                     v.ThinkNow = true;
                     if (v.Pecking && PeckCastRules.IsCut(true, false, false)) Cut(victim, CutCause.Stun);
                     HitSteal(caster, victim, job);
-                    ChampionHit(caster, victim, job, castingBefore, freshBefore);
+                    EnforcerHit(caster, victim, job, castingBefore, freshBefore);
                 }
                 else if (e.Kind == ControlKind.Slow)
                 {
@@ -1325,7 +1325,7 @@ namespace CluckWars.Balance
                 if (impulse.sqrMagnitude > 0f)
                 {
                     HitSteal(caster, victim, job);
-                    if (job == AbilityJob.Shove) ChampionHit(caster, victim, job, castingBefore, freshBefore);   // a Steal's own knock is not a second hit
+                    if (job == AbilityJob.Shove) EnforcerHit(caster, victim, job, castingBefore, freshBefore);   // a Steal's own knock is not a second hit
                 }
             }
 
@@ -1352,7 +1352,7 @@ namespace CluckWars.Balance
                 }
             }
 
-            // ---- the bite and the per-enemy trophies (the Champion's, design 2026-11-25 redesign) ----
+            // ---- the bite and the per-enemy debts (the Enforcer's, design 2026-11-25 redesign) ----
 
             // A Peck cast is running now (the same test the landing uses, so the bite and the landing cannot disagree).
             private bool Casting(Chick ch) => ch.Pecking && _time + Eps < ch.PeckDoneAt;
@@ -1365,12 +1365,12 @@ namespace CluckWars.Balance
                 return BiteRules.Fresh(Casting(v), _time - v.LandedAt, v.LandedWithFood, !ignoreBitten && v.FreshBitten, facts.FreshSeconds);
             }
 
-            // A landed hit of a Champion on a rival (design 4.2). `castingBefore` and `freshBefore` were read before the hit's own effect, so a Stun that
-            // cut the cast first still bites it. The bite, then the trophies: +1 for the bite, +1 for a Stun or Shove. A Steal's take is the caller's.
-            private void ChampionHit(int caster, int victim, AbilityJob job, bool castingBefore, bool freshBefore)
+            // A landed hit of a Enforcer on a rival (design 4.2). `castingBefore` and `freshBefore` were read before the hit's own effect, so a Stun that
+            // cut the cast first still bites it. The bite, then the debts: +1 for the bite, +1 for a Stun or Shove. A Steal's take is the caller's.
+            private void EnforcerHit(int caster, int victim, AbilityJob job, bool castingBefore, bool freshBefore)
             {
-                var trophy = PassiveOf(caster).Trophy;
-                if (!trophy.IsChampion) return;
+                var debt = PassiveOf(caster).Debt;
+                if (!debt.IsEnforcer) return;
                 var c = _c[caster];
                 var v = _c[victim];
                 ref SeatCounters cn = ref _result.Counters[caster];
@@ -1419,27 +1419,27 @@ namespace CluckWars.Balance
                     v.FreshBitten = true;
                     c.ThinkNow = v.ThinkNow = true;
                     if (share > 0f) Record(MatchEventKind.Bite, caster, victim, food, castingBefore ? CutCause.Bite : CutCause.None);
-                    AddTrophy(caster, victim);
+                    AddDebt(caster, victim);
                 }
                 else if (v.FreshBitten && BiteRules.Fresh(castingBefore, _time - v.LandedAt, v.LandedWithFood, false, PassiveOf(caster).Bite.FreshSeconds))
                     cn.BitesSpent++;                                          // the state was fresh and somebody had already spent it
-                if (job == AbilityJob.Stun || job == AbilityJob.Shove) AddTrophy(caster, victim);
+                if (job == AbilityJob.Stun || job == AbilityJob.Shove) AddDebt(caster, victim);
             }
 
-            // One more trophy on that rival (stopping at the cap); any gain, one at the cap too, restarts that count's decay timer.
-            private void AddTrophy(int caster, int victim)
+            // One more debt on that rival (stopping at the cap); any gain, one at the cap too, restarts that count's decay timer.
+            private void AddDebt(int caster, int victim)
             {
                 var c = _c[caster];
-                var trophy = PassiveOf(caster).Trophy;
-                int next = TrophyRules.Add(c.TrophyOn[victim], trophy.Cap);
-                c.TrophyUntil[victim] = _time + trophy.Seconds;
-                if (next == c.TrophyOn[victim]) return;
-                c.TrophyOn[victim] = next;
-                _result.Counters[caster].TrophiesEarned++;
+                var debt = PassiveOf(caster).Debt;
+                int next = DebtRules.Add(c.DebtOn[victim], debt.Cap);
+                c.DebtUntil[victim] = _time + debt.Seconds;
+                if (next == c.DebtOn[victim]) return;
+                c.DebtOn[victim] = next;
+                _result.Counters[caster].DebtsEarned++;
             }
 
-            // A count with no gain for TrophySeconds goes to 0 at once, not one by one.
-            private void DecayTrophies()
+            // A count with no gain for DebtSeconds goes to 0 at once, not one by one.
+            private void DecayDebts()
             {
                 for (int s = 0; s < Seats; s++)
                 {
@@ -1447,15 +1447,15 @@ namespace CluckWars.Balance
                     if (!ch.Present) continue;
                     for (int r = 0; r < Seats; r++)
                     {
-                        if (ch.TrophyOn[r] <= 0 || !TrophyRules.Decayed(_time, ch.TrophyUntil[r])) continue;
-                        _result.Counters[s].TrophiesDecayed += ch.TrophyOn[r];
-                        ch.TrophyOn[r] = 0;
+                        if (ch.DebtOn[r] <= 0 || !DebtRules.Decayed(_time, ch.DebtUntil[r])) continue;
+                        _result.Counters[s].DebtsDecayed += ch.DebtOn[r];
+                        ch.DebtOn[r] = 0;
                     }
                 }
             }
 
             // An execution: every count the dead one held, and every count on it, goes to 0; its fresh state ends with its removal.
-            private void ClearTrophies(int dead)
+            private void ClearDebts(int dead)
             {
                 for (int s = 0; s < Seats; s++)
                 {
@@ -1463,9 +1463,9 @@ namespace CluckWars.Balance
                     if (!ch.Present) continue;
                     for (int r = 0; r < Seats; r++)
                     {
-                        if ((s != dead && r != dead) || ch.TrophyOn[r] <= 0) continue;
-                        _result.Counters[s].TrophiesCleared += ch.TrophyOn[r];
-                        ch.TrophyOn[r] = 0;
+                        if ((s != dead && r != dead) || ch.DebtOn[r] <= 0) continue;
+                        _result.Counters[s].DebtsCleared += ch.DebtOn[r];
+                        ch.DebtOn[r] = 0;
                     }
                 }
                 var d = _c[dead];
@@ -1582,7 +1582,7 @@ namespace CluckWars.Balance
                 n.KillCargoFromSeat[victim] += loot;
                 n.KillGainedFromSeat[victim] += gained;
                 n.KillUnfitFromSeat[victim] += pay - gained;
-                ClearTrophies(victim);
+                ClearDebts(victim);
                 Record(MatchEventKind.Kill, s, victim, gained, CutCause.None);
                 Remove(victim, removalSeconds);
             }

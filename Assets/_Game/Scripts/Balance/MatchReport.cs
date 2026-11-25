@@ -188,7 +188,7 @@ namespace CluckWars.Balance
     }
 
     /// <summary>
-    /// One Warrior kit's rows in one population (mixed design, design 2026-11-25 section 8.3): the Bully's hit-steal, the Champion's breaks and trophies,
+    /// One Warrior kit's rows in one population (mixed design, design 2026-11-25 section 8.3): the Bully's hit-steal, the Enforcer's breaks and debts,
     /// the overflow to the centre pile and the worst loss one victim took inside <see cref="MatchReports.LossWindowSeconds"/>. Per match, over the matches that held the kit.
     /// </summary>
     public sealed class WarriorLine
@@ -196,24 +196,24 @@ namespace CluckWars.Balance
         public string Kit;
         public int Matches;
         public WinInterval Win;
-        public bool HitActive, BiteActive, TrophyKit;
+        public bool HitActive, BiteActive, DebtKit;
         public float HitTakesPerMatch, HitFoodPerMatch, HitRefusedLockPerMatch, HitRefusedNoFoodPerMatch, HitRefusedRoomPerMatch;
         /// <summary>Food hit-steals took from this kit (the victim's side).</summary>
         public float HitLostFoodPerMatch;
-        /// <summary>Hits on a fresh rival that stacked the extra trophy (the Champion's, whether or not they took food).</summary>
+        /// <summary>Hits on a fresh rival that stacked the extra debt (the Enforcer's, whether or not they took food).</summary>
         public float FreshHitsPerMatch;
         public float BitesFromCastPerMatch, BitesFromCargoPerMatch, BiteFoodFromCastPerMatch, BiteFoodFromCargoPerMatch, BiteLeftInPilePerMatch, BiteLeftWithVictimPerMatch, BitesSpentPerMatch;
         /// <summary>This kit's Peck casts that rivals bit, and the food bites took from its cargo (the victim's side).</summary>
         public float PecksBittenPerMatch, BiteLostFoodPerMatch;
-        public float TrophiesEarnedPerMatch, TrophiesDecayedPerMatch, TrophiesClearedPerMatch, TrophyCashesPerMatch, TrophyBonusFoodPerMatch;
-        /// <summary>Trophies consumed per Steal that cashed (NaN when none cashed).</summary>
-        public float TrophiesPerCash;
+        public float DebtsEarnedPerMatch, DebtsDecayedPerMatch, DebtsClearedPerMatch, DebtCollectsPerMatch, DebtBonusFoodPerMatch;
+        /// <summary>Debts consumed per Steal that cashed (NaN when none cashed).</summary>
+        public float DebtsPerCollect;
         public float StealsPerMatch, StealFoodPerMatch;
         /// <summary>Food per Steal cast, over the matches that held the kit (NaN when it made none).</summary>
         public float MeanStealSize;
         /// <summary>Food per hit-steal take (NaN when it made none).</summary>
         public float MeanHitSize;
-        /// <summary>The food the kit's identity brought in per match: hit-steal food, bite food and the food the trophies added to Steals.</summary>
+        /// <summary>The food the kit's identity brought in per match: hit-steal food, bite food and the food the debts added to Steals.</summary>
         public float IdentityFoodPerMatch;
         public float WorstLossMean, WorstLossP95;
     }
@@ -894,7 +894,7 @@ namespace CluckWars.Balance
                     freshHits += c.FreshHits;
                     bitesCast += c.BitesFromCast; bitesCargo += c.BitesFromCargo; biteFoodCast += c.BiteFoodFromCast; biteFoodCargo += c.BiteFoodFromCargo;
                     biteLeftPile += c.BiteLeftInPile; biteLeftVictim += c.BiteLeftWithVictim; spent += c.BitesSpent; pecksBitten += c.PecksBitten; biteLost += c.BiteLostFood;
-                    earned += c.TrophiesEarned; decayed += c.TrophiesDecayed; cleared += c.TrophiesCleared; cashes += c.TrophyCashes; cashed += c.TrophiesCashed; bonus += c.TrophyBonusFood;
+                    earned += c.DebtsEarned; decayed += c.DebtsDecayed; cleared += c.DebtsCleared; cashes += c.DebtCollects; cashed += c.DebtsCollected; bonus += c.DebtBonusFood;
                     stealCasts += c.Steals; stealFood += c.StealFood;
                     worstSum += c.WorstVictimLoss5s;
                     worst.Add(c.WorstVictimLoss5s);
@@ -905,16 +905,16 @@ namespace CluckWars.Balance
                 section.Warriors.Add(new WarriorLine
                 {
                     Kit = kit.Label, Matches = n, Win = win,
-                    HitActive = kit.Passive.HitSteal.Active, BiteActive = kit.Passive.Bite.Active, TrophyKit = kit.Passive.Trophy.IsChampion,
+                    HitActive = kit.Passive.HitSteal.Active, BiteActive = kit.Passive.Bite.Active, DebtKit = kit.Passive.Debt.IsEnforcer,
                     HitTakesPerMatch = (float)(takes / n), HitFoodPerMatch = (float)(hitFood / n), HitRefusedLockPerMatch = (float)(lockRef / n),
                     HitRefusedNoFoodPerMatch = (float)(noFood / n), HitRefusedRoomPerMatch = (float)(roomRef / n), HitLostFoodPerMatch = (float)(hitLost / n),
                     FreshHitsPerMatch = (float)(freshHits / n), BitesFromCastPerMatch = (float)(bitesCast / n), BitesFromCargoPerMatch = (float)(bitesCargo / n),
                     BiteFoodFromCastPerMatch = (float)(biteFoodCast / n), BiteFoodFromCargoPerMatch = (float)(biteFoodCargo / n),
                     BiteLeftInPilePerMatch = (float)(biteLeftPile / n), BiteLeftWithVictimPerMatch = (float)(biteLeftVictim / n), BitesSpentPerMatch = (float)(spent / n),
                     PecksBittenPerMatch = (float)(pecksBitten / n), BiteLostFoodPerMatch = (float)(biteLost / n),
-                    TrophiesEarnedPerMatch = (float)(earned / n), TrophiesDecayedPerMatch = (float)(decayed / n), TrophiesClearedPerMatch = (float)(cleared / n),
-                    TrophyCashesPerMatch = (float)(cashes / (double)n), TrophyBonusFoodPerMatch = (float)(bonus / n),
-                    TrophiesPerCash = cashes > 0 ? (float)(cashed / cashes) : float.NaN,
+                    DebtsEarnedPerMatch = (float)(earned / n), DebtsDecayedPerMatch = (float)(decayed / n), DebtsClearedPerMatch = (float)(cleared / n),
+                    DebtCollectsPerMatch = (float)(cashes / (double)n), DebtBonusFoodPerMatch = (float)(bonus / n),
+                    DebtsPerCollect = cashes > 0 ? (float)(cashed / cashes) : float.NaN,
                     StealsPerMatch = stealCasts / (float)n, StealFoodPerMatch = (float)(stealFood / n),
                     MeanStealSize = stealCasts > 0 ? (float)(stealFood / stealCasts) : float.NaN,
                     MeanHitSize = hitTakes > 0 ? (float)(hitFood / hitTakes) : float.NaN,
@@ -1297,13 +1297,13 @@ namespace CluckWars.Balance
             if (!pops.Any(p => p.Warriors.Count > 0)) sb.AppendLine("No Warrior kit in these matches.");
             else
             {
-                sb.AppendLine("Per match, over the matches that held the kit (mixed design). The Bully's rows are the hit-steal (takes and food, then the hits that took nothing: rival locked, rival empty, beak full; food lost is the victim's side). The Champion's rows are the fresh hits (a hit on a rival that is casting a Peck or just pecked: one extra trophy stacked, no food unless the passive's bite share is above 0), the bites (the food taken when it is: from a casting rival's pile, from the cargo of a rival whose Peck just landed, with their food; spent bites are hits on a state somebody had already bitten; Pecks bitten and food lost are the victim's side), the trophies (earned, decayed, cleared by an execution, the Steals that cashed them, the trophies consumed per cash, the food they added to Steals), the mean Steal size, the food the identity brought in (hit-steal food, bite food and the trophies' food), and the worst loss one victim took inside " + MatchReports.LossWindowSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " s from this kit's hit-steals, Steals and bites (mean over matches and 95th percentile).");
+                sb.AppendLine("Per match, over the matches that held the kit (mixed design). The Bully's rows are the hit-steal (takes and food, then the hits that took nothing: rival locked, rival empty, beak full; food lost is the victim's side). The Enforcer's rows are the fresh hits (a hit on a rival that is casting a Peck or just pecked: one extra debt stacked, no food unless the passive's bite share is above 0), the bites (the food taken when it is: from a casting rival's pile, from the cargo of a rival whose Peck just landed, with their food; spent bites are hits on a state somebody had already bitten; Pecks bitten and food lost are the victim's side), the debts (earned, decayed, cleared by an execution, the Steals that cashed them, the debts consumed per cash, the food they added to Steals), the mean Steal size, the food the identity brought in (hit-steal food, bite food and the debts' food), and the worst loss one victim took inside " + MatchReports.LossWindowSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " s from this kit's hit-steals, Steals and bites (mean over matches and 95th percentile).");
                 sb.AppendLine();
-                sb.AppendLine("| Kit | Population | Matches | Win | Hit takes | Hit food | Refused: lock / empty / full | Hit food lost | Fresh hits | Bites cast / cargo | Bite food cast / cargo | Bites spent | Pecks bitten | Bite food lost | Trophies earned | Decayed | Cleared | Cashes | Trophies per cash | Trophy food | Steals | Mean Steal size | Identity food | Worst loss mean | Worst loss p95 |");
+                sb.AppendLine("| Kit | Population | Matches | Win | Hit takes | Hit food | Refused: lock / empty / full | Hit food lost | Fresh hits | Bites cast / cargo | Bite food cast / cargo | Bites spent | Pecks bitten | Bite food lost | Debts earned | Decayed | Cleared | Cashes | Debts per cash | Debt food | Steals | Mean Steal size | Identity food | Worst loss mean | Worst loss p95 |");
                 sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
                 foreach (var p in pops)
                     foreach (var w in p.Warriors)
-                        sb.AppendLine($"| {w.Kit} | {Name(p.Population)} | {w.Matches} | {Pct(w.Win.Rate)} ({Pm(w.Win)}) | {Num(w.HitTakesPerMatch, "0.00")} | {Num(w.HitFoodPerMatch, "0.0")} | {Num(w.HitRefusedLockPerMatch, "0.00")} / {Num(w.HitRefusedNoFoodPerMatch, "0.00")} / {Num(w.HitRefusedRoomPerMatch, "0.00")} | {Num(w.HitLostFoodPerMatch, "0.0")} | {Num(w.FreshHitsPerMatch, "0.00")} | {Num(w.BitesFromCastPerMatch, "0.00")} / {Num(w.BitesFromCargoPerMatch, "0.00")} | {Num(w.BiteFoodFromCastPerMatch, "0.0")} / {Num(w.BiteFoodFromCargoPerMatch, "0.0")} | {Num(w.BitesSpentPerMatch, "0.00")} | {Num(w.PecksBittenPerMatch, "0.00")} | {Num(w.BiteLostFoodPerMatch, "0.0")} | {Num(w.TrophiesEarnedPerMatch, "0.00")} | {Num(w.TrophiesDecayedPerMatch, "0.00")} | {Num(w.TrophiesClearedPerMatch, "0.00")} | {Num(w.TrophyCashesPerMatch, "0.00")} | {Num(w.TrophiesPerCash, "0.00")} | {Num(w.TrophyBonusFoodPerMatch, "0.0")} | {Num(w.StealsPerMatch, "0.00")} | {Num(w.MeanStealSize, "0.0")} | {Num(w.IdentityFoodPerMatch, "0.0")} | {Num(w.WorstLossMean, "0.0")} | {Num(w.WorstLossP95, "0.0")} |");
+                        sb.AppendLine($"| {w.Kit} | {Name(p.Population)} | {w.Matches} | {Pct(w.Win.Rate)} ({Pm(w.Win)}) | {Num(w.HitTakesPerMatch, "0.00")} | {Num(w.HitFoodPerMatch, "0.0")} | {Num(w.HitRefusedLockPerMatch, "0.00")} / {Num(w.HitRefusedNoFoodPerMatch, "0.00")} / {Num(w.HitRefusedRoomPerMatch, "0.00")} | {Num(w.HitLostFoodPerMatch, "0.0")} | {Num(w.FreshHitsPerMatch, "0.00")} | {Num(w.BitesFromCastPerMatch, "0.00")} / {Num(w.BitesFromCargoPerMatch, "0.00")} | {Num(w.BiteFoodFromCastPerMatch, "0.0")} / {Num(w.BiteFoodFromCargoPerMatch, "0.0")} | {Num(w.BitesSpentPerMatch, "0.00")} | {Num(w.PecksBittenPerMatch, "0.00")} | {Num(w.BiteLostFoodPerMatch, "0.0")} | {Num(w.DebtsEarnedPerMatch, "0.00")} | {Num(w.DebtsDecayedPerMatch, "0.00")} | {Num(w.DebtsClearedPerMatch, "0.00")} | {Num(w.DebtCollectsPerMatch, "0.00")} | {Num(w.DebtsPerCollect, "0.00")} | {Num(w.DebtBonusFoodPerMatch, "0.0")} | {Num(w.StealsPerMatch, "0.00")} | {Num(w.MeanStealSize, "0.0")} | {Num(w.IdentityFoodPerMatch, "0.0")} | {Num(w.WorstLossMean, "0.0")} | {Num(w.WorstLossP95, "0.0")} |");
             }
             sb.AppendLine();
             sb.AppendLine("## Peck cuts per class and cutter");
@@ -1581,7 +1581,7 @@ namespace CluckWars.Balance
         }
 
         private static string WarriorJson(WarriorLine w) =>
-            $"{{\"kit\":{S(w.Kit)},\"matches\":{w.Matches},\"win\":{W(w.Win)},\"hitTakes\":{N(w.HitTakesPerMatch)},\"hitFood\":{N(w.HitFoodPerMatch)},\"hitRefusedLock\":{N(w.HitRefusedLockPerMatch)},\"hitRefusedNoFood\":{N(w.HitRefusedNoFoodPerMatch)},\"hitRefusedRoom\":{N(w.HitRefusedRoomPerMatch)},\"hitLostFood\":{N(w.HitLostFoodPerMatch)},\"freshHits\":{N(w.FreshHitsPerMatch)},\"bitesFromCast\":{N(w.BitesFromCastPerMatch)},\"bitesFromCargo\":{N(w.BitesFromCargoPerMatch)},\"biteFoodFromCast\":{N(w.BiteFoodFromCastPerMatch)},\"biteFoodFromCargo\":{N(w.BiteFoodFromCargoPerMatch)},\"biteLeftInPile\":{N(w.BiteLeftInPilePerMatch)},\"biteLeftWithVictim\":{N(w.BiteLeftWithVictimPerMatch)},\"bitesSpent\":{N(w.BitesSpentPerMatch)},\"pecksBitten\":{N(w.PecksBittenPerMatch)},\"biteLostFood\":{N(w.BiteLostFoodPerMatch)},\"trophiesEarned\":{N(w.TrophiesEarnedPerMatch)},\"trophiesDecayed\":{N(w.TrophiesDecayedPerMatch)},\"trophiesCleared\":{N(w.TrophiesClearedPerMatch)},\"trophyCashes\":{N(w.TrophyCashesPerMatch)},\"trophiesPerCash\":{N(w.TrophiesPerCash)},\"trophyBonusFood\":{N(w.TrophyBonusFoodPerMatch)},\"steals\":{N(w.StealsPerMatch)},\"stealFood\":{N(w.StealFoodPerMatch)},\"meanStealSize\":{N(w.MeanStealSize)},\"meanHitSize\":{N(w.MeanHitSize)},\"identityFood\":{N(w.IdentityFoodPerMatch)},\"worstLossMean\":{N(w.WorstLossMean)},\"worstLossP95\":{N(w.WorstLossP95)}}}";
+            $"{{\"kit\":{S(w.Kit)},\"matches\":{w.Matches},\"win\":{W(w.Win)},\"hitTakes\":{N(w.HitTakesPerMatch)},\"hitFood\":{N(w.HitFoodPerMatch)},\"hitRefusedLock\":{N(w.HitRefusedLockPerMatch)},\"hitRefusedNoFood\":{N(w.HitRefusedNoFoodPerMatch)},\"hitRefusedRoom\":{N(w.HitRefusedRoomPerMatch)},\"hitLostFood\":{N(w.HitLostFoodPerMatch)},\"freshHits\":{N(w.FreshHitsPerMatch)},\"bitesFromCast\":{N(w.BitesFromCastPerMatch)},\"bitesFromCargo\":{N(w.BitesFromCargoPerMatch)},\"biteFoodFromCast\":{N(w.BiteFoodFromCastPerMatch)},\"biteFoodFromCargo\":{N(w.BiteFoodFromCargoPerMatch)},\"biteLeftInPile\":{N(w.BiteLeftInPilePerMatch)},\"biteLeftWithVictim\":{N(w.BiteLeftWithVictimPerMatch)},\"bitesSpent\":{N(w.BitesSpentPerMatch)},\"pecksBitten\":{N(w.PecksBittenPerMatch)},\"biteLostFood\":{N(w.BiteLostFoodPerMatch)},\"debtsEarned\":{N(w.DebtsEarnedPerMatch)},\"debtsDecayed\":{N(w.DebtsDecayedPerMatch)},\"debtsCleared\":{N(w.DebtsClearedPerMatch)},\"debtCollects\":{N(w.DebtCollectsPerMatch)},\"debtsPerCollect\":{N(w.DebtsPerCollect)},\"debtBonusFood\":{N(w.DebtBonusFoodPerMatch)},\"steals\":{N(w.StealsPerMatch)},\"stealFood\":{N(w.StealFoodPerMatch)},\"meanStealSize\":{N(w.MeanStealSize)},\"meanHitSize\":{N(w.MeanHitSize)},\"identityFood\":{N(w.IdentityFoodPerMatch)},\"worstLossMean\":{N(w.WorstLossMean)},\"worstLossP95\":{N(w.WorstLossP95)}}}";
 
         private static string LootJson(LootStealRow k) =>
             $"{{\"steals\":{k.Steals},\"win\":{W(k.Win)},\"winWithPrize\":{W(k.WinWithPrize)},\"meanFinal\":{N(k.MeanFinal)},\"bankedShare\":{N(k.BankedShare)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";

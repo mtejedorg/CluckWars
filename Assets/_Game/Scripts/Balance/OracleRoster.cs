@@ -8,7 +8,7 @@ namespace CluckWars.Balance
 {
     /// <summary>
     /// The what-if roster swap (design 2026-11-25, section 5): a copy of the shipped ability registry in which one passive is replaced by another,
-    /// so a passive that is not registered (the Champion) can take a seat in the match simulator. The shipped registry, the game and
+    /// so a passive that is not registered (the Enforcer) can take a seat in the match simulator. The shipped registry, the game and
     /// <see cref="BalanceBook"/> are untouched; the book and the simulator are simply built over the copy.
     /// </summary>
     public static class OracleRoster

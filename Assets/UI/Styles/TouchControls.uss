@@ -533,7 +533,7 @@
 .cw-hex-icon--hoarder      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_HoarderPassiveSO.png"); }
 .cw-hex-icon--bulwark      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BulwarkPassiveSO.png"); }
 .cw-hex-icon--relentless   { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_RelentlessPassiveSO.png"); }
-.cw-hex-icon--champion { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ChampionPassiveSO.png"); }
+.cw-hex-icon--enforcer { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_EnforcerPassiveSO.png"); }
 .cw-hex-icon--bully        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_BullyPassiveSO.png"); }
 .cw-hex-icon--spoiler      { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_SpoilerPassiveSO.png"); }
 .cw-hex-icon--thief        { background-image: url("project://database/Assets/_Game/Art/UI/Icons/Abilities/Icon_ThiefPassiveSO.png"); }

@@ -97,10 +97,10 @@ namespace CluckWars.Balance
         public bool LandedWithFood;
         /// <summary>The seat's current fresh state has been bitten already (cleared by its next cast start or landing).</summary>
         public bool FreshBitten;
-        /// <summary>Trophies this seat holds on each rival, by rival seat (the Champion's; zeros for every other kit). Meaningful for the policy's own seat.</summary>
-        public int[] TrophyOn;
+        /// <summary>Debts this seat holds on each rival, by rival seat (the Enforcer's; zeros for every other kit). Meaningful for the policy's own seat.</summary>
+        public int[] DebtOn;
         /// <summary>Seconds until each of those counts decays, by rival seat (0 with no count).</summary>
-        public float[] TrophyLeft;
+        public float[] DebtLeft;
         /// <summary>Seconds each rival stays locked against this seat's hit-steal, by rival seat. Meaningful for the policy's own seat.</summary>
         public float[] HitLockLeft;
 
@@ -126,10 +126,10 @@ namespace CluckWars.Balance
         public OracleNav Nav;
         public MatchRules Rules;
 
-        /// <summary>Trophies <paramref name="seat"/> holds on <paramref name="rival"/>.</summary>
-        public int TrophiesOn(int seat, int rival)
+        /// <summary>Debts <paramref name="seat"/> holds on <paramref name="rival"/>.</summary>
+        public int DebtsOn(int seat, int rival)
         {
-            var on = Seats[seat].TrophyOn;
+            var on = Seats[seat].DebtOn;
             return on != null && rival >= 0 && rival < on.Length ? on[rival] : 0;
         }
     }

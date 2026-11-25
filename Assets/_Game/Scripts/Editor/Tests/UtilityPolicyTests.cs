@@ -391,19 +391,19 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void P1Champion_PrefersAFreshRivalOverThePile_OnlyWhenThePeckIsSlower()
+        public void P1Enforcer_PrefersAFreshRivalOverThePile_OnlyWhenThePeckIsSlower()
         {
-            // The same scene at a fast and at a slow Peck: the Champion's Steal on a rival mid-cast (the bite plus the Steal) beats the pile only when foraging is slow.
+            // The same scene at a fast and at a slow Peck: the Enforcer's Steal on a rival mid-cast (the bite plus the Steal) beats the pile only when foraging is slow.
             MatchIntent Scene(float peckCooldown)
             {
-                var me = MatchTestKit.Fighter("champion", 6f, new[] { Steal(5f, 5f, 4f) }, peckAmount: 10f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
+                var me = MatchTestKit.Fighter("enforcer", 6f, new[] { Steal(5f, 5f, 4f) }, peckAmount: 10f, peckCooldown: peckCooldown, castSeconds: 0.4f, capacity: 20);
                 me.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
-                me.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
+                me.Passive.Debt = new DebtFacts { IsEnforcer = true, Steal = 2f, Cap = 3, Seconds = 6f };
                 var view = View(Four(me, Kit("rival")));
                 view.PileFood[OracleMapSO.CentreIndex] = 10f;
                 view.Seats[0].Pos = Vector2.zero;                    // inside the centre pile's reach
-                view.Seats[0].TrophyOn = new int[4];
-                view.Seats[0].TrophyLeft = new float[4];
+                view.Seats[0].DebtOn = new int[4];
+                view.Seats[0].DebtLeft = new float[4];
                 view.Seats[0].CooldownLeft[1] = 3f;                  // the Steal is 3 s from ready
                 view.Seats[1].Pos = new Vector2(12f, 0f);
                 view.Seats[1].Cargo = 12f;

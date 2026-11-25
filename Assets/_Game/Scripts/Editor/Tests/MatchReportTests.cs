@@ -259,7 +259,7 @@ namespace CluckWars.Tests
             kit.Class = ChickenClass.Warrior;
             kit.Passive.HitSteal = new HitStealFacts { Stun = 2f, Shove = 2f, LockSeconds = 3f };
             kit.Passive.Bite = new BiteFacts { FreshSeconds = 1f };
-            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = 2f, Cap = 3, Seconds = 6f };
+            kit.Passive.Debt = new DebtFacts { IsEnforcer = true, Steal = 2f, Cap = 3, Seconds = 6f };
 
             var results = new MatchResult[2];
             for (int i = 0; i < results.Length; i++)
@@ -289,16 +289,16 @@ namespace CluckWars.Tests
             Assert.AreEqual(2f, line.BitesSpentPerMatch, 1e-4f);
             Assert.AreEqual(2f, line.PecksBittenPerMatch, 1e-4f);
             Assert.AreEqual(3f, line.BiteLostFoodPerMatch, 1e-4f);
-            Assert.AreEqual(6f, line.TrophiesEarnedPerMatch, 1e-4f);
-            Assert.AreEqual(4f, line.TrophiesDecayedPerMatch, 1e-4f);
-            Assert.AreEqual(2f, line.TrophiesClearedPerMatch, 1e-4f);
-            Assert.AreEqual(2f, line.TrophyCashesPerMatch, 1e-4f);
-            Assert.AreEqual(2.5f, line.TrophiesPerCash, 1e-4f, "trophies cashed over cashes");
-            Assert.AreEqual(6f, line.TrophyBonusFoodPerMatch, 1e-4f);
+            Assert.AreEqual(6f, line.DebtsEarnedPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.DebtsDecayedPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.DebtsClearedPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.DebtCollectsPerMatch, 1e-4f);
+            Assert.AreEqual(2.5f, line.DebtsPerCollect, 1e-4f, "debts cashed over cashes");
+            Assert.AreEqual(6f, line.DebtBonusFoodPerMatch, 1e-4f);
             Assert.AreEqual(4f, line.StealsPerMatch, 1e-4f);
             Assert.AreEqual(30f / 4f, line.MeanStealSize, 1e-4f, "Steal food over Steal casts");
             Assert.AreEqual(2f, line.MeanHitSize, 1e-4f, "hit food over hit takes");
-            Assert.AreEqual(8f + 7f + 5f + 6f, line.IdentityFoodPerMatch, 1e-4f, "hit food, bite food and the trophies' food");
+            Assert.AreEqual(8f + 7f + 5f + 6f, line.IdentityFoodPerMatch, 1e-4f, "hit food, bite food and the debts' food");
             Assert.AreEqual(4f, line.WorstLossMean, 1e-4f);
             Assert.AreEqual(5.8f, line.WorstLossP95, 1e-3f, "linear interpolation between 2 and 6");
 
@@ -307,14 +307,14 @@ namespace CluckWars.Tests
             foreach (var heading in new[]
             {
                 "Hit takes", "Hit food", "Refused: lock / empty / full", "Hit food lost", "Fresh hits", "Bites cast / cargo", "Bite food cast / cargo", "Bites spent", "Pecks bitten",
-                "Bite food lost", "Trophies earned", "Decayed", "Cleared", "Cashes", "Trophies per cash", "Trophy food", "Steals", "Mean Steal size", "Identity food",
+                "Bite food lost", "Debts earned", "Decayed", "Cleared", "Cashes", "Debts per cash", "Debt food", "Steals", "Mean Steal size", "Identity food",
                 "Worst loss mean", "Worst loss p95",
             })
                 StringAssert.Contains(heading, md);
             StringAssert.Contains("kit0", md);
             string json = report.ToJson();
             Assert.DoesNotThrow(() => JsonUtility.FromJson<JsonProbe>(json));
-            foreach (var key in new[] { "\"warriors\"", "\"hitTakes\"", "\"biteLeftInPile\"", "\"trophiesCleared\"", "\"meanStealSize\"", "\"worstLossP95\"" })
+            foreach (var key in new[] { "\"warriors\"", "\"hitTakes\"", "\"biteLeftInPile\"", "\"debtsCleared\"", "\"meanStealSize\"", "\"worstLossP95\"" })
                 StringAssert.Contains(key, json);
         }
 
@@ -324,7 +324,7 @@ namespace CluckWars.Tests
             c.HitTakes = 4; c.HitFood = 8f; c.HitRefusedLock = 1; c.HitRefusedNoFood = 2; c.HitRefusedRoom = 3; c.HitLostFood = 5f;
             c.FreshHits = 7; c.BitesFromCast = 3; c.BitesFromCargo = 2; c.BiteFoodFromCast = 7f; c.BiteFoodFromCargo = 5f; c.BiteLeftInPile = 4f; c.BiteLeftWithVictim = 1f;
             c.BitesSpent = 2; c.PecksBitten = 2; c.BiteLostFood = 3f;
-            c.TrophiesEarned = 6; c.TrophiesDecayed = 4; c.TrophiesCleared = 2; c.TrophyCashes = 2; c.TrophiesCashed = 5; c.TrophyBonusFood = 6f;
+            c.DebtsEarned = 6; c.DebtsDecayed = 4; c.DebtsCleared = 2; c.DebtCollects = 2; c.DebtsCollected = 5; c.DebtBonusFood = 6f;
             c.Steals = 4; c.StealFood = 30f; c.WorstVictimLoss5s = worst;
             return c;
         }

@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The Champion's bite rules (design 2026-11-25, redesign): pure functions over facts.</summary>
+    /// <summary>The Enforcer's bite rules (design 2026-11-25, redesign): pure functions over facts.</summary>
     public sealed class BiteRulesTests
     {
         [Test]

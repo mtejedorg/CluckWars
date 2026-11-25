@@ -9,10 +9,10 @@ namespace CluckWars.Tests
         [Test]
         public void Roster_ParsesAndRejectsAnythingButAnObjectOfNames()
         {
-            Assert.IsTrue(WhatIfSpec.TryParse("{\"roster\":{\"Relentless\":\"Champion\"},\"scenarios\":[]}", out var spec, out string error), error);
+            Assert.IsTrue(WhatIfSpec.TryParse("{\"roster\":{\"Relentless\":\"Enforcer\"},\"scenarios\":[]}", out var spec, out string error), error);
             Assert.AreEqual(1, spec.Roster.Count);
             Assert.AreEqual("Relentless", spec.Roster[0].Key);
-            Assert.AreEqual("Champion", spec.Roster[0].Value);
+            Assert.AreEqual("Enforcer", spec.Roster[0].Value);
 
             Assert.IsTrue(WhatIfSpec.TryParse("{\"scenarios\":[]}", out spec, out error), error);
             Assert.AreEqual(0, spec.Roster.Count, "no key, no swap");

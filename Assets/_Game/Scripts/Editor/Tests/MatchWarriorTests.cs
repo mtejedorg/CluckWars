@@ -11,8 +11,8 @@ using MatchEventKind = CluckWars.Balance.MatchEventKind;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// The two Warrior kits under test in the match simulator (design 2026-11-25): the Bully's hit-steal and the Champion's fresh hits and
-    /// trophies. Every number is the test's own on synthetic maps and kits; nothing asserts a win rate.
+    /// The two Warrior kits under test in the match simulator (design 2026-11-25): the Bully's hit-steal and the Enforcer's fresh hits and
+    /// debts. Every number is the test's own on synthetic maps and kits; nothing asserts a win rate.
     /// </summary>
     public sealed class MatchWarriorTests
     {
@@ -259,14 +259,14 @@ namespace CluckWars.Tests
                 StringAssert.Contains(call, source, "the simulator must call the game's rule, not restate it.");
         }
 
-        // ================================================================ the Champion (Maestro, 2026-11-25: a hit on a fresh rival takes no food, it stacks a trophy)
+        // ================================================================ the Enforcer (Maestro, 2026-11-25: a hit on a fresh rival takes no food, it stacks a debt)
 
-        // A Champion on a fast, big-reach kit. `share` is the passive's FreshBiteShare: 0 as shipped (no food from a fresh hit), 1 the old bite.
-        private static MatchKit Champ(int capacity = 100, float fresh = 1f, float share = 0f, float trophySteal = 2f, int cap = 3, float seconds = 20f, params MatchAbility[] abilities)
+        // A Enforcer on a fast, big-reach kit. `share` is the passive's FreshBiteShare: 0 as shipped (no food from a fresh hit), 1 the old bite.
+        private static MatchKit Champ(int capacity = 100, float fresh = 1f, float share = 0f, float debtSteal = 2f, int cap = 3, float seconds = 20f, params MatchAbility[] abilities)
         {
             var kit = MatchTestKit.Fighter("champ", 100f, abilities, peckAmount: 3f, peckCooldown: 500f, castSeconds: 0.1f, capacity: capacity);
             kit.Passive.Bite = new BiteFacts { FreshSeconds = fresh, FoodShare = share };
-            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Steal = trophySteal, Cap = cap, Seconds = seconds };
+            kit.Passive.Debt = new DebtFacts { IsEnforcer = true, Steal = debtSteal, Cap = cap, Seconds = seconds };
             return kit;
         }
 
@@ -300,7 +300,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void FreshHit_MidCast_TakesNoFood_StacksOneExtraTrophy()
+        public void FreshHit_MidCast_TakesNoFood_StacksOneExtraDebt()
         {
             var r = MatchSim.Run(Duo(Champ(abilities: MatchTestKit.Stun(Big, 1f, 5f)), Pecker("victim", 6f, 1f), Steps((VictimCasting(), 0)), 3f, pile: 10f), 1);
             var c = r.Counters[0];
@@ -309,7 +309,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(0f, c.Stolen, 1e-4f);
             Assert.AreEqual(0f, r.Counters[1].Foraged, "the Stun cut the cast, as any Stun does");
             Assert.AreEqual(1, r.Counters[1].CutsByCause[(int)CutCause.Stun]);
-            Assert.AreEqual(2, c.TrophiesEarned, "+1 for the Stun, +1 for the fresh rival");
+            Assert.AreEqual(2, c.DebtsEarned, "+1 for the Stun, +1 for the fresh rival");
             Assert.AreEqual(0, r.Events.Count(e => e.Kind == MatchEventKind.Bite), "no bite event without food");
             Assert.AreEqual(0, r.RejectedIntents);
         }
@@ -321,13 +321,13 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, r.Counters[0].FreshHits);
             Assert.AreEqual(0f, r.Counters[0].Stolen, 1e-4f);
             Assert.AreEqual(0f, r.Counters[1].LostToSteals, "the victim's cargo is untouched");
-            Assert.AreEqual(2, r.Counters[0].TrophiesEarned);
+            Assert.AreEqual(2, r.Counters[0].DebtsEarned);
         }
 
         [Test]
         public void BiteOn_MidCast_CutsTheCast_TakesFromThePile_RestStaysInThePile()
         {
-            // The victim's bite is 6 from a pile of 10; the Champion's beak holds 4: it takes 4, the other 2 of the bite stay in the pile.
+            // The victim's bite is 6 from a pile of 10; the Enforcer's beak holds 4: it takes 4, the other 2 of the bite stay in the pile.
             var r = MatchSim.Run(Duo(Champ(4, share: 1f, abilities: MatchTestKit.Shove(Big, 0.1f, 5f)), Pecker("victim", 6f, 1f), Steps((VictimCasting(), 0)), 3f, pile: 10f), 1);
             var c = r.Counters[0];
             Assert.AreEqual(1, c.BitesFromCast);
@@ -364,17 +364,17 @@ namespace CluckWars.Tests
         {
             var r = MatchSim.Run(Duo(Champ(abilities: MatchTestKit.Stun(Big, 1f, 5f)), Pecker("victim", 3f, 0.1f), Steps((VictimLanded(1.1f), 0)), 4f), 1);
             Assert.AreEqual(0, r.Counters[0].FreshHits);
-            Assert.AreEqual(1, r.Counters[0].TrophiesEarned, "only the Stun's own trophy");
+            Assert.AreEqual(1, r.Counters[0].DebtsEarned, "only the Stun's own debt");
         }
 
         [Test]
-        public void FreshHit_OncePerFreshState_TheSecondHitOnlyEarnsItsTrophy()
+        public void FreshHit_OncePerFreshState_TheSecondHitOnlyEarnsItsDebt()
         {
             var hunter = Champ(abilities: new[] { MatchTestKit.Stun(Big, 1f, 5f), MatchTestKit.Shove(Big, 1f, 5f) });
             var r = MatchSim.Run(Duo(hunter, Pecker("victim", 3f, 0.1f), Steps((VictimLanded(0.1f), 0), (VictimLanded(0.3f), 1)), 3f), 1);
             Assert.AreEqual(1, r.Counters[0].FreshHits);
             Assert.AreEqual(1, r.Counters[0].BitesSpent, "the Shove met a state already spent");
-            Assert.AreEqual(3, r.Counters[0].TrophiesEarned, "fresh and Stun, then the Shove's own");
+            Assert.AreEqual(3, r.Counters[0].DebtsEarned, "fresh and Stun, then the Shove's own");
         }
 
         [Test]
@@ -395,10 +395,10 @@ namespace CluckWars.Tests
             }
             var walk = Run(0.15f);
             Assert.AreEqual(1, walk.Counters[0].FreshHits, "the walk refuses only Slow: the hit lands");
-            Assert.AreEqual(2, walk.Counters[0].TrophiesEarned);
+            Assert.AreEqual(2, walk.Counters[0].DebtsEarned);
             var egg = Run(0.6f);
             Assert.AreEqual(0, egg.Counters[0].FreshHits, "the egg refuses the hit");
-            Assert.AreEqual(0, egg.Counters[0].TrophiesEarned);
+            Assert.AreEqual(0, egg.Counters[0].DebtsEarned);
         }
 
         // A victim that stands until `from`, then pecks 3 a bite every 0.1 s until it holds `target`.
@@ -418,16 +418,16 @@ namespace CluckWars.Tests
             Assert.AreEqual(1, c.FreshHits, "the Steal's hit on the just-landed victim: one more stack, no food");
             Assert.AreEqual(1, c.Steals);
             Assert.AreEqual(11f, c.StealFood, 1e-4f, "5 + 2 x 3, the count already at the cap");
-            Assert.AreEqual(1, c.TrophyCashes);
-            Assert.AreEqual(3, c.TrophiesCashed);
-            Assert.AreEqual(6f, c.TrophyBonusFood, 1e-4f);
+            Assert.AreEqual(1, c.DebtCollects);
+            Assert.AreEqual(3, c.DebtsCollected);
+            Assert.AreEqual(6f, c.DebtBonusFood, 1e-4f);
             Assert.AreEqual(11f, r.Counters[1].LostToSteals, 1e-4f, "all the food came through the Steal");
         }
 
         [Test]
         public void Steal_ThatTakesNothing_LeavesTheCount()
         {
-            // A full Champion: the Steal takes 0, so it cashes nothing and the count stays until it decays on its own.
+            // A full Enforcer: the Steal takes 0, so it cashes nothing and the count stays until it decays on its own.
             var hunter = Champ(0, seconds: 1.5f, abilities: new[] { MatchTestKit.Stun(Big, 0.2f, 0.5f), MatchTestKit.Steal(Big, 5f, 4f) });
             var victim = MatchTestKit.Fighter("victim", 100f, new MatchAbility[0], peckAmount: 3f, peckCooldown: 0.1f, castSeconds: 0.1f, capacity: 30);
             var setup = Duo(hunter, victim, Steps((At(1f), 0), (v => v.Seats[1].LandedWithFood && v.Seats[1].Cargo >= 6f && v.Seats[1].SinceLanded >= 0.2f, 1)), 8f);
@@ -435,13 +435,13 @@ namespace CluckWars.Tests
             var r = MatchSim.Run(setup, 1);
             var c = r.Counters[0];
             Assert.AreEqual(0, c.Steals);
-            Assert.AreEqual(0, c.TrophyCashes);
-            Assert.AreEqual(2, c.TrophiesEarned, "the Stun's, then the fresh stack");
-            Assert.AreEqual(2, c.TrophiesDecayed, "the count was still there to decay");
+            Assert.AreEqual(0, c.DebtCollects);
+            Assert.AreEqual(2, c.DebtsEarned, "the Stun's, then the fresh stack");
+            Assert.AreEqual(2, c.DebtsDecayed, "the count was still there to decay");
         }
 
         [Test]
-        public void Trophies_PerEnemy_CappedAndDecayAllAtOnce()
+        public void Debts_PerEnemy_CappedAndDecayAllAtOnce()
         {
             MatchResult Run(float clock)
             {
@@ -453,10 +453,10 @@ namespace CluckWars.Tests
                 return MatchSim.Run(setup, 1);
             }
             var held = Run(4f);
-            Assert.AreEqual(6, held.Counters[0].TrophiesEarned, "three on each rival; the fourth gain at the cap adds nothing");
-            Assert.AreEqual(0, held.Counters[0].TrophiesDecayed, "the gain at the cap restarted the timer: nothing has decayed at 4 s");
+            Assert.AreEqual(6, held.Counters[0].DebtsEarned, "three on each rival; the fourth gain at the cap adds nothing");
+            Assert.AreEqual(0, held.Counters[0].DebtsDecayed, "the gain at the cap restarted the timer: nothing has decayed at 4 s");
             var gone = Run(5.5f);
-            Assert.AreEqual(6, gone.Counters[0].TrophiesDecayed, "TrophySeconds after the last gain, every count went in one step");
+            Assert.AreEqual(6, gone.Counters[0].DebtsDecayed, "DebtSeconds after the last gain, every count went in one step");
         }
 
         [Test]
@@ -471,11 +471,11 @@ namespace CluckWars.Tests
             var amounts = r.Events.Where(e => e.Kind == MatchEventKind.Bite).OrderBy(e => e.Other).Select(e => e.Amount).ToArray();
             CollectionAssert.AreEqual(new[] { 3f, 2f, 0f }, amounts, "in seat order, each held to the room left");
             Assert.AreEqual(3, r.Counters[0].FreshHits);
-            Assert.AreEqual(6, r.Counters[0].TrophiesEarned, "a count of 2 on each: the fresh stack and the Stun");
+            Assert.AreEqual(6, r.Counters[0].DebtsEarned, "a count of 2 on each: the fresh stack and the Stun");
         }
 
         [Test]
-        public void TwoChampions_OneFreshVictim_TheFirstSpendsTheState_BothEarnTheirHitTrophy()
+        public void TwoEnforcers_OneFreshVictim_TheFirstSpendsTheState_BothEarnTheirHitDebt()
         {
             var a = Champ(abilities: MatchTestKit.Stun(Big, 1f, 5f));
             var b = Champ(abilities: MatchTestKit.Shove(Big, 1f, 5f));
@@ -486,29 +486,29 @@ namespace CluckWars.Tests
             var r = MatchSim.Run(setup, 1);
             Assert.AreEqual(1, r.Counters[0].FreshHits + r.Counters[2].FreshHits, "one stack from the fresh state");
             Assert.AreEqual(1, r.Counters[0].BitesSpent + r.Counters[2].BitesSpent, "the other met a state already spent");
-            // Each cast also reaches the other Champion: 2 on the victim (fresh and hit) plus 1 for the second's hit, and one hit each on the other Champion.
-            Assert.AreEqual(5, r.Counters[0].TrophiesEarned + r.Counters[2].TrophiesEarned);
+            // Each cast also reaches the other Enforcer: 2 on the victim (fresh and hit) plus 1 for the second's hit, and one hit each on the other Enforcer.
+            Assert.AreEqual(5, r.Counters[0].DebtsEarned + r.Counters[2].DebtsEarned);
         }
 
         [Test]
         public void Executed_ClearsEveryCountOnAndOfTheDead()
         {
-            MatchResult Run(bool championDies)
+            MatchResult Run(bool enforcerDies)
             {
                 var spoiler = MatchTestKit.Fighter("spoiler", 100f, new[] { MatchTestKit.DeathMark(1f, 5f, 5f, 3f, 3f, 2f) });
-                var champion = Champ(abilities: MatchTestKit.Stun(Big, 0.2f, 5f));
+                var enforcer = Champ(abilities: MatchTestKit.Stun(Big, 0.2f, 5f));
                 var rival = Carrier("rival");
-                var setup = Arena(new MatchKit[] { spoiler, champion, rival, null }, 9f);
+                var setup = Arena(new MatchKit[] { spoiler, enforcer, rival, null }, 9f);
                 setup.Policies[0] = MatchTestKit.Stand;
-                // The dead one is the loaded one: either the Champion pecks and the rival stands, or the rival pecks late and the Champion stands.
+                // The dead one is the loaded one: either the Enforcer pecks and the rival stands, or the rival pecks late and the Enforcer stands.
                 bool stunned = false;
                 setup.Policies[1] = MatchTestKit.Policy((v, s) =>
                 {
-                    var intent = championDies ? MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(s)) : MatchTestKit.StandAt(v, s);
+                    var intent = enforcerDies ? MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(s)) : MatchTestKit.StandAt(v, s);
                     if (v.Time >= 1f && !stunned) { stunned = true; intent.CastSlot = 0; }
                     return intent;
                 });
-                setup.Policies[2] = championDies
+                setup.Policies[2] = enforcerDies
                     ? MatchTestKit.Stand
                     : MatchTestKit.Policy((v, s) => v.Time < 2f ? MatchTestKit.StandAt(v, s) : MatchTestKit.PeckAt(v, s, OracleMapSO.PersonalIndex(s)));
                 setup.Forced = new ForcedKills { Spoiler = 0, Kills = 1, Victims = ForcedVictims.Loaded, Times = new[] { 5f } };
@@ -516,10 +516,10 @@ namespace CluckWars.Tests
             }
             var dies = Run(true);
             Assert.AreEqual(1, dies.Kills[0]);
-            Assert.AreEqual(2, dies.Counters[1].TrophiesCleared, "the Champion's own counts on the two rivals went with it");
+            Assert.AreEqual(2, dies.Counters[1].DebtsCleared, "the Enforcer's own counts on the two rivals went with it");
             var victimDies = Run(false);
             Assert.AreEqual(1, victimDies.Kills[0]);
-            Assert.AreEqual(1, victimDies.Counters[1].TrophiesCleared, "only the count on the dead rival went; the one on the spoiler decays on its own");
+            Assert.AreEqual(1, victimDies.Counters[1].DebtsCleared, "only the count on the dead rival went; the one on the spoiler decays on its own");
         }
 
         [Test]
@@ -539,21 +539,21 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void Sim_CallsTheSharedRules_NotCopies_Champion()
+        public void Sim_CallsTheSharedRules_NotCopies_Enforcer()
         {
             string source = File.ReadAllText(Path.Combine(Application.dataPath, "_Game/Scripts/Balance/MatchSim.cs"));
             StringAssert.Contains("class Core", source);
-            foreach (var call in new[] { "BiteRules.Fresh(", "BiteRules.FromCast(", "BiteRules.FromCargo(", "TrophyRules.Add(", "TrophyRules.StealAmount(", "TrophyRules.Decayed(" })
+            foreach (var call in new[] { "BiteRules.Fresh(", "BiteRules.FromCast(", "BiteRules.FromCargo(", "DebtRules.Add(", "DebtRules.StealAmount(", "DebtRules.Decayed(" })
                 StringAssert.Contains(call, source, "the simulator must call the shared rule, not restate it.");
             foreach (var gone in new[] { "PeckBreakRules", "ResolveBreak", "SpillOverflow" })
-                StringAssert.DoesNotContain(gone, source, "the Peck break and the trophy room are retired");
+                StringAssert.DoesNotContain(gone, source, "the Peck break and the debt room are retired");
         }
 
-        private static MatchResult ChampionFight(bool shipped, ulong seed)
+        private static MatchResult EnforcerFight(bool shipped, ulong seed)
         {
             var hunter = Champ(30, 0f, 0f, 0f, 3, 6f, MatchTestKit.Steal(8f, 5f, 3f), MatchTestKit.Stun(8f, 1f, 3f));
             hunter.Farm.PeckCooldown = 1f;
-            if (!shipped) { hunter.Passive.Bite = BiteFacts.None; hunter.Passive.Trophy = TrophyFacts.None; }
+            if (!shipped) { hunter.Passive.Bite = BiteFacts.None; hunter.Passive.Debt = DebtFacts.None; }
             var kits = new[] { hunter, Carrier("b", 3f), Carrier("c", 3f), Carrier("d", 3f) };
             foreach (var k in kits.Skip(1)) { k.Farm.PeckCooldown = 1f; k.Farm.CargoCapacity = 30; }
             var setup = Arena(kits, 25f);
@@ -569,17 +569,17 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void ShippedOff_PlaysExactlyAsBefore_Champion()
+        public void ShippedOff_PlaysExactlyAsBefore_Enforcer()
         {
-            // The Champion as shipped (no fresh window, trophies adding nothing) against no facts at all.
+            // The Enforcer as shipped (no fresh window, debts adding nothing) against no facts at all.
             foreach (ulong seed in new ulong[] { 1, 2, 3 })
             {
-                var a = ChampionFight(true, seed);
-                var b = ChampionFight(false, seed);
+                var a = EnforcerFight(true, seed);
+                var b = EnforcerFight(false, seed);
                 Assert.AreEqual(b.Winner, a.Winner);
                 Assert.AreEqual(b.EndSeconds, a.EndSeconds);
                 CollectionAssert.AreEqual(b.Banked, a.Banked);
-                Assert.AreEqual(b.Events.Count, a.Events.Count(e => e.Kind != MatchEventKind.TrophyCash), "the only extra events are the cashes of counts");
+                Assert.AreEqual(b.Events.Count, a.Events.Count(e => e.Kind != MatchEventKind.DebtCollect), "the only extra events are the cashes of counts");
                 for (int s = 0; s < 4; s++)
                 {
                     Assert.AreEqual(b.Counters[s].Foraged, a.Counters[s].Foraged, $"seat {s}");
@@ -588,7 +588,7 @@ namespace CluckWars.Tests
                     Assert.AreEqual(0, a.Counters[s].FreshHits);
                 }
             }
-            Assert.Greater(ChampionFight(true, 1).Counters[0].Steals, 0, "the Champion did steal: the comparison is not vacuous");
+            Assert.Greater(EnforcerFight(true, 1).Counters[0].Steals, 0, "the Enforcer did steal: the comparison is not vacuous");
         }
 
         [Test]

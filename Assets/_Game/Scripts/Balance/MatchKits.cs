@@ -107,7 +107,7 @@ namespace CluckWars.Balance
                 Loot = passive.LootMark,
                 HitSteal = passive.HitSteal,
                 Bite = passive.Bite,
-                Trophy = passive.Trophy,
+                Debt = passive.Debt,
                 SlowFactorsEmitted = (float[])emittedSlowFactors.Clone(),
                 SlowFactorsReceived = received,
             };

@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7e3a5c1b9d2f4a608b1c0d4e5f6a7b82, type: 3}
-  m_Name: Champion
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ChampionPassiveSO
-  DisplayName: Champion
-  ShortLabel: CHMP
-  Description: Hit a bird that has just pecked and you stack one more trophy on it. Every hit on the same bird is a trophy, and each trophy makes your Steal on that bird bigger.
+  m_Name: Enforcer
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.EnforcerPassiveSO
+  DisplayName: Enforcer
+  ShortLabel: ENFR
+  Description: Hit a bird that has just pecked and you stack one more debt on it. Every hit on the same bird is a debt, and each debt makes your Steal on that bird bigger.
   Icon: 
   AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
   Category: 3
@@ -31,9 +31,9 @@ MonoBehaviour:
     m_Bits: 256
   FreshSeconds: 0
   FreshBiteShare: 0
-  TrophySteal: 0
-  TrophyCap: 3
-  TrophySeconds: 6
+  DebtSteal: 0
+  DebtCap: 3
+  DebtSeconds: 6
   Subclass: 1
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}

@@ -54,11 +54,11 @@ namespace CluckWars.Balance
         private MatchPhase _phase;
         private bool _leading;
         private bool _holdSteal;
-        // The Warrior kits under test (design 2026-11-25): the hit-steal facts (Bully) and the bite and trophy facts (Champion).
+        // The Warrior kits under test (design 2026-11-25): the hit-steal facts (Bully) and the bite and debt facts (Enforcer).
         private HitStealFacts _hit;
         private float _hitReach;
         private BiteFacts _bite;
-        private TrophyFacts _trophy;
+        private DebtFacts _debt;
         private float _fightReach;
         private bool _mayEngage;
 
@@ -80,7 +80,7 @@ namespace CluckWars.Balance
             _cast = -1;
             _hit = kit.Passive.HitSteal;
             _bite = kit.Passive.Bite;
-            _trophy = kit.Passive.Trophy;
+            _debt = kit.Passive.Debt;
             var abilities = kit.Abilities ?? Array.Empty<MatchAbility>();
             _mayEngage = MayEngage(abilities);
             Vector2 home = v.Map.Places[OracleMapSO.BaseIndex(_seat)].Pos;
@@ -94,9 +94,9 @@ namespace CluckWars.Balance
             float distHome = Vector2.Distance(me.Pos, home);
             float returnAt = BotTactics.ReturnThreshold(_profile, _phase, _leading, capacity);
 
-            // Free actions of the Warrior kits under test: a hit for food (Bully), a builder or a cash on a rival (Champion). Each sets the cast the intent carries.
+            // Free actions of the Warrior kits under test: a hit for food (Bully), a builder or a cash on a rival (Enforcer). Each sets the cast the intent carries.
             HitForFood(v, me, abilities, capacity - cargo);
-            ChampionOverlay(v, me, abilities, capacity - cargo);
+            EnforcerOverlay(v, me, abilities, capacity - cargo);
 
             // Priority 0: BANK OR LOSE IT. A Thief with the loot mark banks by its own rule (the clock, the win, a full beak for the next mark).
             float depositRate = Mathf.Max(0.5f, kit.Farm.DepositRate);
@@ -246,7 +246,7 @@ namespace CluckWars.Balance
                 if (preyRadius <= 0f) continue;
 
                 if (_hit.Active && !WorthAHit(v, me, rival, r, dist)) continue;   // the Bully hunts only a rival that would give food by the time he is there
-                if (ChampionOn && !WorthAFight(v, me, rival, r, dist)) continue;  // the Champion leaves the pile only for a fight that beats the Peck
+                if (EnforcerOn && !WorthAFight(v, me, rival, r, dist)) continue;  // the Enforcer leaves the pile only for a fight that beats the Peck
                 float capacity = Mathf.Max(1f, rival.Capacity);
                 float frac = Mathf.Clamp01(StealRules.Stealable(rival.Cargo) / capacity);
                 float banked = Mathf.Clamp01(rival.Banked / winTarget);
@@ -326,10 +326,10 @@ namespace CluckWars.Balance
             return BotHitStealRules.WorthHunting(gain, me.LockLeftOn(r), walk);
         }
 
-        // ---- the Champion (design 2026-11-25, section 7) ----
+        // ---- the Enforcer (design 2026-11-25, section 7) ----
 
-        // The bite or the trophy Steal is on: with both off the Champion plays its plain kit by the ordinary rules.
-        private bool ChampionOn => _trophy.IsChampion && (_bite.Active || _trophy.Steal > 0f);
+        // The bite or the debt Steal is on: with both off the Enforcer plays its plain kit by the ordinary rules.
+        private bool EnforcerOn => _debt.IsEnforcer && (_bite.Active || _debt.Steal > 0f);
 
         private float Reaction => float.IsNaN(_params.ReactionDelay) ? 0f : Mathf.Max(0f, _params.ReactionDelay);
 
@@ -339,8 +339,8 @@ namespace CluckWars.Balance
             return -1;
         }
 
-        // A rival worth leaving the pile for: the fight's food per second (a bite when it is still fresh on arrival, then the Steal on the trophies the
-        // builder and the bite would have put on it) beats the Peck's (BotChampionRules.Fight).
+        // A rival worth leaving the pile for: the fight's food per second (a bite when it is still fresh on arrival, then the Steal on the debts the
+        // builder and the bite would have put on it) beats the Peck's (BotEnforcerRules.Fight).
         private bool WorthAFight(MatchView v, in SeatView me, in SeatView rival, int r, float dist)
         {
             var kit = v.Kits[_seat];
@@ -352,8 +352,8 @@ namespace CluckWars.Balance
             }
             float walk = Mathf.Max(0f, dist - _fightReach) / Mathf.Max(0.1f, kit.Farm.MoveSpeed);
             float reaction = Reaction;
-            float freshLeft = BotChampionRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
-            bool fresh = BotChampionRules.HitFresh(freshLeft - walk, reaction);
+            float freshLeft = BotEnforcerRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
+            bool fresh = BotEnforcerRules.HitFresh(freshLeft - walk, reaction);
             float room = Mathf.Max(0f, me.Capacity - me.Cargo);
             float rivalCargo = StealRules.Stealable(rival.Cargo);
             float bite = 0f;
@@ -366,20 +366,20 @@ namespace CluckWars.Balance
             float stealGain = 0f;
             if (steal >= 0)
             {
-                int count = me.TrophyOn != null ? me.TrophyOn[r] : 0;
-                if (fresh) count = Mathf.Min(_trophy.Cap, count + 2);   // the builder's hit and the bite
+                int count = me.DebtOn != null ? me.DebtOn[r] : 0;
+                if (fresh) count = Mathf.Min(_debt.Cap, count + 2);   // the builder's hit and the bite
                 float left = rival.Pecking ? rivalCargo : Mathf.Max(0f, rivalCargo - bite);
-                stealGain = BotChampionRules.StealGain(abilities[steal].StealAmount, kit.Passive.StealFactor, _trophy.Steal, count, room - bite, left);
+                stealGain = BotEnforcerRules.StealGain(abilities[steal].StealAmount, kit.Passive.StealFactor, _debt.Steal, count, room - bite, left);
             }
             float seconds = walk + 2f * Mathf.Max(0.25f, reaction);
-            return BotChampionRules.Fight(bite + stealGain, seconds, kit.Farm.PeckAmount, Mathf.Max(kit.Farm.PeckCooldown, kit.Farm.PeckCastSeconds));
+            return BotEnforcerRules.Fight(bite + stealGain, seconds, kit.Farm.PeckAmount, Mathf.Max(kit.Farm.PeckCooldown, kit.Farm.PeckCastSeconds));
         }
 
-        // A free cast of the Champion, in the order of the design: a builder on a fresh rival in reach (or the Steal when no builder is ready and
-        // the rival carries), else a due cash of the trophies on a rival in Steal's reach. One cast per think; it never moves the chicken.
-        private void ChampionOverlay(MatchView v, in SeatView me, MatchAbility[] abilities, float room)
+        // A free cast of the Enforcer, in the order of the design: a builder on a fresh rival in reach (or the Steal when no builder is ready and
+        // the rival carries), else a due cash of the debts on a rival in Steal's reach. One cast per think; it never moves the chicken.
+        private void EnforcerOverlay(MatchView v, in SeatView me, MatchAbility[] abilities, float room)
         {
-            if (!ChampionOn || _cast >= 0 || me.Stunned) return;
+            if (!EnforcerOn || _cast >= 0 || me.Stunned) return;
             int stun = SlotOf(abilities, AbilityJob.Stun), shove = SlotOf(abilities, AbilityJob.Shove), steal = SlotOf(abilities, AbilityJob.Steal);
             bool stealReady = steal >= 0 && Ready(me, steal);
             float reaction = Reaction;
@@ -389,14 +389,14 @@ namespace CluckWars.Balance
                 int r = (_seat + k) % Seats;
                 var rival = v.Seats[r];
                 if (!rival.Present || rival.Removed || !rival.Known || rival.Hidden || rival.Shelled) continue;
-                float freshLeft = BotChampionRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
-                if (!BotChampionRules.HitFresh(freshLeft, reaction)) continue;
+                float freshLeft = BotEnforcerRules.FreshLeft(rival.Pecking, rival.PeckCastLeft, rival.SinceLanded, rival.LandedWithFood, rival.FreshBitten, _bite.FreshSeconds);
+                if (!BotEnforcerRules.HitFresh(freshLeft, reaction)) continue;
                 bool stunOk = stun >= 0 && Ready(me, stun) && CanHit(v, me, abilities[stun], r);
                 bool shoveOk = shove >= 0 && Ready(me, shove) && CanHit(v, me, abilities[shove], r);
-                int pick = BotChampionRules.PickBuilder(stunOk, shoveOk,
+                int pick = BotEnforcerRules.PickBuilder(stunOk, shoveOk,
                     stun >= 0 ? abilities[stun].Cooldown : float.MaxValue, shove >= 0 ? abilities[shove].Cooldown : float.MaxValue);
-                if (pick == BotChampionRules.Stun) { _cast = stun; return; }
-                if (pick == BotChampionRules.Shove) { _cast = shove; return; }
+                if (pick == BotEnforcerRules.Stun) { _cast = stun; return; }
+                if (pick == BotEnforcerRules.Shove) { _cast = shove; return; }
                 // No builder in reach: the Steal bites too, when the rival carries and it is in reach.
                 if (stealReady && CanHit(v, me, abilities[steal], r)) { _cast = steal; return; }
             }
@@ -410,10 +410,10 @@ namespace CluckWars.Balance
                 int r = (_seat + k) % Seats;
                 var rival = v.Seats[r];
                 if (!rival.Present || rival.Removed || !rival.Known || rival.Hidden || rival.Shelled) continue;
-                int count = me.TrophyOn != null ? me.TrophyOn[r] : 0;
+                int count = me.DebtOn != null ? me.DebtOn[r] : 0;
                 if (count < 1 || !CanHit(v, me, abilities[steal], r)) continue;
-                float gain = BotChampionRules.StealGain(abilities[steal].StealAmount, v.Kits[_seat].Passive.StealFactor, _trophy.Steal, count, room, StealRules.Stealable(rival.Cargo));
-                if (!BotChampionRules.Cash(count, _trophy.Cap, me.TrophyLeft[r], nextBuilder, gain)) continue;
+                float gain = BotEnforcerRules.StealGain(abilities[steal].StealAmount, v.Kits[_seat].Passive.StealFactor, _debt.Steal, count, room, StealRules.Stealable(rival.Cargo));
+                if (!BotEnforcerRules.Cash(count, _debt.Cap, me.DebtLeft[r], nextBuilder, gain)) continue;
                 _cast = steal;
                 return;
             }

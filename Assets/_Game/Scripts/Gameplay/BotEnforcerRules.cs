@@ -3,10 +3,10 @@ using UnityEngine;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The bot's decisions about the Champion's bite and trophies (design 2026-11-25, section 7), pure functions over facts. Called by the match
+    /// The bot's decisions about the Enforcer's bite and debts (design 2026-11-25, section 7), pure functions over facts. Called by the match
     /// simulator's P0 (<c>ScriptedPolicy</c>) now and by <c>BotController</c> in the game slice.
     /// </summary>
-    public static class BotChampionRules
+    public static class BotEnforcerRules
     {
         public const int Stun = 0;
         public const int Shove = 1;
@@ -25,7 +25,7 @@ namespace CluckWars.Gameplay
         /// <summary>A fresh rival in a ready hitter's reach is worth a hit now when it stays fresh longer than the bot's reaction.</summary>
         public static bool HitFresh(float freshLeft, float reaction) => freshLeft > reaction;
 
-        /// <summary>The hitter that builds a trophy: <see cref="Stun"/> or <see cref="Shove"/>, the shorter cooldown first (a tie goes to the Shove), <see cref="None"/> when neither is ready.</summary>
+        /// <summary>The hitter that builds a debt: <see cref="Stun"/> or <see cref="Shove"/>, the shorter cooldown first (a tie goes to the Shove), <see cref="None"/> when neither is ready.</summary>
         public static int PickBuilder(bool stunReady, bool shoveReady, float stunCooldown, float shoveCooldown)
         {
             if (!stunReady && !shoveReady) return None;
@@ -35,15 +35,15 @@ namespace CluckWars.Gameplay
         }
 
         /// <summary>
-        /// Steal that rival now: it would take at least 1 food, a trophy is on it, and either the count is at the cap or no builder is back before the
+        /// Steal that rival now: it would take at least 1 food, a debt is on it, and either the count is at the cap or no builder is back before the
         /// count decays. A Steal at count 0 stays the ordinary Steal rule.
         /// </summary>
         public static bool Cash(int count, int cap, float decayLeft, float nextBuilderReadyIn, float stealGain) =>
             stealGain >= 1f && count >= 1 && (count >= cap || nextBuilderReadyIn >= decayLeft);
 
-        /// <summary>What a Steal on a rival holding <paramref name="count"/> trophies would take: the inflated amount, held to the free room and the rival's food.</summary>
-        public static float StealGain(float stealAmount, float stealFactor, float perTrophy, int count, float freeRoom, float victimStealable) =>
-            StealMath.Clamp(TrophyRules.StealAmount(stealAmount, stealFactor, perTrophy, count), freeRoom, victimStealable);
+        /// <summary>What a Steal on a rival holding <paramref name="count"/> debts would take: the inflated amount, held to the free room and the rival's food.</summary>
+        public static float StealGain(float stealAmount, float stealFactor, float perDebt, int count, float freeRoom, float victimStealable) =>
+            StealMath.Clamp(DebtRules.StealAmount(stealAmount, stealFactor, perDebt, count), freeRoom, victimStealable);
 
         /// <summary>
         /// Leave the pile for a fight when the fight's food per second (the bite plus the Steal gain over the walk and the casts) beats the Peck's
