@@ -3,7 +3,7 @@ using UnityEngine;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The bot's decisions about the Trophy Hunter's Peck break (design 2026-11-25, section 7), pure functions over facts. Called by the match
+    /// The bot's decisions about the Champion's Peck break (design 2026-11-25, section 7), pure functions over facts. Called by the match
     /// simulator's P0 (<c>ScriptedPolicy</c>) now and by <c>BotController</c> in the game slice.
     /// </summary>
     public static class BotBreakRules

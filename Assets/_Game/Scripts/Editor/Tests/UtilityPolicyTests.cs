@@ -373,7 +373,7 @@ namespace CluckWars.Tests
             {
                 var kit = MatchTestKit.Fighter("hunter", 6f, new MatchAbility[0], peckAmount: peckAmount, capacity: 20);
                 kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-                kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+                kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
                 return kit;
             }
             MatchView Scene(float myPeck, float rivalBite)

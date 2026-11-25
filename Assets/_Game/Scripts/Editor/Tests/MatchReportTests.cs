@@ -259,7 +259,7 @@ namespace CluckWars.Tests
             kit.Class = ChickenClass.Warrior;
             kit.Passive.HitSteal = new HitStealFacts { Stun = 2f, Shove = 2f, LockSeconds = 3f };
             kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-            kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
 
             var results = new MatchResult[2];
             for (int i = 0; i < results.Length; i++)

@@ -11,7 +11,7 @@ using MatchEventKind = CluckWars.Balance.MatchEventKind;
 namespace CluckWars.Tests
 {
     /// <summary>
-    /// The two Warrior kits under test in the match simulator (design 2026-11-25): the Bully's hit-steal and the Trophy Hunter's break and
+    /// The two Warrior kits under test in the match simulator (design 2026-11-25): the Bully's hit-steal and the Champion's break and
     /// trophies. Every number is the test's own on synthetic maps and kits; nothing asserts a win rate.
     /// </summary>
     public sealed class MatchWarriorTests
@@ -259,14 +259,14 @@ namespace CluckWars.Tests
                 StringAssert.Contains(call, source, "the simulator must call the game's rule, not restate it.");
         }
 
-        // ================================================================ the Trophy Hunter
+        // ================================================================ the Champion
 
         private static MatchKit Hunter(float reach, int room = 0, int cap = 3, bool clearOnBank = false, int capacity = 100, float breakCooldown = 2.5f,
             float immune = 2.5f, float peckCooldown = 500f, params MatchAbility[] abilities)
         {
             var kit = MatchTestKit.Fighter("hunter", 100f, abilities, peckAmount: 3f, peckCooldown: peckCooldown, castSeconds: 0.1f, capacity: capacity);
             kit.Passive.Break = new PeckBreakFacts { Reach = reach, Cooldown = breakCooldown, ImmuneSeconds = immune };
-            kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = room, Cap = cap, ClearOnBank = clearOnBank };
+            kit.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = room, Cap = cap, ClearOnBank = clearOnBank };
             return kit;
         }
 
@@ -448,7 +448,7 @@ namespace CluckWars.Tests
             Assert.AreEqual(3, c.TrophiesEarned, "a trophy a cast, however many birds, and none past the cap");
             Assert.AreEqual(3, c.TrophyPeak);
             Assert.AreEqual(3, c.TrophiesAtEnd, "banking keeps trophies when the passive says so");
-            Assert.AreEqual(0, r.Counters[1].TrophiesEarned + r.Counters[1].TrophiesLost, "a rival that is not a Trophy Hunter holds none");
+            Assert.AreEqual(0, r.Counters[1].TrophiesEarned + r.Counters[1].TrophiesLost, "a rival that is not a Champion holds none");
         }
 
         private static PolicyFactory Wander(params (float time, int slot)[] plan)
@@ -602,7 +602,7 @@ namespace CluckWars.Tests
         [Test]
         public void ShippedOff_PlaysExactlyAsBefore_TrophyHalf()
         {
-            // The Trophy Hunter as shipped (no reach, room 0, a cap of 3) against no facts at all.
+            // The Champion as shipped (no reach, room 0, a cap of 3) against no facts at all.
             foreach (ulong seed in new ulong[] { 1, 2, 3 })
             {
                 var a = TrophyFight(true, seed);

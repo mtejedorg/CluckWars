@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The Trophy Hunter's trophy rules (design 2026-11-25): pure functions over facts.</summary>
+    /// <summary>The Champion's trophy rules (design 2026-11-25): pure functions over facts.</summary>
     public sealed class TrophyRulesTests
     {
         [Test]
@@ -26,11 +26,11 @@ namespace CluckWars.Tests
         [Test]
         public void Room_IsTrophiesTimesRoom()
         {
-            var f = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+            var f = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
             Assert.AreEqual(0f, TrophyRules.Room(0, f));
             Assert.AreEqual(6f, TrophyRules.Room(3, f));
-            Assert.AreEqual(0f, TrophyRules.Room(3, new TrophyFacts { IsTrophyHunter = true, Room = 0, Cap = 3 }), "room 0: trophies add nothing");
-            Assert.AreEqual(0f, TrophyRules.Room(3, TrophyFacts.None), "not the Trophy Hunter's kit");
+            Assert.AreEqual(0f, TrophyRules.Room(3, new TrophyFacts { IsChampion = true, Room = 0, Cap = 3 }), "room 0: trophies add nothing");
+            Assert.AreEqual(0f, TrophyRules.Room(3, TrophyFacts.None), "not the Champion's kit");
         }
 
         [Test]

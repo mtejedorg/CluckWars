@@ -81,7 +81,7 @@ namespace CluckWars.Tests
         {
             // A subclass with no asset is dead code that still shows up in code search
             // and misleads the next person balancing the kit.
-            // Simulator-only kits (Data/Simulator, e.g. the Trophy Hunter) are not part of the roster the folder tests above guard, but a type whose
+            // Simulator-only kits (Data/Simulator, e.g. the Champion) are not part of the roster the folder tests above guard, but a type whose
             // only asset lives there is not dead code.
             var typesWithAssets = AllAssets().Concat(TestAssets.LoadAllIn<AbilityBaseSO>(TestAssets.DataRoot + "/Simulator"))
                 .Select(a => a.GetType()).Distinct().ToHashSet();

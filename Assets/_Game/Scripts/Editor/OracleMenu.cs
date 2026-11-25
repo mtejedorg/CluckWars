@@ -260,7 +260,7 @@ namespace CluckWars.EditorTools
 
         /// <summary>
         /// The what-if roster swap: a copy of <paramref name="shipped"/> with each named passive replaced by the passive asset of the other name (found
-        /// anywhere under <c>Assets/_Game/Data</c>, so one outside the registry such as the Trophy Hunter qualifies). The caller destroys the returned copy.
+        /// anywhere under <c>Assets/_Game/Data</c>, so one outside the registry such as the Champion qualifies). The caller destroys the returned copy.
         /// </summary>
         private static AbilityRegistrySO SwapRoster(AbilityRegistrySO shipped, IReadOnlyList<KeyValuePair<string, string>> roster, ILogService log)
         {

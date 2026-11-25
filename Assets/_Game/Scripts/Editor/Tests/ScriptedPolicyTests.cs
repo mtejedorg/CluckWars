@@ -419,12 +419,12 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void P0TrophyHunter_BreaksARivalCastingInReach()
+        public void P0Champion_BreaksARivalCastingInReach()
         {
             var hunter = MatchTestKit.Fighter("hunter", 6f, new MatchAbility[0], capacity: 20);
             hunter.Bot = QuietWarrior;
             hunter.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
-            hunter.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+            hunter.Passive.Trophy = new TrophyFacts { IsChampion = true, Room = 2, Cap = 3 };
             var view = View(Four(hunter, Kit("rival")));
             view.Seats[0].Pos = Vector2.zero;                        // inside the centre pile's reach: the bot could peck it itself
             view.Seats[1].Pos = new Vector2(2f, 0f);

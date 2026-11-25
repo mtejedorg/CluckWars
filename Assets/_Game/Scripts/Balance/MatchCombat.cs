@@ -193,7 +193,7 @@ namespace CluckWars.Balance
         public int HitRefusedRoom;
         /// <summary>Food hit-steals took from this seat (victim side; also in <see cref="LostToSteals"/>).</summary>
         public float HitLostFood;
-        /// <summary>Peck breaks this seat landed (the Trophy Hunter's).</summary>
+        /// <summary>Peck breaks this seat landed (the Champion's).</summary>
         public int Breaks;
         /// <summary>Food breaks took from the victims' piles into this seat's cargo (not counted as foraged).</summary>
         public float BreakFood;

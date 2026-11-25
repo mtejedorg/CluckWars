@@ -23,7 +23,7 @@ namespace CluckWars.Balance
         public double ReplicateScale = 1.0;
         public List<WhatIfScenario> Scenarios = new List<WhatIfScenario>();
         /// <summary>
-        /// The roster swap (<c>"roster":{"Relentless":"TrophyHunter"}</c>, asset names): the passive named by the key gives its seat to the one named by the
+        /// The roster swap (<c>"roster":{"Relentless":"Champion"}</c>, asset names): the passive named by the key gives its seat to the one named by the
         /// value for the whole run, baseline included (<see cref="OracleRoster"/>). Empty for no swap.
         /// </summary>
         public List<KeyValuePair<string, string>> Roster = new List<KeyValuePair<string, string>>();
@@ -43,7 +43,7 @@ namespace CluckWars.Balance
                         result.ReplicateScale = member.Value.Number;
                         break;
                     case "roster":
-                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"TrophyHunter\"}"; return false; }
+                        if (member.Value.Kind != JsonKind.Object) { error = "\"roster\" must be an object of passive asset names, like {\"Relentless\":\"Champion\"}"; return false; }
                         foreach (var swap in member.Value.Members)
                         {
                             if (swap.Value.Kind != JsonKind.String || string.IsNullOrWhiteSpace(swap.Value.Text) || string.IsNullOrWhiteSpace(swap.Key))
@@ -137,9 +137,9 @@ namespace CluckWars.Balance
         public int MatchesPlayed;
         public double ElapsedSeconds;
         public string SpoilerKit, ThiefKit;
-        /// <summary>The kit with a hit-steal (or the Bully's asset) and the Trophy Hunter's kit, for the Warrior overviews; null when none plays.</summary>
+        /// <summary>The kit with a hit-steal (or the Bully's asset) and the Champion's kit, for the Warrior overviews; null when none plays.</summary>
         public string BullyKit, TrophyKit;
-        /// <summary>The roster swap this run played under, as "Relentless -> TrophyHunter" lines; null for none.</summary>
+        /// <summary>The roster swap this run played under, as "Relentless -> Champion" lines; null for none.</summary>
         public string Roster;
         public string[] KitLabels;
         public WhatIfResult Baseline;
@@ -204,7 +204,7 @@ namespace CluckWars.Balance
                 SpoilerKit = baseContext.Kits.FirstOrDefault(k => k.Passive.MatchEndBonusFood > 0f)?.Label,
                 ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Loot.IsThief || k.Passive.StealFactor > 1f)?.Label,
                 BullyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.HitSteal.Active || k.Passive.Asset == "Bully")?.Label,
-                TrophyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Trophy.IsTrophyHunter)?.Label,
+                TrophyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Trophy.IsChampion)?.Label,
             };
 
             WhatIfResult Play(string name, string delta, MatchContext context, string hash)
@@ -487,7 +487,7 @@ namespace CluckWars.Balance
                 sb.AppendLine();
             }
 
-            foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Trophy Hunter", o.TrophyKit) })
+            foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Champion", o.TrophyKit) })
             {
                 if (kit == null || !(title == "the Bully" ? played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": hit")))
                                                           : played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": breaks")))))

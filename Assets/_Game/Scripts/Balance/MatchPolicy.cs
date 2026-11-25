@@ -47,7 +47,7 @@ namespace CluckWars.Balance
         public int CastSlot;
         public int CastTarget;
         /// <summary>
-        /// Press the Trophy Hunter's Peck break on <see cref="BreakTarget"/>: a one-off like a cast. A bool flag, so an object initializer that leaves it
+        /// Press the Champion's Peck break on <see cref="BreakTarget"/>: a one-off like a cast. A bool flag, so an object initializer that leaves it
         /// out never means "break seat 0". If the rival's cast is already over when the press resolves, the press falls back to a pile Peck, else it cancels.
         /// </summary>
         public bool Break;
@@ -95,7 +95,7 @@ namespace CluckWars.Balance
         public float[] CooldownLeft;
         /// <summary>Beak capacity now: the class capacity through the passive, plus the room the held trophies add. Policies read this, never the kit.</summary>
         public float Capacity;
-        /// <summary>Trophies held (the Trophy Hunter's; 0 for every other kit).</summary>
+        /// <summary>Trophies held (the Champion's; 0 for every other kit).</summary>
         public int Trophies;
         /// <summary>Seconds until this seat's Peck cast ends; 0 unless it is pecking. A rival's is read only while it is seen.</summary>
         public float PeckCastLeft;

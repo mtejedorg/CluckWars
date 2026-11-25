@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7e3a5c1b9d2f4a608b1c0d4e5f6a7b82, type: 3}
-  m_Name: TrophyHunter
-  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TrophyHunterPassiveSO
-  DisplayName: Trophy Hunter
-  ShortLabel: TRPH
+  m_Name: Champion
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.ChampionPassiveSO
+  DisplayName: Champion
+  ShortLabel: CHMP
   Description: Catch a rival mid Peck and the bite is yours. Every catch is a trophy, and each trophy makes your beak bigger.
   Icon: 
   AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}

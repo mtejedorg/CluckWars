@@ -33,7 +33,7 @@ namespace CluckWars.Tests
         {
             _shipped = TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
             _relentless = _shipped.Passives.First(p => p.name == "Relentless");
-            _hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/TrophyHunter.asset");
+            _hunter = TestAssets.Load<PassiveAbilitySO>(WarriorPassiveDataTests.SimulatorDir + "/Champion.asset");
         }
 
         [TearDown]
@@ -77,22 +77,22 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void SwappedRegistry_LetsTheBookAddressTheTrophyHunter()
+        public void SwappedRegistry_LetsTheBookAddressTheChampion()
         {
             _copy = OracleRoster.Swap(_shipped, _relentless, _hunter);
             var classes = TestAssets.Load<ChickenClassRegistrySO>(TestAssets.ChickenClassRegistryPath);
             var match = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
             using (var book = new BalanceBook(new QuietLog(), _copy, classes, match))
             {
-                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"TrophyHunter\":{\"BreakReach\":2.5,\"TrophyRoom\":2,\"TrophiesClearOnBank\":true}}}", "test");
+                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"BreakReach\":2.5,\"TrophyRoom\":2,\"TrophiesClearOnBank\":true}}}", "test");
                 Assert.IsTrue(verdict.IsAccepted, verdict.Reason);
                 CollectionAssert.IsEmpty(verdict.Ignored);
-                Assert.AreEqual(3, verdict.Changes.Count(c => c.Contains("TrophyHunter.")));
+                Assert.AreEqual(3, verdict.Changes.Count(c => c.Contains("Champion.")));
             }
             using (var book = new BalanceBook(new QuietLog(), _shipped, classes, match))
             {
-                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"TrophyHunter\":{\"BreakReach\":2.5}}}", "test");
-                Assert.IsNotEmpty(verdict.Ignored, "over the shipped registry the Trophy Hunter is not addressable");
+                var verdict = book.Evaluate("{\"schema\":1,\"assets\":{\"Champion\":{\"BreakReach\":2.5}}}", "test");
+                Assert.IsNotEmpty(verdict.Ignored, "over the shipped registry the Champion is not addressable");
             }
         }
     }

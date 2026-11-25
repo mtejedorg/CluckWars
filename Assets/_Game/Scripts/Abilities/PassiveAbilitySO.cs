@@ -218,10 +218,10 @@ namespace CluckWars.Abilities
         /// match simulator as a property; nothing in the game reads it yet.</summary>
         public virtual HitStealFacts HitSteal => HitStealFacts.None;
 
-        /// <summary>The Trophy Hunter's Peck break as numbers; a reach of 0 (the default) is no break. Read by the match simulator only.</summary>
+        /// <summary>The Champion's Peck break as numbers; a reach of 0 (the default) is no break. Read by the match simulator only.</summary>
         public virtual PeckBreakFacts PeckBreak => default;
 
-        /// <summary>The Trophy Hunter's trophies as numbers; <see cref="TrophyFacts.None"/> for every other passive. Read by the match simulator only.</summary>
+        /// <summary>The Champion's trophies as numbers; <see cref="TrophyFacts.None"/> for every other passive. Read by the match simulator only.</summary>
         public virtual TrophyFacts Trophy => TrophyFacts.None;
 
         /// <summary>

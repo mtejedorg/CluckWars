@@ -3,14 +3,14 @@ using System.Collections.Generic;
 namespace CluckWars.Gameplay
 {
     /// <summary>
-    /// The Trophy Hunter's Peck break as numbers (design 2026-11-25): catch a rival mid Peck-cast, cut it and take its bite from its pile. A
+    /// The Champion's Peck break as numbers (design 2026-11-25): catch a rival mid Peck-cast, cut it and take its bite from its pile. A
     /// <see cref="Reach"/> of 0 is no break at all (the shipped value).
     /// </summary>
     public struct PeckBreakFacts
     {
         /// <summary>Centre to centre metres a break reaches; 0 = no break.</summary>
         public float Reach;
-        /// <summary>Seconds before the same Trophy Hunter may break again. Gates breaks only, never his Peck.</summary>
+        /// <summary>Seconds before the same Champion may break again. Gates breaks only, never his Peck.</summary>
         public float Cooldown;
         /// <summary>Seconds a broken rival cannot be broken again.</summary>
         public float ImmuneSeconds;

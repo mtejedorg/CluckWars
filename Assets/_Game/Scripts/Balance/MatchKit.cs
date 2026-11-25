@@ -86,9 +86,9 @@ namespace CluckWars.Balance
         public LootMarkFacts Loot;
         /// <summary>The Bully's hit-steal (<see cref="HitStealFacts.Active"/> false for every other passive and for the shipped Bully).</summary>
         public HitStealFacts HitSteal;
-        /// <summary>The Trophy Hunter's Peck break (<see cref="PeckBreakFacts.Active"/> false for every other passive and as shipped).</summary>
+        /// <summary>The Champion's Peck break (<see cref="PeckBreakFacts.Active"/> false for every other passive and as shipped).</summary>
         public PeckBreakFacts Break;
-        /// <summary>The Trophy Hunter's trophies (<see cref="TrophyFacts.IsTrophyHunter"/> false for every other passive).</summary>
+        /// <summary>The Champion's trophies (<see cref="TrophyFacts.IsChampion"/> false for every other passive).</summary>
         public TrophyFacts Trophy;
         /// <summary>Every slow factor the shipped kits emit, and what this passive turns each into when it is the victim (parallel arrays).</summary>
         public float[] SlowFactorsEmitted;

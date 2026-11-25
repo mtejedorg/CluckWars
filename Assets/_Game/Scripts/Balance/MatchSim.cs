@@ -361,7 +361,7 @@ namespace CluckWars.Balance
             // hit-steal (the Bully's): when each victim is next open to this chicken's hits, by victim seat
             public readonly float[] HitLockUntil = new float[Seats];
 
-            // trophies and the Peck break (the Trophy Hunter's)
+            // trophies and the Peck break (the Champion's)
             public int Trophies;
             public float BreakImmuneUntil;
             public float NextBreakAt;
@@ -1026,7 +1026,7 @@ namespace CluckWars.Balance
                             }
                             if (ab.Knockback > 0f && !MatchCombat.Refused(IncomingEffect.Shove, _egg[v], _walk[v])) Shove(s, v, ab.Knockback, ab.Job);
                         }
-                        if (PassiveOf(s).Trophy.IsTrophyHunter && TrophyRules.StealEarns(taken)) EarnTrophy(s);   // one trophy a cast, however many birds it robbed
+                        if (PassiveOf(s).Trophy.IsChampion && TrophyRules.StealEarns(taken)) EarnTrophy(s);   // one trophy a cast, however many birds it robbed
                         break;
                     }
                     case AbilityJob.Stun:
@@ -1331,7 +1331,7 @@ namespace CluckWars.Balance
                 }
             }
 
-            // ---- trophies, overflow and the Peck break (the Trophy Hunter's, design 2026-11-25) ----
+            // ---- trophies, overflow and the Peck break (the Champion's, design 2026-11-25) ----
 
             // A rival took food from this chicken (a Steal, a marked steal or a hit-steal): it loses a trophy, and a smaller beak lets the excess go.
             private void Robbed(int victim)
@@ -1377,7 +1377,7 @@ namespace CluckWars.Balance
             private void BankTrophies(int s, Chick ch)
             {
                 var facts = PassiveOf(s).Trophy;
-                if (!facts.IsTrophyHunter || ch.Trophies <= 0) return;
+                if (!facts.IsChampion || ch.Trophies <= 0) return;
                 ref SeatCounters n = ref _result.Counters[s];
                 float added = TrophyRules.Room(ch.Trophies, facts);
                 n.TrophyRoomOffered += added;

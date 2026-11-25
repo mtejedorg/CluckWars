@@ -92,7 +92,7 @@ namespace CluckWars.Balance
             float distHome = Vector2.Distance(me.Pos, home);
             float returnAt = BotTactics.ReturnThreshold(_profile, _phase, _leading, capacity);
             var trophy = kit.Passive.Trophy;
-            if (trophy.IsTrophyHunter)   // the trophies' room is worth carrying: the amount grows with them
+            if (trophy.IsChampion)   // the trophies' room is worth carrying: the amount grows with them
                 returnAt = BotBreakRules.ReturnFraction(BotTactics.ReturnThreshold(_profile, _phase, _leading), _profile.ReturnAmount, me.Trophies, trophy.Room, capacity);
 
             // Free actions of the Warrior kits under test: a hit for food, a break on a rival's Peck. Each sets the cast or the press the intent carries.
@@ -325,7 +325,7 @@ namespace CluckWars.Balance
             return BotHitStealRules.WorthHunting(gain, me.LockLeftOn(r), walk);
         }
 
-        // The Trophy Hunter's press: break the nearest rival whose Peck is in reach and will still be casting after the reaction, when the bot may
+        // The Champion's press: break the nearest rival whose Peck is in reach and will still be casting after the reaction, when the bot may
         // (BotBreakRules.ShouldBreak); else note a rival to walk to (BotBreakRules.Approach).
         private void BreakOverlay(MatchView v, in SeatView me, MatchKit kit)
         {

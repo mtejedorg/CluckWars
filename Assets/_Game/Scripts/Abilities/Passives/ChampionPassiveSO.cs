@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CluckWars.Abilities
 {
     /// <summary>
-    /// <b>Warrior kit under test: the Trophy Hunter</b> (design 2026-11-25). Catch a rival mid Peck-cast and its bite is yours; every break and every
+    /// <b>Warrior kit under test: the Champion</b> (design 2026-11-25). Catch a rival mid Peck-cast and its bite is yours; every break and every
     /// Steal that takes food is a trophy, and each trophy makes the beak bigger. Kit: Peck, Speed, Steal, Slow (Relentless's kit).
     /// </summary>
     /// <remarks>
@@ -12,8 +12,8 @@ namespace CluckWars.Abilities
     /// match simulator. Its shipped numbers are off (reach 0, room 0) whatever the swap. Nothing in the game reads <see cref="PassiveAbilitySO.PeckBreak"/>
     /// or <see cref="PassiveAbilitySO.Trophy"/> yet. <c>RelentlessPassiveSO</c> stays as it was.
     /// </remarks>
-    [CreateAssetMenu(fileName = "TrophyHunter", menuName = "Cluck Wars/Passive/Trophy Hunter", order = 19)]
-    public sealed class TrophyHunterPassiveSO : PassiveAbilitySO
+    [CreateAssetMenu(fileName = "Champion", menuName = "Cluck Wars/Passive/Champion", order = 19)]
+    public sealed class ChampionPassiveSO : PassiveAbilitySO
     {
         [Header("Peck break")]
         [Tooltip("Centre to centre metres a break reaches. 0 = no break (shipped).")]
@@ -31,10 +31,10 @@ namespace CluckWars.Abilities
         [Tooltip("true: banking clears every trophy (a streak). false: trophies are kept through banking (slow growth). Shipped false.")]
         public bool TrophiesClearOnBank = false;
 
-        public TrophyHunterPassiveSO()
+        public ChampionPassiveSO()
         {
-            DisplayName = "Trophy Hunter";
-            ShortLabel = "TRPH";
+            DisplayName = "Champion";
+            ShortLabel = "CHMP";
             AllowedClasses = ChickenClassFlags.Warrior;
         }
 
@@ -43,6 +43,6 @@ namespace CluckWars.Abilities
             Reach = BreakReach, Cooldown = BreakCooldown, ImmuneSeconds = BreakImmuneSeconds,
         };
 
-        public override TrophyFacts Trophy => new TrophyFacts { IsTrophyHunter = true, Room = TrophyRoom, Cap = TrophyCap, ClearOnBank = TrophiesClearOnBank };
+        public override TrophyFacts Trophy => new TrophyFacts { IsChampion = true, Room = TrophyRoom, Cap = TrophyCap, ClearOnBank = TrophiesClearOnBank };
     }
 }

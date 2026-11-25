@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The bot's decisions about the Bully's hit-steal and the Trophy Hunter's break (design 2026-11-25, section 7): pure functions over facts.</summary>
+    /// <summary>The bot's decisions about the Bully's hit-steal and the Champion's break (design 2026-11-25, section 7): pure functions over facts.</summary>
     public sealed class BotWarriorRulesTests
     {
         [Test]

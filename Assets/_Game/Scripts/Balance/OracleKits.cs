@@ -54,7 +54,7 @@ namespace CluckWars.Balance
 
         /// <summary>
         /// A passive's kit label: its <see cref="ChickenSubclass"/> name when the asset is named like the subclass's suffix (every shipped passive:
-        /// <c>Fatty_Hoarder</c>), else <c>&lt;Class&gt;_&lt;asset name&gt;</c>, so a passive seated by a what-if roster swap reads <c>Warrior_TrophyHunter</c>.
+        /// <c>Fatty_Hoarder</c>), else <c>&lt;Class&gt;_&lt;asset name&gt;</c>, so a passive seated by a what-if roster swap reads <c>Warrior_Champion</c>.
         /// </summary>
         public static string LabelOf(PassiveAbilitySO passive)
         {

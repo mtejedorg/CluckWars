@@ -8,7 +8,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The shipped data of the two Warrior kits under test (design 2026-11-25): both ship off, the Trophy Hunter is not in the game's registry.</summary>
+    /// <summary>The shipped data of the two Warrior kits under test (design 2026-11-25): both ship off, the Champion is not in the game's registry.</summary>
     public sealed class WarriorPassiveDataTests
     {
         private const string PassivesDir = TestAssets.AbilitiesDir + "/Passives";
@@ -28,7 +28,7 @@ namespace CluckWars.Tests
 
         private static AbilityRegistrySO Registry => TestAssets.Load<AbilityRegistrySO>(TestAssets.AbilityRegistryPath);
         private static PassiveAbilitySO Passive(string name) => TestAssets.Load<PassiveAbilitySO>($"{PassivesDir}/{name}.asset");
-        private static PassiveAbilitySO TrophyHunter() => TestAssets.Load<PassiveAbilitySO>($"{SimulatorDir}/TrophyHunter.asset");
+        private static PassiveAbilitySO Champion() => TestAssets.Load<PassiveAbilitySO>($"{SimulatorDir}/Champion.asset");
 
         [Test]
         public void ShippedBully_HitStealIsOff()
@@ -44,18 +44,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TrophyHunter_IsNotRegistered_AndItsKitIsLegal()
+        public void Champion_IsNotRegistered_AndItsKitIsLegal()
         {
-            var hunter = TrophyHunter();
+            var hunter = Champion();
             var relentless = Passive("Relentless");
-            Assert.IsFalse(Registry.All.Contains(hunter), "the game cannot pick the Trophy Hunter");
+            Assert.IsFalse(Registry.All.Contains(hunter), "the game cannot pick the Champion");
             Assert.IsFalse(Registry.Passives.Contains(hunter));
             Assert.IsEmpty(FixedKit.Problems(hunter), string.Join(" | ", FixedKit.Problems(hunter)));
-            CollectionAssert.AreEqual(relentless.Kit, hunter.Kit, "the Trophy Hunter plays Relentless's four abilities");
+            CollectionAssert.AreEqual(relentless.Kit, hunter.Kit, "the Champion plays Relentless's four abilities");
             Assert.AreEqual(relentless.Subclass, hunter.Subclass);
             Assert.AreEqual(ChickenClassFlags.Warrior, hunter.AllowedClasses);
             Assert.IsFalse(hunter.PeckBreak.Active, "shipped with no break");
-            Assert.IsTrue(hunter.Trophy.IsTrophyHunter);
+            Assert.IsTrue(hunter.Trophy.IsChampion);
             Assert.AreEqual(0, hunter.Trophy.Room, "shipped with trophies adding no room");
             Assert.IsFalse(hunter.Trophy.ClearOnBank, "shipped: trophies are kept through banking");
             Assert.AreEqual(1f, hunter.OutgoingControlMultiplier, "no multipliers");

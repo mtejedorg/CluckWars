@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace CluckWars.Tests
 {
-    /// <summary>The Trophy Hunter's Peck break rules (design 2026-11-25): pure functions over facts.</summary>
+    /// <summary>The Champion's Peck break rules (design 2026-11-25): pure functions over facts.</summary>
     public sealed class PeckBreakRulesTests
     {
         [Test]

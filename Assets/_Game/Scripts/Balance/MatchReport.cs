@@ -188,7 +188,7 @@ namespace CluckWars.Balance
     }
 
     /// <summary>
-    /// One Warrior kit's rows in one population (mixed design, design 2026-11-25 section 8.3): the Bully's hit-steal, the Trophy Hunter's breaks and trophies,
+    /// One Warrior kit's rows in one population (mixed design, design 2026-11-25 section 8.3): the Bully's hit-steal, the Champion's breaks and trophies,
     /// the overflow to the centre pile and the worst loss one victim took inside <see cref="MatchReports.LossWindowSeconds"/>. Per match, over the matches that held the kit.
     /// </summary>
     public sealed class WarriorLine
@@ -902,7 +902,7 @@ namespace CluckWars.Balance
                 section.Warriors.Add(new WarriorLine
                 {
                     Kit = kit.Label, Matches = n, Win = win,
-                    HitActive = kit.Passive.HitSteal.Active, BreakActive = kit.Passive.Break.Active, TrophyKit = kit.Passive.Trophy.IsTrophyHunter,
+                    HitActive = kit.Passive.HitSteal.Active, BreakActive = kit.Passive.Break.Active, TrophyKit = kit.Passive.Trophy.IsChampion,
                     HitTakesPerMatch = (float)(takes / n), HitFoodPerMatch = (float)(hitFood / n), HitRefusedLockPerMatch = (float)(lockRef / n),
                     HitRefusedNoFoodPerMatch = (float)(noFood / n), HitRefusedRoomPerMatch = (float)(roomRef / n), HitLostFoodPerMatch = (float)(hitLost / n),
                     BreaksPerMatch = (float)(breaks / n), BreakFoodPerMatch = (float)(breakFood / n), BreakLeftInPilePerMatch = (float)(left / n),
@@ -1290,7 +1290,7 @@ namespace CluckWars.Balance
             if (!pops.Any(p => p.Warriors.Count > 0)) sb.AppendLine("No Warrior kit in these matches.");
             else
             {
-                sb.AppendLine("Per match, over the matches that held the kit (mixed design). The Bully's rows are the hit-steal (takes and food, then the hits that took nothing: rival locked, rival empty, beak full; food lost is the victim's side). The Trophy Hunter's rows are the breaks (landed, food taken, food of the bite left in the pile, presses that fell back to a pile Peck, visible cancels, refused presses; Pecks broken is the victim's side), the trophies (earned, lost to a rival's take or an execution, cleared by banking, held on average over the match, the peak, held at the end, the room they added at the trips home and the share of it the trips used), the food that overflowed to the centre pile, and the worst loss one victim took inside " + MatchReports.LossWindowSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " s from this kit's hit-steals, Steals and breaks (mean over matches and 95th percentile).");
+                sb.AppendLine("Per match, over the matches that held the kit (mixed design). The Bully's rows are the hit-steal (takes and food, then the hits that took nothing: rival locked, rival empty, beak full; food lost is the victim's side). The Champion's rows are the breaks (landed, food taken, food of the bite left in the pile, presses that fell back to a pile Peck, visible cancels, refused presses; Pecks broken is the victim's side), the trophies (earned, lost to a rival's take or an execution, cleared by banking, held on average over the match, the peak, held at the end, the room they added at the trips home and the share of it the trips used), the food that overflowed to the centre pile, and the worst loss one victim took inside " + MatchReports.LossWindowSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " s from this kit's hit-steals, Steals and breaks (mean over matches and 95th percentile).");
                 sb.AppendLine();
                 sb.AppendLine("| Kit | Population | Matches | Win | Hit takes | Hit food | Refused: lock / empty / full | Hit food lost | Breaks | Break food | Left in pile | Fallbacks | Cancels | Refused | Pecks broken | Trophies earned | Lost | Cleared | Held (mean) | Peak | At end | Room added | Room used | Overflow | Identity food | Worst loss mean | Worst loss p95 |");
                 sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");

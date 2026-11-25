@@ -375,7 +375,7 @@ namespace CluckWars.Balance
             }
         }
 
-        // The Trophy Hunter's break: the press is either a break or a pile Peck, so it is made when what it gains (the bite, the bite the rival does
+        // The Champion's break: the press is either a break or a pile Peck, so it is made when what it gains (the bite, the bite the rival does
         // not get, and the trophy's room while a trophy is still to win) is more than the Peck the press would have been.
         private bool BreakFor(MatchView v)
         {
