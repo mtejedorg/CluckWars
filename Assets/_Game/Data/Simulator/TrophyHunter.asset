@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e3a5c1b9d2f4a608b1c0d4e5f6a7b82, type: 3}
+  m_Name: TrophyHunter
+  m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Abilities.TrophyHunterPassiveSO
+  DisplayName: Trophy Hunter
+  ShortLabel: TRPH
+  Description: Catch a rival mid Peck and the bite is yours. Every catch is a trophy, and each trophy makes your beak bigger.
+  Icon: 
+  AccentColor: {r: 0.95, g: 0.45, b: 0.25, a: 1}
+  Category: 3
+  TerrainTraversal: 0
+  JumpTier: 0
+  SlotKind: 1
+  AllowedClasses: 1
+  BotRole: 0
+  Duration: 0.05
+  Cooldown: 0
+  SearchMask:
+  CastMotion: 8
+    serializedVersion: 2
+    m_Bits: 256
+  BreakReach: 0
+  BreakCooldown: 2.5
+  BreakImmuneSeconds: 2.5
+  TrophyRoom: 0
+  TrophyCap: 3
+  TrophiesClearOnBank: 0
+  Subclass: 1
+  Kit:
+  - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
+  - {fileID: 11400000, guid: 56e7e5a4f2b9a20498cfb1430f961527, type: 2}
+  - {fileID: 11400000, guid: eca28bb35594446b9dd8b6016f5493fe, type: 2}
+  - {fileID: 11400000, guid: 4c026dfa11fd40cd9914aa8fb37090b6, type: 2}

@@ -25,6 +25,16 @@ namespace CluckWars.Abilities
         [Tooltip("Multiplier on ability cooldowns. 0.75 = 25% faster. Does NOT apply to Peck.")]
         [Range(0.25f, 1f)] public float CooldownMultiplier = 0.75f;
 
+        [Header("Hit-steal (design 2026-11-25; shipped off)")]
+        [Tooltip("Food a Stun that really affects a rival takes into this chicken's cargo. 0 = off (shipped).")]
+        [Min(0f)] public float HitStealStun = 0f;
+        [Tooltip("Food a Shove that really moves a rival takes into this chicken's cargo. 0 = off (shipped).")]
+        [Min(0f)] public float HitStealShove = 0f;
+        [Tooltip("Food an instant Slow that lands takes into this chicken's cargo. 0 = off (designed 0: Slow Area never takes).")]
+        [Min(0f)] public float HitStealSlow = 0f;
+        [Tooltip("Seconds a take locks the same victim against every hitter of this chicken.")]
+        [Min(0f)] public float HitStealLockSeconds = 3f;
+
         public BullyPassiveSO()
         {
             DisplayName = "Bully";
@@ -36,6 +46,11 @@ namespace CluckWars.Abilities
         public override string PerkDetailKey => UiKeys.PerkBullyDetail;
         public override (string name, object value)[] PerkArgs(MatchConfigSO match) =>
             new (string, object)[] { ("pct", Percent(1f - CooldownMultiplier)) };
+
+        public override HitStealFacts HitSteal => new HitStealFacts
+        {
+            Stun = HitStealStun, Shove = HitStealShove, Slow = HitStealSlow, LockSeconds = HitStealLockSeconds,
+        };
 
         public override float ModifyCooldown(float seconds, AbilityBaseSO ability, ChickenController self)
         {

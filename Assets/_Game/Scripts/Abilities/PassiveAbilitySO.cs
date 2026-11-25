@@ -214,6 +214,16 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual LootMarkFacts LootMark => LootMarkFacts.None;
 
+        /// <summary>The Bully's hit-steal as numbers (design 2026-11-25); <see cref="HitStealFacts.None"/> for every other passive. Read by the
+        /// match simulator as a property; nothing in the game reads it yet.</summary>
+        public virtual HitStealFacts HitSteal => HitStealFacts.None;
+
+        /// <summary>The Trophy Hunter's Peck break as numbers; a reach of 0 (the default) is no break. Read by the match simulator only.</summary>
+        public virtual PeckBreakFacts PeckBreak => default;
+
+        /// <summary>The Trophy Hunter's trophies as numbers; <see cref="TrophyFacts.None"/> for every other passive. Read by the match simulator only.</summary>
+        public virtual TrophyFacts Trophy => TrophyFacts.None;
+
         /// <summary>
         /// Called on the state authority each tick while a traversal window is open (not while
         /// unsticking). Lets a passive react to <i>how</i> its owner is moving through terrain.

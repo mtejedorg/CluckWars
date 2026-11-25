@@ -30,6 +30,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   CooldownMultiplier: 0.75
+  HitStealStun: 0
+  HitStealShove: 0
+  HitStealSlow: 0
+  HitStealLockSeconds: 3
   Subclass: 2
   Kit:
   - {fileID: 11400000, guid: 2b6f2fba609676f439ec424dfd05e5f6, type: 2}
