@@ -1,6 +1,6 @@
 # Warrior identity: the Bully's hit-steal and the Trophy Hunter (design and simulator plan)
 
-Date: 2026-11-25. Status: design; the simulator slices S1 to S6 are built from it (amended by Maestro's ruling on `BreakCooldown`, section 12 item 14). Inputs: Maestro's decisions of 2026-11-25 (section 1, closed), the code read on
+Date: 2026-11-25. Status: design; the simulator slices S1 to S6 are built (results in section 14) (amended by Maestro's ruling on `BreakCooldown`, section 12 item 14). Inputs: Maestro's decisions of 2026-11-25 (section 1, closed), the code read on
 `develop` at `0230d380` plus the uncommitted BL-221 work of another session (`BotController`, `ScriptedPolicy`, `BotTactics`, `Warrior.asset`).
 Method, as in `2026-11-23-thief-loot-mark-design.md`: simulator first, every number on the passive SO, shipped off, the game built only after
 Maestro approves the measured rule.
@@ -371,3 +371,78 @@ as a new section 14 (results). Commit (code and spec only): `feat(balance): Warr
    the break against the cast state at the Warrior's press tick (a lag allowance, as `ChickenCombat.SenderLatency` gives other claims)?
 </content>
 </invoke>
+
+## 14. Results of the simulator runs (2026-11-25)
+
+Both runs: `replicateScale` 0.4, seed `0x1352902`, 12 threads, `bal=5465b825`, with Maestro's Thief values of 2026-11-25 (bounty 8, steal x1.6, capacity 16) in every baseline.
+Result files (not committed, `Captures/oracle/`): run A `match-whatif-20261125-114515.md` / `.json` from `whatif-warrior-bully.json` (12 scenarios, 118 560 matches, 5.4 min);
+run B `match-whatif-20261125-115253.md` / `.json` from `whatif-warrior-trophy.json` (15 scenarios, 145 920 matches, 6.7 min). Each file holds every kit's win rate for P0, P1 and
+mixed, the counters below, and the per-kit movement tables. The baseline of run A is the shipped game (Relentless and the old Bully, Snatch kit); the baseline of run B seats the
+Trophy Hunter with its shipped numbers (reach 0, room 0) in Relentless's seat.
+
+**Go measures** (section 9) read off these tables: no scenario of either run puts its Warrior kit at 20 to 30 % under all three populations.
+
+### 14.1 Run A, the Bully (kit Peck, Shadowstep, WingSlam, CluckShock)
+
+Win rates, P0 / P1 / mixed: the shipped Bully 23.2 / 33.2 / 27.5; **the new kit with every amount 0 (B0) 5.2 / 58.3 / 32.9**; Stun 2, Shove 2, lock 3 (the anchor) 40.4 / 43.2 / 38.1.
+The kit alone is the problem for P1 (58 %): Stun, Shove and Jump at x0.75 cooldowns cut pecks and P1 farms; P0 does not know what to do with the kit (5 %). The hit-steal moves P0 up
+to 34 to 47 % and P1 down to 41 to 47 %, so the two populations agree (within 10 points) at every amount, but at a level above the band. The smallest cell (1, 1) still gives
+34.3 / 47.3 / 34.8. The lock hardly matters (anchor at lock 2 / 3 / 4: 39.6 / 40.4 / 38.3 in P0). Other kits move: Speedy_Slippery and Speedy_Featherfoot lose 4 to 7 points and Fatty_Bulwark
+up to 6 in P0, so the 5-point rule also fails. Worst 5 s window for a victim: mean 2.05, 95th percentile 4 at the anchor (inside the 6 limit; 3.16 and 6 at 3 / 3).
+
+## Overview: the Bully (Warrior_Bully), per match in the mixed population unless said
+
+| Scenario | P0 | P1 | mixed | hit takes per match | hit food per match | hits that met the lock per match | identity food per match | worst loss for a victim in 5 s (mean) | worst loss for a victim in 5 s (95th percentile) |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline | 23.2 | 33.2 | 27.5 | n/a | n/a | n/a | 0.00 | 6.37 | 10.00 |
+| B0 kit only (amounts 0) | 5.2 (-18.0*) | 58.3 (+25.1*) | 32.9 (+5.4*) | n/a | n/a | n/a | 0.00 | 0.00 | 0.00 |
+| stun 1 shove 1 lock 3 | 34.3 (+11.1*) | 47.3 (+14.0*) | 34.8 (+7.3*) | 2.02 | 2.01 | 0.68 | 2.01 | 1.03 | 2.00 |
+| stun 1 shove 2 lock 3 | 38.1 (+14.9*) | 43.3 (+10.1*) | 38.2 (+10.7*) | 2.07 | 3.49 | 0.71 | 3.49 | 1.89 | 4.00 |
+| stun 1 shove 3 lock 3 | 42.9 (+19.6*) | 41.2 (+8.0*) | 36.9 (+9.4*) | 2.32 | 5.53 | 0.78 | 5.53 | 2.89 | 6.00 |
+| stun 2 shove 1 lock 3 | 37.4 (+14.2*) | 41.2 (+8.0*) | 36.3 (+8.8*) | 2.09 | 3.35 | 0.82 | 3.35 | 1.73 | 3.00 |
+| stun 2 shove 2 lock 3 | 40.4 (+17.1*) | 43.2 (+10.0*) | 38.1 (+10.6*) | 2.12 | 4.14 | 0.74 | 4.14 | 2.05 | 4.00 |
+| stun 2 shove 3 lock 3 | 44.6 (+21.4*) | 43.3 (+10.1*) | 40.1 (+12.6*) | 2.28 | 6.07 | 0.79 | 6.07 | 3.03 | 6.00 |
+| stun 3 shove 1 lock 3 | 41.4 (+18.2*) | 42.1 (+8.9*) | 37.6 (+10.1*) | 2.16 | 4.91 | 0.85 | 4.91 | 2.52 | 4.00 |
+| stun 3 shove 2 lock 3 | 45.1 (+21.9*) | 42.3 (+9.0*) | 38.3 (+10.8*) | 2.16 | 5.61 | 0.86 | 5.61 | 2.77 | 5.00 |
+| stun 3 shove 3 lock 3 | 46.5 (+23.3*) | 44.6 (+11.4*) | 40.6 (+13.1*) | 2.29 | 6.67 | 0.76 | 6.67 | 3.16 | 6.00 |
+| stun 2 shove 2 lock 2 | 39.6 (+16.4*) | 41.0 (+7.7*) | 36.7 (+9.2*) | 2.25 | 4.39 | 0.67 | 4.39 | 2.25 | 4.00 |
+| stun 2 shove 2 lock 4 | 38.3 (+15.1*) | 44.8 (+11.5*) | 39.0 (+11.5*) | 1.99 | 3.88 | 0.81 | 3.88 | 1.81 | 4.00 |
+
+### 14.2 Run B, the Trophy Hunter (kit Peck, Speed, Steal, Slow)
+
+Win rates, P0 / P1 / mixed: baseline (no break, room 0) 10.6 / 25.1 / 22.0; every cell of the reach x cooldown grid 9.8 / 23.9 to 25.0 / 19.5 to 20.0. **The break barely happens:** 0.24 to 0.33
+a match under the mixed population, and apparently none in P0 (its win rate is identical in every grid cell, so the reach and cooldown never touched a match). The cast lasts 0.4 s and the bot needs a think plus its 0.3 s reaction, so
+a candidate exists for about the first 0.1 s of a cast (`BotBreakRules.Candidate`: cast left above the reaction); the reach and cooldown axes change nothing measurable. The room
+is barely used either: the bot banks at 12 plus its trophy room (at most 18 with room 2 and 3 trophies), under the class capacity of 20, so only a bite or a steal that overshoots uses room
+(8 to 11 % of it). The trophy lifetime reading changes the held average, not the win rate: **streak** (cleared on bank) holds 0.39 trophies on average and 0.69 at the end of a match
+(room 2) against 0.56 and 1.19 kept; room 3 is the same. **Slow growth** (room 1) holds 0.56 and 1.25 at cap 4, the same at cap 6 (nobody gets past 3). Win rates: streak room 2 9.4 / 24.6 / 20.2,
+streak room 3 8.8 / 25.4 / 20.0, slow growth room 1 cap 4 12.5 / 24.8 / 21.5, cap 6 12.3 / 24.8 / 21.5, original (room 2, cap 3, kept) 9.8 / 24.4 / 20.0. No other kit moves more than about 2 points in any
+Trophy Hunter scenario. Worst 5 s window for a victim: mean 6.1 to 6.2, 95th percentile 10, against 5.79 and 10 without the break: the Steal in the kit sets it, not the break.
+
+## Overview: the Trophy Hunter (Warrior_TrophyHunter), per match in the mixed population unless said
+
+| Scenario | P0 | P1 | mixed | breaks per match | break food per match | break presses that fell back to a Peck per match | break presses cancelled per match | trophies earned per match | trophies held (mean over the match) | trophies at the end of the match (mean) | share of the trophy room used when banking (%) | overflow to the centre pile per match | identity food per match | worst loss for a victim in 5 s (mean) | worst loss for a victim in 5 s (95th percentile) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 10.6 | 25.1 | 22.0 | 0.00 | 0.00 | 0.00 | 0.00 | 2.30 | 0.50 | 1.05 | n/a | 0.00 | 0.00 | 5.79 | 10.00 |
+| kept reach 2.0 cooldown 1.5 room 2 cap 3 | 9.8 (-0.8) | 23.9 (-1.2) | 19.9 (-2.1) | 0.27 | 0.79 | 0.01 | 0.00 | 2.54 | 0.55 | 1.17 | 7.98 | 0.00 | 0.79 | 6.17 | 10.00 |
+| kept reach 2.0 cooldown 2.5 room 2 cap 3 | 9.8 (-0.8) | 23.9 (-1.2) | 19.9 (-2.1) | 0.27 | 0.79 | 0.01 | 0.00 | 2.54 | 0.55 | 1.17 | 7.98 | 0.00 | 0.79 | 6.17 | 10.00 |
+| kept reach 2.0 cooldown 3.5 room 2 cap 3 | 9.8 (-0.8) | 23.9 (-1.2) | 19.5 (-2.5) | 0.24 | 0.71 | 0.01 | 0.00 | 2.54 | 0.54 | 1.15 | 8.15 | 0.00 | 0.71 | 6.12 | 10.00 |
+| kept reach 2.5 cooldown 1.5 room 2 cap 3 | 9.8 (-0.8) | 24.4 (-0.7) | 20.0 (-2.0) | 0.30 | 0.87 | 0.01 | 0.01 | 2.56 | 0.56 | 1.19 | 8.00 | 0.00 | 0.87 | 6.18 | 10.00 |
+| kept reach 2.5 cooldown 2.5 room 2 cap 3 | 9.8 (-0.8) | 24.4 (-0.7) | 20.0 (-2.0) | 0.30 | 0.87 | 0.01 | 0.01 | 2.56 | 0.56 | 1.19 | 8.00 | 0.00 | 0.87 | 6.18 | 10.00 |
+| kept reach 2.5 cooldown 3.5 room 2 cap 3 | 9.8 (-0.8) | 24.4 (-0.7) | 19.6 (-2.4) | 0.27 | 0.78 | 0.01 | 0.01 | 2.56 | 0.55 | 1.17 | 8.16 | 0.00 | 0.78 | 6.13 | 10.00 |
+| kept reach 3.0 cooldown 1.5 room 2 cap 3 | 9.8 (-0.8) | 25.0 (-0.1) | 20.0 (-2.0) | 0.33 | 0.96 | 0.01 | 0.01 | 2.58 | 0.56 | 1.20 | 8.72 | 0.00 | 0.96 | 6.24 | 10.00 |
+| kept reach 3.0 cooldown 2.5 room 2 cap 3 | 9.8 (-0.8) | 25.0 (-0.1) | 20.0 (-2.0) | 0.33 | 0.95 | 0.01 | 0.01 | 2.58 | 0.56 | 1.20 | 8.72 | 0.00 | 0.95 | 6.24 | 10.00 |
+| kept reach 3.0 cooldown 3.5 room 2 cap 3 | 9.8 (-0.8) | 25.0 (-0.1) | 19.6 (-2.4) | 0.29 | 0.86 | 0.01 | 0.01 | 2.58 | 0.55 | 1.18 | 8.89 | 0.00 | 0.86 | 6.19 | 10.00 |
+| streak room 2 cap 3 | 9.4 (-1.2) | 24.6 (-0.5) | 20.2 (-1.8) | 0.31 | 0.92 | 0.01 | 0.01 | 2.61 | 0.39 | 0.69 | 9.87 | 0.00 | 0.92 | 6.18 | 10.00 |
+| streak room 3 cap 3 | 8.8 (-1.8) | 25.4 (+0.2) | 20.0 (-2.0) | 0.30 | 0.88 | 0.01 | 0.01 | 2.60 | 0.40 | 0.68 | 11.26 | 0.00 | 0.88 | 6.22 | 10.00 |
+| slow growth room 1 cap 4 | 12.5 (+1.9) | 24.8 (-0.4) | 21.5 (-0.5) | 0.30 | 0.87 | 0.01 | 0.01 | 2.59 | 0.56 | 1.25 | 9.02 | 0.00 | 0.87 | 6.19 | 10.00 |
+| slow growth room 1 cap 6 | 12.3 (+1.7) | 24.8 (-0.4) | 21.5 (-0.5) | 0.30 | 0.87 | 0.01 | 0.01 | 2.60 | 0.56 | 1.26 | 9.13 | 0.00 | 0.87 | 6.19 | 10.00 |
+| break only room 0 | 11.5 (+1.0) | 25.8 (+0.7) | 22.1 (+0.1) | 0.25 | 0.74 | 0.01 | 0.01 | 2.44 | 0.55 | 1.18 | n/a | 0.00 | 0.74 | 6.07 | 10.00 |
+| steals only reach 0 room 2 cap 3 | 8.7 (-1.9) | 23.7 (-1.4) | 19.6 (-2.4) | 0.00 | 0.00 | 0.00 | 0.00 | 2.36 | 0.50 | 1.04 | 7.81 | 0.00 | 0.00 | 5.81 | 10.00 |
+
+### 14.3 What this says (for Maestro)
+
+- Bully: no value of the grid fits the band. The hit-steal brings P0 and P1 together but at 34 to 47 %, and the kit without it is already 58 % in P1. A lower take cannot be tried through
+  the bot's own rule (it casts for food at 1 or more); the lever is probably elsewhere (the cooldown multiplier, the Jump or the Shove's reach).
+- Trophy Hunter: as built (the bot rules of section 7, the 0.4 s cast) the break is a rare event and the kit plays as Relentless's, 10 / 24 / 20. To make the break matter, the window has to
+  open (a longer cast for the victim, a reaction-free press online as in open question 2, or the bot pressing on the approach), and the bot has to bank later to fill the room.

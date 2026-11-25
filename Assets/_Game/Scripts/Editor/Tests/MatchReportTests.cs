@@ -251,6 +251,80 @@ namespace CluckWars.Tests
             StringAssert.Contains("mean match length", md);
         }
 
+        [Test]
+        public void WarriorBlock_ShowsEveryCounterOfSection8()
+        {
+            var context = Context();
+            var kit = context.Kits[0];
+            kit.Class = ChickenClass.Warrior;
+            kit.Passive.HitSteal = new HitStealFacts { Stun = 2f, Shove = 2f, LockSeconds = 3f };
+            kit.Passive.Break = new PeckBreakFacts { Reach = 2.5f, Cooldown = 2.5f, ImmuneSeconds = 2.5f };
+            kit.Passive.Trophy = new TrophyFacts { IsTrophyHunter = true, Room = 2, Cap = 3 };
+
+            var results = new MatchResult[2];
+            for (int i = 0; i < results.Length; i++)
+            {
+                results[i] = Result(0);
+                results[i].Counters[0] = WarriorCounters(results[i].Counters[0], worst: i == 0 ? 2f : 6f);
+            }
+            var run = Output(MatchDesignKind.Mixed, new[] { Cell(0, 0, 2, 4, 6), Cell(1, 0, 2, 4, 6) }, results);
+
+            var report = MatchReports.Build(context, new[] { run }, Reference());
+
+            var line = report.Warriors.Single(w => w.Kit == "kit0");
+            Assert.AreEqual(2, line.Matches);
+            Assert.AreEqual(4f, line.HitTakesPerMatch, 1e-4f);
+            Assert.AreEqual(8f, line.HitFoodPerMatch, 1e-4f);
+            Assert.AreEqual(1f, line.HitRefusedLockPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.HitRefusedNoFoodPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.HitRefusedRoomPerMatch, 1e-4f);
+            Assert.AreEqual(5f, line.HitLostFoodPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.BreaksPerMatch, 1e-4f);
+            Assert.AreEqual(9f, line.BreakFoodPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.BreakLeftInPilePerMatch, 1e-4f);
+            Assert.AreEqual(1f, line.BreakFallbacksPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.BreakCancelsPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.BreakRefusedPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.PecksBrokenPerMatch, 1e-4f);
+            Assert.AreEqual(3f, line.TrophiesEarnedPerMatch, 1e-4f);
+            Assert.AreEqual(1f, line.TrophiesLostPerMatch, 1e-4f);
+            Assert.AreEqual(2f, line.TrophiesClearedPerMatch, 1e-4f);
+            Assert.AreEqual(90f / 45f, line.MeanTrophiesHeld, 1e-4f, "trophy seconds over the match's seconds");
+            Assert.AreEqual(3f, line.TrophyPeakMean, 1e-4f);
+            Assert.AreEqual(1f, line.TrophiesAtEndMean, 1e-4f);
+            Assert.AreEqual(10f, line.RoomOfferedPerMatch, 1e-4f);
+            Assert.AreEqual(0.5f, line.RoomFilledShare, 1e-4f);
+            Assert.AreEqual(3f, line.OverflowPerMatch, 1e-4f);
+            Assert.AreEqual(8f + 9f, line.IdentityFoodPerMatch, 1e-4f);
+            Assert.AreEqual(4f, line.WorstLossMean, 1e-4f);
+            Assert.AreEqual(5.8f, line.WorstLossP95, 1e-3f, "linear interpolation between 2 and 6");
+
+            string md = report.ToMarkdown();
+            StringAssert.Contains("## Warrior kits", md);
+            foreach (var heading in new[]
+            {
+                "Hit takes", "Hit food", "Refused: lock / empty / full", "Hit food lost", "Breaks", "Break food", "Left in pile", "Fallbacks", "Cancels", "Refused",
+                "Pecks broken", "Trophies earned", "Lost", "Cleared", "Held (mean)", "Peak", "At end", "Room added", "Room used", "Overflow", "Identity food",
+                "Worst loss mean", "Worst loss p95",
+            })
+                StringAssert.Contains(heading, md);
+            StringAssert.Contains("kit0", md);
+            string json = report.ToJson();
+            Assert.DoesNotThrow(() => JsonUtility.FromJson<JsonProbe>(json));
+            foreach (var key in new[] { "\"warriors\"", "\"hitTakes\"", "\"breakLeftInPile\"", "\"trophiesCleared\"", "\"roomFilledShare\"", "\"worstLossP95\"" })
+                StringAssert.Contains(key, json);
+        }
+
+        // The counters of one Warrior seat in one match: the same numbers every match, but the worst loss.
+        private static SeatCounters WarriorCounters(SeatCounters c, float worst)
+        {
+            c.HitTakes = 4; c.HitFood = 8f; c.HitRefusedLock = 1; c.HitRefusedNoFood = 2; c.HitRefusedRoom = 3; c.HitLostFood = 5f;
+            c.Breaks = 3; c.BreakFood = 9f; c.BreakLeftInPile = 4f; c.BreakFallbacks = 1; c.BreakCancels = 2; c.BreakRefused = 3; c.PecksBroken = 2;
+            c.TrophiesEarned = 3; c.TrophiesLost = 1; c.TrophiesCleared = 2; c.TrophyPeak = 3; c.TrophySeconds = 90f; c.TrophiesAtEnd = 1;
+            c.TrophyRoomOffered = 10f; c.TrophyRoomFilled = 5f; c.OverflowToCentre = 3f; c.WorstVictimLoss5s = worst;
+            return c;
+        }
+
         [Serializable]
         private sealed class JsonProbe { public int schema; }
     }

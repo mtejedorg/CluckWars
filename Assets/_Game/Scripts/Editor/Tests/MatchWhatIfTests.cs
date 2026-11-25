@@ -175,5 +175,31 @@ namespace CluckWars.Tests
                 }
             }
         }
+
+        [Test]
+        public void Numbers_CarryTheWarriorGroup()
+        {
+            var report = new MatchReportSection { Population = PolicyPopulation.P0 };
+            report.Warriors.Add(new WarriorLine
+            {
+                Kit = "Warrior_TrophyHunter", Matches = 10, BreakActive = true, TrophyKit = true, BreaksPerMatch = 2.5f, BreakFoodPerMatch = 6f, MeanTrophiesHeld = 1.5f,
+                TrophiesAtEndMean = 2f, RoomFilledShare = 0.4f, OverflowPerMatch = 0.5f, IdentityFoodPerMatch = 6f, WorstLossMean = 3f, WorstLossP95 = 7f,
+            });
+            report.Warriors.Add(new WarriorLine { Kit = "Warrior_Bully", Matches = 10, HitActive = true, HitTakesPerMatch = 3f, HitFoodPerMatch = 6f, IdentityFoodPerMatch = 6f });
+
+            var numbers = MatchWhatIf.Numbers(report).Where(n => n.Group == "warrior").ToList();
+
+            float Value(string label) => numbers.Single(n => n.Label == label && n.Population == "P0").Value;
+            Assert.AreEqual(2.5f, Value("Warrior_TrophyHunter: breaks per match"));
+            Assert.AreEqual(1.5f, Value("Warrior_TrophyHunter: trophies held (mean over the match)"));
+            Assert.AreEqual(2f, Value("Warrior_TrophyHunter: trophies at the end of the match (mean)"));
+            Assert.AreEqual(40f, Value("Warrior_TrophyHunter: share of the trophy room used when banking (%)"), 1e-4f);
+            Assert.AreEqual(0.5f, Value("Warrior_TrophyHunter: overflow to the centre pile per match"));
+            Assert.AreEqual(7f, Value("Warrior_TrophyHunter: worst loss for a victim in 5 s (95th percentile)"));
+            Assert.AreEqual(3f, Value("Warrior_Bully: hit takes per match"));
+            Assert.IsFalse(numbers.Any(n => n.Label == "Warrior_Bully: breaks per match"), "a kit without a break carries no break rows");
+            Assert.IsFalse(numbers.Any(n => n.Label == "Warrior_TrophyHunter: hit takes per match"), "and one without a hit-steal no hit rows");
+        }
+
     }
 }

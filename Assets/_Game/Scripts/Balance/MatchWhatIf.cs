@@ -137,6 +137,8 @@ namespace CluckWars.Balance
         public int MatchesPlayed;
         public double ElapsedSeconds;
         public string SpoilerKit, ThiefKit;
+        /// <summary>The kit with a hit-steal (or the Bully's asset) and the Trophy Hunter's kit, for the Warrior overviews; null when none plays.</summary>
+        public string BullyKit, TrophyKit;
         /// <summary>The roster swap this run played under, as "Relentless -> TrophyHunter" lines; null for none.</summary>
         public string Roster;
         public string[] KitLabels;
@@ -201,6 +203,8 @@ namespace CluckWars.Balance
                 KitLabels = baseContext.Kits.Select(k => k.Label).ToArray(),
                 SpoilerKit = baseContext.Kits.FirstOrDefault(k => k.Passive.MatchEndBonusFood > 0f)?.Label,
                 ThiefKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Loot.IsThief || k.Passive.StealFactor > 1f)?.Label,
+                BullyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.HitSteal.Active || k.Passive.Asset == "Bully")?.Label,
+                TrophyKit = baseContext.Kits.FirstOrDefault(k => k.Passive.Trophy.IsTrophyHunter)?.Label,
             };
 
             WhatIfResult Play(string name, string delta, MatchContext context, string hash)
@@ -311,6 +315,35 @@ namespace CluckWars.Balance
                 {
                     AddRate("loot-steals", $"{row.Steals} marked steals, no prize", pop, row.Win, row.Label);
                     AddRate("loot-steals", $"{row.Steals} marked steals, with prize", pop, row.WinWithPrize, row.Label);
+                }
+                foreach (var w in s.Warriors)
+                {
+                    string who = w.Kit + ": ";
+                    if (w.HitActive || w.HitTakesPerMatch > 0f)
+                    {
+                        Add("warrior", who + "hit takes per match", pop, w.HitTakesPerMatch, trials: w.Matches);
+                        Add("warrior", who + "hit food per match", pop, w.HitFoodPerMatch, trials: w.Matches);
+                        Add("warrior", who + "hits that met the lock per match", pop, w.HitRefusedLockPerMatch, trials: w.Matches);
+                    }
+                    if (w.BreakActive || w.TrophyKit)
+                    {
+                        Add("warrior", who + "breaks per match", pop, w.BreaksPerMatch, trials: w.Matches);
+                        Add("warrior", who + "break food per match", pop, w.BreakFoodPerMatch, trials: w.Matches);
+                        Add("warrior", who + "break presses that fell back to a Peck per match", pop, w.BreakFallbacksPerMatch, trials: w.Matches);
+                        Add("warrior", who + "break presses cancelled per match", pop, w.BreakCancelsPerMatch, trials: w.Matches);
+                        Add("warrior", who + "Pecks broken per match", pop, w.PecksBrokenPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies earned per match", pop, w.TrophiesEarnedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies lost per match", pop, w.TrophiesLostPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies cleared by banking per match", pop, w.TrophiesClearedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "trophies held (mean over the match)", pop, w.MeanTrophiesHeld, trials: w.Matches);
+                        Add("warrior", who + "trophies at the end of the match (mean)", pop, w.TrophiesAtEndMean, trials: w.Matches);
+                        Add("warrior", who + "trophy room added per match", pop, w.RoomOfferedPerMatch, trials: w.Matches);
+                        Add("warrior", who + "share of the trophy room used when banking (%)", pop, w.RoomFilledShare * 100f, trials: w.Matches);
+                        Add("warrior", who + "overflow to the centre pile per match", pop, w.OverflowPerMatch, trials: w.Matches);
+                    }
+                    Add("warrior", who + "identity food per match", pop, w.IdentityFoodPerMatch, trials: w.Matches);
+                    Add("warrior", who + "worst loss for a victim in 5 s (mean)", pop, w.WorstLossMean, trials: w.Matches);
+                    Add("warrior", who + "worst loss for a victim in 5 s (95th percentile)", pop, w.WorstLossP95, trials: w.Matches);
                 }
                 var run = s.Runs.FirstOrDefault(r => r.Design == MatchDesignKind.Mixed);
                 if (run != null && run.Matches > 0)
@@ -435,6 +468,54 @@ namespace CluckWars.Balance
                 ThiefRow(s.Name, all[s.Name], false);
             }
             sb.AppendLine();
+
+            // Overview: every kit's win rate, then the Warrior kit under test.
+            foreach (string pop in shownPops)
+            {
+                sb.AppendLine($"## Every kit's win rate, {pop} (share of the seats a kit sat in that won, in points; the change from the baseline in brackets)");
+                sb.AppendLine();
+                sb.AppendLine("| Scenario | " + string.Join(" | ", o.KitLabels) + " |");
+                sb.AppendLine("|---|" + string.Concat(o.KitLabels.Select(_ => "---|")));
+                string Cells(List<WhatIfLine> ls, bool isBase) => string.Join(" | ", o.KitLabels.Select(label =>
+                {
+                    var l = Find(ls, "kit", label, pop);
+                    return l == null ? "n/a" : isBase ? F(l.Base) : $"{F(l.Scenario)} ({D(l)})";
+                }));
+                sb.AppendLine($"| baseline | {Cells(Compare(o.Baseline.Numbers, o.Baseline.Numbers), true)} |");
+                foreach (var s in o.Scenarios)
+                    sb.AppendLine(s.Refused ? $"| {s.Name} | REFUSED: {s.Reason} |" : $"| {s.Name} | {Cells(all[s.Name], false)} |");
+                sb.AppendLine();
+            }
+
+            foreach (var (title, kit) in new[] { ("the Bully", o.BullyKit), ("the Trophy Hunter", o.TrophyKit) })
+            {
+                if (kit == null || !(title == "the Bully" ? played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": hit")))
+                                                          : played.Any(s => all[s.Name].Any(l => l.Group == "warrior" && l.Label.StartsWith(kit + ": breaks")))))
+                    continue;
+                bool bully = title == "the Bully";
+                sb.AppendLine($"## Overview: {title} ({kit}), per match in the mixed population unless said");
+                sb.AppendLine();
+                string[] cols = bully
+                    ? new[] { "hit takes per match", "hit food per match", "hits that met the lock per match", "identity food per match", "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" }
+                    : new[] { "breaks per match", "break food per match", "break presses that fell back to a Peck per match", "break presses cancelled per match", "trophies earned per match", "trophies held (mean over the match)",
+                              "trophies at the end of the match (mean)", "share of the trophy room used when banking (%)", "overflow to the centre pile per match", "identity food per match",
+                              "worst loss for a victim in 5 s (mean)", "worst loss for a victim in 5 s (95th percentile)" };
+                sb.AppendLine("| Scenario | P0 | P1 | mixed | " + string.Join(" | ", cols) + " |");
+                sb.AppendLine("|---|---|---|---|" + string.Concat(cols.Select(_ => "---|")));
+                void WarriorRow(string name, List<WhatIfLine> ls, bool isBase)
+                {
+                    string Rate(string pop) { var l = Find(ls, "kit", kit, pop); return l == null ? "n/a" : isBase ? F(l.Base) : $"{F(l.Scenario)} ({D(l)})"; }
+                    string Col(string c) { var l = Find(ls, "warrior", kit + ": " + c, "mixed"); return l == null ? "n/a" : isBase ? F(l.Base, "0.00") : F(l.Scenario, "0.00"); }
+                    sb.AppendLine($"| {name} | {Rate("P0")} | {Rate("P1")} | {Rate("mixed")} | {string.Join(" | ", cols.Select(Col))} |");
+                }
+                WarriorRow("baseline", Compare(o.Baseline.Numbers, o.Baseline.Numbers), true);
+                foreach (var s in o.Scenarios)
+                {
+                    if (s.Refused) { sb.AppendLine($"| {s.Name} | REFUSED: {s.Reason} |"); continue; }
+                    WarriorRow(s.Name, all[s.Name], false);
+                }
+                sb.AppendLine();
+            }
 
             // Overview: the Thief's loot mark.
             if (played.Any(s => all[s.Name].Any(l => l.Group == "loot-steals")))

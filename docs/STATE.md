@@ -11,6 +11,14 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-25 - Warrior identity in the match simulator: the Bully's hit-steal, the Trophy Hunter's break and trophies (BL-222, `develop`, not pushed; nothing changes in the game)
+
+- **Built (simulator only, everything shipped off):** pure rules `HitStealRules`, `PeckBreakRules`, `TrophyRules` (+ `BotHitStealRules`, `BotBreakRules`), three `PassiveAbilitySO` virtuals, the Bully's four hit-steal fields (all amounts 0), the unregistered `TrophyHunterPassiveSO` with `Data/Simulator/TrophyHunter.asset` (outside the Abilities folder: the roster tests treat every asset in it as shipped), the what-if roster swap (`"roster":{"Relentless":"TrophyHunter"}`, `OracleRoster`), hit-steal, breaks, trophies, overflow and `CapacityOf`/`SeatView.Capacity` in `MatchSim`, both policies, the Warrior block of the match report and the what-if. Maestro's rulings folded in: `BreakCooldown` gates breaks only; trophy lifetime is data (`TrophiesClearOnBank`, shipped false).
+- **Also committed:** Thief loot bounty 8, steal x1.6, capacity 16 (Maestro 2026-11-25).
+- **Results:** `docs/superpowers/specs/2026-11-25-warrior-identity-design.md` section 14. No scenario passes the go measures; the new Bully kit is 58 % in P1 even without the hit-steal; the break is rare (0.3 a match) because a 0.4 s cast leaves a bot about 0.1 s after its reaction.
+- **Unverified:** the game's bot (`BotController`) does not call the new rules yet; nothing was played in a real match.
+- **Docs upkeep owed to `librarian`:** FILE_STRUCTURE (`Gameplay/HitStealRules.cs`, `PeckBreakRules.cs`, `TrophyRules.cs`, `BotHitStealRules.cs`, `BotBreakRules.cs`, `Abilities/Passives/TrophyHunterPassiveSO.cs`, `Data/Simulator/`, `Balance/OracleRoster.cs`, tests `HitStealRulesTests`, `PeckBreakRulesTests`, `TrophyRulesTests`, `WarriorPassiveDataTests`, `OracleRosterTests`, `WhatIfSpecTests`, `MatchWarriorTests`, `BotWarriorRulesTests`); rules: guards `MatchWarriorTests.EveryCapacityRead_GoesThroughCapacityOf`, `Sim_CallsTheSharedRules_NotCopies`, `ShippedOff_PlaysExactlyAsBefore`, the extended `ScriptedPolicyTests.P0_CallsTheGamesOwnFunctions_NotCopiesOfThem`; `AbilityIconStyle` has a `TrophyHunterPassiveSO` entry sharing Relentless's art.
+
 ## 2026-11-25 - Maestro's values: execute bounty 15, Spoiler 30, Thief 15; the Thief bot no longer retreats from its marked rival (BL-217, BL-220, `develop`, not pushed)
 
 - **Values** (Maestro 2026-11-25): `MatchConfig.asset` `ExecuteBounty` 17 to 15; `Spoiler.asset` `MinimumCapacity` 25 to 30 (and the `SpoilerPassiveSO` default); `Thief.asset` `MinimumCapacity` 20 to 15. The stored descriptions of both passives carry the new numbers. Older entries below that quote 17, 25 or 20 are history.

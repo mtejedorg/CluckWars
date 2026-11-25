@@ -187,6 +187,36 @@ namespace CluckWars.Balance
         public int MatchesWithSpoiler;
     }
 
+    /// <summary>
+    /// One Warrior kit's rows in one population (mixed design, design 2026-11-25 section 8.3): the Bully's hit-steal, the Trophy Hunter's breaks and trophies,
+    /// the overflow to the centre pile and the worst loss one victim took inside <see cref="MatchReports.LossWindowSeconds"/>. Per match, over the matches that held the kit.
+    /// </summary>
+    public sealed class WarriorLine
+    {
+        public string Kit;
+        public int Matches;
+        public WinInterval Win;
+        public bool HitActive, BreakActive, TrophyKit;
+        public float HitTakesPerMatch, HitFoodPerMatch, HitRefusedLockPerMatch, HitRefusedNoFoodPerMatch, HitRefusedRoomPerMatch;
+        /// <summary>Food hit-steals took from this kit (the victim's side).</summary>
+        public float HitLostFoodPerMatch;
+        public float BreaksPerMatch, BreakFoodPerMatch, BreakLeftInPilePerMatch, BreakFallbacksPerMatch, BreakCancelsPerMatch, BreakRefusedPerMatch;
+        /// <summary>This kit's Peck casts that rivals broke.</summary>
+        public float PecksBrokenPerMatch;
+        public float TrophiesEarnedPerMatch, TrophiesLostPerMatch, TrophiesClearedPerMatch;
+        /// <summary>Trophies held, averaged over the seconds of each match, then over the matches.</summary>
+        public float MeanTrophiesHeld;
+        public float TrophyPeakMean;
+        public float TrophiesAtEndMean;
+        public float RoomOfferedPerMatch;
+        /// <summary>Of the room the trophies added at the trips home, the share the trips used (NaN when no trip began with a trophy).</summary>
+        public float RoomFilledShare;
+        public float OverflowPerMatch;
+        /// <summary>The food the kit's identity brought in per match: hit-steal food plus break food.</summary>
+        public float IdentityFoodPerMatch;
+        public float WorstLossMean, WorstLossP95;
+    }
+
     /// <summary>What the executions of one kit paid on victims of one class (mixed design): the victim's whole beak, and how much of it and the bounty fitted the killer's cargo.</summary>
     public sealed class KillLootLine
     {
@@ -219,6 +249,8 @@ namespace CluckWars.Balance
         public List<KillLootLine> KillLoot = new List<KillLootLine>();
         public List<ThiefLine> Thief = new List<ThiefLine>();
         public ThiefSummary ThiefIncome;
+        /// <summary>One row per Warrior kit (mixed design); empty when no Warrior kit played.</summary>
+        public List<WarriorLine> Warriors = new List<WarriorLine>();
         /// <summary>The Thief's win rate by the marked steals it really took (mixed design; survivor bias included). Empty with the loot mark off.</summary>
         public List<LootStealRow> LootSteals = new List<LootStealRow>();
         public List<PeckCutLine> PeckCuts = new List<PeckCutLine>();
@@ -686,6 +718,7 @@ namespace CluckWars.Balance
             section.FirstContactNoAssassin = Contact(contactsNoAssassin);
             BuildHeadToHead(section, context, run);
             BuildThief(section, context, run, lootTargets);
+            BuildWarriors(section, context, run);
             BuildPeckCuts(section, context, cutExposed, cutWhile, cuts, classAppear);
             BuildPlayedKills(section, context, run, targets);
             BuildKillLoot(section, context, run);
@@ -833,6 +866,53 @@ namespace CluckWars.Balance
                 section.Thief.Add(new ThiefLine
                 {
                     Victim = context.Kits[k].Label, StolenPerMatch = (float)(from[k] / meetings[k]), Share = stolen > 0 ? (float)(from[k] / stolen) : 0f,
+                });
+            }
+        }
+
+        private static void BuildWarriors(MatchReportSection section, MatchContext context, MatchRunOutput run)
+        {
+            for (int k = 0; k < context.Kits.Length; k++)
+            {
+                var kit = context.Kits[k];
+                if (kit.Class != ChickenClass.Warrior) continue;
+                int n = 0;
+                double takes = 0, hitFood = 0, lockRef = 0, noFood = 0, roomRef = 0, hitLost = 0, breaks = 0, breakFood = 0, left = 0, fallbacks = 0, cancels = 0, refused = 0,
+                    broken = 0, earned = 0, lost = 0, cleared = 0, held = 0, peak = 0, atEnd = 0, offered = 0, filled = 0, overflow = 0, worstSum = 0;
+                var worst = new List<float>();
+                for (int i = 0; i < run.Results.Length; i++)
+                {
+                    int seat = Array.IndexOf(run.Cells[i].KitOfSeat, k);
+                    if (seat < 0) continue;
+                    var r = run.Results[i];
+                    var c = r.Counters[seat];
+                    n++;
+                    takes += c.HitTakes; hitFood += c.HitFood; lockRef += c.HitRefusedLock; noFood += c.HitRefusedNoFood; roomRef += c.HitRefusedRoom; hitLost += c.HitLostFood;
+                    breaks += c.Breaks; breakFood += c.BreakFood; left += c.BreakLeftInPile; fallbacks += c.BreakFallbacks; cancels += c.BreakCancels; refused += c.BreakRefused;
+                    broken += c.PecksBroken;
+                    earned += c.TrophiesEarned; lost += c.TrophiesLost; cleared += c.TrophiesCleared; peak += c.TrophyPeak; atEnd += c.TrophiesAtEnd;
+                    held += r.EndSeconds > 0f ? c.TrophySeconds / r.EndSeconds : 0f;
+                    offered += c.TrophyRoomOffered; filled += c.TrophyRoomFilled; overflow += c.OverflowToCentre;
+                    worstSum += c.WorstVictimLoss5s;
+                    worst.Add(c.WorstVictimLoss5s);
+                }
+                if (n == 0) continue;
+                worst.Sort();
+                var win = k < section.Kits.Count ? section.Kits[k].Win : WinInterval.Wilson(0, 0);
+                section.Warriors.Add(new WarriorLine
+                {
+                    Kit = kit.Label, Matches = n, Win = win,
+                    HitActive = kit.Passive.HitSteal.Active, BreakActive = kit.Passive.Break.Active, TrophyKit = kit.Passive.Trophy.IsTrophyHunter,
+                    HitTakesPerMatch = (float)(takes / n), HitFoodPerMatch = (float)(hitFood / n), HitRefusedLockPerMatch = (float)(lockRef / n),
+                    HitRefusedNoFoodPerMatch = (float)(noFood / n), HitRefusedRoomPerMatch = (float)(roomRef / n), HitLostFoodPerMatch = (float)(hitLost / n),
+                    BreaksPerMatch = (float)(breaks / n), BreakFoodPerMatch = (float)(breakFood / n), BreakLeftInPilePerMatch = (float)(left / n),
+                    BreakFallbacksPerMatch = (float)(fallbacks / n), BreakCancelsPerMatch = (float)(cancels / n), BreakRefusedPerMatch = (float)(refused / n),
+                    PecksBrokenPerMatch = (float)(broken / n),
+                    TrophiesEarnedPerMatch = (float)(earned / n), TrophiesLostPerMatch = (float)(lost / n), TrophiesClearedPerMatch = (float)(cleared / n),
+                    MeanTrophiesHeld = (float)(held / n), TrophyPeakMean = (float)(peak / n), TrophiesAtEndMean = (float)(atEnd / n),
+                    RoomOfferedPerMatch = (float)(offered / n), RoomFilledShare = offered > 0 ? (float)(filled / offered) : float.NaN,
+                    OverflowPerMatch = (float)(overflow / n), IdentityFoodPerMatch = (float)((hitFood + breakFood) / n),
+                    WorstLossMean = (float)(worstSum / n), WorstLossP95 = Quantile(worst, 0.95f),
                 });
             }
         }
@@ -1205,6 +1285,20 @@ namespace CluckWars.Balance
             }
             sb.AppendLine();
 
+            sb.AppendLine("## Warrior kits");
+            sb.AppendLine();
+            if (!pops.Any(p => p.Warriors.Count > 0)) sb.AppendLine("No Warrior kit in these matches.");
+            else
+            {
+                sb.AppendLine("Per match, over the matches that held the kit (mixed design). The Bully's rows are the hit-steal (takes and food, then the hits that took nothing: rival locked, rival empty, beak full; food lost is the victim's side). The Trophy Hunter's rows are the breaks (landed, food taken, food of the bite left in the pile, presses that fell back to a pile Peck, visible cancels, refused presses; Pecks broken is the victim's side), the trophies (earned, lost to a rival's take or an execution, cleared by banking, held on average over the match, the peak, held at the end, the room they added at the trips home and the share of it the trips used), the food that overflowed to the centre pile, and the worst loss one victim took inside " + MatchReports.LossWindowSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " s from this kit's hit-steals, Steals and breaks (mean over matches and 95th percentile).");
+                sb.AppendLine();
+                sb.AppendLine("| Kit | Population | Matches | Win | Hit takes | Hit food | Refused: lock / empty / full | Hit food lost | Breaks | Break food | Left in pile | Fallbacks | Cancels | Refused | Pecks broken | Trophies earned | Lost | Cleared | Held (mean) | Peak | At end | Room added | Room used | Overflow | Identity food | Worst loss mean | Worst loss p95 |");
+                sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+                foreach (var p in pops)
+                    foreach (var w in p.Warriors)
+                        sb.AppendLine($"| {w.Kit} | {Name(p.Population)} | {w.Matches} | {Pct(w.Win.Rate)} ({Pm(w.Win)}) | {Num(w.HitTakesPerMatch, "0.00")} | {Num(w.HitFoodPerMatch, "0.0")} | {Num(w.HitRefusedLockPerMatch, "0.00")} / {Num(w.HitRefusedNoFoodPerMatch, "0.00")} / {Num(w.HitRefusedRoomPerMatch, "0.00")} | {Num(w.HitLostFoodPerMatch, "0.0")} | {Num(w.BreaksPerMatch, "0.00")} | {Num(w.BreakFoodPerMatch, "0.0")} | {Num(w.BreakLeftInPilePerMatch, "0.0")} | {Num(w.BreakFallbacksPerMatch, "0.00")} | {Num(w.BreakCancelsPerMatch, "0.00")} | {Num(w.BreakRefusedPerMatch, "0.00")} | {Num(w.PecksBrokenPerMatch, "0.00")} | {Num(w.TrophiesEarnedPerMatch, "0.00")} | {Num(w.TrophiesLostPerMatch, "0.00")} | {Num(w.TrophiesClearedPerMatch, "0.00")} | {Num(w.MeanTrophiesHeld, "0.00")} | {Num(w.TrophyPeakMean, "0.00")} | {Num(w.TrophiesAtEndMean, "0.00")} | {Num(w.RoomOfferedPerMatch, "0.0")} | {Pct(w.RoomFilledShare)} | {Num(w.OverflowPerMatch, "0.0")} | {Num(w.IdentityFoodPerMatch, "0.0")} | {Num(w.WorstLossMean, "0.0")} | {Num(w.WorstLossP95, "0.0")} |");
+            }
+            sb.AppendLine();
             sb.AppendLine("## Peck cuts per class and cutter");
             sb.AppendLine();
             sb.AppendLine("Hazard = of the Peck casts that began with a rival holding a ready cutter of that kind in range, the share then cut by it. The raw count is shown but confounds exposure.");
@@ -1408,6 +1502,7 @@ namespace CluckWars.Balance
                 var t = r.ThiefIncome;
                 sb.Append($",\"thiefIncome\":{{\"kit\":{S(t.Kit)},\"matches\":{t.Matches},\"stealsPerMatch\":{N(t.StealsPerMatch)},\"stolenPerMatch\":{N(t.StolenPerMatch)},\"foragedPerMatch\":{N(t.ForagedPerMatch)},\"bankedPerMatch\":{N(t.BankedPerMatch)}}}");
             }
+            sb.Append(",\"warriors\":[" + string.Join(",", r.Warriors.Select(WarriorJson)) + "]");
             sb.Append(",\"peckCuts\":[" + string.Join(",", r.PeckCuts.Select(l =>
                 $"{{\"class\":{S(l.Class.ToString())},\"cause\":{S(MatchEvent.CauseName(l.Cause))},\"exposed\":{l.Exposed},\"cut\":{l.Cut},\"hazard\":{N(l.Hazard)},\"foodLostPerMatch\":{N(l.FoodLostPerMatch)}}}")) + "]");
             if (r.FirstContactNoAssassin != null)
@@ -1452,6 +1547,7 @@ namespace CluckWars.Balance
                 var t = p.ThiefIncome;
                 sb.Append($",\"thiefIncome\":{{\"kit\":{S(t.Kit)},\"matches\":{t.Matches},\"stealsPerMatch\":{N(t.StealsPerMatch)},\"stolenPerMatch\":{N(t.StolenPerMatch)},\"foragedPerMatch\":{N(t.ForagedPerMatch)},\"bankedPerMatch\":{N(t.BankedPerMatch)}}}");
             }
+            sb.Append(",\"warriors\":[" + string.Join(",", p.Warriors.Select(WarriorJson)) + "]");
             sb.Append(",\"peckCuts\":[" + string.Join(",", p.PeckCuts.Select(l =>
                 $"{{\"class\":{S(l.Class.ToString())},\"cause\":{S(MatchEvent.CauseName(l.Cause))},\"exposed\":{l.Exposed},\"cut\":{l.Cut},\"hazard\":{N(l.Hazard)},\"foodLostPerMatch\":{N(l.FoodLostPerMatch)}}}")) + "]");
             sb.Append('}');
@@ -1476,6 +1572,9 @@ namespace CluckWars.Balance
             sb.Append('}');
             return sb.ToString();
         }
+
+        private static string WarriorJson(WarriorLine w) =>
+            $"{{\"kit\":{S(w.Kit)},\"matches\":{w.Matches},\"win\":{W(w.Win)},\"hitTakes\":{N(w.HitTakesPerMatch)},\"hitFood\":{N(w.HitFoodPerMatch)},\"hitRefusedLock\":{N(w.HitRefusedLockPerMatch)},\"hitRefusedNoFood\":{N(w.HitRefusedNoFoodPerMatch)},\"hitRefusedRoom\":{N(w.HitRefusedRoomPerMatch)},\"hitLostFood\":{N(w.HitLostFoodPerMatch)},\"breaks\":{N(w.BreaksPerMatch)},\"breakFood\":{N(w.BreakFoodPerMatch)},\"breakLeftInPile\":{N(w.BreakLeftInPilePerMatch)},\"breakFallbacks\":{N(w.BreakFallbacksPerMatch)},\"breakCancels\":{N(w.BreakCancelsPerMatch)},\"breakRefused\":{N(w.BreakRefusedPerMatch)},\"pecksBroken\":{N(w.PecksBrokenPerMatch)},\"trophiesEarned\":{N(w.TrophiesEarnedPerMatch)},\"trophiesLost\":{N(w.TrophiesLostPerMatch)},\"trophiesCleared\":{N(w.TrophiesClearedPerMatch)},\"trophiesHeld\":{N(w.MeanTrophiesHeld)},\"trophyPeak\":{N(w.TrophyPeakMean)},\"trophiesAtEnd\":{N(w.TrophiesAtEndMean)},\"roomOffered\":{N(w.RoomOfferedPerMatch)},\"roomFilledShare\":{N(w.RoomFilledShare)},\"overflow\":{N(w.OverflowPerMatch)},\"identityFood\":{N(w.IdentityFoodPerMatch)},\"worstLossMean\":{N(w.WorstLossMean)},\"worstLossP95\":{N(w.WorstLossP95)}}}";
 
         private static string LootJson(LootStealRow k) =>
             $"{{\"steals\":{k.Steals},\"win\":{W(k.Win)},\"winWithPrize\":{W(k.WinWithPrize)},\"meanFinal\":{N(k.MeanFinal)},\"bankedShare\":{N(k.BankedShare)},\"nobodyReachedTarget\":{N(k.NobodyReachedTarget)},\"label\":{S(k.Label)}}}";
