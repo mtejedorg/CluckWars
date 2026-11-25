@@ -185,6 +185,18 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void MaxSingleSteal_CoversTheFullyInflatedSteal()
+        {
+            // The Enforcer's Steal on a rival holding a capped count: the ability's nominal amount plus perDebt x cap (design 4.3); the victim's receiver must accept it.
+            var plain = PlainAbilities();
+            var steal = plain.First(a => a.Job == AbilityJob.Steal);
+            var pool = new List<AbilityBaseSO>(plain) { MakeEnforcer(2f, 3) };
+            float inflated = steal.NominalStealAmount + 2f * 3f;
+            Assert.IsTrue(StealRules.IsPlausibleAmount(inflated, StealRules.MaxSingleSteal(pool)), $"a Steal inflated to {inflated} must not be refused as a forgery");
+            Assert.IsFalse(StealRules.IsPlausibleAmount(StealRules.MaxSingleSteal(pool) + 0.5f, StealRules.MaxSingleSteal(pool)), "and the bound is still a bound");
+        }
+
+        [Test]
         public void MaxSingleSteal_WithNoHitStealOrDebt_IsTheOldBound()
         {
             var plain = PlainAbilities();

@@ -428,7 +428,7 @@ namespace CluckWars.Tests
             string activate = Body(SnatchPath, "public override void OnActivate(");
             StringAssert.Contains("loot.TakeMarked(", activate);
             StringAssert.Contains("loot.IsMarking(", activate, "a bounty only for the caster's own marked rival");
-            StringAssert.Contains("StealFrom(thief, _scratch[i], StealAmount)", activate, "the ordinary steal is unchanged");
+            StringAssert.Contains("StealFrom(thief, _scratch[i], StealAmount, thief.Debts)", activate, "the ordinary steal is unchanged (it only carries the Enforcer's debts argument now, BL-226)");
             StringAssert.Contains("if (i == markedIndex) continue;", activate);
 
             string filter = Body(SnatchPath, "protected override bool ExtraTargetFilter(");

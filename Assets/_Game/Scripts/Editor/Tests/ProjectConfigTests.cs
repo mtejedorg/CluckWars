@@ -197,6 +197,7 @@ namespace CluckWars.Tests
             Require<BotController>("Solo mode spawns 3 bots off this prefab.");
             Require<ChickenVFX>("Ability and hit VFX.");
             Require<ChickenHitSteal>("The Bully's hit-steal: no take, no lock, no event without it (BL-226).");
+            Require<EnforcerDebts>("The Enforcer's debts: no count, no inflated Steal, no event without it (BL-226).");
         }
 
         [Test]
@@ -223,6 +224,7 @@ namespace CluckWars.Tests
             Single<ChickenVFX>();
             Single<ChickenMatchStats>();
             Single<ChickenHitSteal>();
+            Single<EnforcerDebts>();
         }
 
         [Test]

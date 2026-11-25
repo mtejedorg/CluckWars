@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CluckWars.Abilities;
@@ -188,6 +189,158 @@ namespace CluckWars.Tests
             var hit = variant.GetComponent<ChickenHitSteal>();
             Assert.IsNotNull(hit, "the decoy variant inherits the component (CODE-ASSET-06)");
             AssertListed(variant, hit, "the variant's own NetworkedBehaviours list must be baked with the new component");
+        }
+
+        // ---- the Enforcer's debts (G5) ----
+
+        private const string DebtsPath = Scripts + "Gameplay/EnforcerDebts.cs";
+        private const string DebtBookPath = Scripts + "Gameplay/DebtBook.cs";
+        private const string SnatchPath = Scripts + "Abilities/SnatchAbilitySO.cs";
+        private const string AbilityBasePath = Scripts + "Abilities/AbilityBaseSO.cs";
+        private const string AbilityControllerPath = Scripts + "Gameplay/AbilityController.cs";
+
+        [Test]
+        public void Snatch_ReportsTheHitBeforeItsSteal_AndAsksTheInflatedAmount()
+        {
+            string body = Body(SnatchPath, "public override void OnActivate(");
+            int report = body.IndexOf("ReportHit(thief, _scratch[i], AbilityJob.Steal,", StringComparison.Ordinal);
+            int steal = body.IndexOf("StealFrom(thief, _scratch[i], StealAmount, thief.Debts)", StringComparison.Ordinal);
+            Assert.Greater(report, 0, "a plain Steal on a carrier is a hit");
+            Assert.Greater(steal, report, "the fresh stack counts toward this very Steal, so the hit is reported first (design 4.2 step 3 before 4)");
+            StringAssert.Contains("StealRules.CanStealFrom(", body.Substring(report, steal - report), "a shell is no hit");
+
+            string inflated = Body(AbilityBasePath, "protected static float StealFrom(Gameplay.ChickenController thief, Gameplay.ChickenController victim, float nominalAmount, Gameplay.EnforcerDebts debts)");
+            StringAssert.Contains("debts.StealAmountOn(victim, resolved)", inflated, "the amount comes from the debts' own rule");
+            int count = inflated.IndexOf("debts.CountOn(victim)", StringComparison.Ordinal);
+            int begin = inflated.IndexOf("debts.BeginAsk(consumed)", StringComparison.Ordinal);
+            int ask = inflated.IndexOf("cargo.StealFrom(victim, debts.StealAmountOn", StringComparison.Ordinal);
+            Assert.Greater(count, 0);
+            Assert.Greater(begin, count, "the count the ask used is read, then staged");
+            Assert.Greater(ask, begin, "before the ask");
+            StringAssert.Contains("finally { debts.EndAsk(); }", inflated, "the staged count can never leak into another request");
+            StringAssert.Contains("return cargo.StealFrom(victim, resolved);", inflated, "no debts component: exactly the plain steal");
+        }
+
+        [Test]
+        public void ReportHit_ForwardsToTheDebts_AndTheSettleTellsThem()
+        {
+            string report = Body(ControllerPath, "public void ReportHit(");
+            Assert.Less(report.IndexOf("_hitSteal?.OnHit(", StringComparison.Ordinal), report.IndexOf("_debts?.OnHit(", StringComparison.Ordinal));
+            string settle = Body(CargoPath, "public void RPC_SettleSteal(");
+            StringAssert.Contains("_controller.Debts?.OnStealSettled(victimId, requestId, settled.Credited)", settle);
+            Assert.Less(settle.IndexOf("Debts?.OnStealSettled(", StringComparison.Ordinal), settle.IndexOf("if (settled.Credited <= 0f", StringComparison.Ordinal),
+                "told before the zero-credit early return, or the pending ask would never close");
+            StringAssert.Contains("_debts?.ResetForNewRound();", Body(ControllerPath, "public void RPC_ResetControlStates("), "a new round starts with no debts");
+        }
+
+        [Test]
+        public void TheCargoTellsTheDebts_BeforeItSendsTheDrain()
+        {
+            string request = Body(CargoPath, "private void RequestSteal(");
+            int told = request.IndexOf("_controller.Debts?.OnStealOpened(", StringComparison.Ordinal);
+            Assert.Greater(told, request.IndexOf("_requests.AskSteal(", StringComparison.Ordinal), "told after the request is open");
+            Assert.Less(told, request.IndexOf("RPC_DrainStolen(asked, _controller.Id, requestId)", StringComparison.Ordinal), "and before the drain is sent: a local victim answers inside it");
+            string opened = Body(DebtsPath, "internal void OnStealOpened(");
+            StringAssert.Contains("_stagedConsumed <= 0", opened, "only a Steal that staged debts is recorded");
+        }
+
+        [Test]
+        public void Game_CallsTheSharedRules_NotCopies_Enforcer()
+        {
+            string debts = Code(DebtsPath), book = Code(DebtBookPath), abilities = Code(AbilityControllerPath);
+            StringAssert.Contains("class EnforcerDebts", debts);
+            StringAssert.Contains("class DebtBook", book);
+            StringAssert.Contains("class AbilityController", abilities);
+            StringAssert.Contains("BiteRules.Fresh(", abilities, "freshness is the simulator's rule");
+            StringAssert.Contains("IsFreshFor(", debts, "and the Enforcer reads it through the one composition");
+            StringAssert.Contains("DebtRules.Add(", book);
+            StringAssert.Contains("DebtRules.Decayed(", book);
+            StringAssert.Contains("DebtRules.StealAmount(", debts, "the inflated Steal is the simulator's rule");
+        }
+
+        [Test]
+        public void EnforcerDebts_FixedUpdateNetwork_OpensWithTheAuthorityGate()
+        {
+            string body = Body(DebtsPath, "public override void FixedUpdateNetwork()");
+            int gate = body.IndexOf("if (!HasStateAuthority) return;", StringComparison.Ordinal);
+            Assert.Greater(gate, 0, "ARCH-NET-01: FixedUpdateNetwork opens with the authority gate");
+            string beforeGate = body.Substring(body.IndexOf('{') + 1, gate - body.IndexOf('{') - 1);
+            Assert.IsTrue(string.IsNullOrWhiteSpace(beforeGate), "nothing runs before the gate");
+            string src = Code(DebtsPath);
+            StringAssert.Contains("SelfInject.Ensure(this, _log != null);", src);
+            StringAssert.DoesNotContain("Debug.Log", src);
+            StringAssert.DoesNotContain("Container.Inject(this)", src);
+            StringAssert.Contains("ClearAll();", body, "no debts outside a running round, nor for a removed or decoy chicken");
+        }
+
+        [Test]
+        public void DebtCapacity_HoldsEveryRivalOfMaxPlayers()
+        {
+            var match = TestAssets.Load<MatchConfigSO>(TestAssets.MatchConfigPath);
+            Assert.GreaterOrEqual(EnforcerDebts.Slots, match.MaxPlayers - 1, "one slot per rival of a full room");
+            string src = Code(DebtsPath);
+            Assert.AreEqual(3, Regex.Matches(src, @"\[Networked, Capacity\(Slots\)\]").Count, "the three arrays share the one capacity");
+            StringAssert.Contains("no free debt slot", File.ReadAllText(DebtsPath), "a full table is reported, never silent");
+        }
+
+        [Test]
+        public void DebtTimers_AreReadThroughEffectWindow()
+        {
+            string src = Code(DebtsPath);
+            StringAssert.Contains("EffectWindow.IsOpen(", src);
+            StringAssert.Contains("EffectWindow.Remaining(", src);
+            StringAssert.DoesNotContain(".RemainingTime(", src, "ARCH-NET-15: a window is read through EffectWindow");
+            StringAssert.DoesNotContain(".Expired(", src);
+            StringAssert.DoesNotContain(".ExpiredOrNotRunning(", src);
+        }
+
+        [Test]
+        public void DebtEvents_WriteTheirFieldsBeforeTheirIds()
+        {
+            string hit = Body(DebtsPath, "public void OnHit(");
+            Assert.Less(hit.IndexOf("LastDebtVictim = victim.Id;", StringComparison.Ordinal), hit.IndexOf("FreshHitEventId++", StringComparison.Ordinal), "ARCH-EVT-02: the payload first");
+            string gain = Body(DebtsPath, "private void Gain(");
+            Assert.Less(gain.IndexOf("LastDebtVictim = victim.Id;", StringComparison.Ordinal), gain.IndexOf("DebtEventId++", StringComparison.Ordinal));
+            string settled = Body(DebtsPath, "internal void OnStealSettled(");
+            int bump = settled.IndexOf("DebtCashEventId++", StringComparison.Ordinal);
+            Assert.Greater(bump, 0);
+            Assert.Less(settled.IndexOf("LastDebtVictim = victimId;", StringComparison.Ordinal), bump);
+            Assert.Less(settled.IndexOf("LastCashBonus =", StringComparison.Ordinal), bump);
+            Assert.Less(settled.IndexOf("if (!(credited > 0f)) return;", StringComparison.Ordinal), settled.IndexOf("DebtBook.Cash(", StringComparison.Ordinal), "only a positive answer cashes");
+            string events = Code(Scripts + "Gameplay/ChickenLocalEvents.cs");
+            foreach (var id in new[] { "FreshHitEventId", "DebtEventId", "DebtCashEventId" })
+                StringAssert.Contains(id, events, $"the one observer raises {id} (ARCH-EVT-03)");
+        }
+
+        [Test]
+        public void FreshHit_StacksTheExtraDebt_ThenSpendsTheState_ThenTheHitsOwnDebt()
+        {
+            string hit = Body(DebtsPath, "public void OnHit(");
+            int fresh = hit.IndexOf("IsFreshFor(", StringComparison.Ordinal);
+            int extra = hit.IndexOf("Gain(victim, facts);", StringComparison.Ordinal);
+            int mark = hit.IndexOf("RPC_MarkBitten(", StringComparison.Ordinal);
+            int own = hit.IndexOf("if (job == AbilityJob.Stun || job == AbilityJob.Shove) Gain(victim, facts);", StringComparison.Ordinal);
+            Assert.Greater(fresh, 0);
+            Assert.Greater(extra, fresh, "the extra stack follows the fresh read");
+            Assert.Greater(mark, extra, "the state is spent after the stack");
+            Assert.Greater(own, mark, "a Stun or Shove adds its own debt last; a Steal's own hit adds none");
+            StringAssert.Contains("!facts.IsEnforcer", hit, "every other kit returns at once");
+            StringAssert.DoesNotContain("Cargo", hit, "a fresh hit moves no food (Maestro, 2026-11-25)");
+        }
+
+        [Test]
+        public void ChickenPrefab_CarriesEnforcerDebts_AndListsItAmongItsNetworkedBehaviours()
+        {
+            var prefab = TestAssets.Load<GameObject>(TestAssets.ChickenPrefabPath);
+            var debts = prefab.GetComponent<EnforcerDebts>();
+            Assert.IsNotNull(debts, "Chicken.prefab has no EnforcerDebts: no Enforcer would ever keep a debt (CODE-ASSET-11)");
+            Assert.AreEqual(1, prefab.GetComponentsInChildren<EnforcerDebts>(true).Length);
+            AssertListed(prefab, debts, "EnforcerDebts is on the prefab but not in NetworkObject.NetworkedBehaviours: Fusion would not replicate it");
+
+            var variant = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Doppelganger.prefab");
+            var inherited = variant.GetComponent<EnforcerDebts>();
+            Assert.IsNotNull(inherited, "the decoy variant inherits it (CODE-ASSET-06)");
+            AssertListed(variant, inherited, "the variant's own NetworkedBehaviours list must be baked with the new component");
         }
     }
 }

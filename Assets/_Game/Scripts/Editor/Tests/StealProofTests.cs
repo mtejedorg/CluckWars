@@ -139,7 +139,7 @@ namespace CluckWars.Tests
 
         // ---- 3. The six thief sites: gate BEFORE the self-credit ---------------
 
-        [TestCase("Abilities/SnatchAbilitySO.cs",      "StealFrom(thief, _scratch[i], StealAmount)")]
+        [TestCase("Abilities/SnatchAbilitySO.cs",      "StealFrom(thief, _scratch[i], StealAmount, thief.Debts)")]   // the Enforcer's debts ride on the same entry point (BL-226)
         [TestCase("Abilities/SneakyStealAbilitySO.cs", "StealFrom(thief, _scratch[0], StealAmount)")]
         [TestCase("Abilities/ScrapAbilitySO.cs",       "StealFrom(thief, _scratch[0], StealAmount)")]
         [TestCase("Abilities/RollTrampleAbilitySO.cs", "StealFrom(thief, _scratch[0], StealAmount)")]
@@ -196,7 +196,7 @@ namespace CluckWars.Tests
         {
             string snatch = Src("Abilities/SnatchAbilitySO.cs");
             // The steal (gated inside StealFrom) and the shove are two unconditional statements: a shell stops only the first.
-            StringAssert.IsMatch(@"StealFrom\(thief, _scratch\[i\], StealAmount\);\s*thief\.KnockAway\(_scratch\[i\], KnockbackStrength\);", snatch);
+            StringAssert.IsMatch(@"StealFrom\(thief, _scratch\[i\], StealAmount, thief\.Debts\);\s*thief\.KnockAway\(_scratch\[i\], KnockbackStrength\);", snatch);
             string spine = Src("Gameplay/ChickenController.cs");
             StringAssert.IsMatch(@"Cargo\.StealFrom\(other, StealBackAmount\);\s*KnockAway\(other, StealBackKnockback\);", spine);
         }

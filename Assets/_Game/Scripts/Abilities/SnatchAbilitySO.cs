@@ -106,7 +106,10 @@ namespace CluckWars.Abilities
                 // A steal-proof victim (Egg Shell / Turtle Mode) gives nothing (StealFrom's gate); the shove below
                 // is unaffected (ApplyKnockback has its own control-immunity check) and names the thief, so a base
                 // wall refuses it exactly where it refuses the steal. Nothing is sent for a strength of 0 (shipped).
-                StealFrom(thief, _scratch[i], StealAmount);
+                // The Enforcer's hit (BL-226): a Steal that reaches a carrier stacks the fresh debt on a fresh rival before it asks, so the stack counts toward this
+                // very Steal; the ask is then inflated by the debts on him. For every other kit both calls are plain (no facts, no debts).
+                ReportHit(thief, _scratch[i], AbilityJob.Steal, StealRules.CanStealFrom(_scratch[i]));
+                StealFrom(thief, _scratch[i], StealAmount, thief.Debts);
                 thief.KnockAway(_scratch[i], KnockbackStrength);
             }
         }

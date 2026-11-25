@@ -345,6 +345,24 @@ namespace CluckWars.Abilities
         }
 
         /// <summary>
+        /// <see cref="StealFrom(Gameplay.ChickenController, Gameplay.ChickenController, float)"/> for a thief that may hold debts on its victim (the Enforcer's):
+        /// asks the amount <see cref="Gameplay.EnforcerDebts.StealAmountOn"/> inflates by the debts on that victim, and stages the count the ask used so the
+        /// victim's answer can cash it. With no debts component, or a passive without debt facts, it asks exactly what the plain overload asks.
+        /// </summary>
+        protected static float StealFrom(Gameplay.ChickenController thief, Gameplay.ChickenController victim, float nominalAmount, Gameplay.EnforcerDebts debts)
+        {
+            var cargo = thief != null ? thief.Cargo : null;
+            if (cargo == null) return 0f;
+            float resolved = ResolveStealAmount(nominalAmount, thief);
+            if (debts == null) return cargo.StealFrom(victim, resolved);
+
+            int consumed = debts.CountOn(victim);
+            debts.BeginAsk(consumed);   // the cargo tells the debts which request this is before it sends it (a local victim answers inside the send)
+            try { return cargo.StealFrom(victim, debts.StealAmountOn(victim, resolved)); }
+            finally { debts.EndAsk(); }
+        }
+
+        /// <summary>
         /// Tells the caster's hit-pricing behaviours (the Bully's hit-steal) that this ability just went at <paramref name="victim"/>, with the caster's
         /// prediction that it affected him (design 2026-11-25, 16.3). Called by the Stun, Shove and Slow abilities right after the effect is sent.
         /// </summary>

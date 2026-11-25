@@ -239,6 +239,7 @@ namespace CluckWars.Gameplay
         private AssassinExecute _assassin;
         private ThiefLoot _thiefLoot;
         private ChickenHitSteal _hitSteal;
+        private EnforcerDebts _debts;
         private AbilityRegistrySO _abilityRegistry;
         private ILogService _log;
 
@@ -626,6 +627,7 @@ namespace CluckWars.Gameplay
             _assassin = GetComponent<AssassinExecute>();
             _thiefLoot = GetComponent<ThiefLoot>();
             _hitSteal = GetComponent<ChickenHitSteal>();
+            _debts = GetComponent<EnforcerDebts>();
             BindPresentation();   // presentation caches its indicator / nameplate / badge stack here
             _activeStats = ResolveStatsForClass(Class);
             Effects.Log = _log;
@@ -1190,6 +1192,9 @@ namespace CluckWars.Gameplay
         /// <summary>This chicken's hit-steal (the Bully's take per Stun or Shove; the component is on every chicken, only a passive with hit-steal facts uses it), or null before <c>Spawned</c>.</summary>
         public ChickenHitSteal Hits => _hitSteal;
 
+        /// <summary>This chicken's per-rival debts (the Enforcer's; the component is on every chicken, only a passive with debt facts uses it), or null before <c>Spawned</c>.</summary>
+        public EnforcerDebts Debts => _debts;
+
         /// <summary>
         /// One of this chicken's hitters (Stun, Shove, an instant Slow, a Steal) just went at <paramref name="victim"/>, with the caster's prediction
         /// <paramref name="affected"/> that it affected him (<see cref="PredictStunLands"/>, <see cref="PredictShoveMoves"/>, <see cref="PredictSlowLands"/>).
@@ -1200,6 +1205,7 @@ namespace CluckWars.Gameplay
         {
             if (victim == null || victim.IsDecoy || !HasStateAuthority) return;
             _hitSteal?.OnHit(victim, job, affected);
+            _debts?.OnHit(victim, job, affected);
         }
 
         /// <summary>
@@ -1911,6 +1917,7 @@ namespace CluckWars.Gameplay
             _assassin?.ResetForNewRound();
             _thiefLoot?.ResetForNewRound();
             _hitSteal?.ResetForNewRound();
+            _debts?.ResetForNewRound();
             _stealLocks.Clear();
             // End running abilities through their own OnDeactivate first (modifiers, traversal holds, ability
             // state), THEN hard-release traversal and clear the stack as a backstop.
