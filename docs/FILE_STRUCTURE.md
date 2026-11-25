@@ -48,11 +48,11 @@ An upper assembly may reference lower ones, never the reverse. Editor tools (`As
 | Assembly | Defined in (`Scripts/`) | Folders attached by `.asmref` | References | Woven by Fusion | `.cs` files |
 |---|---|---|---|---|---|
 | `CluckWars.Core` | `Logging` | `Bootstrap`, `Diagnostics/Shared`, `Geometry`, `Injection`, `Localization`, `Services` | Zenject; prebuilt: Zenject-usage.dll | no | 28 |
-| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 201 |
+| `CluckWars.Gameplay` | `Gameplay` | `Abilities`, `Audio`, `Balance`, `Networking`, `Settings` | CluckWars.Core, Fusion.Unity, Zenject, Unity.AI.Navigation | yes | 208 |
 | `CluckWars.Presentation` | `Visuals` | `Input`, `UI` | CluckWars.Core, CluckWars.Gameplay, Fusion.Unity, Zenject, Unity.InputSystem, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime, UnityEngine.UI | yes | 150 |
 | `CluckWars.Diagnostics` | `Diagnostics` | `AbilityLab` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, Fusion.Unity, Zenject, Unity.InputSystem | yes | 32 |
 | `CluckWars.App` | `App` | `Installers` | CluckWars.Core, CluckWars.Gameplay, CluckWars.Presentation, CluckWars.Diagnostics, Fusion.Unity, Zenject, Unity.Services.Core, Unity.Services.Authentication, Unity.Services.Multiplayer, Unity.Services.RemoteConfig | yes | 5 |
-| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 319 |
+| `Assembly-CSharp-Editor` | built-in (any `Editor` folder) | - | all `autoReferenced` assemblies | no | 327 |
 | `Assembly-CSharp` | built-in (everything else) | - | all `autoReferenced` assemblies | yes | 0 |
 
 `.cs` counts cover `Assets/_Game` only. `AssembliesToWeave` in `Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion`: `Fusion.Unity`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `Fusion.Addons.Physics`, `Fusion.Addons.FSM`, `CluckWars.Gameplay`, `CluckWars.Presentation`, `CluckWars.Diagnostics`, `CluckWars.App`.
@@ -90,17 +90,17 @@ Per-folder `.cs` counts (every folder under `Assets/_Game/Scripts` that holds a 
 | Folder (`Assets/_Game/Scripts/`) | Assembly | `.cs` files directly in it |
 |---|---|---|
 | `Abilities` | `CluckWars.Gameplay` | 45 |
-| `Abilities/Passives` | `CluckWars.Gameplay` | 8 |
+| `Abilities/Passives` | `CluckWars.Gameplay` | 9 |
 | `AbilityLab` | `CluckWars.Diagnostics` | 5 |
 | `App` | `CluckWars.App` | 3 |
 | `Audio` | `CluckWars.Gameplay` | 9 |
-| `Balance` | `CluckWars.Gameplay` | 38 |
+| `Balance` | `CluckWars.Gameplay` | 39 |
 | `Bootstrap` | `CluckWars.Core` | 1 |
 | `Diagnostics` | `CluckWars.Diagnostics` | 27 |
 | `Diagnostics/Shared` | `CluckWars.Core` | 9 |
 | `Editor` | `Assembly-CSharp-Editor` | 18 |
-| `Editor/Tests` | `Assembly-CSharp-Editor` | 293 |
-| `Gameplay` | `CluckWars.Gameplay` | 92 |
+| `Editor/Tests` | `Assembly-CSharp-Editor` | 301 |
+| `Gameplay` | `CluckWars.Gameplay` | 97 |
 | `Gameplay/Session` | `CluckWars.Gameplay` | 2 |
 | `Geometry` | `CluckWars.Core` | 1 |
 | `Injection` | `CluckWars.Core` | 1 |
@@ -141,7 +141,7 @@ Non-script file counts by folder (depth 3):
 | `Art/UI/Chickens` | 8 `.png` |
 | `Art/UI/Frames` | 9 `.png`, 1 `.md` |
 | `Art/UI/Fx` | 15 `.png`, 1 `.spriteatlas` |
-| `Art/UI/Icons` | 58 `.png` |
+| `Art/UI/Icons` | 59 `.png` |
 | `Audio/Abilities` | 2 `.wav`, 1 `.md` |
 | `Audio/UI` | 17 `.wav`, 1 `.md` |
 | `Data` | 10 `.asset` |
@@ -149,6 +149,7 @@ Non-script file counts by folder (depth 3):
 | `Data/Abilities/Passives` | 8 `.asset` |
 | `Data/Balance` | 2 `.asset` |
 | `Data/Classes` | 4 `.asset` |
+| `Data/Simulator` | 1 `.asset` |
 | `Editor` | 8 `.cs` |
 | `Materials` | 1 `.mat` |
 | `Prefabs` | 6 `.prefab` |
@@ -176,7 +177,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Abilities` (+ `Passives/`) | Gameplay | Ability ScriptableObjects and their shared vocabulary (below) |
 | `Scripts/Networking` | Gameplay | `INetworkService` (all Fusion runner lifecycle), `PlayerNetworkInput` (the per-tick input struct; its aim byte is always 0 since 2026-11-20), `AimRules` (aim decode, the soft-lock pick; no device aims any more), `DisconnectRules`, `NetworkProtocol` (the one `Version` integer that is part of the Photon app version; bumped by hand with every networked layout or RPC signature change, ARCH-NET-21) |
 | `Scripts/Audio` | Gameplay | `IAudioService` with `UnityAudioService` / `NullAudioService`, `AudioTicker`, `SfxId`, `AudioRegistrySO`, `UiAudioSO`, `ProceduralAudioBank`, `MissingSfxReporter` |
-| `Scripts/Balance` | Gameplay | The Balance Oracle, which reports and proposes and never blocks (decision 2026-11-20): `OracleMapSO` (the shipped arena baked as data, built by `Editor/OracleMapBaker`), `OraclePaths` (wall-aware shortest paths for the bake), `OracleKit` and `OracleKits` (assets resolved to kits, through `BalanceBook.Preview` copies for a proposal), `FarmSim` (fixed-tick farming run on the baked map), `OracleRunner` (economy per kit, Spoiler and Thief tables), `SneakyTables`, `OracleReport`, `OracleReferenceSO` (the accepted reference the drift guard compares to), `OracleSweep` (food sweep per pile setup), `OracleSolver` (proposes free values as a balance delta), `FoodRules` (the starting pile food rules); the match simulator (CODE-DESIGN-01): `MatchSim` (seeded four-chicken match on the baked map), `MatchSight` (the bot sight rule the simulator shares), `MatchCombat` (casts, contact, shoves and the timer tie-break), `MatchStats` (per-seat counters), `MatchPolicy` (the `IMatchPolicy` a seat decides with), `FarmOnlyPolicy` (the farming policy), `ScriptedPolicy` (P0, the policy that calls the game's own bot functions), `UtilityPolicy` (P1, a scored policy), `MatchRunner` (runs designs and populations over seeds), `MatchReport` (the match report and its sensitivity tables), `MatchWhatIf` (the what-if report: named schema-1 deltas run against the baseline with the same seeds, read-only), `MatchSweep` (the sensitivity sweep and robustness tags), `MatchSolverTerm` (the guarded match term of the solver), `OracleNav` (wall-aware steering on the baked map), `MatchRng` (seeded streams), `MatchKit` and `MatchKits` (kits with their declared ability facts, read through `BalanceBook.Preview` copies); the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice`; the dev-tools-only local path (ARCH-DATA-14): `BalanceBook.Local.cs` (partial, local apply entry points), `BalanceLocalOverride` (apply window, stored/applied state), `BalanceLocalStore` (dev-only local file), `BalanceSctCheck` (the oracle's before and after numbers for a local apply, with the `OracleMapSO` the book was handed; reports, never blocks) |
+| `Scripts/Balance` | Gameplay | The Balance Oracle, which reports and proposes and never blocks (decision 2026-11-20): `OracleMapSO` (the shipped arena baked as data, built by `Editor/OracleMapBaker`), `OraclePaths` (wall-aware shortest paths for the bake), `OracleKit` and `OracleKits` (assets resolved to kits, through `BalanceBook.Preview` copies for a proposal), `FarmSim` (fixed-tick farming run on the baked map), `OracleRunner` (economy per kit, Spoiler and Thief tables), `SneakyTables`, `OracleReport`, `OracleReferenceSO` (the accepted reference the drift guard compares to), `OracleSweep` (food sweep per pile setup), `OracleSolver` (proposes free values as a balance delta), `FoodRules` (the starting pile food rules); the match simulator (CODE-DESIGN-01): `MatchSim` (seeded four-chicken match on the baked map), `MatchSight` (the bot sight rule the simulator shares), `MatchCombat` (casts, contact, shoves and the timer tie-break), `MatchStats` (per-seat counters), `MatchPolicy` (the `IMatchPolicy` a seat decides with), `FarmOnlyPolicy` (the farming policy), `ScriptedPolicy` (P0, the policy that calls the game's own bot functions), `UtilityPolicy` (P1, a scored policy), `MatchRunner` (runs designs and populations over seeds), `MatchReport` (the match report and its sensitivity tables), `MatchWhatIf` (the what-if report: named schema-1 deltas run against the baseline with the same seeds, read-only; a delta may carry `"roster"`, a swap of a passive for an unregistered one), `OracleRoster` (that roster swap: lets `Champion` take a seat; BL-222), `MatchSweep` (the sensitivity sweep and robustness tags), `MatchSolverTerm` (the guarded match term of the solver), `OracleNav` (wall-aware steering on the baked map), `MatchRng` (seeded streams), `MatchKit` and `MatchKits` (kits with their declared ability facts, read through `BalanceBook.Preview` copies); the live-ops balance layer: `BalanceBook` (holds and applies a server-published delta), `BalanceJson` (strict reader), `BalanceRefresher` (boot cache + background fetch), `BalanceCache`, `BalanceSourceChoice`; the dev-tools-only local path (ARCH-DATA-14): `BalanceBook.Local.cs` (partial, local apply entry points), `BalanceLocalOverride` (apply window, stored/applied state), `BalanceLocalStore` (dev-only local file), `BalanceSctCheck` (the oracle's before and after numbers for a local apply, with the `OracleMapSO` the book was handed; reports, never blocks) |
 | `Scripts/Settings` | Gameplay | `PlayerPreferences` (persisted display options, the `KeyboardScheme` choice and the dev-tools gate), `LastSetup` (last committed menu choices) |
 | `Scripts/Visuals` | Presentation (asmdef) | Local-only presentation: chicken visuals/VFX/animator/nameplates/badges, telegraphs and range overlays, `StatusEffects` table, `FeedbackTuning`, `FeedbackPaletteSO`, `MatchCamera`, fence fade, surround haze (`CWHazeFeature`, `SurroundHazeMapSO`), Death Mark screen pass (`MarkScreenFeature`), rival indicators and the floor arrows (`RivalIndicator`, `FloorRivalArrows`, `FloorArrowRules`, `MarkedTargetArrowRules`), the Death Mark / Hunt hunter feedback (`MarkFeedback`, `HuntBrackets`, `HuntRules`), the Thief loot mark feedback (`LootFeedback`, `LootPresentationRules`, `LootHexRules`), `HudControlZones`, per-beat `*BeatRules`, `OwnSoundRules`, `ChickenModelPresenter` |
 | `Scripts/UI` | Presentation | UI Toolkit controllers (`MenuUiController` and its partials, `MatchOverlaysController` and its partials, `MatchHudController`, `MarkHudController` and its partial `MarkHudController.Loot`), `CoinBagGlyph` (the loot bag drawn by code), `UiElements`, ability icon/palette mapping, pure layout/flow rules (`MatchStandings`, `WaitingRoomRules`, `SafeAreaPadding`, `OrientationPolicy`), `DebugHud`, and `MatchHud` (a UGUI canvas built in code for the hit flash and the comeback banner) |
@@ -188,7 +189,7 @@ Non-script file counts by folder (depth 3):
 | `Scripts/Editor` | Assembly-CSharp-Editor | Build menu (`CluckWarsBuildMenu`, `BuildGuards`, `BuildInfoWriter`), import stampers (`UiAudioImportSettings`, `UiSpriteImportSettings`, `TmpEssentialsAutoImport`, `AndroidVibratePermission`), animation authoring (`ChickenAnimationSetup`, whose menu `Cluck Wars/Animation/Wire Peck Cast` runs `EnsurePeckCastWiring` on `Chicken.controller`; `CastArchetypeClipGenerator`, `CastArchetypePreview`), capture probes (`ParticleProbe`, `PeckEdgeProbe`), `AbilityLabMenu`, `AutoTestEditorHooks`, `BalanceEditorHooks` (Remote Config In Editor toggle, restores the assets on reload / Play Mode exit), `AbilityIconStyleChecker` (no header; on load it logs any registered ability without an `AbilityIconStyle` mapping), Oracle tooling (`OracleMapBaker` bakes `Game.unity` into `OracleMap.asset`, `OracleMenu` writes the oracle report to `Captures/oracle/`; its `MatchTimingBatch` and `BotArrivalRadius` serve the match simulator, and its `Match report` and `Match sensitivity` entries (batch methods `MatchReportBatch` and `MatchSensitivityBatch`) write the match report and the sensitivity run, its `Match what-if` entry (menu `Cluck Wars/Balance/Oracle/Match what-if`, batch method `MatchWhatIfBatch`) writes the what-if report, and its `Accept match as balanced` entry (batch method `AcceptMatchBatch`) records the match report in `OracleReference.asset`) |
 | `Scripts/Editor/Tests` | Assembly-CSharp-Editor | The EditMode suite (section 6) |
 
-**`Scripts/Gameplay` sub-areas** (all 89 files):
+**`Scripts/Gameplay` sub-areas** (all 97 files):
 
 | Sub-area | Files |
 |---|---|
@@ -198,26 +199,27 @@ Non-script file counts by folder (depth 3):
 | The chicken | `ChickenController` (motion, control windows, RPC entry points, `Local` / `LocalDriven`), `ChickenCargo`, `ChickenCombat` (execute removal/respawn; hosts `SenderLatency` / `PeerLatency`), `ChickenMovement`, `ChickenTraversal`, `ChickenCapsule`, `ChickenMatchStats`, `ChickenLocalEvents`, `EventEdge`, `ListenerList`, `ControlState`, `EffectWindow`, `ContactHysteresis`, `RecentPositions`, `LocalChickenRules`, `IChickenModelPresenter`, `Doppelganger`, `SilentCargoWrite` |
 | Chicken classes | `ChickenClass` (the enum), `ChickenClassInfo` (holds `ChickenClasses`), `ChickenStatsSO`, `ChickenClassRegistrySO` |
 | Ability runtime | `AbilityController` (slots, cooldowns, `LoadoutCodes`), `AbilityRegistrySO`, `AbilityActivationRules`, `AbilityAimForward`, `AbilityRunRules`, `AbilityEffectStack`, `AbilityCue`, `AbilityZone`, `AreaEffectRules`, `ZoneDiscMesh`, `FixedKit`, `PreEquippedLoadout`, `LoadoutClaimRules`, `PeckChainRules`, `PeckCastRules` (the Peck cast: when it ends naturally, when a stun or shove cuts it; pure), `TargetCooldowns`, `JumpResolver`, `LootMark` (the Thief's loot mark rules, shared with the match simulator) |
+| Warrior identity rules (BL-222, shipped off) | `HitStealRules` (the Bully's steal on a Peck hit), `PeckBreakRules` (the Champion's break of a cast), `TrophyRules` (trophies, overflow); pure, shared by the game's passives and the simulator |
 | Death Mark (Assassin execute) | `AssassinExecute`, `ExecuteRules`, `ExecuteRespawnRules`, `MarkPickRules` |
 | Thief loot mark | `ThiefLoot` (the `NetworkBehaviour` on the chicken: networked mark, state, age timer and the `LootTakenEventId` one-shot; runs only for a Thief), `MarkedStealBook` (the Thief's ledger of the one open marked steal; pure) |
 | Food, bases and transfers | `FoodPile`, `PlayerBase`, `FoodTransferRules` (holds `FoodRequests`), `PendingStealLedger`, `StealMath`, `StealRules`, `BaseDepositRules`, `BaseKeepOutRules`, `BaseWallRules`, `PileFootprintShape` |
 | RPC claims and control | `RpcClaim` (holds `RpcRejectionLimiter`), `ControlClaimRules`, `ControlReapplyRules` |
 | Map and terrain | `MapGenerator`, `PinwheelLayout`, `SectorScatter`, `TerrainObstacle`, `TerrainTraversal`, `ArenaDensityMetric` |
-| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotLootRules` (pure rules for the Thief bot's loot mark: pursue, hold Steal, bank now; the game's bot and the simulator's P0 call the same functions), `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
+| Bots | `BotController` (solo-mode bot AI on the state authority), `BotTactics`, `BotLootRules` (pure rules for the Thief bot's loot mark: pursue, hold Steal, bank now; the game's bot and the simulator's P0 call the same functions), `BotHitStealRules` and `BotBreakRules` (pure rules for the Bully's hit-steal and the Champion's break; called by the simulator's policies, not yet by `BotController`; BL-222), `BotSightRules` (pure rule for what a bot knows of a rival: live while visible, last seen position while hidden; ARCH-DATA-15) |
 | Shared config assets | `MatchConfigSO`, `PrefabRegistrySO`, `ColorSchemeSO` |
 
-**`Scripts/Abilities`** (45 files + 8 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
+**`Scripts/Abilities`** (45 files + 9 in `Passives/`): one `<Name>AbilitySO` per ability (30 concrete classes), the
 abstract bases `AbilityBaseSO`, `PassiveAbilitySO` and `StunBurstAbilitySO` (shared base of `AmbushAbilitySO` and
 `WingSlamAbilitySO`, which is why it has no asset), and the shared vocabulary: `AbilityContext`, `AbilityAim`,
 `AbilityTargeting`, `AbilityJob`, `AccentKey`, `CastArchetype`, `ChickenSubclass`, `AreaEffectKind`,
-`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`, `AbilityOracleFacts` (the numbers the oracle reads off an ability, declared by the ability). `Passives/` holds the 8 `<Name>PassiveSO` classes.
+`AreaEffectChannel`, `AreaEffectSpec`, `AreaEffectSpawner`, `AbilityOracleFacts` (the numbers the oracle reads off an ability, declared by the ability). `Passives/` holds the 9 `<Name>PassiveSO` classes: the 8 shipped ones and `ChampionPassiveSO` (unregistered, simulator only, BL-222).
 
 ### 3.2 `Assets/_Game/Data`
 
 ScriptableObject assets only; the full class-to-asset table is section 5. Subfolders: `Data` (10 project-wide
 singletons: registries, `MatchConfig`, palettes, haze/fence manifests), `Data/Abilities` (30 ability assets),
 `Data/Abilities/Passives` (8 specializations, which also carry the fixed kits), `Data/Classes` (4 `ChickenStatsSO`, one
-per class).
+per class), `Data/Simulator` (assets only the match simulator uses: `Champion.asset`, the Warrior's second simulator kit; kept outside `Abilities/` because the roster tests treat every asset in that folder as shipped; never registered, never in a scene; BL-222).
 
 - **Retired abilities:** 19 of the 30 ability assets have `Retired: 1` (the `Retired` field on `AbilityBaseSO`: "kept in
   the repo, out of the registry, every kit and the free pool"). Exactly those 19 are absent from
@@ -461,6 +463,7 @@ Every `.asset` under `Assets/_Game/Data`, with the class its `m_Script` GUID res
 | `Data/Balance` | `OracleMapSO` | `Balance/OracleMapSO.cs` | `OracleMap.asset` |
 | `Data/Balance` | `OracleReferenceSO` | `Balance/OracleReferenceSO.cs` | `OracleReference.asset` |
 | `Data/Classes` | `ChickenStatsSO` | `Gameplay/ChickenStatsSO.cs` | `Assassin.asset`, `Fatty.asset`, `Speedy.asset`, `Warrior.asset` |
+| `Data/Simulator` | `ChampionPassiveSO` | `Abilities/Passives/ChampionPassiveSO.cs` | `Champion.asset` |
 
 Ability assets: 19 registered, 19 retired.
 <!-- END GENERATED: data -->
@@ -496,7 +499,7 @@ Shared helpers (all in `Assets/_Game/Scripts/Editor/Tests/`):
 | `MatchTestKit.cs` | Shared inputs and map for the match simulator tests (releases them in `TearDown`) | 2 |
 | `IconStrokeMetrics.cs` | Pixel metrics on shipped icon PNGs (used by `AbilityIconArtTests`, `StateGlyphArtTests`) | - |
 
-Test classes for the bot sight rule and the match simulator: `BotSightTests`, `BotLootRulesTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
+Test classes for the bot sight rule and the match simulator: `BotSightTests`, `BotLootRulesTests`, `BotWarriorRulesTests`, `HitStealRulesTests`, `PeckBreakRulesTests`, `TrophyRulesTests`, `WarriorPassiveDataTests`, `OracleRosterTests`, `WhatIfSpecTests`, `MatchWarriorTests`, `MatchNavTests`, `MatchRngTests`, `MatchSimFarmTests`, `MatchFactsTests`, `MatchKitsTests`, `MatchCombatTests`, `MatchSightTests`, `MatchSpoilerTests`, `MatchStatsTests`, `MatchReviewFixTests`, `ScriptedPolicyTests`, `MatchRunnerTests`, `MatchReportTests`, `MatchReferenceTests`, `MatchSolverTermTests`, `UtilityPolicyTests`, `MatchSweepTests`, `MatchWhatIfTests`, `MatchLootTests`; `TestHookPassive` is a passive whose knockback and control hooks a test sets (used only by the match kit tests).
 
 Recording fakes are not shared: each test file declares its own private nested class (`RecordingLog` in 9 files, e.g.
 `SelfInjectTests.cs` and `MissingSfxTests.cs`; `FakeAudio`, `FakeInput`, `FakeDevice`, `FakeClock`, `FakePresenter`,

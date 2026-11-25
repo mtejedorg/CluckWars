@@ -447,7 +447,7 @@ Classes differ by stat spread, passive pool, and **class-gated ability access** 
 | Stat | Meaning |
 |---|---|
 | **Cargo Capacity** | Food carried before a forced return (also caps how much you can *steal* in one go) |
-| **Peck** (amount / cooldown / cast) | Food per cast (3 for every class), the per-class seconds between presses, and the per-class cast length (`PeckCastSeconds`: Speedy 0.4 s, Warrior 0.5 s, Fatty 0.7 s, placeholders for Maestro and the oracle); the Assassin cannot forage |
+| **Peck** (amount / cooldown / cast) | Food per cast (3 for every class), the per-class seconds between presses, and the per-class cast length (`PeckCastSeconds`: Speedy 0.4 s, Warrior 0.4 s (0.5 s until 2026-11-25), Fatty 0.7 s, placeholders for Maestro and the oracle); the Assassin cannot forage |
 | **Move Speed** | Across-map speed |
 
 There is **no HP and no Resistance** — durability is expressed through *control resistance*
@@ -459,7 +459,7 @@ There is **no HP and no Resistance** — durability is expressed through *contro
 |---|---|---|---|---|---|
 | **Fatty** 🐔 | 10.125 | 35 | 0.71 s / 0.7 s | 30 s / 2 trips | *"Slow, but it all fits in the beak."* |
 | **Speedy** 🐤 | 12.15 | 10 | 0.71 s / 0.4 s | 30 s / 4 trips | *"If you can't catch me, you can't rob me."* |
-| **Warrior** ⚔️ | 10.125 | 14 | 0.79 s / 0.5 s | 35 s / 3 trips | *"The farm is a battlefield."* |
+| **Warrior** ⚔️ | 10.8 (10.125 until 2026-11-25) | 20 (14 until 2026-11-25) | 0.71 s / 0.4 s (0.79 s / 0.5 s until 2026-11-25; `Warrior.asset`) | 35 s / 3 trips (not re-measured since the 2026-11-25 change) | *"The farm is a battlefield."* |
 | **Assassin** 🗡️ | 11.1 | 10 | n/a (cannot forage) | 40 s / 4 trips | *"Blink and your food is gone."* |
 
 > **Move speeds are the x1.35 values** from the 2026-08-14 arena rescale (38 m -> 51.3 m).
@@ -477,7 +477,7 @@ cannot forage at all (the oracle report has no farming number for him: "does not
 Assassin is a fast chicken who is *genuinely bad at farming*; that is the mechanical reason he
 denies instead of collects.
 
-**Peck is a cast (BL-206, 2026-11-21).** Pressing Peck starts a cast of `PeckCastSeconds` (table above; `ChickenStatsSO`, Fatty 0.7 s, Warrior 0.5 s, Speedy 0.4 s). The chicken is rooted for the whole cast. The food is asked of the pile when the cast ends, not at the press: amount = min(`PeckAmount` 3, free cargo, pile food), re-checked at the end. A stun, a shove, an execution or the chicken's own next move cuts the cast and nothing is taken; a pile that runs out of food mid-cast (another chicken emptied it) cuts it at once for everyone still pecking it (Maestro, 2026-11-21), while a pile with some food left does not and the cast lands what remains; a slow or being robbed does not cut it (a Snatch cuts only if a balance delta ever gives it knockback, and a Bulwark-damped push too weak to count as a knockback does not cut). The cooldown counts from the press, so a cut cast spends it. A stun landing in the same tick the cast completes lets the food land. Auto-Peck and bots are unchanged: they press again after the cast ends. This replaces the old rule "food at the press, then a 0.4 s movement lock", which is gone. Cast lengths are placeholders until Maestro and the oracle set them.
+**Peck is a cast (BL-206, 2026-11-21).** Pressing Peck starts a cast of `PeckCastSeconds` (table above; `ChickenStatsSO`, Fatty 0.7 s, Warrior 0.4 s (0.5 s until 2026-11-25), Speedy 0.4 s). The chicken is rooted for the whole cast. The food is asked of the pile when the cast ends, not at the press: amount = min(`PeckAmount` 3, free cargo, pile food), re-checked at the end. A stun, a shove, an execution or the chicken's own next move cuts the cast and nothing is taken; a pile that runs out of food mid-cast (another chicken emptied it) cuts it at once for everyone still pecking it (Maestro, 2026-11-21), while a pile with some food left does not and the cast lands what remains; a slow or being robbed does not cut it (a Snatch cuts only if a balance delta ever gives it knockback, and a Bulwark-damped push too weak to count as a knockback does not cut). The cooldown counts from the press, so a cut cast spends it. A stun landing in the same tick the cast completes lets the food land. Auto-Peck and bots are unchanged: they press again after the cast ends. This replaces the old rule "food at the press, then a 0.4 s movement lock", which is gone. Cast lengths are placeholders until Maestro and the oracle set them.
 
 **Speedy never gets terrain traversal.** Not a jump, not a Blink, not a Vault — Maestro,
 2026-08-21: *"Speedy can use control on other chickens and escape just by having more speed.
@@ -517,7 +517,7 @@ current, shipped state.
 | **Fatty** | The Boulder (Bulwark) | Knockback cut by 75%; stuns, getting stuck and timed slows end 35% sooner | Peck, **Stun**, **Egg Shell**, **Shove** |
 | | The Hauler (Hoarder) | Carries at least 40 food (a full win's worth) | Peck, **Slow Area**, **Egg Shell**, **Steal** |
 | **Sneaky** | The Assassin (Spoiler) | His Hunt picks the leader (the rival with the most food banked) twice as often (`MarkKill.asset` `LeaderPickWeight`, read by the passive's text); carries at least 30 food (`MinimumCapacity`; 25 until 2026-11-25; a kill's loot is ordinary cargo held to it). No end-of-clock prize since 2026-11-24 (`Spoiler.asset` `BonusFood` 0) | **Hunt**, **Jump**, **Hide**, **Stun** |
-| | The Thief | One rival at a time carries his **loot mark**; a Steal that reaches it adds a 10-food bounty of new food to his cargo (`Thief.asset` `LootBounty`, section 6.2); carries at least 15 food (`MinimumCapacity`; 20 until 2026-11-25); banks 20 bonus food at the clock if nobody won (`ClockPrize`). The old 1.6x on every steal is gone (`StealMultiplier` 1) | **Steal**, **Jump**, **Hide**, **Slow Area** |
+| | The Thief | One rival at a time carries his **loot mark**; a Steal that reaches it adds an 8-food bounty of new food to his cargo (`Thief.asset` `LootBounty` 8; 10 until 2026-11-25, section 6.2); carries at least 16 food (`MinimumCapacity` 16; 20 until 2026-11-25 and 15 for a few hours that day); banks 20 bonus food at the clock if nobody won (`ClockPrize`). Every steal he makes takes 1.6x (`StealMultiplier` 1.6 since 2026-11-25; it was 1 from 2026-11-24, and 1.6 before that) | **Steal**, **Jump**, **Hide**, **Slow Area** |
 
 **Slot roles (Maestro, 2026-11-20).** The kits above are listed in slot order, and the order is a rule: slot 1 is the **income** move (Peck; Hunt for the Spoiler, Steal for the Thief), slot 2 **movement** (the Fatty's second attack instead), slot 3 the **flex** move (defence or self utility, or a second attack; the least used), slot 4 the **main attack**, the combo partner of slot 1. The touch hexes are tilted to match (ART.md section 6.7). `FixedKitTests.ShippedKits_HaveTheExactSlotOrder` pins the eight orders and `EveryKit_FollowsTheSlotRoles` the roles (BL-156).
 
@@ -538,6 +538,7 @@ stands inside (the first-60%-of-the-zone's-life window was removed the same day;
 crowd control and one mobility move; the old "defend a pile" identity is gone. **Bully** is the cooldown spammer
 (every move except Peck recharges 25% faster; the old steal x1.4 and +2 cargo were removed, and its declared
 Solo Clear Time exception with them, so it farms like the naked Warrior: Oracle 34.98 s / 3 trips on every seat).
+**Warrior numbers today (2026-11-25, Maestro):** Move Speed 10.8, cargo 20, Peck cooldown 0.71 s and cast 0.4 s (`Warrior.asset`; they were 10.125, 14, 0.79 s and 0.5 s until 2026-11-25). **Simulator only, off in the game (BL-222, 2026-11-25):** two experimental Warrior kits exist in the match simulator and nowhere else. The Bully's hit-steal (a stun or shove takes food from the victim into the Bully's cargo; every amount is 0 in `Bully.asset`, so it does nothing) and the **Champion** (`ChampionPassiveSO`, `Data/Simulator/Champion.asset`, unregistered: a Peck break and trophies, run only through the what-if roster swap) cannot be met in a match. **Relentless is still the shipped second Warrior kit.** Spec: `docs/superpowers/specs/2026-11-25-warrior-identity-design.md`.
 **Relentless** is tenacity plus stronger crowd control, and it stays the Warrior's signature. Two multipliers
 on one passive: `DurationMultiplier` 0.75 shortens the stuns, getting-stuck and timed slows that land on it (the same
 `ModifyControlDuration` mechanism as Bulwark, no knockback cut), and `OutgoingDurationMultiplier`
@@ -597,7 +598,7 @@ steal outright: the thief is not credited, so the formula never runs.
 equip too (a Steal cast by any other kit is unchanged). While a round runs, one living rival of another corner carries the Thief's mark, drawn by a weighted
 lottery (`LootPickRules`: a base weight, more for food banked at home, somewhat less for food in the beak, a plus above 25 banked plus carried; never the last
 marked rival unless he is the only one; never a decoy or an ally). A Steal cast that reaches the marked rival is a **marked steal**: it takes what a Steal takes
-(5 food, `StealMultiplier` 1) and then adds `LootBounty` 10 of **new food**, both into the Thief's ordinary cargo, in that order, each held to its free room; what
+(5 food times `StealMultiplier`, now 1.6, so 8 food; 1 until 2026-11-25) and then adds `LootBounty` 8 (10 until 2026-11-25) of **new food**, both into the Thief's ordinary cargo, in that order, each held to its free room; what
 does not fit is lost, and an empty beak still pays the bounty. A full Thief gains nothing and the mark is still spent. The mark is spent only by a steal that really
 reached the rival: a shell (Egg Shell) or a base wall refuses it, nothing is paid and the mark stays. The next mark appears `LootLeadSeconds` (1 s) before Steal is
 ready again; a mark older than `LootSeconds` (12 s) moves to another rival only while Steal is on cooldown (with Steal ready it stays, "overdue", and moves the moment
