@@ -422,7 +422,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 ### CODE-UI-08 — Give colours and timings of gameplay meaning one named home
 - Rule: A colour that carries gameplay meaning (carry level, health, a status, a removed chicken) and a juice timing is a named constant in `FeedbackTuning`, used by every consumer; player colours have one definition (`Gameplay/PlayerColors.cs`, `PlayerPalette` forwards). A Gameplay file cannot name `FeedbackTuning`: its colour stays local with a comment. Owner D3 (2026-11-07): per-state ability accent colours live in a config ScriptableObject so they are easy to change.
 - Why: copies drift; a serialized field added to a shipped palette asset reads black until re-authored (CODE-ASSET-13).
-- Enforced by: TEST `PlayerPaletteTests.NoOtherFile_DefinesItsOwnCopyOfThePlayerColours`, `GameplayPresentationBoundaryTests.TheTwoSimulationConstants_LiveInGameplay_AndFeedbackTuningIsTheSameValue`, `FeedbackPaletteTests.AccentKey_KeepsItsSerializedNumbers_AndLivesWithTheAbilities`; since 2026-11-17 the Hunt marker and bracket colour per state has one home in `HuntRules`, pinned by `HuntRulesTests.BracketColour_ArmingSeatLiveLegalYellowLiveBlockedRed` and `MarkMarkerGeometryTests.Uss_FarChipIsTheRedPill_SameRedAsTheHexChip`; rest CONVENTION
+- Enforced by: TEST `PlayerPaletteTests.NoOtherFile_DefinesItsOwnCopyOfThePlayerColours`, `GameplayPresentationBoundaryTests.TheTwoSimulationConstants_LiveInGameplay_AndFeedbackTuningIsTheSameValue`, `FeedbackPaletteTests.AccentKey_KeepsItsSerializedNumbers_AndLivesWithTheAbilities`; since 2026-11-17 the Hunt marker and bracket colour per state has one home in `HuntRules`, pinned by `HuntRulesTests.BracketColour_ArmingSeatLiveLegalYellowLiveBlockedRed` and `MarkMarkerGeometryTests.Uss_FarChipIsTheRedPill_SameRedAsTheHexChip`; since BL-227 the Warrior kits' three colours (`WarriorFreshColor`, `WarriorDebtColor`, `WarriorLockColor`) are pinned in the shipped palette asset and kept apart from the loot, yolk, stun, hunt and player colours by `WarriorFeedbackTests.ThePaletteColours_AreInTheShippedAsset_AndReadApartFromTheOtherMarks`, and `WarriorFeedbackTests.TheFeedback_IsLocalPresentation_NoNetworkStateNoRpc_NoLiteralColours` bars literal colours in `WarriorFeedback`; rest CONVENTION
 - Audit check: `git grep -n -E "new Color(32)?\(" HEAD -- Assets/_Game/Scripts/Visuals Assets/_Game/Scripts/UI Assets/_Game/Scripts/Input` outside `FeedbackTuning.cs` and palette files; each hit is a texture pixel, a prefab default or an alpha rebuild, or a finding.
 - Source: docs/CONVENTIONS.md:259-263, M:feedback-icons-decisions-2026-11-07.md:15; icons thread 2026-11-07 (owner)
 - Status: PARTIAL (only player colours and two aliases are guarded; code-constant vs palette-SO split is open question Q3; same rule as ARCH-LAY-15)
@@ -430,7 +430,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 ### CODE-UI-09 — Draw the local player's status stack above everyone else's
 - Rule: The local player's badges and stack are always drawn on top of other chickens' (E9c).
 - Why: owner, icons thread 2026-11-10: "Always draw player above others".
-- Enforced by: NONE found (no test name matches; not verified further)
+- Enforced by: NONE for the badge row and world bars (no test name matches; not verified further). For the HUD, since BL-227: the YOU OWE cue (`WarriorOwe`) is the last element of `MarkHud.uxml`, so it draws over every rival tag and the loot badge, pinned by `WarriorFeedbackTests.EveryElementTheWarriorHudBinds_IsInTheUxml_AndEveryClassItUsesHasARule`
 - Audit check: read the sort-order code of the badge row and world bars for a local-player branch; confirm in a 4-client screenshot with overlapping chickens.
 - Proposed guard: a pure rule (`sortKey(isLocal, depth)`) tested so the local entry always sorts last, plus a source guard that the badge row uses it.
 - Source: M:feedback-icons-decisions-2026-11-07.md; icons thread 2026-11-10 (owner)
@@ -614,7 +614,7 @@ The worked example for CODE-TEXT-06 and CODE-TEXT-10 (what is enforced, what is 
 ### CODE-ASSET-13 — Add no serialized field to a shipped palette asset without re-authoring it
 - Rule: A new serialized field on a shipped palette asset (`FeedbackPaletteSO`, `ColorSchemeSO`) reads as black until somebody re-authors the asset: author the value in the same commit.
 - Why: Unity deserialises a missing colour field as zero.
-- Enforced by: CONVENTION (review only)
+- Enforced by: CONVENTION (review only); the three Warrior fields added in BL-227 are pinned against the shipped asset by `WarriorFeedbackTests.ThePaletteColours_AreInTheShippedAsset_AndReadApartFromTheOtherMarks`, but no test covers a future field
 - Audit check: a diff adding a `Color` field to a `*PaletteSO.cs` / `ColorSchemeSO.cs` also changes the matching `.asset` under `Assets/_Game/Data`.
 - Source: docs/CONVENTIONS.md:262
 - Status: CURRENT
@@ -1479,7 +1479,7 @@ Highest regression risk first. Each gap was re-checked at b7c2616e (the evidence
 | G-14 | CODE-TEXT-04 | UXML text test covers 4 menu UXML plus MatchOverlays (UiTextTests.cs:25-28, :343); `MatchTopBar`, `MarkHud`, `TouchControls` unchecked (2026-11-17: only the Hunt elements of `TouchControls.uxml` are guarded, by `HuntHexRulesTests.TouchControlsUxml_HasTheHuntElementsOnAllFourSlots_WithNoBakedText`) | Iterate every `Assets/UI/*.uxml` except `AbilityLab.uxml`, allow-listing slot-number labels | S |
 | G-05 | CODE-TEXT-01 | A `UiKeys` constant that no code or UXML reads still passes the bijection | Every constant is named in some runtime `.cs`, a UXML `@key`, or returned by a `*Key` property | S |
 | G-16 | CODE-DESIGN-04 | Retuning before the owner's test has no guard | Balance-freeze hash of shipped gameplay numbers, updated deliberately in the same commit | M |
-| G-17 | CODE-UI-09 | Local player's stack drawn on top: no test found | Pure sort rule plus a source guard | M |
+| G-17 | CODE-UI-09 | Local player's stack drawn on top: no test found for the badge row and world bars (the `MarkHud.uxml` YOU OWE cue is pinned since BL-227) | Pure sort rule plus a source guard | M |
 | G-18 | CODE-ASSET-03 | `PrimitiveType.Plane` ban: no test (`git grep` of Tests finds none) | RuntimeFiles scan | S |
 | G-19 | CODE-TEST-06 | A green session that never exercised the changed path | `verify.ps1 -Require <events>` failing on zero counts | S |
 | G-20 | CODE-UI-08 | Gameplay-meaning colours outside `FeedbackTuning`: only player colours guarded | Scan `Visuals/`, `UI/`, `Input/` for `new Color(` outside the palette files, counted allow-list | M |
