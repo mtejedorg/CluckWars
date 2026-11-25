@@ -701,3 +701,55 @@ Champion scenario. Worst 5 s window for a victim: mean 6.1 to 6.2, 95th percenti
   the bot's own rule (it casts for food at 1 or more); the lever is probably elsewhere (the cooldown multiplier, the Jump or the Shove's reach).
 - Champion: as built (the bot rules of section 7, the 0.4 s cast) the break is a rare event and the kit plays as Relentless's, 10 / 24 / 20. To make the break matter, the window has to
   open (a longer cast for the victim, a reaction-free press online as in open question 2, or the bot pressing on the approach), and the bot has to bank later to fill the room.
+
+## 15. Results of the reworked runs (2026-11-25, evening; BL-222)
+
+Slice R4 as run after the bot fixes. Both runs: `replicateScale` 0.4, seed 20261122, 12 threads, the shipped game as baseline re-run after BL-224 (a Brawler with no Steal and no hit that pays forages) and BL-225 (P1 values a cast by its take), so the baselines are **not** comparable with section 14: P1 moved most (shipped Bully 33 to 44, Relentless 26 to 32). Files (not committed): `Captures/oracle/match-whatif-20261125-135008` (Bully, `whatif-e-bully.json`), `-140227` (Bully, stun 1 / shove 1 at the best multiplier), `-140450` (Bully kit only, hit-steal 0), `-140017` (Champion, `whatif-e-champion.json`, `"roster":{"Relentless":"Champion"}`), each `.md` and `.json`. Foraging is the new per-kit lever `PeckCooldownMultiplier` (BL-223), not the class-wide `Warrior` Peck values. Win rates are points over the seats a kit sat in; the Champion rows use `FreshBiteShare` 0 except the two B rows.
+
+### 15.1 Run A, the Bully (kit Peck, Shadowstep, WingSlam, CluckShock)
+
+Hit-steal Stun 2, Shove 2, lock 3 unless the row says otherwise; the baseline is the shipped game (old Bully with Snatch). Worst loss is for one victim inside 5 s.
+
+| Scenario | P0 | P1 | mixed | hit takes per match | hit food per match | mean hit-steal take | hits that met the lock per match | identity food per match | worst loss for a victim in 5 s (mean) | worst loss for a victim in 5 s (95th percentile) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| baseline | 23.2 | 43.7 | 32.9 | n/a | n/a | n/a | n/a | 0.00 | 5.79 | 10.00 |
+| Bully stun 2 shove 2 lock 3, Peck x1.0 | 40.4 | 50.6 | 39.0 | 1.90 | 3.72 | 1.96 | 0.66 | 3.72 | 1.91 | 4.00 |
+| Bully stun 2 shove 2 lock 3, Peck x1.2 | 33.0 | 41.2 | 30.8 | 2.07 | 4.05 | 1.96 | 0.72 | 4.05 | 2.04 | 4.00 |
+| Bully stun 2 shove 2 lock 3, Peck x1.3 | 28.1 | 35.7 | 28.5 | 2.18 | 4.27 | 1.96 | 0.76 | 4.27 | 2.19 | 4.00 |
+| Bully stun 2 shove 2 lock 3, Peck x1.4 | 26.9 | 27.1 | 22.4 | 2.18 | 4.26 | 1.96 | 0.73 | 4.26 | 2.19 | 4.00 |
+| Bully stun 2 shove 2 lock 3, Peck x1.5 | 22.0 | 19.0 | 18.7 | 2.23 | 4.37 | 1.96 | 0.76 | 4.37 | 2.22 | 4.00 |
+| Bully stun 1 shove 1 lock 3, Peck x1.4 | 20.1 | 25.1 | 19.9 | 2.12 | 2.11 | 0.99 | 0.69 | 2.11 | 1.09 | 2.00 |
+| Bully kit only (amounts 0), Peck x1.0 | 46.4 | 56.8 | 41.0 | 0 | 0 | n/a | 0 | 0 | 0 | 0 |
+| Bully kit only (amounts 0), Peck x1.4 | 27.5 | 32.9 | 26.9 | 0 | 0 | n/a | 0 | 0 | 0 | 0 |
+
+### 15.2 Run C, the reworked Champion (kit Peck, WingSlam, CluckShock, Snatch)
+
+K kit only (fresh 0, trophy steal 0), H hits only (trophy steal 2, fresh 0), A anchor (fresh 1.0, trophy steal 2, cap 3, 6 s), T1 and T3 (trophy steal 1 and 3), B the anchor with `FreshBiteShare` 1 (the old reading, the victim's whole `PeckAmount` as food). The baseline is the Champion as shipped at multiplier 1.0, which is the K cell at 1.0. "Fresh hits" are the stacks gained from fresh rivals; bite food is 0 wherever the share is 0; identity food is the trophies' bonus food plus bite food.
+
+| Scenario | P0 | P1 | mixed | fresh hits per match | bites per match | bite food per match | Pecks bitten per match | trophies earned per match | trophies consumed per cash | Steals per match | mean Steal size | identity food per match | worst loss for a victim in 5 s (mean) | worst loss for a victim in 5 s (95th percentile) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| baseline | 8.7 | 31.9 | 25.5 | 0.00 | 0.00 | 0.00 | 0.00 | 3.88 | 1.41 | 1.88 | 4.51 | 0.00 | 4.83 | 10.00 |
+| K kit only, Peck x1.25 | 8.1 | 14.2 | 12.1 | 0.00 | 0.00 | 0.00 | 0.00 | 4.11 | 1.41 | 2.05 | 4.48 | 0.00 | 5.12 | 10.00 |
+| K kit only, Peck x1.5 | 6.1 | 3.8 | 5.6 | 0.00 | 0.00 | 0.00 | 0.00 | 4.08 | 1.37 | 2.14 | 4.45 | 0.00 | 5.01 | 10.00 |
+| H hits only (trophy steal 2, no fresh), Peck x1.0 | 28.0 | 33.5 | 29.9 | 0.00 | 0.00 | 0.00 | 0.00 | 3.45 | 1.38 | 1.70 | 5.51 | 1.58 | 5.82 | 14.00 |
+| H hits only (trophy steal 2, no fresh), Peck x1.25 | 18.9 | 17.3 | 16.4 | 0.00 | 0.00 | 0.00 | 0.00 | 3.71 | 1.39 | 1.86 | 5.58 | 1.81 | 6.29 | 14.00 |
+| H hits only (trophy steal 2, no fresh), Peck x1.5 | 17.9 | 5.5 | 10.8 | 0.00 | 0.00 | 0.00 | 0.00 | 3.76 | 1.34 | 1.98 | 5.56 | 2.03 | 6.38 | 14.00 |
+| A anchor (fresh 1.0, trophy steal 2), Peck x1.0 | 33.6 | 35.6 | 31.2 | 0.71 | 0.00 | 0.00 | 0.00 | 4.16 | 1.62 | 1.69 | 5.95 | 2.22 | 6.24 | 14.00 |
+| A anchor (fresh 1.0, trophy steal 2), Peck x1.25 | 22.0 | 17.5 | 18.9 | 0.82 | 0.00 | 0.00 | 0.00 | 4.50 | 1.66 | 1.85 | 5.96 | 2.48 | 6.57 | 14.00 |
+| A anchor (fresh 1.0, trophy steal 2), Peck x1.5 | 19.9 | 5.2 | 12.5 | 0.88 | 0.00 | 0.00 | 0.00 | 4.64 | 1.63 | 1.95 | 5.89 | 2.64 | 6.60 | 14.00 |
+| T1 (trophy steal 1), Peck x1.0 | 28.7 | 34.8 | 30.4 | 0.70 | 0.00 | 0.00 | 0.00 | 4.22 | 1.61 | 1.71 | 5.31 | 1.20 | 5.48 | 13.00 |
+| T1 (trophy steal 1), Peck x1.5 | 14.2 | 6.0 | 8.7 | 0.87 | 0.00 | 0.00 | 0.00 | 4.72 | 1.62 | 2.00 | 5.30 | 1.51 | 5.88 | 13.00 |
+| T3 (trophy steal 3), Peck x1.0 | 36.8 | 37.1 | 33.9 | 0.70 | 0.00 | 0.00 | 0.00 | 4.08 | 1.63 | 1.69 | 6.39 | 2.98 | 6.83 | 16.00 |
+| T3 (trophy steal 3), Peck x1.5 | 23.0 | 7.4 | 13.9 | 0.87 | 0.00 | 0.00 | 0.00 | 4.60 | 1.63 | 1.96 | 6.42 | 3.67 | 7.29 | 16.00 |
+| B bite on (share 1, old reading), Peck x1.0 | 36.0 | 39.9 | 33.6 | 0.75 | 0.75 | 2.17 | 0.00 | 4.18 | 1.61 | 1.59 | 5.87 | 4.17 | 6.65 | 14.00 |
+| B bite on (share 1, old reading), Peck x1.5 | 24.2 | 8.7 | 16.2 | 0.94 | 0.94 | 2.73 | 0.00 | 4.73 | 1.59 | 1.79 | 5.76 | 4.92 | 6.81 | 14.00 |
+
+### 15.3 What this says (for Maestro)
+
+- **The P0 defect is closed.** A Brawler with no Steal and no hit that pays now forages: the Bully kit with the hit-steal at 0 plays 46 / 57 / 41 (P0 / P1 / mixed) at multiplier 1.0 instead of 1 to 7 %, and 27.5 / 32.9 / 26.9 at 1.4. The hit-steal on top of it adds nothing under P0 and costs about 6 points under P1 and 4 under mixed at 1.4 (26.9 / 27.1 / 22.4): at 2 food a hit it is a flavour, not a win-rate engine.
+- **Bully: the best foraging lever is 1.4** (P0 26.9, P1 27.1, mixed 22.4: all three in the 20 to 30 band and within 0.2 points of each other; clock share under 3 %, worst 5 s loss 2.2 mean, 4 at the 95th percentile). 1.3 is a little high (28.1 / 35.7 / 28.5), 1.5 a little low (22.0 / 19.0 / 18.7). Stun 1 / Shove 1 at 1.4 is too weak (20.1 / 25.1 / 19.9; mean take 0.99); amounts 2 stay.
+- **Champion, fresh hits and trophies: 1.0 is too strong, 1.25 too weak, so about 1.1.** At 1.0 the anchor is 33.6 / 35.6 / 31.2, T1 28.7 / 34.8 / 30.4 (worst 5 s mean 5.5, under the limit of 6) and H 28.0 / 33.5 / 29.9; at 1.25 the anchor falls to 22.0 / 17.5 / 18.9 and at 1.5 to 19.9 / 5.2 / 12.5. P1 collapses with a slower Peck because it never swaps the pile for a fight (kit only at 1.5: 3.8), P0 only halves, so the P0 / P1 gap re-opens at 1.5 (15 points at the anchor) and is within 5 at 1.0 and 1.25. T1 at a multiplier near 1.1 is the pick (trophy steal 1: worst loss 5.5 mean, 13 at the 95th percentile).
+- **The trophies are the whole identity; the fresh stack is thin.** Hits on fresh rivals are only 0.7 to 0.9 a match (a 0.4 s cast and a 1 s window are rarely met by a bot), and the anchor with the stack on is only 1 to 6 points above H without it. The go measure "at least 2 bites a match" fails with or without food (the B rows, share 1, bite 0.75 a match, 2.2 to 2.7 food); identity food is 2.2 per match at the anchor against about 25 banked, short of a fifth.
+- **The old bite is worth a few points, not a different kit.** B against A: +2.4 / +4.3 / +2.4 at 1.0, +4.3 / +3.5 / +3.7 at 1.5 (P0 / P1 / mixed), and 2 more food a match of identity; with the food off the Champion keeps most of it.
+- **Gap against the other kits.** The shipped Steal kits keep a wide P0 / P1 gap (Relentless 10.2 / 32.3, the Champion kit only 8.7 / 31.9): P0, the game's bot, plays a plain Steal kit badly, and BL-225 lifted P1 for every Steal holder. Where P0 plays a rule that fights (H, A, T1, T3) the Champion's gap is 5 to 6 points. That is a bot question, not a number to tune.
+- **Neighbours.** At multipliers up to 1.25 no non-Warrior kit moves more than about 4 points; at 1.5 Slippery, Featherfoot and Fatty_Bulwark gain 5 to 6 in P1 because a slow Champion leaves them the piles.
