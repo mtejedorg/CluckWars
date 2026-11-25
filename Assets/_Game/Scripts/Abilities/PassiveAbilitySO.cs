@@ -214,6 +214,14 @@ namespace CluckWars.Abilities
         /// </summary>
         public virtual LootMarkFacts LootMark => LootMarkFacts.None;
 
+        /// <summary>
+        /// Multiplier on this passive's chickens' <b>Peck</b> cooldown (foraging cadence): 1 is the class cooldown (shipped on every passive), 1.25 a Peck
+        /// 25 % slower. Read through <see cref="PeckCastRules.Cooldown"/> by <c>PeckAbilitySO.ResolveCooldown</c> and the match simulator's kit builder, so a
+        /// balance delta can slow one kit's foraging without touching its class. Does not touch any other ability's cooldown (<see cref="ModifyCooldown"/>).
+        /// </summary>
+        [Tooltip("Multiplier on the Peck cooldown of this passive's chickens. 1 = the class cooldown (shipped). 1.25 = a Peck 25 percent slower.")]
+        [Min(PeckCastRules.MinCooldownMultiplier)] public float PeckCooldownMultiplier = 1f;
+
         /// <summary>The Bully's hit-steal as numbers (design 2026-11-25); <see cref="HitStealFacts.None"/> for every other passive. Read by the
         /// match simulator as a property; nothing in the game reads it yet.</summary>
         public virtual HitStealFacts HitSteal => HitStealFacts.None;

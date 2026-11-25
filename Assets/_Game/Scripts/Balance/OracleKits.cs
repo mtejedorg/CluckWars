@@ -150,6 +150,7 @@ namespace CluckWars.Balance
             {
                 cargo = passive.ModifyCargoCapacity(cargo, null);
                 peckCooldown = passive.ModifyCooldown(peckCooldown, peck, null);
+                peckCooldown = PeckCastRules.Cooldown(peckCooldown, passive.PeckCooldownMultiplier);   // the per-kit foraging lever, the game's own function
                 deposit = passive.ModifyDepositRate(deposit, null);
                 ignoresSlow = passive.IgnoresPileSlow(null);
             }

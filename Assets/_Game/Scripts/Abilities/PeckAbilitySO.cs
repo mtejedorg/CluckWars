@@ -72,7 +72,9 @@ namespace CluckWars.Abilities
         public override float ResolveCooldown(ChickenController caster)
         {
             var stats = caster != null ? caster.Stats : null;
-            return stats != null && stats.PeckCooldown > 0f ? stats.PeckCooldown : Cooldown;
+            float classCooldown = stats != null && stats.PeckCooldown > 0f ? stats.PeckCooldown : Cooldown;
+            var passive = caster != null ? caster.Passive : null;
+            return PeckCastRules.Cooldown(classCooldown, passive != null ? passive.PeckCooldownMultiplier : 1f);
         }
 
         /// <summary>

@@ -25,6 +25,17 @@ namespace CluckWars.Gameplay
             return knocked;
         }
 
+        /// <summary>The smallest <see cref="CluckWars.Abilities.PassiveAbilitySO.PeckCooldownMultiplier"/> any reader honours (a Peck every quarter of the class cooldown at the fastest).</summary>
+        public const float MinCooldownMultiplier = 0.25f;
+
+        /// <summary>
+        /// The Peck cooldown of one chicken: the class cooldown times its passive's <see cref="CluckWars.Abilities.PassiveAbilitySO.PeckCooldownMultiplier"/>
+        /// (1 for a chicken with no passive). The one place the game's <c>PeckAbilitySO</c> and the match simulator's kit builder both read it, so a balance
+        /// delta that slows one kit's foraging reaches both. A multiplier below <see cref="MinCooldownMultiplier"/> counts as the minimum.
+        /// </summary>
+        public static float Cooldown(float classCooldown, float passiveMultiplier) =>
+            classCooldown * Mathf.Max(passiveMultiplier, MinCooldownMultiplier);
+
         /// <summary>Food asked of the pile when the cast lands: the bite, bounded by the room left and what the pile
         /// still offers. Never negative.</summary>
         public static float LandingTake(float amount, float freeSpace, float available) =>
