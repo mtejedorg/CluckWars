@@ -312,7 +312,7 @@ namespace CluckWars.Visuals
         private void OnHitStealTaken(HitStealTakenEvent e)
         {
             if (_bound == null || !WarriorFeedbackRules.PopShown(e.Take)) return;
-            FloatingCombatText.SpawnSelfPop(_bound, UiKeys.HudPopHitTake, FeedbackTuning.FloatingTextCargoGainColor, ("n", Mathf.RoundToInt(e.Take)));
+            FloatingCombatText.SpawnSelfPop(_bound, UiKeys.HudPopHitTake, FeedbackTuning.WarriorDebtColor, ("n", Mathf.RoundToInt(e.Take)));
             _haptics?.Buzz(HapticKind.HuntLive);
             NamePendingFood(e.Take);
         }
