@@ -23,7 +23,7 @@ $ser  = Get-PhoneSerial -Adb $adb -Override $null
 
 Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 & "$PSScriptRoot\start.ps1" | Out-Null
-$S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name | Select-Object -Last 1).FullName
+$S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Where-Object { $_.Name -like 'session-*' } | Sort-Object Name | Select-Object -Last 1).FullName
 Write-Host "session: $S"
 
 function Start-Exe([string]$name, [string[]]$extra) {

@@ -78,7 +78,7 @@ if (-not (Test-Path $exe)) { throw "no Windows build at $exe (build with the Tes
 Get-Process CluckWars -ErrorAction SilentlyContinue | Stop-Process -Force
 # PC-only: never touch a phone (no logcat / screenrecord)
 & "$PSScriptRoot\start.ps1" -NoRecord | Out-Null
-$S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Sort-Object Name | Select-Object -Last 1).FullName
+$S = (Get-ChildItem (Join-Path $root 'Captures') -Directory | Where-Object { $_.Name -like 'session-*' } | Sort-Object Name | Select-Object -Last 1).FullName
 Write-Host "session: $S   mode: $Mode   rounds: $Rounds   window: ${Width}x${Height}$(if ($AutoZone) { '   autozone' })$(if ($AutoAura) { '   autoaura' })$(if ($allExtra) { '   extra: ' + ($allExtra -join ' ') })"
 
 function Start-Exe([string]$name, [string[]]$extra) {
