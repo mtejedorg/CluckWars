@@ -11,6 +11,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-26 - Warrior feedback fixes and the one-button build (BL-232, BL-231, `develop`)
+
+- **Three feedback fixes, each on a Maestro answer:** `4b85f5e1` the Steal amount is a corner chip `.cw-hex-stealchip` on the hex (WF3; the centre label path `RefreshStealAmountDigit` is gone); `3add3b75` floating pops at one bird stack upward from the shared spawn (stagger; `FloatingTextStackStep/Max/Radius`, `FloatingTextStackTests`); `cc02f1d5` `TAKE +n` wears `WarriorDebtColor` orange (`TakePopColourTests`).
+- **One-button build (`8b3c1145`, BL-231):** `toolsuilduild.bat [-Target All|Windows|Android|PlayStore|TestSession]` sets the `DOTNET_*` variables, retries a build-tool crash and judges from the log; see `docs/TESTING.md` "Building from the command line".
+- **NOT verified:** no frame ever caught two pops at one bird (stacking is covered by unit tests only); `TAKE +n` can still sit behind the LOOT pill and the You nameplate; the chip frame was taken only on the phone-size HUD, not PC; the Enforcer debt pips look is to be redesigned later (BL-233).
+
 ## 2026-11-26 - Warrior kit feedback: the fresh marker, debt pips, "you owe", the Steal hex amount, the Bully's take and lock (G9, BL-227, `develop`, not pushed; BL-227 stays open: the Enforcer icon and the G9f feedback audit are not done)
 
 - **Closed later the same day:** the Enforcer icon is real (`Icon_EnforcerPassiveSO.png`, a ledger card with three tally strokes and a kernel; generator `tools/art/enforcer_icon/make_enforcer_icon.py`, same GUID), `librarian` brought FILE_STRUCTURE, TESTING and CODE_RULES in line, the Kit Lab page was republished with both kits (no delta published), suite 4607 / 4607 in batch. Still open: the G9f feedback audit, the 4-client session (G10) before any build, and Maestro's answers on the report page https://claude.ai/artifact/7pgjXoYoic76dVB5aitnWw (WF1 to WF6).

@@ -26,6 +26,13 @@ The Android build forces:
 
 `Builds/` is gitignored. APK filename embeds `PlayerSettings.bundleVersion`.
 
+### Building from the command line (`toolsuilduild.bat`)
+
+`toolsuilduild.bat [-Target All|Windows|Android|PlayStore|TestSession]` (default `All`; `TestSession` = dev-tools Windows + Android for the multi-client sessions) runs the batch build through `tools/build/build.ps1`. It replaces `Builds/Windows` and `Builds/Android`, writes one log per attempt to `Captures/build/`, and prints `PASS` or `FAIL`. Exit codes: `0` every requested target built, `1` a target failed after the retries, `2` could not start (Unity or a game client is already running, Unity not found; set `UNITY_EXE` for a non-Hub install). Unity exits 0 even when a build fails, so the verdict comes from the `[Build] <target> OK` lines in the log, not from the exit code.
+- **Why the `DOTNET_*` variables:** the script sets `DOTNET_gcServer=0`, `DOTNET_gcConcurrent=0`, `DOTNET_TieredCompilation=0` and `DOTNET_PROCESSOR_COUNT=4`, which UnityLinker and il2cpp inherit. On 2026-11-26 their runtime crashed (exit `-1073741819`) at a different place on every run; with these set the full Android build passed. Which variable matters was not isolated. A crash with that exit code is retried (2 retries by default); any other failure is not.
+- **URP settings note:** the build rewrites `Assets/UniversalRenderPipelineGlobalSettings.asset` (drops two renderer-feature entries). When that file shows as modified afterwards, the script prints a note with the `git checkout -- <file>` command to restore it.
+- The `-executeMethod CluckWars.EditorTools.CluckWarsBuildMenu.BuildAll` / `BuildPlayStore` forms in this doc stay valid as the underlying command; use `build.bat` for a repeatable build.
+
 ### Build number and tag
 
 The **build number** names a commit, not a build moment (Maestro, 2026-11-19): the two-digit UTC year,
