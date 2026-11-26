@@ -327,6 +327,16 @@ namespace CluckWars.Visuals
         /// </summary>
         public const float FloatingTextStackClearance = 0.20f;
 
+        /// <summary>BL-232: a new pop starts <b>this much</b> higher (world metres) than each live pop already within <see cref="FloatingTextStackRadius"/> of it, so pops
+        /// at one bird stack instead of overprinting. 0.36: one word pop's glyph height (~0.3 m along the billboard) plus a gap, drawn at 0.866 on screen.</summary>
+        public const float FloatingTextStackStep = 0.36f;
+
+        /// <summary>BL-232: most steps a pop is lifted (the stack of one bird is at most this tall); the extra pops of a scrum overprint rather than leave the screen.</summary>
+        public const int FloatingTextStackMax = 2;
+
+        /// <summary>BL-232: horizontal reach (world metres) in which a live pop counts as "at the same bird": about a bird's footprint plus the follow drift of a shove.</summary>
+        public const float FloatingTextStackRadius = 0.9f;
+
         /// <summary>Smallest cargo change, in food units, that earns a floating popup. A simulation constant (it decides
         /// when <c>ChickenCargo</c> raises <c>CargoChanged</c>): the value and its reasoning live on
         /// <see cref="ChickenCargo.CargoChangeEventThreshold"/>; this is the same compile-time value for presentation.</summary>

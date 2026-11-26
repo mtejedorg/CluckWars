@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CluckWars.Gameplay;
 using CluckWars.Localization;
 using UnityEngine;
@@ -83,6 +84,7 @@ namespace CluckWars.Visuals
 
         private Popup[] _pool;
         private int     _liveCount;
+        private readonly List<Vector3> _liveOrigins = new List<Vector3>(16);
 
         /// <summary>Live popups on this peer right now. Read-only; exists for the debug
         /// HUD and for tests that want to assert the cap is respected.</summary>
@@ -250,6 +252,34 @@ namespace CluckWars.Visuals
             SpawnCargoDelta(worldPos, delta);
         }
 
+        // ── Stacking (BL-232) ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// How many live pops sit within <see cref="FeedbackTuning.FloatingTextStackRadius"/> (horizontally) of <paramref name="at"/>: the pops a new one
+        /// there would print over. Pure: <paramref name="liveOrigins"/> are the live pops' current points.
+        /// </summary>
+        public static int NearbyLive(Vector3 at, IReadOnlyList<Vector3> liveOrigins)
+        {
+            if (liveOrigins == null) return 0;
+            float r2 = FeedbackTuning.FloatingTextStackRadius * FeedbackTuning.FloatingTextStackRadius;
+            int n = 0;
+            for (int i = 0; i < liveOrigins.Count; i++)
+            {
+                float dx = liveOrigins[i].x - at.x, dz = liveOrigins[i].z - at.z;
+                if (dx * dx + dz * dz <= r2) n++;
+            }
+            return n;
+        }
+
+        /// <summary>Extra start height for a pop with <paramref name="nearbyLive"/> live pops already at its bird: one
+        /// <see cref="FeedbackTuning.FloatingTextStackStep"/> each, up to <see cref="FeedbackTuning.FloatingTextStackMax"/> steps. It falls back by itself as the older pops expire.</summary>
+        public static float StackOffset(int nearbyLive) =>
+            Mathf.Clamp(nearbyLive, 0, Mathf.Max(0, FeedbackTuning.FloatingTextStackMax)) * FeedbackTuning.FloatingTextStackStep;
+
+        /// <summary>Where a pop asked for at <paramref name="worldPos"/> actually starts, given the live pops' points: lifted by <see cref="StackOffset"/> so it never prints over the pops already there.</summary>
+        public static Vector3 StackedSpawnPosition(Vector3 worldPos, IReadOnlyList<Vector3> liveOrigins) =>
+            worldPos + Vector3.up * StackOffset(NearbyLive(worldPos, liveOrigins));
+
         // ── Lifecycle ──────────────────────────────────────────────────────────
 
         private void Awake()
@@ -330,6 +360,12 @@ namespace CluckWars.Visuals
         private void SpawnInternal(Vector3 worldPos, string text, Color color, Transform follow, float characterSize, bool isLocal)
         {
             if (_pool == null) BuildPool();
+
+            // One shared place for every kit: a pop over a bird that already shows live pops starts higher than they did (BL-232).
+            _liveOrigins.Clear();
+            for (int i = 0; i < _pool.Length; i++)
+                if (_pool[i].Live) _liveOrigins.Add(_pool[i].Origin);
+            worldPos = StackedSpawnPosition(worldPos, _liveOrigins);
 
             var popup = TakeFreeSlot() ?? TakeOldestLiveSlot();
             if (popup == null) return; // capacity 0 — impossible via Capacity's Max(1,…)
