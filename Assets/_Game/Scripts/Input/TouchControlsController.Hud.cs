@@ -527,10 +527,10 @@ namespace CluckWars.Input
             // A4: the victims' remaining stun takes the centre over the cooldown seconds (the cooldown is necessarily
             // running: he just cast) on the touch arc and the desktop / pad strip alike. The cooldown clip and the
             // duration ring are separate layers and keep drawing. A "you are stunned" cross keeps the centre.
+            RefreshStealChip(slot, equipped, mark);
             if (RefreshHuntDigit(slot, mark)) return;
             if (RefreshCasterStunDigit(slot, equipped, mark)) return;
             if (RefreshEggDigit(slot, equipped, mark)) return;
-            if (RefreshStealAmountDigit(slot, equipped, mark)) return;
 
             // With drawn marks, the label is the seconds readout and nothing else; with
             // the glyph fallback it also carries ⃠ / ✕ (text written in ApplyRefusalState).
@@ -719,44 +719,42 @@ namespace CluckWars.Input
         }
 
         /// <summary>
-        /// BL-227: while the local Enforcer's Steal is ready and a carrier stands in reach, the layer-9 label owns "+n", the food the next Steal would take from
-        /// that carrier (<see cref="WarriorFeedback"/>: the debts included, clamped as the cargo clamps the ask). It never takes the label from a cooldown
-        /// (<paramref name="mark"/> is <see cref="HexCenterMark.None"/> only when the hex is ready) and hands it back the moment the number goes. The digit wears the
-        /// debt colour (palette), the pips' own. Reformats only when the number moves.
+        /// BL-227 / BL-232: while the local Enforcer's Steal is ready and a carrier stands in reach, a small chip pinned to the hex's upper-right corner shows
+        /// "+n", the food the next Steal would take from that carrier (<see cref="WarriorFeedback"/>: the debts included, clamped as the cargo clamps the
+        /// ask). The chip is its own element (the debt colour, cream digits), so it never takes the centre label from a cooldown and never covers the icon.
+        /// It is shown only while the hex's own in-range pip is on and the Steal is ready (<paramref name="mark"/> is <see cref="HexCenterMark.None"/>), and
+        /// reformats only when the number moves.
         /// </summary>
-        private bool RefreshStealAmountDigit(int slot, AbilityBaseSO equipped, HexCenterMark mark)
+        private void RefreshStealChip(int slot, AbilityBaseSO equipped, HexCenterMark mark)
         {
-            var label = _slots[slot].CdNum;
+            var chip = _slots[slot].StealChip;
+            if (chip == null) return;
             int amount = WarriorFeedback.Current.StealAmount;
             // "In reach" is the game's own verdict, the one behind the hex's in-range pip (AbilitySlotOverlay.IsHot), not a second distance test.
-            bool show = amount > 0 && equipped.Is(AbilityJob.Steal) && mark == HexCenterMark.None && _localOverlay != null && _localOverlay.IsHot(slot);
+            bool show = amount > 0 && equipped != null && equipped.Is(AbilityJob.Steal) && mark == HexCenterMark.None && _localOverlay != null && _localOverlay.IsHot(slot);
 
             if (!show)
             {
-                if (!_stealDigitShown[slot]) return false;
+                if (!_stealDigitShown[slot]) return;
                 _stealDigitShown[slot] = false;
                 StealAmountShownNow = 0;
-                label.style.color = new StyleColor(StyleKeyword.Null);
-                _appliedCdSeconds[slot] = int.MinValue;
-                _appliedCdText[slot] = null;
-                return false;
+                chip.style.display = DisplayStyle.None;
+                return;
             }
 
             if (!_stealDigitShown[slot])
             {
                 _stealDigitShown[slot] = true;
                 _appliedStealAmount[slot] = int.MinValue;
-                // The debt colour, the pips' own (captured 2026-11-26: plain cream lost the number against the Steal icon, and the label is the whole hex, so a chip behind it hid the hex).
-                label.style.color = FeedbackTuning.WarriorDebtColor;
-                label.style.display = DisplayStyle.Flex;
+                chip.style.backgroundColor = FeedbackTuning.WarriorDebtColor;
+                chip.style.display = DisplayStyle.Flex;
             }
             if (amount != _appliedStealAmount[slot])
             {
                 _appliedStealAmount[slot] = amount;
-                label.text = UiText.Format(UiKeys.HudHexStealAmount, ("n", amount));
+                chip.text = UiText.Format(UiKeys.HudHexStealAmount, ("n", amount));
             }
             StealAmountShownNow = amount;
-            return true;
         }
 
         /// <summary>
@@ -949,6 +947,12 @@ namespace CluckWars.Input
             hex.Add(slash);
             hex.Add(x);
             hex.Add(auto);
+            // BL-232: the Enforcer's Steal amount chip, pinned to the hex's upper-right corner (text and colour written by RefreshStealChip).
+            var stealChip = new Label(string.Empty) { pickingMode = PickingMode.Ignore };
+            stealChip.AddToClassList("cw-hex-stealchip");
+            stealChip.style.display = DisplayStyle.None;
+            hex.Add(stealChip);
+            slot.StealChip = stealChip;
             slot.AutoTag = auto;
             slot.CancelX = x;
             slot.Puff = puff;

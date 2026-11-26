@@ -601,6 +601,29 @@
     padding: 0; margin: 0;
 }
 
+/* The Enforcer's Steal amount chip (BL-232, RefreshStealChip): a small pill pinned to the hex's upper-right corner, under the category mark and clear of
+   the icon (the hex's right edge is vertical from y 37 to 112). The fill is written from code (the debt colour, FeedbackTuning.WarriorDebtColor);
+   cream digits with an ink rim like the badge. Same on the touch arc and the desktop / pad strip. */
+.cw-hex-stealchip {
+    position: absolute;
+    right: -20px; top: 58px;
+    min-width: 54px; height: 42px;
+    -unity-font-definition: url("project://database/Assets/_Game/Resources/Fonts/LilitaOne-Regular.ttf");
+    font-size: 34px;
+    color: rgb(254, 245, 224);
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgb(42, 26, 12);
+    background-color: rgb(255, 133, 31);
+    border-left-width: 3px; border-right-width: 3px; border-top-width: 3px; border-bottom-width: 3px;
+    border-left-color: rgb(42, 26, 12); border-right-color: rgb(42, 26, 12);
+    border-top-color: rgb(42, 26, 12); border-bottom-color: rgb(42, 26, 12);
+    border-top-left-radius: 21px; border-top-right-radius: 21px;
+    border-bottom-left-radius: 21px; border-bottom-right-radius: 21px;
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    padding: 0 6px; margin: 0;
+}
+
 /* The cancel X shown over the held hex while the edge band is armed: two crossed bars, bigger than the
    stunned cross's weight class so it reads as a different thing. */
 .cw-hex-x {

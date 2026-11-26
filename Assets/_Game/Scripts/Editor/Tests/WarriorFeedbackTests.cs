@@ -244,21 +244,24 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheStealHex_OwnsTheCentreOnlyWhileReady_AndHandsItBack()
+        public void TheStealHex_ShowsTheAmountOnACornerChip_OnlyWhileReadyAndInReach()
         {
             string hud = Code(Scripts + "Input/TouchControlsController.Hud.cs");
             string chain = Body(hud, "private void RefreshCenterMark(");
-            int egg = chain.IndexOf("RefreshEggDigit(", System.StringComparison.Ordinal);
-            int steal = chain.IndexOf("RefreshStealAmountDigit(", System.StringComparison.Ordinal);
-            Assert.Greater(steal, egg, "the amount comes after the states that own the label");
-            string digit = Body(hud, "private bool RefreshStealAmountDigit(");
-            StringAssert.Contains("mark == HexCenterMark.None", digit, "a cooldown or a refusal keeps the centre");
-            StringAssert.Contains("equipped.Is(AbilityJob.Steal)", digit);
-            StringAssert.Contains("_localOverlay.IsHot(slot)", digit, "in reach is the game's own verdict, the one behind the hex's in-range pip");
-            StringAssert.Contains("WarriorFeedback.Current.StealAmount", digit, "the number is the data's, never typed");
-            StringAssert.Contains("UiKeys.HudHexStealAmount", digit);
-            StringAssert.Contains("StyleKeyword.Null", digit, "the stylesheet colour comes back with the label");
-            Assert.IsFalse(Regex.IsMatch(digit, "\\.text\\s*=\\s*\"[^\"]*\""), "no literal text");
+            int chipCall = chain.IndexOf("RefreshStealChip(", System.StringComparison.Ordinal);
+            int hunt = chain.IndexOf("RefreshHuntDigit(", System.StringComparison.Ordinal);
+            Assert.GreaterOrEqual(chipCall, 0, "the chip is refreshed with the centre mark");
+            Assert.Less(chipCall, hunt, "the chip is its own element: no digit state of the centre label can return before it runs");
+            Assert.IsFalse(chain.Contains("RefreshStealAmountDigit"), "the amount no longer takes the centre label");
+            string chip = Body(hud, "private void RefreshStealChip(");
+            StringAssert.Contains("mark == HexCenterMark.None", chip, "a cooldown or a refusal hides the chip");
+            StringAssert.Contains("equipped.Is(AbilityJob.Steal)", chip);
+            StringAssert.Contains("_localOverlay.IsHot(slot)", chip, "in reach is the game's own verdict, the one behind the hex's in-range pip");
+            StringAssert.Contains("WarriorFeedback.Current.StealAmount", chip, "the number is the data's, never typed");
+            StringAssert.Contains("UiKeys.HudHexStealAmount", chip);
+            StringAssert.Contains("FeedbackTuning.WarriorDebtColor", chip, "the fill is the debt colour");
+            Assert.IsFalse(Regex.IsMatch(chip, "\\.text\\s*=\\s*\"[^\"]*\""), "no literal text");
+            StringAssert.Contains(".cw-hex-stealchip", File.ReadAllText("Assets/UI/Styles/TouchControls.uss"), "the emitted class has a rule (CODE-UI-06)");
         }
 
         [Test]

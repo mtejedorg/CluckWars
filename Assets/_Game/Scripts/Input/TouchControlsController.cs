@@ -146,6 +146,7 @@ namespace CluckWars.Input
             public VisualElement Pip;        // in-range pip: a rival is in this move's shape (bottom-centre)
             public HexDurationRing Ring;     // duration ring while this slot's ability is running
             public HexChainRing Chain;       // spinning dashed ring on the Peck hex while the auto-chain runs
+            public Label         StealChip;  // built in code: the Enforcer's "+n" Steal amount chip, upper-right corner (BL-232)
             public Label         AutoTag;    // built in code: "AUTO" while Auto-Peck is on and this hex holds the Peck
             public VisualElement CancelX;    // built in code: the cream X shown while the edge-band cancel is armed
             public VisualElement FizzleSlash;// built in code: the 0.3 s slash flash after a fizzle
