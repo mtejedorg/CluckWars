@@ -13,6 +13,8 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ## 2026-11-26 - Warrior feedback fixes and the one-button build (BL-232, BL-231, `develop`)
 
+- **Play Console (2026-11-26):** the bundle `CluckWars-0.1-26474357.aab` (build cut from `01548e5`, the commit before this note) and its native debug symbols zip are uploaded to the internal-testing track as a **draft** release (version code 26474357); it is not rolled out to testers. The R8 mapping came with the bundle. The upload went through the Play Console in Chrome with the file split into 9 MB parts (the browser tool caps a file at 10 MB) and checked by SHA-256 on both sides.
+
 - **Three feedback fixes, each on a Maestro answer:** `4b85f5e1` the Steal amount is a corner chip `.cw-hex-stealchip` on the hex (WF3; the centre label path `RefreshStealAmountDigit` is gone); `3add3b75` floating pops at one bird stack upward from the shared spawn (stagger; `FloatingTextStackStep/Max/Radius`, `FloatingTextStackTests`); `cc02f1d5` `TAKE +n` wears `WarriorDebtColor` orange (`TakePopColourTests`).
 - **One-button build (`8b3c1145`, BL-231):** `toolsuilduild.bat [-Target All|Windows|Android|PlayStore|TestSession]` sets the `DOTNET_*` variables, retries a build-tool crash and judges from the log; see `docs/TESTING.md` "Building from the command line".
 - **NOT verified:** no frame ever caught two pops at one bird (stacking is covered by unit tests only); `TAKE +n` can still sit behind the LOOT pill and the You nameplate; the chip frame was taken only on the phone-size HUD, not PC; the Enforcer debt pips look is to be redesigned later (BL-233).
