@@ -131,7 +131,7 @@ namespace CluckWars.Balance
 
             // Priority 1: RETREAT.
             if (BotLootRules.Retreat(cargoFraction >= _profile.ProtectCargoThreshold && _nearest >= 0 && _nearestDist <= dangerR,
-                    lootThief && IsPursuingMark(v, me)))
+                    lootThief && IsPursuingMark(v, me, abilities)))
             {
                 _state = State.Flee;
                 TryCast(v, me, abilities, BotSituation.Retreating, _nearest);
@@ -620,19 +620,25 @@ namespace CluckWars.Balance
         // True and an intent when the bot goes for the marked rival this think: walk to it (the last seen spot when it is hidden, the simulator's
         // path goes round walls) and cast Steal once it is in reach. False leaves the ordinary rules, including the marked rival being abandoned
         // (home behind its wall, shelled, given up), which lets Steal go elsewhere and the mark move.
-        private static bool IsPursuingMark(MatchView v, in SeatView me)
+        private bool IsPursuingMark(MatchView v, in SeatView me, MatchAbility[] abilities)
         {
             int mark = me.LootTarget;
             if (mark < 0) return false;
             var m = v.Seats[mark];
-            bool behind = BotLootRules.BehindWall(m.Pos, v.Map.Places[OracleMapSO.BaseIndex(mark)].Pos, v.Rules.KeepOutRadius);
-            return BotLootRules.Pursue(m.Present && !m.Removed, m.Known, m.Shelled, behind);
+            Vector2 baseCentre = v.Map.Places[OracleMapSO.BaseIndex(mark)].Pos;
+            bool behind = BotLootRules.BehindWall(m.Pos, baseCentre, v.Rules.KeepOutRadius);
+            float reach = 0f;
+            for (int a = 0; a < abilities.Length; a++)
+                if (abilities[a].Job == AbilityJob.Steal) { reach = abilities[a].Reach * BotTactics.CommitReachFraction; break; }
+            bool catchable = BotLootRules.CanIntercept(Vector2.Distance(me.Pos, baseCentre), Vector2.Distance(m.Pos, baseCentre), v.Rules.KeepOutRadius,
+                reach, v.Kits[_seat].Farm.MoveSpeed, v.Kits[mark].Farm.MoveSpeed, Vector2.Distance(me.Pos, m.Pos));
+            return BotLootRules.Pursue(m.Present && !m.Removed, m.Known, m.Shelled, behind, catchable);
         }
 
         private bool ChaseMarked(MatchView v, in SeatView me, MatchAbility[] abilities, float arrival, out MatchIntent intent)
         {
             intent = default;
-            if (!IsPursuingMark(v, me)) return false;
+            if (!IsPursuingMark(v, me, abilities)) return false;
             int mark = me.LootTarget;
             var m = v.Seats[mark];
 

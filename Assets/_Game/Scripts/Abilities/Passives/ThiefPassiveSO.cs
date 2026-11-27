@@ -35,6 +35,26 @@ namespace CluckWars.Abilities
         [Tooltip("Extra lottery weight for a rival above the over threshold.")]
         [Min(0f)] public float LootOverBonus = 10f;
 
+        [Header("Loot mark rule v2 (2026-11-26)")]
+        [Tooltip("Least food a rival must carry to be a candidate for the mark.")]
+        [Min(0f)] public float LootMinCargo = 6f;
+        [Tooltip("Last resort: when nobody carries LootMinCargo, any rival carrying at least this much can take the mark (the other filters stay). 0 switches the fallback off.")]
+        [Min(0f)] public float LootFallbackMinCargo = 1f;
+        [Tooltip("Stalled draw: when a draw is allowed and no rival carries anything for this many seconds, the mark lands on a random rival, empty beak included. 0 switches it off.")]
+        [Min(0f)] public float LootStallSeconds = 5f;
+        [Tooltip("Metres from his own base centre at which a rival weighs in full for the mark; closer he weighs less, down to LootHomeMinWeight at his base's wall. Soft: a bird at home still gets the mark when nobody else is eligible.")]
+        [Min(0f)] public float LootHomeRadius = 8f;
+        [Tooltip("Weight factor (0..1) of a rival at or inside his base's wall, on top of the lottery weight.")]
+        [Range(0f, 1f)] public float LootHomeMinWeight = 0.05f;
+        [Tooltip("A marked bird carrying less than this (but more than 0) is light: the mark leaves him while Steal is on cooldown, and when Steal is ready only if a candidate no farther than he is (plus LootSwitchSlackMeters) exists.")]
+        [Min(0f)] public float LootKeepCargo = 3f;
+        [Tooltip("Metres a candidate may be farther from the Thief than a light marked bird and still take the mark from him.")]
+        [Min(0f)] public float LootSwitchSlackMeters = 3f;
+        [Tooltip("No mark is drawn before the match has run this many seconds.")]
+        [Min(0f)] public float LootOpeningSeconds = 5f;
+        [Tooltip("No new mark is drawn within this many seconds of a mark ending unpaid.")]
+        [Min(0f)] public float LootRedrawGapSeconds = 1.5f;
+
         [Header("Carrying")]
         [Tooltip("Capacity floor of the Thief's beak, like the Hoarder's: the Sneaky class stat is shared with the Spoiler and does not move. " +
                  "0 is no floor (the class capacity); Thief.asset ships 20. It sets how many marked steals one trip holds.")]
@@ -68,6 +88,15 @@ namespace CluckWars.Abilities
             Seconds = LootSeconds,
             LeadSeconds = LootLeadSeconds,
             OverFraction = LootOverFraction,
+            MinCargo = LootMinCargo,
+            FallbackMinCargo = LootFallbackMinCargo,
+            StallSeconds = LootStallSeconds,
+            HomeRadius = LootHomeRadius,
+            HomeMinWeight = LootHomeMinWeight,
+            KeepCargo = LootKeepCargo,
+            SwitchSlackMeters = LootSwitchSlackMeters,
+            OpeningSeconds = LootOpeningSeconds,
+            RedrawGapSeconds = LootRedrawGapSeconds,
             Weights = new LootWeightTable
             {
                 Base = LootBaseWeight, Banked = LootBankedWeight, Carried = LootCarriedWeight, OverBonus = LootOverBonus,

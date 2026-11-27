@@ -71,6 +71,8 @@ namespace CluckWars.Balance
         public bool RecordEvents;
         /// <summary>Scripted kills; the default (no kills) leaves the match to its policies.</summary>
         public ForcedKills Forced;
+        /// <summary>Food each seat carries at GO; null (the default) starts every beak empty. What-ifs and tests: the Thief's mark needs a rival who carries food.</summary>
+        public float[] StartCargo;
     }
 
     public sealed class MatchResult
@@ -349,7 +351,10 @@ namespace CluckWars.Balance
             public LootState LootState;
             public int LootTarget = -1;
             public float LootSince;
-            public float LootDrawAt;
+            /// <summary>When the last mark ended unpaid (the redraw gap counts from it); minus infinity before the first.</summary>
+            public float LootUnpaidEndAt = float.NegativeInfinity;
+            public float LootDryFor;            // seconds a draw was allowed and found nobody carrying anything (the stalled draw's clock)
+            public bool LootSpeculative;        // the live mark came from the stalled draw and its bird has not carried anything yet
             public bool HasLastLoot;
             public int LastLoot;
             /// <summary>Loot food (marked take plus bounty) still in the cargo; a share of it leaves with every deposit or theft.</summary>
@@ -387,6 +392,7 @@ namespace CluckWars.Balance
             private MatchRng _lootRng;
             private readonly List<int> _lootCandidates = new List<int>(Seats);
             private readonly List<float> _lootWeights = new List<float>(Seats);
+            private readonly List<float> _lootDistances = new List<float>(Seats);
             private readonly float _baseSpan;
             private int _forcedNext;
             private readonly List<int> _markCandidates = new List<int>(Seats);
@@ -478,6 +484,7 @@ namespace CluckWars.Balance
                     if (kit == null) continue;
 
                     ch.Abilities = abilities;
+                    if (s.StartCargo != null && seat < s.StartCargo.Length && s.StartCargo[seat] > 0f) ch.Cargo = s.StartCargo[seat];
                     ch.MarkSlot = DeathMarkSlot(abilities);
                     ch.LootSlot = kit.Passive.Loot.Active ? StealSlot(abilities) : -1;
                     ch.AbReady = new float[abilities.Length];
@@ -489,9 +496,8 @@ namespace CluckWars.Balance
                     }
                     if (ch.LootSlot >= 0)
                     {
-                        // GO: the Thief's first mark is drawn at once when Steal is ready (design section 4).
+                        // GO: the Thief waits for its first mark; LootRules.MayDraw says when it may come (the lead, the opening seconds).
                         ch.LootState = LootState.Waiting;
-                        ch.LootDrawAt = LootRules.DrawAt(0f, ch.AbReady[ch.LootSlot], kit.Passive.Loot.LeadSeconds);
                     }
                     centres.Add(s.Map.Places[OracleMapSO.BaseIndex(seat)].Pos);
                     ch.Pos = Spawn(s.Map, seat);
@@ -1145,7 +1151,7 @@ namespace CluckWars.Balance
                 if (++t.MarksThisTrip > tn.MaxMarksPerTrip) tn.MaxMarksPerTrip = t.MarksThisTrip;
                 v.ThinkNow = t.ThinkNow = true;
                 Record(MatchEventKind.Loot, thief, victim, take + bounty, CutCause.None);
-                EndLoot(thief);
+                EndLoot(thief, true);
                 return take;
             }
 
@@ -1159,17 +1165,30 @@ namespace CluckWars.Balance
                 return lootOut;
             }
 
-            // The mark ends (paid, timed out or its bird removed): the bird is the last marked, the next draw is due ahead of Steal's return.
-            private void EndLoot(int thief)
+            // The mark ends: the bird is the last marked, paid or not (v2). An unpaid end starts the redraw gap; a paid one does not (the gap is for marks
+            // that were not cashed). The next draw is gated by LootRules.MayDraw.
+            private void EndLoot(int thief, bool paid)
             {
                 var ch = _c[thief];
                 ch.HasLastLoot = true;
                 ch.LastLoot = ch.LootTarget;
                 ch.LootTarget = -1;
                 ch.LootState = LootState.Waiting;
-                ch.LootDrawAt = LootRules.DrawAt(_time, ch.AbReady[ch.LootSlot], PassiveOf(thief).Loot.LeadSeconds);
+                ch.LootSpeculative = false;
+                ch.LootDryFor = 0f;
+                if (!paid) ch.LootUnpaidEndAt = _time;
                 ch.ThinkNow = true;
             }
+
+            // Rule v2 inputs, read from the simulator's own state: the bird stands inside his base's wall; how far he is from his base centre.
+            private bool InsideOwnBase(int t) =>
+                BaseWallRules.IsInside(new Vector3(_c[t].Pos.x, 0f, _c[t].Pos.y), _map.Places[OracleMapSO.BaseIndex(t)].Pos, _rules.KeepOutRadius);
+
+            private float DistanceToOwnBase(int t) => Vector2.Distance(_c[t].Pos, _map.Places[OracleMapSO.BaseIndex(t)].Pos);
+
+            private bool LootEligible(int t, float minCargo, bool needsFood = true) =>
+                LootRules.Eligible(_c[t].Removed, false, false, InsideOwnBase(t), _c[t].Cargo, minCargo,
+                    MatchCombat.Refused(IncomingEffect.Steal, _egg[t], _walk[t]), Hidden(_c[t]), needsFood);
 
             // The state machine, once a tick in a rotating seat order so a draw never favours a low seat.
             private void LootUpkeep()
@@ -1180,9 +1199,15 @@ namespace CluckWars.Balance
                     var ch = _c[s];
                     if (!ch.Present || ch.LootSlot < 0) continue;
                     var loot = PassiveOf(s).Loot;
+                    float stealLeft = Math.Max(0f, ch.AbReady[ch.LootSlot] - _time);
                     if (ch.LootState == LootState.Waiting)
                     {
-                        if (_time + Eps >= ch.LootDrawAt) DrawLoot(s, loot);
+                        if (!LootRules.DrawDue(stealLeft, loot.LeadSeconds)) { ch.LootDryFor = 0f; continue; }
+                        float room = CapacityOf(s) - ch.Cargo;
+                        bool allowed = LootRules.MayDraw(stealLeft, loot.LeadSeconds, _time, loot.OpeningSeconds, _time - ch.LootUnpaidEndAt, loot.RedrawGapSeconds, room, false);
+                        if (!allowed) ch.LootDryFor = 0f;   // the stalled draw's clock counts only while a draw is allowed, as the game's
+                        bool drew = allowed && DrawLoot(s, loot, stealLeft <= 1e-4f);
+                        if (!drew) _result.Counters[s].LootSearchingSeconds += _tick;   // the draw is due and no mark came up: the HUD's searching hex
                     }
                     else if (LootLive(ch))
                     {
@@ -1190,11 +1215,47 @@ namespace CluckWars.Balance
                         float age = _time - ch.LootSince;
                         for (int m = 0; m < Seats; m++)
                             if (m != s && _c[m].Present && _c[m].MarkTarget == ch.LootTarget) { _result.Counters[s].LootHuntOverlapSeconds += _tick; break; }
+                        int marked = ch.LootTarget;
+                        // Rule v2, 4a to 4d (LootRules.Keep), the same call the game makes. A removed bird is cleared where he is removed (EndLoot there).
+                        float cargo = _c[marked].Cargo;
+                        if (ch.LootSpeculative && cargo > 1e-4f) ch.LootSpeculative = false;   // he carries something now: the ordinary rules take over
+                        if (ch.LootSpeculative && !InsideOwnBase(marked))
+                        {
+                            // As the game: a random mark on an empty bird gives way once a rival worth marking carries food.
+                            GatherLoot(s, loot, marked, loot.MinCargo);
+                            if (_lootCandidates.Count > 0)
+                            {
+                                _result.Counters[s].LootEndedEmpty++;
+                                EndLoot(s, false);
+                                continue;
+                            }
+                        }
+                        int closer = LootRules.IsLight(cargo, loot.KeepCargo) && ready ? FindCloserLoot(s, marked, loot) : -1;
+                        LootEnd end = LootRules.Keep(false, InsideOwnBase(marked), cargo, loot.KeepCargo, ready, closer >= 0, ch.LootSpeculative);
+                        if (end == LootEnd.Light && closer >= 0)
+                        {
+                            _result.Counters[s].LootEndedLight++;
+                            ch.HasLastLoot = true;
+                            ch.LastLoot = marked;
+                            StartLoot(s, closer);   // straight to the closer bird: no redraw gap
+                            continue;
+                        }
+                        if (end != LootEnd.None)
+                        {
+                            switch (end)
+                            {
+                                case LootEnd.Home: _result.Counters[s].LootEndedHome++; break;
+                                case LootEnd.Empty: _result.Counters[s].LootEndedEmpty++; break;
+                                case LootEnd.Light: _result.Counters[s].LootEndedLight++; break;
+                            }
+                            EndLoot(s, false);
+                            continue;
+                        }
                         switch (LootRules.Advance(ch.LootState, age, loot.Seconds, ready))
                         {
                             case LootStep.Move:
                                 _result.Counters[s].LootTimeouts++;
-                                EndLoot(s);
+                                EndLoot(s, false);
                                 break;
                             case LootStep.GoOverdue:
                                 ch.LootState = LootState.Overdue;
@@ -1204,8 +1265,9 @@ namespace CluckWars.Balance
                 }
             }
 
-            // The draw: living rivals, the last marked out, a weight each, one proportional pick from the loot stream. No candidate: stay waiting.
-            private void DrawLoot(int s, in LootMarkFacts loot)
+            // The eligible rivals (LootRules.Eligible), the last marked out unless he is the only rival in the match (the game's GatherCandidates), then one
+            // weight (lottery times home factor) per candidate, in _lootWeights, and the distance from the Thief in _lootDistances. `except` is kept out of the list.
+            private void GatherLoot(int s, in LootMarkFacts loot, int except, float minCargo, bool needsFood = true)
             {
                 var ch = _c[s];
                 _lootCandidates.Clear();
@@ -1214,24 +1276,65 @@ namespace CluckWars.Balance
                 {
                     if (t == s || !_c[t].Present) continue;
                     rivals++;
-                    if (!_c[t].Removed) _lootCandidates.Add(t);
+                    if (t == except || !LootEligible(t, minCargo, needsFood)) continue;
+                    _lootCandidates.Add(t);
                 }
                 LootPickRules.Filter(_lootCandidates, ch.HasLastLoot, ch.LastLoot, rivals);
-                if (_lootCandidates.Count == 0) return;
 
                 var table = loot.Weights;
                 table.OverThreshold = loot.OverFraction * _farm.WinTarget;
                 _lootWeights.Clear();
+                _lootDistances.Clear();
                 foreach (int t in _lootCandidates)
-                    _lootWeights.Add(LootPickRules.Weight(_c[t].Banked, _c[t].Cargo, table));
-                int pick = LootPickRules.Pick(_lootWeights, _lootRng.NextFloat());
-                if (pick < 0) return;
+                {
+                    float home = LootPickRules.HomeFactor(DistanceToOwnBase(t), _rules.KeepOutRadius, loot.HomeRadius, loot.HomeMinWeight);
+                    _lootWeights.Add(LootPickRules.Weight(_c[t].Banked, _c[t].Cargo, table, home));
+                    _lootDistances.Add(Vector2.Distance(_c[t].Pos, ch.Pos));
+                }
+            }
 
+            // Rule v2, 4d: the seat a light marked bird gives way to (index into _lootCandidates), or -1.
+            private int FindCloserLoot(int s, int marked, in LootMarkFacts loot)
+            {
+                GatherLoot(s, loot, marked, loot.MinCargo);   // the usual floor only, as the game's FindCloser
+                if (_lootCandidates.Count == 0) return -1;
+                int pick = LootPickRules.SwitchTarget(_lootDistances, _lootWeights, Vector2.Distance(_c[marked].Pos, _c[s].Pos), loot.SwitchSlackMeters, _lootRng.NextFloat());
+                return pick;
+            }
+
+            // A mark lands on the pick-th of the gathered candidates.
+            private void StartLoot(int s, int pick)
+            {
+                var ch = _c[s];
                 ch.LootTarget = _lootCandidates[pick];
                 ch.LootSince = _time;
                 ch.LootState = LootState.Live;
                 ch.ThinkNow = true;
                 _result.Counters[s].LootOffered++;
+            }
+
+            // The draw: eligible rivals, the last marked out, a weight each, one proportional pick from the loot stream. False when there is no candidate.
+            private bool DrawLoot(int s, in LootMarkFacts loot, bool stealReady)
+            {
+                GatherLoot(s, loot, -1, loot.MinCargo);
+                if (_lootCandidates.Count == 0 && stealReady && loot.FallbackMinCargo > 0f) GatherLoot(s, loot, -1, loot.FallbackMinCargo);   // last resort, as the game's TryDraw
+                bool speculative = false;
+                if (_lootCandidates.Count == 0)
+                {
+                    // Stalled (Maestro, 2026-11-27), as the game's TryDraw: nobody carries anything and nobody has for StallSeconds: a random rival, empty beak included.
+                    _c[s].LootDryFor += _tick;
+                    if (!(stealReady && loot.StallSeconds > 0f && _c[s].LootDryFor >= loot.StallSeconds)) return false;
+                    GatherLoot(s, loot, -1, 0f, false);
+                    if (_lootCandidates.Count == 0) return false;
+                    _lootWeights.Clear();
+                    for (int i = 0; i < _lootCandidates.Count; i++) _lootWeights.Add(1f);
+                    speculative = true;
+                }
+                int pick = LootPickRules.Pick(_lootWeights, _lootRng.NextFloat());
+                if (pick < 0) return false;
+                StartLoot(s, pick);
+                _c[s].LootSpeculative = speculative;
+                return true;
             }
 
             private void Control(int caster, int victim, ControlEmission e, AbilityJob job)
@@ -1612,7 +1715,7 @@ namespace CluckWars.Balance
                 v.ThinkNow = true;
                 if (v.MarkTarget >= 0) EndMark(v, v.MarkTarget);        // a mark ends with its holder; no cooldown change
                 for (int m = 0; m < Seats; m++)                         // a loot mark ends with its bird, unpaid
-                    if (_c[m].Present && _c[m].LootTarget == victim) { _result.Counters[m].LootTimeouts++; EndLoot(m); }
+                    if (_c[m].Present && _c[m].LootTarget == victim) { _result.Counters[m].LootTimeouts++; EndLoot(m, false); }
             }
 
             // A mark ended, paid or failed: its target is the one the next press cannot pick.

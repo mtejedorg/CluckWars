@@ -161,6 +161,14 @@ namespace CluckWars.Balance
         public int LootTaken;
         /// <summary>Marks that moved on without a take (the timeout) or ended without pay (the marked bird was removed).</summary>
         public int LootTimeouts;
+        /// <summary>Marks that ended unpaid because the marked bird crossed into his own base's wall (rule v2).</summary>
+        public int LootEndedHome;
+        /// <summary>Marks that ended unpaid because the marked bird carried nothing any more (rule v2).</summary>
+        public int LootEndedEmpty;
+        /// <summary>Marks that left a light bird (ended, or moved straight to a closer bird; rule v2).</summary>
+        public int LootEndedLight;
+        /// <summary>Seconds a Thief's draw was due (Steal within the lead) with no mark up: gated by the opening, the redraw gap or a full beak, or nobody eligible. The HUD's "searching" hex.</summary>
+        public float LootSearchingSeconds;
         /// <summary>Steal casts that covered the marked rival in range but were refused by a base wall or a shell.</summary>
         public int LootRefused;
         /// <summary>Food the marked steals took from the marked rivals (into the Thief's cargo).</summary>

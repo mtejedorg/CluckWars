@@ -354,6 +354,22 @@ namespace CluckWars.Tests
             Assert.AreEqual("loottake tick=40 thief=B1 victim=P2 stolen=3.00 bounty=7.00 unfit=3.00", MatchTelemetry.LootTake(40, "B1", "P2", 3f, 7f, 3f));
             Assert.AreEqual("lootmove tick=90 thief=B1 victim=P2 age=12.00 reason=timeout", MatchTelemetry.LootMove(90, "B1", "P2", 12f, MatchTelemetry.LootMoveTimeout));
             Assert.AreEqual("lootmove tick=91 thief=B1 victim=? age=1.50 reason=gone", MatchTelemetry.LootMove(91, "B1", "?", 1.5f, MatchTelemetry.LootMoveGone));
+            Assert.AreEqual("lootmove tick=92 thief=B1 victim=P3 age=4.00 reason=home", MatchTelemetry.LootMove(92, "B1", "P3", 4f, MatchTelemetry.LootMoveHome));
+            Assert.AreEqual("lootmove tick=93 thief=B1 victim=P3 age=4.00 reason=empty", MatchTelemetry.LootMove(93, "B1", "P3", 4f, MatchTelemetry.LootMoveEmpty));
+            Assert.AreEqual("lootmove tick=94 thief=B1 victim=P3 age=4.00 reason=light", MatchTelemetry.LootMove(94, "B1", "P3", 4f, MatchTelemetry.LootMoveLight));
+        }
+
+        [Test]
+        public void EveryUnpaidEnd_HasItsOwnTelemetryReason()
+        {
+            Assert.AreEqual("gone", MatchTelemetry.LootMoveReason(LootEnd.Gone));
+            Assert.AreEqual("home", MatchTelemetry.LootMoveReason(LootEnd.Home));
+            Assert.AreEqual("empty", MatchTelemetry.LootMoveReason(LootEnd.Empty));
+            Assert.AreEqual("light", MatchTelemetry.LootMoveReason(LootEnd.Light));
+            Assert.AreEqual("timeout", MatchTelemetry.LootMoveReason(LootEnd.Timeout));
+            var named = new System.Collections.Generic.HashSet<string>();
+            foreach (LootEnd end in Enum.GetValues(typeof(LootEnd)))
+                if (end != LootEnd.None) Assert.IsTrue(named.Add(MatchTelemetry.LootMoveReason(end)), $"{end} shares a reason with another end");
         }
 
         // ---- the behaviour (source guards: a live runner is needed to execute it) --------------------------------------
@@ -369,7 +385,7 @@ namespace CluckWars.Tests
             StringAssert.Contains("SelfInject.Ensure(this, _log != null);", src);
             StringAssert.DoesNotContain("Debug.Log", src);
             StringAssert.DoesNotContain("Container.Inject(this)", src);
-            foreach (var call in new[] { "LootPickRules.Filter(", "LootPickRules.Weight(", "LootPickRules.Pick(", "LootRules.Advance(", "LootRules.DrawDue(" })
+            foreach (var call in new[] { "LootPickRules.Filter(", "LootPickRules.Weight(", "LootPickRules.Pick(", "LootRules.Advance(", "LootRules.MayDraw(", "LootRules.Keep(", "LootRules.Eligible(", "LootPickRules.HomeFactor(", "LootPickRules.SwitchTarget(" })
                 StringAssert.Contains(call, src, "the mark runs the shared pure rules, not a copy of them");
         }
 

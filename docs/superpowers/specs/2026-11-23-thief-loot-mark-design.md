@@ -653,3 +653,35 @@ Maestro, after the round 2 simulator runs: "Una vez aprobado en el simulador, qu
 ## Rulings of 2026-11-25
 
 Maestro's rulings (commits bf549e36, aafa14de): `MatchConfig.asset` `ExecuteBounty` 15, `Spoiler.asset` `MinimumCapacity` 30, `Thief.asset` `MinimumCapacity` 15. The capacity-20 P0 drop was the bot defect BL-220, not the capacity: the loot Thief retreated from the marked rival it was pursuing (`BotLootRules.Retreat`). After the fix P0 at capacity 20 went from 22.4 to 35.4 %. Capacity 15 measures Thief 34.9 / 24.9 / 26.3 and Spoiler 21.1 / 20.1 / 27.3 for P0 / P1 / mixed (report `Captures/oracle/match-report-20261124-234409.md`). Sections of this spec that quote 17 / 25 / 20 as approved are superseded by these values.
+
+## v2 (2026-11-26): who may carry the mark, and when it leaves
+
+**Why.** Playtest bug: the mark landed on rivals who carried nothing (every rival has the base lottery weight) and stayed on a bird after he dropped his load. Maestro approved a full rule ("v2") and answered the open decisions below. It replaces the first naive attempt (cargo above 0 as the only filter, the lone carrier markable twice, an emptied bird forgotten): both exemptions are gone.
+
+**Maestro's answers (2026-11-26).** Never the same victim twice in a row (paid or not, an emptied bird included). The home rule is soft, with an 8 m radius from the bird's own base centre: a bird near his base is strongly avoided but still gets the mark when nobody else is eligible ("no stretches without a mark"). The lead stays 1 s. The mark is kept through Steal's cooldown; a light bird keeps it only while Steal is ready and nobody as close is eligible (sticky light bird with the as-close switch).
+
+**The rule.** Every decision is a pure function in `LootMark.cs` (Fusion-free, injected inputs), called by both `ThiefLoot` (game) and `MatchSim` (simulator).
+
+1. **Draw** (`LootRules.MayDraw`) only when all hold: Steal's cooldown left is at most the lead (`DrawDue`); the match has run `LootOpeningSeconds`; `LootRedrawGapSeconds` have passed since the last unpaid end; the Thief has free room (a full beak draws nothing; room below the bounty still draws and the rest is lost); no marked steal is in flight. No candidate: stay Waiting and retry next tick.
+2. **Eligible** (`LootRules.Eligible`, hard filters): living rival, not an ally of the Thief's corner, not a decoy, cargo at least `LootMinCargo` (and above 0), not steal-proof (shell), not hidden, and not inside his own base's wall (no ability crosses it, so the mark would end on the next tick). Then `LootPickRules.Filter`: the last victim is out unless he is the only rival in the whole match (rivals are counted, carriers are not).
+3. **Weight** = the lottery weight (`LootPickRules.Weight`) times `LootPickRules.HomeFactor(distToOwnBase, wallRadius, homeRadius, minWeight)`: 1 from `LootHomeRadius` out, `LootHomeMinWeight` at or inside the keep-out radius, linear between. Soft: it never excludes.
+4. **A live mark ends unpaid** (`LootRules.Keep`, in this order, after the "marked steal pending" guard): `Gone` (removed); `Home` (the bird crossed into his own base's wall: until he does, the mark follows him home); `Empty` (cargo 0); `Light` (cargo above 0 but below `LootKeepCargo`): with Steal on cooldown the mark ends, with Steal ready it is kept unless an eligible candidate is no farther from the Thief than the marked bird plus `LootSwitchSlackMeters`; then the mark moves straight to one of those (`LootPickRules.SwitchTarget`, a weighted pick, home factor included) with no redraw gap and the old bird becomes the last victim. The age timeout (`LootRules.Advance`, `LootSeconds`) is unchanged.
+5. After an unpaid end the next draw obeys rule 1; after a paid end nothing new.
+
+**Parameters** (fields on `ThiefPassiveSO` and `LootMarkFacts`; a value of 0 switches its rule off; `Thief.asset` is not edited, a missing serialized field takes the initializer).
+
+| Field | Default | Meaning |
+|---|---|---|
+| `LootMinCargo` | 6 food | least cargo to be a candidate |
+| `LootHomeRadius` | 8 m | from the bird's own base centre: full weight from here out |
+| `LootHomeMinWeight` | 0.05 | weight factor at or inside the base wall |
+| `LootKeepCargo` | 3 food | below this (above 0) a marked bird is light |
+| `LootSwitchSlackMeters` | 3 m | a light bird gives way to a candidate this much farther than he is |
+| `LootOpeningSeconds` | 5 s | no mark before the match has run this long |
+| `LootRedrawGapSeconds` | 1.5 s | no draw this soon after an unpaid end |
+| `LootSeconds` (existing) | 12 s | unchanged |
+| `LootLeadSeconds` (existing) | 1 s | unchanged |
+
+**What else changed.** Telemetry reasons `home`, `empty`, `light` join `timeout` and `gone` (`MatchTelemetry.LootMoveReason`). The Steal hex shows a hollow gold ring (`LootDotState.Searching`, appended) while the draw is due and no mark is up; solid gold now means a mark exists. The simulator gains the counters `LootEndedHome`, `LootEndedEmpty`, `LootEndedLight`, `LootSearchingSeconds` and `MatchSetup.StartCargo`. No `[Networked]` field, enum ordinal or RPC changed; the last victim and the time of the last unpaid end are authority-local.
+
+**Deviations and open points.** (a) A bird inside his own base's wall is a hard filter, which the brief's list did not name: without it the only eligible bird at home would get a mark that ends the same tick, every 1.5 s. (b) "Hidden" reads `BotSightRules.IsHidden(VisualOpacity)` in the game and the simulator's own hide state; the replicated opacity is read on the Thief's authority. (c) Not done, left as is: the bounty needs a take, the Snatch empty-beak target exemption (and the bots' mirror of it), ending the mark on a Blocked cast, a per-victim time rest, the report rows counting the new unpaid ends (`LootTimeouts` still counts only timeouts and removals).

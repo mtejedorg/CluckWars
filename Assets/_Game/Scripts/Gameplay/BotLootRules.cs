@@ -20,7 +20,24 @@ namespace CluckWars.Gameplay
         /// let the mark move) when there is no live mark, when the bot has given a hidden rival up (<see cref="BotSightRules"/>), when the rival is
         /// shelled (the cast would be refused) or when it stands inside its own base's wall (no ability crosses it).
         /// </summary>
-        public static bool Pursue(bool markLive, bool known, bool shelled, bool behindWall) => markLive && known && !shelled && !behindWall;
+        /// <param name="catchable"><see cref="CanIntercept"/>: the Thief can reach the marked bird before it is home. Defaults to true for callers that do not know.</param>
+        public static bool Pursue(bool markLive, bool known, bool shelled, bool behindWall, bool catchable = true) =>
+            markLive && known && !shelled && !behindWall && catchable;
+
+        /// <summary>
+        /// Can the Thief still catch the marked bird (Maestro, 2026-11-27: "decide if it reaches him; if not, use Steal on another bird and trust the mark
+        /// will move")? Worst case the bird runs straight home: the Thief must be able to get within <paramref name="reach"/> of the point where the bird
+        /// crosses its base's wall no later than the bird gets there (the Thief may cut the corner, so it measures the Thief's own distance to the base).
+        /// A bird already inside reach, or of unknown speed, counts as catchable.
+        /// </summary>
+        public static bool CanIntercept(float thiefToMarkedBase, float markToMarkedBase, float wallRadius, float reach, float thiefSpeed, float markSpeed,
+            float distToMark)
+        {
+            if (distToMark <= reach || markSpeed <= 0.01f || thiefSpeed <= 0.01f) return true;
+            float thiefSeconds = Mathf.Max(0f, thiefToMarkedBase - wallRadius - reach) / thiefSpeed;
+            float markSeconds = Mathf.Max(0f, markToMarkedBase - wallRadius) / markSpeed;
+            return thiefSeconds <= markSeconds;
+        }
 
         /// <summary>
         /// Does the retreat rule (a loaded bot with a rival inside its danger radius runs home) fire? Not while the Thief pursues a live mark:

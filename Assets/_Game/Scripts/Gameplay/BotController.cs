@@ -693,7 +693,23 @@ namespace CluckWars.Gameplay
             var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
             bool behindWall = config != null && PlayerBase.TryGetBaseCentre(mark.HomeCornerIndex, out Vector2 centre) &&
                               BotLootRules.BehindWall(new Vector2(sight.Position.x, sight.Position.z), centre, config.BaseKeepOutRadius);
-            return BotLootRules.Pursue(true, !sight.GivenUp, mark.IsStealProof, behindWall);
+            return BotLootRules.Pursue(true, !sight.GivenUp, mark.IsStealProof, behindWall, MarkIsCatchable(mark, sight.Position));
+        }
+
+        // BotLootRules.CanIntercept with the live numbers: false means "he will be home before I get there", so the bot lets the mark go and Steal goes elsewhere.
+        private bool MarkIsCatchable(ChickenController mark, Vector3 markPos)
+        {
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
+            if (config == null || _abilities == null || mark.Stats == null || !PlayerBase.TryGetBaseCentre(mark.HomeCornerIndex, out Vector2 centre)) return true;
+            float reach = 0f;
+            for (int i = 0; i < _abilities.EquippedSlotCount; i++)
+            {
+                var a = _abilities.GetSlot(i);
+                if (a.Is(AbilityJob.Steal)) { reach = BotTactics.EffectiveReach(a) * BotTactics.CommitReachFraction; break; }
+            }
+            Vector3 me = _controller.transform.position;
+            return BotLootRules.CanIntercept(Vector2.Distance(new Vector2(me.x, me.z), centre), Vector2.Distance(new Vector2(markPos.x, markPos.z), centre),
+                config.BaseKeepOutRadius, reach, EstimateMoveSpeed(), mark.Stats.MoveSpeed, Planar.Distance(me, markPos));
         }
 
         /// <summary>

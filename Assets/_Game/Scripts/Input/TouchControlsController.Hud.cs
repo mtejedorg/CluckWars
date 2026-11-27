@@ -244,7 +244,8 @@ namespace CluckWars.Input
 
         /// <summary>
         /// The Steal hex's loot dot (<see cref="LootHexRules"/>): the same top-centre dot the Hunt hex wears, empty and scaling up with the Steal cooldown while
-        /// the next mark is coming, solid gold once it is due or live, pulsing while the marked rival is inside Steal's reach. The colours are the palette's;
+        /// the next mark is coming, a hollow gold ring once it is due but none is up (searching), solid gold while a mark is up, pulsing while the marked rival is
+        /// inside Steal's reach. The colours are the palette's;
         /// the class that shows the dot has its rule in TouchControls.uss. Each part is written only when its input changes (the pulse every frame, not under
         /// Reduced Motion).
         /// </summary>
@@ -262,16 +263,36 @@ namespace CluckWars.Input
                 {
                     refs.HuntDot.style.backgroundColor = StyleKeyword.Null;   // hand the dot back to the Hunt's own colouring
                     refs.HuntDot.style.scale = StyleKeyword.Null;
+                    SetLootRing(refs.HuntDot, false);
                     _appliedHuntCorner[slot] = int.MinValue;
                 }
             }
             if (view.Dot == LootDotState.Off || refs.HuntDot == null) return;
 
-            refs.HuntDot.style.backgroundColor = view.Dot == LootDotState.Live ? FeedbackTuning.LootGoldColor : FeedbackTuning.LootEmptyColor;
-            float scale = view.Dot == LootDotState.Live ? 1f : Mathf.Lerp(0.55f, 1f, view.Fill01);
+            bool searching = view.Dot == LootDotState.Searching;
+            refs.HuntDot.style.backgroundColor = searching ? new StyleColor(Color.clear)
+                : view.Dot == LootDotState.Live ? FeedbackTuning.LootGoldColor : FeedbackTuning.LootEmptyColor;
+            SetLootRing(refs.HuntDot, searching);
+            float scale = view.Dot == LootDotState.Coming ? Mathf.Lerp(0.55f, 1f, view.Fill01) : 1f;
             if (view.Pulse && !PlayerPreferences.ReducedMotionEnabled)
                 scale *= 1f + FeedbackTuning.LootDotPulse * 0.5f * (1f + Mathf.Sin(Time.unscaledTime * FeedbackTuning.LootDotPulseHz * 2f * Mathf.PI));
             refs.HuntDot.style.scale = new Scale(new Vector3(scale, scale, 1f));
+        }
+
+        // The searching dot is a gold outline with no fill; every other state clears the outline (the Hunt's own dot has none).
+        private static void SetLootRing(VisualElement dot, bool on)
+        {
+            Color gold = FeedbackTuning.LootGoldColor;
+            var width = on ? new StyleFloat(2f) : new StyleFloat(StyleKeyword.Null);
+            var colour = on ? new StyleColor(gold) : new StyleColor(StyleKeyword.Null);
+            dot.style.borderTopWidth = width;
+            dot.style.borderRightWidth = width;
+            dot.style.borderBottomWidth = width;
+            dot.style.borderLeftWidth = width;
+            dot.style.borderTopColor = colour;
+            dot.style.borderRightColor = colour;
+            dot.style.borderBottomColor = colour;
+            dot.style.borderLeftColor = colour;
         }
 
         /// <summary>

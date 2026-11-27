@@ -41,7 +41,22 @@ namespace CluckWars.Gameplay
                 tick, killer, victim, payout, bounty, victimCargo, gained, payout > gained ? payout - gained : 0f, victimPecking ? 1 : 0);
         }
 
-        public const string LootMoveTimeout = "timeout", LootMoveGone = "gone";
+        public const string LootMoveTimeout = "timeout", LootMoveGone = "gone", LootMoveEmpty = "empty",
+            LootMoveHome = "home", LootMoveLight = "light";
+
+        /// <summary>The telemetry reason of an unpaid end (<see cref="LootEnd"/>); an unnamed one reads "timeout" only for <see cref="LootEnd.Timeout"/>.</summary>
+        public static string LootMoveReason(LootEnd end)
+        {
+            switch (end)
+            {
+                case LootEnd.Gone: return LootMoveGone;
+                case LootEnd.Home: return LootMoveHome;
+                case LootEnd.Empty: return LootMoveEmpty;
+                case LootEnd.Light: return LootMoveLight;
+                case LootEnd.Timeout: return LootMoveTimeout;
+                default: return "none";
+            }
+        }
 
         /// <summary>A Thief's loot mark was drawn on <paramref name="victim"/> (written by the Thief's authority).</summary>
         /// <param name="candidates">Rivals in the draw.</param>
@@ -56,7 +71,7 @@ namespace CluckWars.Gameplay
             string.Format(CultureInfo.InvariantCulture, "loottake tick={0} thief={1} victim={2} stolen={3:0.00} bounty={4:0.00} unfit={5:0.00}",
                 tick, thief, victim, stolen, bounty, unfit);
 
-        /// <summary>A mark ended unpaid: <see cref="LootMoveTimeout"/> (old with Steal on cooldown, the mark moves) or <see cref="LootMoveGone"/> (its bird left play).</summary>
+        /// <summary>A mark ended unpaid: <see cref="LootMoveTimeout"/> (old with Steal on cooldown), <see cref="LootMoveGone"/> (its bird left play), <see cref="LootMoveHome"/> (he crossed into his base), <see cref="LootMoveEmpty"/> (nothing to take) or <see cref="LootMoveLight"/> (little to take: the mark ended or moved to a closer bird).</summary>
         public static string LootMove(int tick, string thief, string victim, float age, string reason) =>
             string.Format(CultureInfo.InvariantCulture, "lootmove tick={0} thief={1} victim={2} age={3:0.00} reason={4}", tick, thief, victim, age, reason);
 

@@ -18,6 +18,23 @@ namespace CluckWars.Tests
         }
 
         [Test]
+        public void Pursue_AnUncatchableMarkIsAbandoned()
+        {
+            Assert.IsFalse(BotLootRules.Pursue(true, true, false, false, false), "he is home before the Thief can reach him");
+            Assert.IsTrue(BotLootRules.Pursue(true, true, false, false, true));
+        }
+
+        [Test]
+        public void CanIntercept_ComparesTheThiefsWalkToTheWallWithTheBirdsWalkHome()
+        {
+            // wall 2.5, reach 5: the Thief 40 m from the bird's base needs (40-2.5-5)/11 = 2.95 s; the bird 10 m out needs (10-2.5)/10.8 = 0.69 s.
+            Assert.IsFalse(BotLootRules.CanIntercept(40f, 10f, 2.5f, 5f, 11f, 10.8f, 30f), "a bird near home, a Thief far away: he gets there first");
+            Assert.IsTrue(BotLootRules.CanIntercept(40f, 35f, 2.5f, 5f, 11f, 10.8f, 15f), "a bird far from home: the Thief cuts him off (2.95 s against 3.01 s)");
+            Assert.IsTrue(BotLootRules.CanIntercept(40f, 4f, 2.5f, 5f, 11f, 10.8f, 4f), "already inside reach");
+            Assert.IsTrue(BotLootRules.CanIntercept(40f, 10f, 2.5f, 5f, 11f, 0f, 30f), "unknown speed counts as catchable");
+        }
+
+        [Test]
         public void BehindWall_IsInsideTheKeepOutCircleOfItsOwnBase()
         {
             var centre = new Vector2(10f, 10f);

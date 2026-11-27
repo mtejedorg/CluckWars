@@ -10,8 +10,11 @@ namespace CluckWars.Visuals
         Off = 0,
         /// <summary>The next mark is still coming: a pale, empty bag dot that fills with the Steal cooldown.</summary>
         Coming = 1,
-        /// <summary>A mark is live, or comes within the passive's lead time: the dot is solid gold.</summary>
+        /// <summary>A mark is up on a rival: the dot is solid gold.</summary>
         Live = 2,
+        /// <summary>The next mark is due (Steal is ready or within the passive's lead time) but none is up yet: nobody is eligible, or the opening seconds or the redraw
+        /// gap still hold (rule v2, 2026-11-26). A hollow gold ring: the promise is not kept yet. Appended after <see cref="Live"/>; no ordinal moved.</summary>
+        Searching = 3,
     }
 
     /// <summary>The Steal hex's loot dot for one frame.</summary>
@@ -27,8 +30,9 @@ namespace CluckWars.Visuals
     /// <summary>
     /// The Steal hex while a loot mark is on or coming (design 2026-11-23 section 11, "mark is coming"): pure rules, no Unity object, fed by
     /// <c>LootFeedback</c> and drawn by the HUD (<c>TouchControlsController</c>, touch arc and desktop / pad strip alike). The dot is empty and fills with the
-    /// Steal cooldown, then turns solid gold the lead time before Steal is ready: the instant <see cref="LootRules.DrawDue"/> says the next mark is drawn, so
-    /// the hex, the disc and the arrow light together. The lead is the passive's (<c>LootMarkFacts.LeadSeconds</c>), never a literal.
+    /// Steal cooldown, then turns into a hollow gold ring the lead time before Steal is ready (<see cref="LootRules.DrawDue"/>: the next mark is being drawn) and
+    /// solid gold only once a mark is up on a rival, so a draw that finds nobody (rule v2) never shows a promise it does not keep. The lead is the passive's
+    /// (<c>LootMarkFacts.LeadSeconds</c>), never a literal.
     /// </summary>
     public static class LootHexRules
     {
@@ -45,8 +49,8 @@ namespace CluckWars.Visuals
         {
             if (!isThiefActive || state == LootState.Off) return default;
             bool markUp = state == LootState.Live || state == LootState.Overdue;
-            if (markUp || LootRules.DrawDue(cooldownRemaining, leadSeconds))
-                return new LootHexView { Dot = LootDotState.Live, Fill01 = 1f, Pulse = markUp && markedInReach };
+            if (markUp) return new LootHexView { Dot = LootDotState.Live, Fill01 = 1f, Pulse = markedInReach };
+            if (LootRules.DrawDue(cooldownRemaining, leadSeconds)) return new LootHexView { Dot = LootDotState.Searching, Fill01 = 1f };
             return new LootHexView { Dot = LootDotState.Coming, Fill01 = Mathf.Clamp01(cooldownProgress01) };
         }
     }

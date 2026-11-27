@@ -146,7 +146,7 @@ namespace CluckWars.Tests
         }
 
         [Test]
-        public void TheHexDot_IsEmptyWhileTheMarkIsComing_AndGoldFromTheLeadTimeBeforeStealIsReady()
+        public void TheHexDot_IsEmptyWhileTheMarkIsComing_AndSearchingFromTheLeadTimeBeforeStealIsReady()
         {
             float lead = ShippedThief().LootMark.LeadSeconds;
             Assert.Greater(lead, 0f, "the passive carries a lead");
@@ -155,8 +155,13 @@ namespace CluckWars.Tests
             Assert.AreEqual(LootDotState.Coming, coming.Dot);
             Assert.AreEqual(0.4f, coming.Fill01, 1e-5f, "the dot fills with the Steal cooldown");
 
-            Assert.AreEqual(LootDotState.Live, LootHexRules.ViewFor(true, LootState.Waiting, lead, 0.9f, lead, false).Dot, "gold exactly the lead before Steal is ready");
-            Assert.AreEqual(LootDotState.Live, LootHexRules.ViewFor(true, LootState.Waiting, 0f, 1f, lead, false).Dot, "Steal ready, no mark drawn yet: still the due colour");
+            // Rule v2 (2026-11-26): the draw can find nobody, so a due draw with no mark up is a hollow ring, never the solid gold of a mark that exists.
+            Assert.AreEqual(LootDotState.Searching, LootHexRules.ViewFor(true, LootState.Waiting, lead, 0.9f, lead, false).Dot, "hollow exactly the lead before Steal is ready");
+            Assert.AreEqual(LootDotState.Searching, LootHexRules.ViewFor(true, LootState.Waiting, 0f, 1f, lead, false).Dot, "Steal ready, no mark drawn yet: searching, not gold");
+            Assert.AreEqual(LootDotState.Live, LootHexRules.ViewFor(true, LootState.Live, lead, 0.9f, lead, false).Dot, "a mark up at the same moment is solid gold");
+            Assert.AreEqual(1f, LootHexRules.ViewFor(true, LootState.Waiting, 0f, 1f, lead, false).Fill01, "the ring is full size");
+            Assert.IsFalse(LootHexRules.ViewFor(true, LootState.Waiting, 0f, 1f, lead, true).Pulse, "nothing to fire at while searching");
+            Assert.AreEqual(3, (int)LootDotState.Searching, "appended after Live: no ordinal moved");
             Assert.AreEqual(LootDotState.Coming, LootHexRules.ViewFor(true, LootState.Waiting, lead + 0.01f, 0.9f, lead, false).Dot);
         }
 
@@ -184,8 +189,8 @@ namespace CluckWars.Tests
                 float between = (shipped + served) * 0.5f;
                 var withShipped = LootHexRules.ViewFor(true, LootState.Waiting, between, 0.5f, shipped, false).Dot;
                 var withServed = LootHexRules.ViewFor(true, LootState.Waiting, between, 0.5f, lead, false).Dot;
-                Assert.AreNotEqual(withShipped, withServed, "a cooldown between the two leads is gold under the longer lead and still coming under the shorter");
-                Assert.AreEqual(served > shipped ? LootDotState.Live : LootDotState.Coming, withServed);
+                Assert.AreNotEqual(withShipped, withServed, "a cooldown between the two leads is searching under the longer lead and still coming under the shorter");
+                Assert.AreEqual(served > shipped ? LootDotState.Searching : LootDotState.Coming, withServed);
             }
             finally { Object.DestroyImmediate(changed); }
         }
