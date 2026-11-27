@@ -11,6 +11,12 @@ what's shipped, what's in flight, and what's blocked on testing.
 
 ---
 
+## 2026-11-27 - Thief loot mark v2 and flatter class speeds, shipped to Play (BL-217, `develop`)
+
+- **Two commits on `develop`:** `4ffb32f3` the loot mark rule v2 (candidates carry 6, last resort 1; soft 8 m home radius; never the same victim twice in a row; kept through Steal cooldown unless he goes home or drops below 3; stalled draw after 5 s of nothing; the bot drops a mark it cannot reach); `d052ff55` class speeds Fatty 10.9, Warrior 11.3, Sneaky 11.4 (Speedy 12.15 unchanged). Detail: the design doc's "v2" section and its 2026-11-27 additions.
+- **Build 26476131** (`v0.1+26476131`, built from a dirty tree: other sessions' test files were in it): Windows, APK and the Play bundle. Maestro uploaded and published the bundle by hand.
+- **Measured, not played:** Thief 13 to 17 % wins (floor 20 %), 1.6 to 1.9 marks paid per match; speed change neutral. Maestro's call: the feeling in play decides. Open: bounty 10 (declined for now), a counter for "mark dropped as not catchable", Fatty_Hoarder 46 % with P0 vs 18 % with P1, Bulwark P1 34 %.
+
 ## 2026-11-26 - Warrior feedback fixes and the one-button build (BL-232, BL-231, `develop`)
 
 - **Play Console (2026-11-26):** the bundle `CluckWars-0.1-26474357.aab` (build cut from `01548e5`, the commit before this note) and its native debug symbols zip are uploaded to the internal-testing track as a **draft** release (version code 26474357); it is not rolled out to testers. The R8 mapping came with the bundle. The upload went through the Play Console in Chrome with the file split into 9 MB parts (the browser tool caps a file at 10 MB) and checked by SHA-256 on both sides.
