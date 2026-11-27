@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CluckWars.Gameplay.ChickenStatsSO
   DisplayName: Fatty
   MaxHP: 120
-  MoveSpeed: 10.125
+  MoveSpeed: 10.9
   TurnSpeed: 720
   CargoCapacity: 35
   PeckAmount: 3

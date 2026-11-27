@@ -99,15 +99,15 @@
         <thead><tr><th>Class</th><th class="num">Move</th><th class="num">Cargo</th><th class="num">Peck cooldown</th><th class="num">Peck cast</th><th>Fantasy</th></tr></thead>
         <tbody>
           <!-- Source: docs/GDD.md §5.2 roster table; Peck cast: Assets/_Game/Data/Classes/{Fatty,Speedy,Warrior}.asset PeckCastSeconds -->
-          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.125</td><td class="num">35</td><td class="num">0.71 s</td><td class="num">0.7 s</td><td>"Slow, but it all fits in the beak."</td></tr>
+          <tr><td><span class="tag t-fatty">Fatty</span></td><td class="num">10.9</td><td class="num">35</td><td class="num">0.71 s</td><td class="num">0.7 s</td><td>"Slow, but it all fits in the beak."</td></tr>
           <tr><td><span class="tag t-speedy">Speedy</span></td><td class="num">12.15</td><td class="num">10</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"If you can't catch me, you can't rob me."</td></tr>
-          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">10.8</td><td class="num">20</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"The farm is a battlefield."</td></tr>
-          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">11.1</td><td class="num">10</td><td class="num">cannot forage</td><td class="num">n/a</td><td>"Blink and your food is gone."</td></tr>
+          <tr><td><span class="tag t-warrior">Warrior</span></td><td class="num">11.3</td><td class="num">20</td><td class="num">0.71 s</td><td class="num">0.4 s</td><td>"The farm is a battlefield."</td></tr>
+          <tr><td><span class="tag t-assassin">Sneaky</span></td><td class="num">11.4</td><td class="num">10</td><td class="num">cannot forage</td><td class="num">n/a</td><td>"Blink and your food is gone."</td></tr>
         </tbody>
       </table>
     </div>
     <!-- Source: docs/GDD.md §5.2 (load-bearing detail; Speedy and terrain) -->
-    <p>Speedy and Sneaky share cargo, and Sneaky is a little slower (11.1 against 12.15). The real difference: Sneaky cannot forage at all, which is the mechanical reason it denies instead of collecting. Speedy never gets terrain traversal, no jump and no blink, because a fast chicken that can also ignore walls would stop being constrained by the map.</p>
+    <p>Speedy and Sneaky share cargo, and Sneaky is a little slower (11.4 against 12.15). The real difference: Sneaky cannot forage at all, which is the mechanical reason it denies instead of collecting. Speedy never gets terrain traversal, no jump and no blink, because a fast chicken that can also ignore walls would stop being constrained by the map.</p>
 
     <h3>Eight specializations</h3>
     <!-- Source: docs/GDD.md §5.3 -->

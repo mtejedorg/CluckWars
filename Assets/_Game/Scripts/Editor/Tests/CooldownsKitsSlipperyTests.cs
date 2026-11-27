@@ -202,13 +202,13 @@ namespace CluckWars.Tests
         // ---- 4. Assassin speed ----------------------------------------------------------------
 
         [Test]
-        public void Assassin_MoveSpeed_Is11_1_SpeedyUnchanged()
+        public void Assassin_MoveSpeed_Is11_4_SpeedyUnchanged()
         {
             var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<ChickenStatsSO>("Assets/_Game/Data/Classes/Assassin.asset");
             var speedy = UnityEditor.AssetDatabase.LoadAssetAtPath<ChickenStatsSO>("Assets/_Game/Data/Classes/Speedy.asset");
             Assert.IsNotNull(assassin);
             Assert.IsNotNull(speedy);
-            Assert.AreEqual(11.1f, assassin.MoveSpeed, 1e-4f, "Maestro 2026-11-05 (Assassin is SCT-exempt)");
+            Assert.AreEqual(11.4f, assassin.MoveSpeed, 1e-4f, "Maestro 2026-11-27: class speeds flattened (Fatty 10.9, Warrior 11.3, Sneaky 11.4, Speedy 12.15 unchanged)");
             Assert.AreEqual(12.15f, speedy.MoveSpeed, 1e-4f);
         }
     }
